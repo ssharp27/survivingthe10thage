@@ -15,6 +15,12 @@ run/main_scene="res://Main.tscn"
 config/features=PackedStringArray("4.7", "C#")
 config/icon="res://icon.svg"
 
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas"
+
 [dotnet]
 
 project/assembly_name="survivingthe10thage"
@@ -22,3 +28,63 @@ project/assembly_name="survivingthe10thage"
 [editor_plugins]
 
 required_editor_plugins=PackedStringArray("res://addons/godot_mcp/Editor/GodotMcpPlugin.cs")
+enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")
+
+[input]
+
+move_right={
+"dead_zone": 0.5,
+"events": [],
+"hold_threshold": 0.5,
+"physical_key": 544,
+"stick_mode": 1,
+"strength": 1.0
+}
+move_left={
+"dead_zone": 0.5,
+"events": [],
+"hold_threshold": 0.5,
+"physical_key": 545,
+"stick_mode": 1,
+"strength": 1.0
+}
+move_up={
+"dead_zone": 0.5,
+"events": [],
+"hold_threshold": 0.5,
+"physical_key": 546,
+"stick_mode": 1,
+"strength": 1.0
+}
+move_down={
+"dead_zone": 0.5,
+"events": [],
+"hold_threshold": 0.5,
+"physical_key": 547,
+"stick_mode": 1,
+"strength": 1.0
+}
+pick_a={
+"dead_zone": 0.5,
+"events": [],
+"hold_threshold": 0.5,
+"physical_key": 65,
+"stick_mode": 1,
+"strength": 1.0
+}
+pick_s={
+"dead_zone": 0.5,
+"events": [],
+"hold_threshold": 0.5,
+"physical_key": 83,
+"stick_mode": 1,
+"strength": 1.0
+}
+pick_d={
+"dead_zone": 0.5,
+"events": [],
+"hold_threshold": 0.5,
+"physical_key": 68,
+"stick_mode": 1,
+"strength": 1.0
+}
