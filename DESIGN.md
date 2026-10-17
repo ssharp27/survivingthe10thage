@@ -19,6 +19,7 @@ battles/chapters we fought at the table.
 
 - Meta-map = the **campaign path**; each **stage = one battle/chapter** from the campaign, with its actual set pieces (special enemies, hazards, mini-boss from that encounter).
 - **Campfire rests** between stages: short rest = heals + small buff; long rest = full heal, revive eliminated members, next-stage power — at the price of horde scaling.
+- **Campfires also sit after mini-bosses**, mid-run: an un-revived downed member becomes eliminated and **revives at the next campfire**, so 2–3 campfires per run are the party-recovery beats.
 - Bosses run the **data-driven attack-timeline engine**: phases at 100/66/33% HP, every move is telegraph → attack → recovery, composed from reusable pattern primitives (spokes, rings, sweeps, walls, chases).
 
 ## Engine decisions (unchanged from earlier plan)
@@ -28,16 +29,31 @@ battles/chapters we fought at the table.
 - Stats = flat dictionary, now keyed **per party member**.
 - Horde director paces spawns; VS pacing math for XP curve/kill rates unchanged.
 
+## Campaign data
+
+### Party roster (M1 uses the first two; 3 more PCs to come in M2)
+
+- **Baldrun** — Ursine (white humanoid polar bear, Volibear silhouette), Rune Knight Fighter. Massive two-handed maul.
+  - Base weapon: generic maul — heavy, slow, **area damage**.
+  - Evolution: **Stormcaller** — maul that summons lightning.
+- **Mosiah** — Human Bard, stylish combat with a rapier.
+  - Base weapon: generic rapier — fast, precise.
+  - Evolution: **Viperkiss** — **critical + poison damage** focus.
+
+### Stage 1 — Tanurial Forest
+
+Standard fantasy forest outside a major city, currently under attack. Baseline enemies: goblins, wolves. Mini-bosses and boss for this stage: **TBD** (greybox uses placeholders).
+
 ## Milestones
 
-- **M1 — greybox, squad feel from day one**: one stage ("Generic Ruins" placeholder), Leader + **one recruitable ally**, full down/death-save(d20 anim)/revive/TPK loop, squad XP + targeted picks, one signature attack each, one prototype boss on the timeline engine, run summary → death loop.
+- **M1 — greybox, squad feel from day one**: one stage (**Tanurial Forest**, placeholder art), Baldrun + Mosiah (one Leader, the other at a narrative join point), goblins/wolves hordes, **mini-boss → campfire party-recovery beat**, full down/death-save(d20 anim)/revive/eliminated-at-campfire/TPK loop, squad XP + targeted picks, maul + rapier signature attacks, one **placeholder** boss on the timeline engine, run summary → death loop.
 - **M2 — the campaign roster**: all 5 PCs with classes, signature attacks, subclass evolutions; recruitment wiring; meta-progression (unlock characters, starting party size 1→2→3).
 - **M3 — more stages**: each a campaign battle with hazards + unique enemies + set pieces; campfire/rest layer.
 - **M4 — finale battle + gauntlet**, run summaries as a **campaign journal**, juice/polish.
 
-## Open decisions (awaiting campaign data)
+## Open decisions
 
-- Roster: 5 PCs, names/classes (+ race, signature spell, campaign quirks).
-- Which battle is stage 1 (M1 can greybox with "Generic Ruins" until then).
-- Stage set pieces + recruitment moments: per-battle campaign memories.
-- Tank/aggro passives (M2), gauntlet shape (M4).
+- Who leads in M1: Baldrun or Mosiah starts the run; the other is the narrative-recruit moment.
+- Tanurial Forest mini-bosses + boss: user is designing; greybox uses placeholder timeline boss.
+- Remaining 3 PCs (M2).
+- Tank/aggro passives (M2), rest/gauntlet shape (M4).
