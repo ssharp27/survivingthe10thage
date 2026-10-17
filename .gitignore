@@ -1,0 +1,14 @@
+# Godot
+.godot/
+obj/
+*.csproj.old
+
+# Godot-MCP local server binary cache (lives under .godot/ too, kept explicit)
+.godot/mcp-server/
+
+# ai-game.dev per-project cloud credentials (.ai-game-dev/ credentials, project keys)
+.ai-game-dev/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db

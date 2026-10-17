@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "packageReferences": [
+    {
+      "id": "com.IvanMurzak.ReflectorNet",
+      "version": "5.4.3"
+    },
+    {
+      "id": "com.IvanMurzak.McpPlugin",
+      "version": "8.7.1"
+    }
+  ]
+}

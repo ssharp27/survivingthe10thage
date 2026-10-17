@@ -1,0 +1,27 @@
+<Project Sdk="Godot.NET.Sdk/4.7.2">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+  </PropertyGroup>
+
+  <!--
+    Godot-MCP addon (v0.28.0) pinned NuGet packages — versions taken from
+    addons/godot_mcp/nuget-deps.json of the installed release. Do not bump
+    independently; they must match what the addon ships.
+  -->
+  <ItemGroup>
+    <PackageReference Include="com.IvanMurzak.ReflectorNet" Version="5.4.3" />
+    <PackageReference Include="com.IvanMurzak.McpPlugin" Version="8.7.1" />
+  </ItemGroup>
+
+  <!--
+    Extension catalog embed — REQUIRED. The addon's extension registry reads
+    this catalog via GetManifestResourceStream at editor runtime; without it
+    the Extensions panel is empty. LogicalName must match exactly.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="addons/godot_mcp/extensions.catalog.json" LogicalName="Godot-MCP.extensions.catalog.json" />
+  </ItemGroup>
+
+</Project>
