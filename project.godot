@@ -33,7 +33,7 @@ enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")
 [input]
 
 move_right={
-"dead_zone": 0.5,
+"deadzone": 0.5,
 "events": [],
 "hold_threshold": 0.5,
 "physical_key": 544,
@@ -41,7 +41,7 @@ move_right={
 "strength": 1.0
 }
 move_left={
-"dead_zone": 0.5,
+"deadzone": 0.5,
 "events": [],
 "hold_threshold": 0.5,
 "physical_key": 545,
@@ -49,7 +49,7 @@ move_left={
 "strength": 1.0
 }
 move_up={
-"dead_zone": 0.5,
+"deadzone": 0.5,
 "events": [],
 "hold_threshold": 0.5,
 "physical_key": 546,
@@ -57,7 +57,7 @@ move_up={
 "strength": 1.0
 }
 move_down={
-"dead_zone": 0.5,
+"deadzone": 0.5,
 "events": [],
 "hold_threshold": 0.5,
 "physical_key": 547,
@@ -65,7 +65,7 @@ move_down={
 "strength": 1.0
 }
 pick_a={
-"dead_zone": 0.5,
+"deadzone": 0.5,
 "events": [],
 "hold_threshold": 0.5,
 "physical_key": 65,
@@ -73,7 +73,7 @@ pick_a={
 "strength": 1.0
 }
 pick_s={
-"dead_zone": 0.5,
+"deadzone": 0.5,
 "events": [],
 "hold_threshold": 0.5,
 "physical_key": 83,
@@ -81,7 +81,7 @@ pick_s={
 "strength": 1.0
 }
 pick_d={
-"dead_zone": 0.5,
+"deadzone": 0.5,
 "events": [],
 "hold_threshold": 0.5,
 "physical_key": 68,

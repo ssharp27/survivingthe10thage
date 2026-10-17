@@ -51,7 +51,9 @@ public partial class Boss : Combatant
         {
             Vector2 to = target.GlobalPosition - GlobalPosition;
             float dist = to.Length();
-            if (dist > 260.0f)
+            // close to melee reach: party signature weapons top out ~130px, so the
+            // boss must settle inside that or it can never be struck
+            if (dist > 100.0f)
                 GlobalPosition = g.ClampToArena(GlobalPosition + to.Normalized() * driftSpeed * delta);
             _contactCd -= delta;
             if (dist < radius + g.MEMBER_RADIUS && _contactCd <= 0.0f)

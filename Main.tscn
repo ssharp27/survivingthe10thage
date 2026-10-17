@@ -1,3 +1,57 @@
-[gd_scene load_steps=1 format=3]
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://src/Game.cs" id="1_game"]
+[ext_resource type="Script" path="res://src/Director.cs" id="2_dir"]
+[ext_resource type="Script" path="res://src/PartyMember.cs" id="3_pm"]
+[ext_resource type="Script" path="res://src/Boss.cs" id="4_boss"]
 
 [node name="Main" type="Node2D"]
+script = ExtResource("1_game")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+
+[node name="Director" type="Node2D" parent="."]
+script = ExtResource("2_dir")
+
+[node name="Baldrun" type="Node2D" parent="."]
+script = ExtResource("3_pm")
+displayName = "Baldrun"
+weaponName = "Maul"
+memberIndex = 0
+isLeader = true
+maxHp = 150.0
+baseSpeed = 170.0
+weaponDamage = 26.0
+cooldown = 1.4
+range = 115.0
+arcHalf = 1.25
+
+[node name="Mosiah" type="Node2D" parent="."]
+script = ExtResource("3_pm")
+displayName = "Mosiah"
+weaponName = "Rapier"
+memberIndex = 1
+maxHp = 85.0
+baseSpeed = 180.0
+weaponDamage = 10.0
+cooldown = 0.6
+range = 130.0
+arcHalf = 0.35
+
+[node name="BossMini" type="Node2D" parent="."]
+script = ExtResource("4_boss")
+kind = "mini"
+maxHp = 300.0
+radius = 46.0
+driftSpeed = 42.0
+bulletDamage = 10.0
+position = Vector2(0.0, -500.0)
+
+[node name="BossFinal" type="Node2D" parent="."]
+script = ExtResource("4_boss")
+kind = "final"
+maxHp = 800.0
+radius = 60.0
+driftSpeed = 48.0
+bulletDamage = 12.0
+position = Vector2(0.0, -700.0)

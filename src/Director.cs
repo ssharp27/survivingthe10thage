@@ -6,11 +6,15 @@ using Godot;
 /// </summary>
 public partial class Director : Godot.Node2D
 {
+    // ---------- horde director for M1: budget-curve spawning of goblins/wolves around the
+    // leader, ramping within each half; paused during campfire and boss phases ----------
     float _spawnTimer = 4.0f;
+    // VS-authentic on-screen cap: the horde applies pressure but can't snowball past this
+    const int MAX_LIVE = 40;
 
     public override void _Process(double d)
     {
-        Game g = GetOwner() as Game;
+        Game g = GetParent() as Game;
         if (g == null)
             return;
         int st = g.GetStageState();
@@ -19,6 +23,8 @@ public partial class Director : Godot.Node2D
         _spawnTimer -= (float)d;
         if (_spawnTimer > 0.0f)
             return;
+        if (g.GetLiveEnemies() >= MAX_LIVE)
+            return; // at cap: stop spawning, don't reset the timer either
         double t = g.GetStageT();
         double half = st == 0 ? g.GetFirstHalf() : g.GetSecondHalf();
         _spawnTimer = (float)System.Math.Max(0.5, 2.0 - 1.1 * (t / half));
@@ -33,7 +39,7 @@ public partial class Director : Godot.Node2D
         bool wolf = (float)GD.Randf() < 0.30f;
         Enemy e = new Enemy();
         e.kind = wolf ? "wolf" : "goblin";
-        e.maxHp = wolf ? 34.0f : 22.0f;
+        e.maxHp = wolf ? 26.0f : 18.0f; // maul (26 dmg) one-shots both archetypes
         e.hp = e.maxHp;
         e.speed = wolf ? 150.0f : 78.0f;
         e.contactDamage = wolf ? 7.0f : 4.0f;

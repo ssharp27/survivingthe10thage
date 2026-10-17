@@ -86,7 +86,8 @@ public partial class PartyMember : Godot.Node2D
         for (int i = 0; i < enemies.Count; i++)
         {
             Godot.Node2D n = enemies[i];
-            if (((Combatant)n).kind == "dead")
+            Combatant nc = (Combatant)n;
+            if (nc == null || nc.kind == "dead")
                 continue;
             float dd = n.GlobalPosition.DistanceTo(p);
             if (dd < bestD)
@@ -109,12 +110,13 @@ public partial class PartyMember : Godot.Node2D
                 for (int i = 0; i < enemies.Count; i++)
                 {
                     Godot.Node2D n = enemies[i];
-                    if (((Combatant)n).kind == "dead")
+                    Combatant nc = (Combatant)n;
+                    if (nc == null || nc.kind == "dead")
                         continue;
                     Vector2 e = n.GlobalPosition - p;
                     float dd = e.Length();
                     if (dd <= range * rangeMul && System.Math.Abs(angleDiff((float)System.Math.Atan2(e.Y, e.X), facing)) <= arcHalf)
-                        ((Combatant)n).TakeDamage(dmg);
+                        nc.TakeDamage(dmg);
                 }
             }
             else

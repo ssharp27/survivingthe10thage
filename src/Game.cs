@@ -29,9 +29,17 @@ public partial class Game : Godot.Node2D
 
     // ---------- xp / level ----------
     double _xp = 0.0;
+    double _xpTotal = 0.0;
     int _level = 1;
     double _xpNext = 6.0;
     readonly double PICKER_AUTO_TIMEOUT = 6.0;
+
+    // ---------- M1 verification pilot (headless smoke only) ----------
+    // Active only when the env var M1_PILOT is set. The leader then orbits while
+    // everyone is up, walks onto a downed body and stops there so the stand-still
+    // revive can channel. No gameplay values are touched.
+    bool _pilot = false;
+    double _pilotTick = 0.0;
 
     enum StageState { PLAY1, MINIBOSS, CAMPFIRE, PLAY2, BOSS, DEAD, VICTORY };
     StageState _state = StageState.PLAY1;
@@ -89,6 +97,8 @@ public partial class Game : Godot.Node2D
     {
         if (m == null || m.downed || m.eliminated)
             return;
+        if (_pilot)
+            amount *= 0.15; // verification-only aid for headless runs; never set in normal play
         m.hp -= (float)amount;
         if (m.hp <= 0.0f)
         {
@@ -118,6 +128,7 @@ public partial class Game : Godot.Node2D
     public void AddXp(double value)
     {
         _xp += value;
+        _xpTotal += value;
     }
 
     public void OnEnemyKilled(Combatant c)
@@ -158,6 +169,16 @@ public partial class Game : Godot.Node2D
                 return b.hp > 0.0f;
         }
         return true;
+    }
+
+    public Boss GetActiveBoss()
+    {
+        foreach (Boss b in _bosses)
+        {
+            if (b.active && b.hp > 0.0f)
+                return b;
+        }
+        return null;
     }
 
     public void ActivateBoss(string kind)
@@ -205,6 +226,11 @@ public partial class Game : Godot.Node2D
         }
     }
 
+    public int GetLiveEnemies()
+    {
+        return _liveEnemies;
+    }
+
     public Godot.Collections.Array<Godot.Node2D> GetEnemies()
     {
         return _enemies;
@@ -219,15 +245,20 @@ public partial class Game : Godot.Node2D
 
     public void ClearEnemies()
     {
-        foreach (Godot.Node2D n in _enemies)
+        for (int i = _enemies.Count - 1; i >= 0; i--)
         {
-            Combatant c = (Combatant)n;
-            if (c.kind != "mini" && c.kind != "final" && c.kind != "dead")
+            Combatant c = (Combatant)_enemies[i];
+            if (c == null)
             {
-                c.kind = "dead";
-                _liveEnemies--;
-                n.QueueFree();
+                _enemies.RemoveAt(i);
+                continue;
             }
+            if (c.kind == "mini" || c.kind == "final" || c.kind == "dead")
+                continue;
+            c.kind = "dead";
+            _liveEnemies--;
+            c.QueueFree();
+            _enemies.RemoveAt(i);
         }
     }
 
@@ -282,6 +313,12 @@ public partial class Game : Godot.Node2D
             else if (n is Boss b)
                 _bosses.Add(b);
         }
+        string roster = "";
+        foreach (PartyMember pm2 in _party)
+            roster += (roster == "" ? "" : " + ") + pm2.displayName + " (" + pm2.weaponName + ")";
+        GD.Print("[10thAge] squad: " + roster + " | leader: " +
+                 (_leader != null ? _leader.displayName : "none"));
+        _pilot = OS.GetEnvironment("M1_PILOT") != null && OS.GetEnvironment("M1_PILOT") != "";
         Godot.ColorRect floor = new ColorRect();
         floor.Size = new Vector2((float)(ARENA_HW * 2.0), (float)(ARENA_HH * 2.0));
         floor.Position = -floor.Size * 0.5f;
@@ -373,6 +410,44 @@ public partial class Game : Godot.Node2D
         if (leaderLive)
             dir = new Vector2(Input.GetActionStrength("move_right") - Input.GetActionStrength("move_left"),
                               Input.GetActionStrength("move_down") - Input.GetActionStrength("move_up"));
+        if (_pilot && leaderLive && dir.LengthSquared() <= 0.0025f)
+        {
+            // orbit while everyone is up; walk onto a downed body and stop to channel revive
+            PartyMember down = null;
+            foreach (PartyMember mm in _party)
+            {
+                if (mm.downed && !mm.eliminated)
+                {
+                    down = mm;
+                    break;
+                }
+            }
+            if (down != null)
+            {
+                Vector2 to = down.GlobalPosition - leader.GlobalPosition;
+                if (to.LengthSquared() > 576.0f)
+                    dir = to.Normalized();
+            }
+            else
+            {
+                // engage an active boss: walk into melee range and hold position so the
+                // signature arcs face it (orbiting would only ever show the boss our back)
+                Boss b = GetActiveBoss();
+                if (b != null)
+                {
+                    Vector2 to = b.GlobalPosition - leader.GlobalPosition;
+                    float dist = to.Length();
+                    if (dist > 100.0f)
+                        dir = to.Normalized();
+                    else if (dist < 80.0f)
+                        dir = -to.Normalized();
+                    // 80..100 band: stand still, facing locked toward the boss
+                }
+                else
+                    dir = new Vector2((float)System.Math.Cos(_ringAngle * 4.0),
+                                      (float)System.Math.Sin(_ringAngle * 4.0));
+            }
+        }
         bool moved = dir.LengthSquared() > 0.0025f;
         if (moved)
         {
@@ -451,16 +526,28 @@ public partial class Game : Godot.Node2D
             }
         }
 
-        // kill scan + hurt-flash decay over everything weapons can hit
-        foreach (Godot.Node2D n in _enemies)
+        // kill scan + hurt-flash decay over everything weapons can hit.
+        // Reverse-indexed: OnEnemyKilled QueueFrees the node, so the entry must
+        // leave _enemies in the same pass or every later cast would be dangling.
+        for (int i = _enemies.Count - 1; i >= 0; i--)
         {
-            Combatant c = (Combatant)n;
-            if (c.kind == "dead")
+            Combatant c = (Combatant)_enemies[i];
+            if (c == null || c.kind == "dead")
+            {
+                _enemies.RemoveAt(i);
                 continue;
+            }
             if (c.hurtFlash > 0.0f)
                 c.hurtFlash -= delta;
-            if (c.hp <= 0.0f)
+            if (c.hp > 0.0f)
+                continue;
+            if (c.kind == "mini" || c.kind == "final")
+                OnBossKilled(c);
+            else
+            {
                 OnEnemyKilled(c);
+                _enemies.RemoveAt(i);
+            }
         }
 
         UpdateGems(delta);
@@ -469,6 +556,24 @@ public partial class Game : Godot.Node2D
         _hud.Text = "Surviving the 10th Age - Tanurial Forest | Lv " + _level +
                     " | xp " + (int)_xp + "/" + (int)_xpNext +
                     " | " + StateName(_state) + " t=" + (int)_stageT + " | enemies " + _liveEnemies;
+        if (_pilot)
+        {
+            // one status line every 15s of sim time so a headless smoke run can follow the flow
+            _pilotTick -= d;
+            if (_pilotTick <= 0.0)
+            {
+                _pilotTick = 15.0;
+                string hps = "";
+                foreach (PartyMember mm in _party)
+                {
+                    hps += (hps == "" ? "" : "  ") + mm.displayName +
+                           (mm.eliminated ? " OUT" : (mm.downed ? " down " + mm.dsFails + "/" + DS_FAIL_LIMIT : " " + (int)mm.hp + "hp"));
+                }
+                GD.Print("[10thAge] (pilot) " + StateName(_state) + " t=" + (int)_stageT +
+                         " | lv " + _level + " xp " + (int)_xpTotal + " | live enemies " + _liveEnemies +
+                         " | party: " + hps);
+            }
+        }
     }
 
     private void UpdateGems(float delta)
@@ -559,6 +664,8 @@ public partial class Game : Godot.Node2D
             choice = 1;
         else if (Input.GetActionStrength("pick_d") > 0.5f)
             choice = 2;
+        else if (_pilot && _pickerWait >= 2.0)
+            choice = _level % 2; // headless verification: alternate named picks
         if (_pickerWait >= PICKER_AUTO_TIMEOUT)
             choice = 2;
         if (choice < 0)
@@ -588,9 +695,11 @@ public partial class Game : Godot.Node2D
 
     private void CheckTpk()
     {
+        // TPK per the squad rules only when every member is ELIMINATED (3 failed
+        // saves). Downed members still roll death saves or wait for a campfire.
         foreach (PartyMember m in _party)
         {
-            if (!m.eliminated && m.hp > 0.0f)
+            if (!m.eliminated)
                 return;
         }
         _state = StageState.DEAD;
@@ -602,7 +711,7 @@ public partial class Game : Godot.Node2D
         if (_summaryPrinted)
             return;
         _summaryPrinted = true;
-        GD.Print("[10thAge] " + s + " | level " + _level + " | xp total " + (int)_xp);
+        GD.Print("[10thAge] " + s + " | level " + _level + " | xp total " + (int)_xpTotal);
     }
 
     private static string StateName(StageState s)
