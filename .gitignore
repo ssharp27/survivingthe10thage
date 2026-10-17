@@ -2,6 +2,8 @@
 .godot/
 obj/
 *.csproj.old
+mono/
+bin/
 
 # Godot-MCP local server binary cache (lives under .godot/ too, kept explicit)
 .godot/mcp-server/
