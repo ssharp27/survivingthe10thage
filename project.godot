@@ -11,8 +11,13 @@ config_version=5
 [application]
 
 config/name="survivingthe10thage"
-config/icon="res://icon.svg"
 run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.7", "C#")
+config/icon="res://icon.svg"
+
+[dotnet]
+
+project/assembly_name="survivingthe10thage"
 
 [editor_plugins]
 
