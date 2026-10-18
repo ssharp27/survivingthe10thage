@@ -44,7 +44,7 @@ public partial class PartyMember : Godot.Node2D
     public override void _EnterTree()
     {
         AddToGroup("party");
-        z_index = 5; // members (and their _draw telegraphs) paint above enemy squares
+        ZIndex = 5; // members (and their _draw telegraphs) paint above enemy squares
         hp = maxHp;
         _body = new ColorRect();
         _body.Size = new Vector2(30.0f, 30.0f);
