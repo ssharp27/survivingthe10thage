@@ -19,8 +19,8 @@ public partial class Enemy : Combatant
     {
         if (kind == "reaper")
         {
-            // TEST death-state reaper: big red circle-ish (diamond reads rounder
-            // without a draw path), instant kill on touch, attack-proof
+            // TEST death-state reaper: big red diamond; touching it DOWNs a member
+            // (death saves start), attack-proof
             _body = new ColorRect();
             _body.Size = new Vector2(72.0f, 72.0f);
             _body.Position = -_body.Size * 0.5f;
@@ -43,14 +43,17 @@ public partial class Enemy : Combatant
         float delta = (float)d;
         if (_body == null)
             InitVisuals();
+        if (kind == "dead")
+            return; // despawned: parked offscreen and inert; the node is NOT freed, so
+                    // without this guard a dead reaper would walk back into the arena
         Game g = GetParent() as Game;
         if (g == null)
             return;
         Vector2 p = GlobalPosition;
         if (kind == "reaper")
         {
-            // TEST reaper: chase the nearest ally, kill the first body it touches,
-            // then despawn. Attack-proof via its huge hp; no separation / contact
+            // TEST reaper: chase the nearest ally, DOWN the first body it touches
+            // (starts the death-save cycle), then despawn. Attack-proof via its huge hp;
             // damage logic needed. kind "dead" + offscreen = clean despawn without
             // freeing (kill scan drops the registry entry, no XP).
             PartyMember prey = g.NearestMember(p);
@@ -58,9 +61,9 @@ public partial class Enemy : Combatant
                 GlobalPosition = g.ClampToArena(GlobalPosition + (prey.GlobalPosition - GlobalPosition).Normalized() * speed * delta);
             PartyMember touch = g.NearestMemberAny(GlobalPosition);
             if (touch != null && touch.GlobalPosition.DistanceTo(GlobalPosition) < 36.0f + g.MEMBER_RADIUS
-                && g.OnReaperKill(touch))
+                && g.OnReaperDown(touch))
             {
-                // only despawn when the kill actually landed; immune bodies let it keep lurking
+                // despawn only when a down actually landed: immune bodies let it lurk
                 kind = "dead";
                 GlobalPosition = new Vector2(0.0f, -10000.0f);
             }

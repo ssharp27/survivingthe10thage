@@ -174,19 +174,23 @@ public partial class Game : Godot.Node2D
         }
     }
 
-    public bool OnReaperKill(PartyMember m)
+    public bool OnReaperDown(PartyMember m)
     {
-        // TEST reaper (user death-state tester): whatever it touches is simply out
-        // until the next campfire — no roll, no saves. Returns true only when the
-        // kill actually landed, so immunity lets the reaper keep lurking.
-        if (m == null || m.eliminated)
+        // TEST reaper (user death-state tester): whatever it touches goes DOWN and
+        // starts the d20 death-save cycle — this is the revival test bench. Returns
+        // true only when the down actually landed, so immunity lets it keep lurking.
+        if (m == null || m.eliminated || m.downed)
             return false;
         if (m.invuln > 0.0f || m.reviveShield)
             return false;
-        m.downed = false;
+        m.hp = 0.0f;
+        m.downed = true;
         m.stable = false;
-        m.eliminated = true;
-        m.SetDsText("SLAIN - next campfire");
+        m.dsTimer = 0.0f; // the first d20 rolls right away
+        m.dsFails = 0;
+        m.dsSucceeds = 0;
+        m.dsDamageBuffer = 0.0f;
+        m.SetDsText("DOWN");
         CheckTpk();
         return true;
     }
@@ -486,8 +490,9 @@ public partial class Game : Godot.Node2D
         _ringAngle += 0.15 * d;
         if (!_reaperSpawned && _stageT >= 10.0 && _state == StageState.PLAY1)
         {
-            // TEST reaper: instant kill on touch, attack-proof (hp stays huge),
-            // despawns after its first kill — lets a human poke the death states
+            // TEST reaper: spawns ONCE 10 s into horde I, downs whoever it touches
+            // (death-save tester), attack-proof (hp stays huge), despawns after its
+            // first down
             _reaperSpawned = true;
             Vector2 near = GetLeader() != null ? GetLeader().GlobalPosition : new Vector2(0, 0);
             Enemy r = new Enemy();
