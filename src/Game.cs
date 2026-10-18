@@ -40,6 +40,7 @@ public partial class Game : Godot.Node2D
     // revive can channel. No gameplay values are touched.
     bool _pilot = false;
     double _pilotTick = 0.0;
+    Godot.RandomNumberGenerator Rng;
 
     enum StageState { PLAY1, MINIBOSS, CAMPFIRE, PLAY2, BOSS, DEAD, VICTORY };
     StageState _state = StageState.PLAY1;
@@ -327,6 +328,21 @@ public partial class Game : Godot.Node2D
         floor.ZIndex = -20; // the .tscn party/boss nodes predate this node in tree order;
                             // without a negative z they'd be painted over by the floor
         AddChild(floor);
+        // scattered floor patches = motion reference. the camera keeps the leader centered,
+        // so a single-color floor made movement LOOK frozen even when input worked
+        Rng = new Godot.RandomNumberGenerator();
+        Rng.SetSeed(9001);
+        for (int i = 0; i < 60; i++)
+        {
+            Godot.ColorRect p = new ColorRect();
+            float s = 6.0f + (float)Rng.Randf() * 10.0f;
+            p.Size = new Vector2(s, s);
+            p.GlobalPosition = new Vector2((float)Rng.Randf() * (float)ARENA_HW * 2.0f - (float)ARENA_HW,
+                                           (float)Rng.Randf() * (float)ARENA_HH * 2.0f - (float)ARENA_HH);
+            p.Color = new Color(0.13f, 0.20f, 0.13f, 1.0f);
+            p.ZIndex = -15;
+            AddChild(p);
+        }
         BuildWall(new Vector2(0.0f, -(float)ARENA_HH - 40.0f), new Vector2((float)(ARENA_HW * 2.0 + 100.0), 80.0f));
         BuildWall(new Vector2(0.0f, (float)ARENA_HH + 40.0f), new Vector2((float)(ARENA_HW * 2.0 + 100.0), 80.0f));
         BuildWall(new Vector2(-(float)ARENA_HW - 40.0f, 0.0f), new Vector2(80.0f, (float)(ARENA_HH * 2.0 + 100.0)));
@@ -568,6 +584,14 @@ public partial class Game : Godot.Node2D
         _hud.Text = "Surviving the 10th Age - Tanurial Forest | Lv " + _level +
                     " | xp " + (int)_xp + "/" + (int)_xpNext +
                     " | " + StateName(_state) + " t=" + (int)_stageT + " | enemies " + _liveEnemies;
+        // TEMP debug: show the four movement action strengths (R,L,U,D) — proves
+        // key-press -> binding -> action pipeline end to end from a real GUI press
+        float sR = Input.GetActionStrength("move_right");
+        float sL = Input.GetActionStrength("move_left");
+        float sU = Input.GetActionStrength("move_up");
+        float sD = Input.GetActionStrength("move_down");
+        if (sR + sL + sU + sD > 0.0f)
+            _hud.Text += " | in " + (int)sR + (int)sL + (int)sU + (int)sD;
         if (_pilot)
         {
             // one status line every 15s of sim time so a headless smoke run can follow the flow
