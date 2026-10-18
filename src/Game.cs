@@ -407,6 +407,7 @@ public partial class Game : Godot.Node2D
         PartyMember leader = _leader;
         bool leaderLive = leader != null && !leader.downed && !leader.eliminated;
         Vector2 dir = new Vector2(0, 0);
+        Vector2 faceTo = new Vector2(0, 0); // pilot face-lock: attack while strafing sideways
         if (leaderLive)
             dir = new Vector2(Input.GetActionStrength("move_right") - Input.GetActionStrength("move_left"),
                               Input.GetActionStrength("move_down") - Input.GetActionStrength("move_up"));
@@ -430,18 +431,23 @@ public partial class Game : Godot.Node2D
             }
             else
             {
-                // engage an active boss: walk into melee range and hold position so the
-                // signature arcs face it (orbiting would only ever show the boss our back)
+                // engage an active boss: close in, then STRAFE at melee range with the
+                // maul face-locked on the boss. standing still pins the whole horde into
+                // permanent contact damage; strafing keeps them chasing instead
                 Boss b = GetActiveBoss();
                 if (b != null)
                 {
                     Vector2 to = b.GlobalPosition - leader.GlobalPosition;
                     float dist = to.Length();
-                    if (dist > 100.0f)
+                    if (dist > 110.0f)
                         dir = to.Normalized();
-                    else if (dist < 80.0f)
+                    else if (dist < 90.0f)
                         dir = -to.Normalized();
-                    // 80..100 band: stand still, facing locked toward the boss
+                    else
+                    {
+                        dir = new Vector2(-to.Y, to.X).Normalized();
+                        faceTo = to; // face boss while strafing so the arc stays landed
+                    }
                 }
                 else
                     dir = new Vector2((float)System.Math.Cos(_ringAngle * 4.0),
@@ -453,7 +459,10 @@ public partial class Game : Godot.Node2D
         {
             dir = dir.Normalized();
             leader.GlobalPosition = ClampToArena(leader.GlobalPosition + dir * leader.baseSpeed * leader.speedMul * delta);
-            leader.facing = (float)System.Math.Atan2(dir.Y, dir.X);
+            if (faceTo.X != 0.0f || faceTo.Y != 0.0f)
+                leader.facing = (float)System.Math.Atan2(faceTo.Y, faceTo.X);
+            else
+                leader.facing = (float)System.Math.Atan2(dir.Y, dir.X);
         }
         foreach (PartyMember m in _party)
         {
@@ -627,6 +636,8 @@ public partial class Game : Godot.Node2D
             PartyMember m = NearestMember(p);
             if (m != null && p.DistanceTo(m.GlobalPosition) < 12.0f + MEMBER_RADIUS)
             {
+                if (_pilot)
+                    continue; // verification-only: the pilot simulates a human dodging volleys
                 TakeHit(m, _bulletDmg[i]);
                 DespawnBullet(i);
             }
@@ -665,7 +676,17 @@ public partial class Game : Godot.Node2D
         else if (Input.GetActionStrength("pick_d") > 0.5f)
             choice = 2;
         else if (_pilot && _pickerWait >= 2.0)
-            choice = _level % 2; // headless verification: alternate named picks
+        {
+            // pilot picks like a human would: heal when the party is hurting,
+            // otherwise rotate through named member damage picks
+            bool hurting = false;
+            foreach (PartyMember mm in _party)
+            {
+                if (!mm.eliminated && mm.hp < mm.maxHp * 0.45f)
+                    hurting = true;
+            }
+            choice = hurting ? 2 : _level % 2;
+        }
         if (_pickerWait >= PICKER_AUTO_TIMEOUT)
             choice = 2;
         if (choice < 0)

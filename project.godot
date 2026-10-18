@@ -34,57 +34,29 @@ enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")
 
 move_right={
 "deadzone": 0.5,
-"events": [],
-"hold_threshold": 0.5,
-"physical_key": 544,
-"stick_mode": 1,
-"strength": 1.0
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_size":0,"physical_keycode":547,"key_code":-1,"physical_button":-1,"key_button":-1,"pressed":false,"repeat":false,"clear_on_push":false), Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_size":0,"physical_keycode":4194307,"key_code":-1,"physical_button":-1,"key_button":-1,"pressed":false,"repeat":false,"clear_on_push":false)]
 }
 move_left={
 "deadzone": 0.5,
-"events": [],
-"hold_threshold": 0.5,
-"physical_key": 545,
-"stick_mode": 1,
-"strength": 1.0
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_size":0,"physical_keycode":544,"key_code":-1,"physical_button":-1,"key_button":-1,"pressed":false,"repeat":false,"clear_on_push":false), Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_size":0,"physical_keycode":4194306,"key_code":-1,"physical_button":-1,"key_button":-1,"pressed":false,"repeat":false,"clear_on_push":false)]
 }
 move_up={
 "deadzone": 0.5,
-"events": [],
-"hold_threshold": 0.5,
-"physical_key": 546,
-"stick_mode": 1,
-"strength": 1.0
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_size":0,"physical_keycode":566,"key_code":-1,"physical_button":-1,"key_button":-1,"pressed":false,"repeat":false,"clear_on_push":false), Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_size":0,"physical_keycode":4194305,"key_code":-1,"physical_button":-1,"key_button":-1,"pressed":false,"repeat":false,"clear_on_push":false)]
 }
 move_down={
 "deadzone": 0.5,
-"events": [],
-"hold_threshold": 0.5,
-"physical_key": 547,
-"stick_mode": 1,
-"strength": 1.0
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_size":0,"physical_keycode":563,"key_code":-1,"physical_button":-1,"key_button":-1,"pressed":false,"repeat":false,"clear_on_push":false), Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_size":0,"physical_keycode":4194308,"key_code":-1,"physical_button":-1,"key_button":-1,"pressed":false,"repeat":false,"clear_on_push":false)]
 }
 pick_a={
 "deadzone": 0.5,
-"events": [],
-"hold_threshold": 0.5,
-"physical_key": 65,
-"stick_mode": 1,
-"strength": 1.0
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_size":0,"physical_keycode":544,"key_code":-1,"physical_button":-1,"key_button":-1,"pressed":false,"repeat":false,"clear_on_push":false)]
 }
 pick_s={
 "deadzone": 0.5,
-"events": [],
-"hold_threshold": 0.5,
-"physical_key": 83,
-"stick_mode": 1,
-"strength": 1.0
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_size":0,"physical_keycode":563,"key_code":-1,"physical_button":-1,"key_button":-1,"pressed":false,"repeat":false,"clear_on_push":false)]
 }
 pick_d={
 "deadzone": 0.5,
-"events": [],
-"hold_threshold": 0.5,
-"physical_key": 68,
-"stick_mode": 1,
-"strength": 1.0
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_size":0,"physical_keycode":547,"key_code":-1,"physical_button":-1,"key_button":-1,"pressed":false,"repeat":false,"clear_on_push":false)]
 }
