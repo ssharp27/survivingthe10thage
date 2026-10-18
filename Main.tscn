@@ -24,7 +24,7 @@ baseSpeed = 170.0
 weaponDamage = 26.0
 cooldown = 1.4
 range = 115.0
-arcHalf = 1.25
+arcHalf = 3.15
 
 [node name="Mosiah" type="Node2D" parent="."]
 script = ExtResource("3_pm")

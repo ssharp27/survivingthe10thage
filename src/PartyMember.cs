@@ -36,6 +36,9 @@ public partial class PartyMember : Godot.Node2D
     // down/death-save state (driven by the Game root)
     public float dsTimer = 0.0f;
     public int dsFails = 0;
+    public int dsSucceeds = 0; // rolls of 11-19; 3 of them = stable
+    public bool stable = false; // 3 successes: rolls stop, hits now slay
+    public float reviveProgress = 0.0f; // leader stand-still channel
     public float dsDamageBuffer = 0.0f; // 2 s gap between damage-caused death-save fails
     public float dsHold = 0.0f; // countdown for SetDsTemp texts; 0 = persistent
 
@@ -64,18 +67,20 @@ public partial class PartyMember : Godot.Node2D
         _telePivot = new Godot.Node2D();
         _telePivot.Name = "Telegraph";
         AddChild(_telePivot);
+        bool circle = arcHalf > 3.0f; // Baldrun's maul is a true 360 deg sweep now
         bool maul = arcHalf > 0.5f;
-        int spokes = maul ? 3 : 1;
-        float w = maul ? 5.0f : 7.0f;
-        Color col = maul ? new Color(1.0f, 0.55f, 0.2f, 0.45f)
-                         : new Color(0.5f, 1.0f, 1.0f, 0.55f);
+        int spokes = circle ? 12 : (maul ? 3 : 1);
+        float w = circle ? 4.0f : (maul ? 5.0f : 7.0f);
+        Color col = circle || maul ? new Color(1.0f, 0.55f, 0.2f, 0.45f)
+                                   : new Color(0.5f, 1.0f, 1.0f, 0.55f);
         _teleParts = new Godot.ColorRect[spokes];
         for (int i = 0; i < spokes; i++)
         {
             Godot.ColorRect s = new Godot.ColorRect();
             s.Size = new Vector2(range, w);
             s.Position = new Vector2(0.0f, -w * 0.5f);
-            s.Rotation = spokes == 1 ? 0.0f : (float)(-arcHalf + 2.0 * arcHalf * i / (spokes - 1));
+            s.Rotation = circle ? (float)(System.Math.PI * 2.0 * i / 12.0)
+                                : (spokes == 1 ? 0.0f : (float)(-arcHalf + 2.0 * arcHalf * i / (spokes - 1)));
             s.Color = col;
             _telePivot.AddChild(s);
             _teleParts[i] = s;

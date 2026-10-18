@@ -28,6 +28,8 @@ public partial class Director : Godot.Node2D
         double t = g.GetStageT();
         double half = st == 0 ? g.GetFirstHalf() : g.GetSecondHalf();
         _spawnTimer = (float)System.Math.Max(0.5, 2.0 - 1.1 * (t / half));
+        if (st == 3)
+            _spawnTimer *= 0.67f; // post-mini-boss: the horde runs 50 % denser
         Vector2 near = g.GetLeader() != null ? g.GetLeader().GlobalPosition : new Vector2(0, 0);
         Spawn(g, near);
     }

@@ -13,22 +13,32 @@ public partial class Game : Godot.Node2D
     public readonly double ARENA_HW = 1200.0;
     public const double ARENA_HH = 900.0;
     public readonly float MEMBER_RADIUS = 16.0f;
+    // ---------- player revive (leader stands still near a body) ----------
+    readonly double REVIVE_RANGE = 30.0;
+    readonly double REVIVE_CHANNEL = 3.0;
 
     // ---------- death saves (user-locked rules) ----------
-    // Downed allies roll a death save every 6 s: nat 20 revives them at 25 % HP,
-    // 11-19 stabilizes (nothing), 10 or below is a failure; three failures = out
-    // until the next campfire. Damage while downed counts as one failure, but a
-    // 2 s buffer keeps a swarm from instantly finishing someone off.
+    // Downed allies roll a d20 every 6 s: nat 20 = revived at 25 % HP, 11-19 = a
+    // success, 3 successes = STABLE (rolls stop; a hit then slays the body
+    // outright unless the player revives it), 10 or below = a failure and 3
+    // failures = out until the next campfire. Damage on a downed (unstable) body
+    // is one failure, kept 2 s apart so a swarm can't insta-finish anyone.
     readonly double DS_INTERVAL = 6.0;
     readonly int DS_FAIL_ON = 10; // roll <= this fails
     readonly int DS_REVIVE_ON = 20; // nat 20 revives at 25 % HP
     readonly int DS_FAIL_LIMIT = 3;
+    readonly int DS_STABLE_NEED = 3; // successes before the rolls stop
     readonly double DS_DAMAGE_FAIL_BUFFER = 2.0;
 
     // ---------- stage pacing (tanurial forest M1) ----------
     readonly double FIRST_HALF = 90.0;
     readonly double SECOND_HALF = 100.0;
     readonly double CAMPFIRE_LEN = 8.0;
+
+    // ---------- death-state tester (user ask) ----------
+    // A big red instant-kill circle spawns 10 s into the run: attack-proof, it
+    // kills the first body it touches and despawns right after. Test tool only.
+    bool _reaperSpawned = false;
 
     // ---------- xp / level ----------
     double _xp = 0.0;
@@ -122,6 +132,14 @@ public partial class Game : Godot.Node2D
             return;
         if (m.downed)
         {
+            if (m.stable)
+            {
+                // stable bodies stopped rolling: the next hit just slays them
+                m.eliminated = true;
+                m.SetDsText("OUT - next campfire");
+                CheckTpk();
+                return;
+            }
             // downed bodies still get ran into / hit by volleys: each hit is one
             // failed death save, buffered 2 s so a swarm can't insta-finish them
             if (m.dsDamageBuffer > 0.0f)
@@ -152,6 +170,19 @@ public partial class Game : Godot.Node2D
         }
     }
 
+    public void OnReaperKill(PartyMember m)
+    {
+        // TEST reaper (user death-state tester): whatever it touches is simply out
+        // until the next campfire — no roll, no saves.
+        if (m == null || m.eliminated)
+            return;
+        m.downed = false;
+        m.stable = false;
+        m.eliminated = true;
+        m.SetDsText("SLAIN - next campfire");
+        CheckTpk();
+    }
+
     public void ReviveAllAtCampfire()
     {
         foreach (PartyMember m in _party)
@@ -161,9 +192,12 @@ public partial class Game : Godot.Node2D
             m.eliminated = false;
             m.downed = false;
             m.hp = m.maxHp * 0.5f;
+            m.stable = false;
             m.dsFails = 0;
+            m.dsSucceeds = 0;
             m.dsTimer = 0.0f;
             m.dsDamageBuffer = 0.0f;
+            m.reviveProgress = 0.0f;
             m.SetDsTemp("back at camp", 2.5);
         }
     }
@@ -189,7 +223,14 @@ public partial class Game : Godot.Node2D
 
     public void OnBossKilled(Combatant b)
     {
-        if (_state == StageState.MINIBOSS && b.kind == "mini")
+        string kb = b.kind; // capture before we overwrite it below
+        // slain bosses must despawn visually but NOT QueueFree: _bosses and the
+        // scene still reference them. kind "dead" drops the registry entry in the
+        // kill scan (so nothing targets it again); the body parks offscreen.
+        b.kind = "dead";
+        ((Boss)b).active = false;
+        b.GlobalPosition = new Vector2(0.0f, -10000.0f);
+        if (_state == StageState.MINIBOSS && kb == "mini")
         {
             _state = StageState.CAMPFIRE;
             _stageT = 0.0;
@@ -197,7 +238,7 @@ public partial class Game : Godot.Node2D
             ReviveAllAtCampfire();
             GD.Print("[10thAge] mini-boss slain — campfire: party back at half HP");
         }
-        else if (_state == StageState.BOSS && b.kind == "final")
+        else if (_state == StageState.BOSS && kb == "final")
         {
             _state = StageState.VICTORY;
             PrintSummary("VICTORY — Tanurial Forest cleared");
@@ -434,6 +475,24 @@ public partial class Game : Godot.Node2D
         float delta = (float)d;
         _stageT += d;
         _ringAngle += 0.15 * d;
+        if (!_reaperSpawned && _stageT >= 10.0 && _state == StageState.PLAY1)
+        {
+            // TEST reaper: instant kill on touch, attack-proof (hp stays huge),
+            // despawns after its first kill — lets a human poke the death states
+            _reaperSpawned = true;
+            Vector2 near = GetLeader() != null ? GetLeader().GlobalPosition : new Vector2(0, 0);
+            Enemy r = new Enemy();
+            r.kind = "reaper";
+            r.maxHp = 100000000.0f;
+            r.hp = r.maxHp;
+            r.speed = 62.0f;
+            r.contactDamage = 0.0f;
+            r.xpValue = 0.0f;
+            r.GlobalPosition = ClampToArena(near + new Vector2(500.0f, 0.0f));
+            RegisterEnemy(r);
+            AddChild(r);
+            GD.Print("[10thAge] TEST reaper live");
+        }
         switch (_state)
         {
             case StageState.PLAY1:
@@ -546,6 +605,8 @@ public partial class Game : Godot.Node2D
             }
             foreach (Boss b in _bosses)
             {
+                if (b.hp <= 0.0f)
+                    continue; // slain bosses are ignored, not aimed at
                 float dd = b.GlobalPosition.DistanceTo(leader.GlobalPosition);
                 if (dd < bestD)
                 {
@@ -571,44 +632,76 @@ public partial class Game : Godot.Node2D
         if (_camera != null && leader != null)
             _camera.GlobalPosition = _camera.GlobalPosition.Lerp(leader.GlobalPosition, 0.08f);
 
-        // death saves (dice-only revive): roll every 6 s. nat 20 = revived at 25 %
-        // HP; 11-19 stabilizes (nothing); 10 or below is a failure and 3 failures
-        // = out until the campfire. Damage while downed counts as a buffered
-        // failure too (handled in TakeHit).
+        // death saves (locked rules): d20 every 6 s while downed - nat 20 revives
+        // at 25 % HP, 11-19 is a success (3 successes = STABLE, rolls stop), 10 or
+        // below is a failure (3 = out until the campfire). Damage on a downed body
+        // is a buffered failure (TakeHit); damage on a STABLE body slays it (TakeHit).
+        // The player revives a body by walking the leader onto it and standing still.
         foreach (PartyMember m in _party)
         {
             if (m.eliminated || !m.downed)
                 continue;
-            m.dsTimer += (float)d;
-            if (m.dsTimer >= DS_INTERVAL)
+            if (!m.stable)
             {
-                m.dsTimer = 0.0f;
-                int roll = (int)(GD.Randi() % 20) + 1;
-                if (roll == DS_REVIVE_ON)
+                m.dsTimer += (float)d;
+                if (m.dsTimer >= DS_INTERVAL)
                 {
-                    m.downed = false;
-                    m.hp = m.maxHp * 0.25f;
-                    m.dsFails = 0;
-                    m.dsDamageBuffer = 0.0f;
-                    m.SetDsTemp("nat20 - revived 25%", 2.5);
-                }
-                else if (roll <= DS_FAIL_ON)
-                {
-                    m.dsFails++;
-                    if (m.dsFails >= DS_FAIL_LIMIT)
+                    m.dsTimer = 0.0f;
+                    int roll = (int)(GD.Randi() % 20) + 1;
+                    if (roll == DS_REVIVE_ON)
                     {
-                        m.eliminated = true;
-                        m.SetDsText("OUT - next campfire");
-                        CheckTpk();
+                        m.downed = false;
+                        m.hp = m.maxHp * 0.25f;
+                        m.stable = false;
+                        m.dsFails = 0;
+                        m.dsSucceeds = 0;
+                        m.dsDamageBuffer = 0.0f;
+                        m.SetDsTemp("nat20 - revived 25%", 2.5);
+                        continue;
+                    }
+                    else if (roll <= DS_FAIL_ON)
+                    {
+                        m.dsFails++;
+                        if (m.dsFails >= DS_FAIL_LIMIT)
+                        {
+                            m.eliminated = true;
+                            m.SetDsText("OUT - next campfire");
+                            CheckTpk();
+                            continue;
+                        }
+                        m.SetDsText("d20:" + roll + " fail " + m.dsFails + "/" + DS_FAIL_LIMIT);
                     }
                     else
                     {
-                        m.SetDsText("d20:" + roll + " fail " + m.dsFails + "/" + DS_FAIL_LIMIT);
+                        m.dsSucceeds++;
+                        if (m.dsSucceeds >= DS_STABLE_NEED)
+                        {
+                            m.stable = true;
+                            m.SetDsText("STABLE - no more rolls");
+                        }
+                        else
+                            m.SetDsText("d20:" + roll + " stable " + m.dsSucceeds + "/" + DS_STABLE_NEED);
                     }
                 }
-                else
-                    m.SetDsText("d20:" + roll + " stable");
             }
+            // player revive channel: leader stands still next to the body
+            bool inRange = leaderLive && leader.GlobalPosition.DistanceTo(m.GlobalPosition) < REVIVE_RANGE;
+            if (inRange && !moved)
+            {
+                m.reviveProgress += (float)d;
+                if (m.reviveProgress >= REVIVE_CHANNEL)
+                {
+                    m.downed = false;
+                    m.stable = false;
+                    m.dsFails = 0;
+                    m.dsSucceeds = 0;
+                    m.reviveProgress = 0.0f;
+                    m.hp = m.maxHp * 0.5f;
+                    m.SetDsTemp("revived!", 2.0);
+                }
+            }
+            else if (m.reviveProgress > 0.0f)
+                m.reviveProgress = (float)System.Math.Max(0.0, m.reviveProgress - delta * 1.5);
         }
 
         // kill scan + hurt-flash decay over everything weapons can hit.
@@ -644,7 +737,7 @@ public partial class Game : Godot.Node2D
         foreach (PartyMember m in _party)
         {
             string st = m.eliminated ? "OUT - next campfire"
-                        : (m.downed ? "DOWN - death saving" : (int)m.hp + "/" + (int)m.maxHp + " hp");
+                        : (m.downed ? (m.stable ? "STABLE down" : "DOWN - death saving") : (int)m.hp + "/" + (int)m.maxHp + " hp");
             _hud.Text += "\n" + m.displayName + ": " + st;
         }
         if (_pilot)
@@ -744,8 +837,8 @@ public partial class Game : Godot.Node2D
             _pickerWait = 0.0;
             string a = _party.Count > 0 ? _party[0].displayName + " " + _party[0].weaponName : "A";
             string b = _party.Count > 1 ? _party[1].displayName + " " + _party[1].weaponName : "B";
-            _pickerLabel.Text = "LEVEL UP: [A] " + a + " dmg +15%   [S] " + b +
-                                " dmg +15% (auto after 6s)";
+            _pickerLabel.Text = "LEVEL UP: [A] " + a + " dmg +25%   [S] " + b +
+                                " dmg +25% (auto after 6s)";
         }
         if (!_pickerActive)
             return;
@@ -773,8 +866,8 @@ public partial class Game : Godot.Node2D
         // no HP restoration on level-up: healing lives only in campfires and revives
         if (choice >= 0 && choice < _party.Count)
         {
-            _party[choice].dmgMul *= 1.15f;
-            GD.Print("[10thAge] upgrade: " + _party[choice].displayName + " dmg +15%");
+            _party[choice].dmgMul *= 1.25f; // big enough ranks that kill-thresholds visibly shift
+            GD.Print("[10thAge] upgrade: " + _party[choice].displayName + " dmg +25%");
         }
     }
 

@@ -17,6 +17,18 @@ public partial class Enemy : Combatant
     // so this runs on demand rather than in _EnterTree.
     public void InitVisuals()
     {
+        if (kind == "reaper")
+        {
+            // TEST death-state reaper: big red circle-ish (diamond reads rounder
+            // without a draw path), instant kill on touch, attack-proof
+            _body = new ColorRect();
+            _body.Size = new Vector2(72.0f, 72.0f);
+            _body.Position = -_body.Size * 0.5f;
+            _body.Rotation = 0.785f;
+            _body.Color = new Color(0.85f, 0.12f, 0.12f);
+            AddChild(_body);
+            return;
+        }
         float w = kind == "wolf" ? 34.0f : 26.0f;
         _body = new ColorRect();
         _body.Size = new Vector2(w, w * 0.8f);
@@ -34,9 +46,27 @@ public partial class Enemy : Combatant
         Game g = GetParent() as Game;
         if (g == null)
             return;
+        Vector2 p = GlobalPosition;
+        if (kind == "reaper")
+        {
+            // TEST reaper: chase the nearest ally, kill the first body it touches,
+            // then despawn. Attack-proof via its huge hp; no separation / contact
+            // damage logic needed. kind "dead" + offscreen = clean despawn without
+            // freeing (kill scan drops the registry entry, no XP).
+            PartyMember prey = g.NearestMember(p);
+            if (prey != null)
+                GlobalPosition = g.ClampToArena(GlobalPosition + (prey.GlobalPosition - GlobalPosition).Normalized() * speed * delta);
+            PartyMember touch = g.NearestMemberAny(GlobalPosition);
+            if (touch != null && touch.GlobalPosition.DistanceTo(GlobalPosition) < 36.0f + g.MEMBER_RADIUS)
+            {
+                g.OnReaperKill(touch);
+                kind = "dead";
+                GlobalPosition = new Vector2(0.0f, -10000.0f);
+            }
+            return;
+        }
         PartyMember m = g.NearestMember(GlobalPosition);
         _contactCd -= delta;
-        Vector2 p = GlobalPosition;
         if (m != null)
         {
             Vector2 to = m.GlobalPosition - p;
