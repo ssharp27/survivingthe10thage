@@ -44,6 +44,18 @@ system dotnet is runtime-only). Run the main scene; **WASD or arrows** move the 
 party follows on the bodyguard ring, everyone auto-attacks. At a level-up the picker label
 shows options — press **A / S / D** (confirm-any-time; the A/S/D letters also walk — VS-style overlap).
 
+## Godot 4.7 C# pitfalls (found empirically, keep for future work)
+
+- **C# `_draw()` is never invoked** (binding dropped the hook; a plain `public void _draw()`
+  silently runs 0 times — probe proved it). Drawing *outside* `_draw` is engine-enforced
+  ("Drawing is only allowed inside this node's `_draw()`…"). **Workaround**: GDScript child
+  `src/AttackTelegraph.gd` (GDScript `_draw` works), attached from C# via
+  `Set("script", GD.Load<Godot.Script>(...))` and triggered with `Call("show_attack", …)`.
+- 4.7 bindings renames/removals hit so far: no `Godot.GDScriptResource` class (use `Godot.Script`);
+  no `Node.Script` property (use `Set("script", …)`, which returns **void**); no `z_index` field
+  (use `ZIndex`); input serialization is `keycode`/`physical_keycode`; no `Input.GetPressedKeys`;
+  `DrawPolygon` wants per-vertex `Godot.Color[]`; `_draw` not virtual (never `override`).
+
 ## Still open — vision work (pick priority with user)
 
 1. **Balance/feel pass for human play**: contact pressure, XP curve, campfire heal economy;

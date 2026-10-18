@@ -10,6 +10,7 @@ battles/chapters we fought at the table.
 - Every member auto-attacks with its own **signature attack** (class-flavored). You only control movement/positioning.
 - **Per-member HP**, summed as the squad's effective pool. Damage goes to orbiting members **before** the Leader — the ring is real geometry. Exceptions exist as class passives (aggro/tank, e.g. Paladin *Protection*).
 - **Downed state**: member stops attacking, HP exits the pool, an animated **d20 rolls over the body** (death-save flair). Accumulated failures → **eliminated** (out until the next campfire). Full squad eliminated = TPK = run over.
+- **Leader down (deferred)**: originally intended as instant TPK; shelved — for now the squad just keeps fighting while the Leader is downed. Future mechanic: a party member can revive the Leader.
 - **Revive**: stand still on a downed body (~3s channel) → revives at **50% HP**. Standing still in a horde is the risk/reward core.
 - **XP is squad-shared**; each level-up pick **targets one named member** ("Wizard's ray +1", "Paladin: Shieldwall evolution").
 - Upgrade paths: 3 ranks, then an **evolution = subclass choice** (Fighter → Champion / Echo Knight). Data-driven.
