@@ -24,7 +24,8 @@ public partial class PartyMember : Godot.Node2D
     public bool downed = false;
     public bool eliminated = false;
     float cdTimer = 0.0f;
-    float attackVis = 0.0f; // swing telegraph (sector/line in _draw) while > 0
+    Godot.Node2D _tele; // child carrying the GDScript telegraph (C# _draw is dead in 4.7)
+    private static Godot.Script _teleScript;
     public float facing = 0.0f;
     public float dmgMul = 1.0f;
     public float cdMul = 1.0f;
@@ -56,6 +57,12 @@ public partial class PartyMember : Godot.Node2D
         _ds = new Label();
         _ds.Position = new Vector2(-24.0f, -40.0f);
         AddChild(_ds);
+        if (_teleScript == null)
+            _teleScript = GD.Load<Godot.Script>("res://src/AttackTelegraph.gd");
+        _tele = new Godot.Node2D();
+        _tele.Name = "Telegraph";
+        _tele.Set("script", _teleScript);
+        AddChild(_tele);
     }
 
     public void SetDsText(string s)
@@ -68,36 +75,6 @@ public partial class PartyMember : Godot.Node2D
     {
         SetDsText(s);
         dsHold = (float)hold;
-    }
-
-    // Greybox swing telegraph: the maul shows its AoE sector, the rapier its stab
-    // line. Semi-transparent so they read over the enemy squares they cover.
-    // C# 4.7 no longer invokes _draw() (the binding dropped the hook), so draw
-    // every frame from _Process instead: while attackVis > 0.
-    public void DrawTelegraph()
-    {
-        if (attackVis <= 0.0f)
-            return;
-        float r = range * rangeMul;
-        if (arcHalf > 0.5f)
-        {
-            const int steps = 12;
-            Vector2[] fan = new Vector2[steps + 2];
-            Godot.Color[] cols = new Godot.Color[steps + 2];
-            fan[0] = new Vector2(0.0f, 0.0f);
-            for (int i = 0; i <= steps; i++)
-            {
-                double a = facing - arcHalf + (2.0 * arcHalf) * i / steps;
-                fan[i + 1] = new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a)) * r;
-            }
-            for (int i = 0; i <= steps + 1; i++)
-                cols[i] = new Color(1.0f, 0.55f, 0.2f, 0.45f);
-            DrawPolygon(fan, cols);
-        }
-        else
-            DrawLine(new Vector2(0.0f, 0.0f),
-                     new Vector2((float)System.Math.Cos(facing), (float)System.Math.Sin(facing)) * r,
-                     new Color(0.5f, 1.0f, 1.0f, 0.55f), 7.0f);
     }
 
     public override void _Process(double d)
@@ -115,15 +92,12 @@ public partial class PartyMember : Godot.Node2D
         else
             _body.Modulate = new Color(1.0f, 1.0f, 1.0f);
         cdTimer -= delta;
-        if (attackVis > 0.0f)
-            attackVis -= delta;
         if (dsHold > 0.0f)
         {
             dsHold -= delta;
             if (dsHold <= 0.0f && !downed && !eliminated)
                 _ds.Text = "";
         }
-        DrawTelegraph();
         if (cdTimer > 0.0f)
             return;
         Vector2 p = GlobalPosition;
@@ -180,7 +154,8 @@ public partial class PartyMember : Godot.Node2D
         else
             ((Combatant)best).TakeDamage(dmg); // Rapier: single precise target
         _flash = 0.12f;
-        attackVis = 0.18f;
+        if (_tele != null)
+            _tele.Call("show_attack", range * rangeMul, arcHalf, facing, arcHalf > 0.5f ? 0 : 1);
     }
 
     private static double angleDiff(double a, double b)
