@@ -51,6 +51,14 @@ public partial class Enemy : Combatant
                 g.TakeHit(m, contactDamage);
             }
         }
+        // downed bodies are still run into even though nobody chases them
+        PartyMember hitAny = g.NearestMemberAny(p);
+        if (hitAny != null && hitAny.downed &&
+            hitAny.GlobalPosition.DistanceTo(p) < 12.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
+        {
+            _contactCd = 0.6f;
+            g.TakeHit(hitAny, contactDamage);
+        }
         // separation: n-bounded push apart (spatial hash replaces this in M2)
         foreach (Godot.Node2D n in g.GetEnemies())
         {

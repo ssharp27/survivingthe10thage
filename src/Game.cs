@@ -13,14 +13,17 @@ public partial class Game : Godot.Node2D
     public readonly double ARENA_HW = 1200.0;
     public const double ARENA_HH = 900.0;
     public readonly float MEMBER_RADIUS = 16.0f;
-    readonly double REVIVE_RANGE = 30.0;
-    readonly double REVIVE_CHANNEL = 3.0;
 
-    // ---------- death saves ----------
-    readonly double DS_INTERVAL = 4.0;
-    readonly double DS_STABILIZE_AT = 15.0;
+    // ---------- death saves (user-locked rules) ----------
+    // Downed allies roll a death save every 6 s: nat 20 revives them at 25 % HP,
+    // 11-19 stabilizes (nothing), 10 or below is a failure; three failures = out
+    // until the next campfire. Damage while downed counts as one failure, but a
+    // 2 s buffer keeps a swarm from instantly finishing someone off.
+    readonly double DS_INTERVAL = 6.0;
+    readonly int DS_FAIL_ON = 10; // roll <= this fails
+    readonly int DS_REVIVE_ON = 20; // nat 20 revives at 25 % HP
     readonly int DS_FAIL_LIMIT = 3;
-    readonly int DS_STABILIZE_NEED = 2;
+    readonly double DS_DAMAGE_FAIL_BUFFER = 2.0;
 
     // ---------- stage pacing (tanurial forest M1) ----------
     readonly double FIRST_HALF = 90.0;
@@ -94,10 +97,47 @@ public partial class Game : Godot.Node2D
         return best;
     }
 
+    // for contact/projectile damage: downed bodies are hit-able, just never chased
+    public PartyMember NearestMemberAny(Vector2 from)
+    {
+        PartyMember best = null;
+        double bestD = 1e18;
+        foreach (PartyMember m in _party)
+        {
+            if (m.eliminated)
+                continue;
+            double dd = m.GlobalPosition.DistanceSquaredTo(from);
+            if (dd < bestD)
+            {
+                bestD = dd;
+                best = m;
+            }
+        }
+        return best;
+    }
+
     public void TakeHit(PartyMember m, double amount)
     {
-        if (m == null || m.downed || m.eliminated)
+        if (m == null || m.eliminated)
             return;
+        if (m.downed)
+        {
+            // downed bodies still get ran into / hit by volleys: each hit is one
+            // failed death save, buffered 2 s so a swarm can't insta-finish them
+            if (m.dsDamageBuffer > 0.0f)
+                return;
+            m.dsDamageBuffer = (float)DS_DAMAGE_FAIL_BUFFER;
+            m.dsFails++;
+            if (m.dsFails >= DS_FAIL_LIMIT)
+            {
+                m.eliminated = true;
+                m.SetDsText("OUT - next campfire");
+            }
+            else
+                m.SetDsText("hit while down: fail " + m.dsFails + "/" + DS_FAIL_LIMIT);
+            CheckTpk();
+            return;
+        }
         if (_pilot)
             amount *= 0.15; // verification-only aid for headless runs; never set in normal play
         m.hp -= (float)amount;
@@ -106,8 +146,7 @@ public partial class Game : Godot.Node2D
             m.downed = true;
             m.dsTimer = 0.0f;
             m.dsFails = 0;
-            m.dsSucceeds = 0;
-            m.reviveProgress = 0.0f;
+            m.dsDamageBuffer = 0.0f;
             m.SetDsText("DOWN");
             CheckTpk();
         }
@@ -122,6 +161,9 @@ public partial class Game : Godot.Node2D
             m.eliminated = false;
             m.downed = false;
             m.hp = m.maxHp * 0.5f;
+            m.dsFails = 0;
+            m.dsTimer = 0.0f;
+            m.dsDamageBuffer = 0.0f;
             m.SetDsTemp("back at camp", 2.5);
         }
     }
@@ -483,6 +525,40 @@ public partial class Game : Godot.Node2D
             else
                 leader.facing = (float)System.Math.Atan2(dir.Y, dir.X);
         }
+        else if (leader != null)
+        {
+            // idle leader turns to its nearest threat: facing only followed the
+            // movement direction, so standing still starved the maul everywhere
+            // except the way they last walked
+            Godot.Node2D best = null;
+            float bestD = 1e9f;
+            for (int i = 0; i < _enemies.Count; i++)
+            {
+                Combatant c = (Combatant)_enemies[i];
+                if (c == null || c.kind == "dead")
+                    continue;
+                Godot.Node2D n = _enemies[i];
+                float dd = n.GlobalPosition.DistanceTo(leader.GlobalPosition);
+                if (dd >= bestD)
+                    continue;
+                bestD = dd;
+                best = n;
+            }
+            foreach (Boss b in _bosses)
+            {
+                float dd = b.GlobalPosition.DistanceTo(leader.GlobalPosition);
+                if (dd < bestD)
+                {
+                    bestD = dd;
+                    best = b;
+                }
+            }
+            if (best != null && bestD <= leader.range * leader.rangeMul * 1.5f)
+            {
+                Vector2 v = best.GlobalPosition - leader.GlobalPosition;
+                leader.facing = (float)System.Math.Atan2(v.Y, v.X);
+            }
+        }
         foreach (PartyMember m in _party)
         {
             if (m.isLeader || m.downed || m.eliminated)
@@ -495,33 +571,28 @@ public partial class Game : Godot.Node2D
         if (_camera != null && leader != null)
             _camera.GlobalPosition = _camera.GlobalPosition.Lerp(leader.GlobalPosition, 0.08f);
 
-        // death saves + stand-still revive channels
+        // death saves (dice-only revive): roll every 6 s. nat 20 = revived at 25 %
+        // HP; 11-19 stabilizes (nothing); 10 or below is a failure and 3 failures
+        // = out until the campfire. Damage while downed counts as a buffered
+        // failure too (handled in TakeHit).
         foreach (PartyMember m in _party)
         {
-            if (m.eliminated)
-                continue;
-            if (!m.downed)
+            if (m.eliminated || !m.downed)
                 continue;
             m.dsTimer += (float)d;
             if (m.dsTimer >= DS_INTERVAL)
             {
                 m.dsTimer = 0.0f;
                 int roll = (int)(GD.Randi() % 20) + 1;
-                if (roll >= (int)DS_STABILIZE_AT)
+                if (roll == DS_REVIVE_ON)
                 {
-                    m.dsSucceeds++;
-                    if (m.dsSucceeds >= DS_STABILIZE_NEED)
-                    {
-                        m.downed = false;
-                        m.hp = m.maxHp * 0.25f;
-                        m.SetDsTemp("stable!", 2.0);
-                    }
-                    else
-                    {
-                        m.SetDsText("d20:" + roll + " stable " + m.dsSucceeds + "/" + DS_STABILIZE_NEED);
-                    }
+                    m.downed = false;
+                    m.hp = m.maxHp * 0.25f;
+                    m.dsFails = 0;
+                    m.dsDamageBuffer = 0.0f;
+                    m.SetDsTemp("nat20 - revived 25%", 2.5);
                 }
-                else
+                else if (roll <= DS_FAIL_ON)
                 {
                     m.dsFails++;
                     if (m.dsFails >= DS_FAIL_LIMIT)
@@ -535,22 +606,8 @@ public partial class Game : Godot.Node2D
                         m.SetDsText("d20:" + roll + " fail " + m.dsFails + "/" + DS_FAIL_LIMIT);
                     }
                 }
-            }
-            bool inRange = leaderLive && leader.GlobalPosition.DistanceTo(m.GlobalPosition) < REVIVE_RANGE;
-            if (inRange && !moved)
-            {
-                m.reviveProgress += (float)d;
-                if (m.reviveProgress >= REVIVE_CHANNEL)
-                {
-                    m.downed = false;
-                    m.reviveProgress = 0.0f;
-                    m.hp = m.maxHp * 0.5f;
-                    m.SetDsTemp("revived!", 2.0);
-                }
-            }
-            else if (m.reviveProgress > 0.0f)
-            {
-                m.reviveProgress = (float)System.Math.Max(0.0, m.reviveProgress - delta * 1.5);
+                else
+                    m.SetDsText("d20:" + roll + " stable");
             }
         }
 
@@ -658,7 +715,7 @@ public partial class Game : Godot.Node2D
                 DespawnBullet(i);
                 continue;
             }
-            PartyMember m = NearestMember(p);
+            PartyMember m = NearestMemberAny(p); // volleys hit downed bodies too
             if (m != null && p.DistanceTo(m.GlobalPosition) < 12.0f + MEMBER_RADIUS)
             {
                 if (_pilot)

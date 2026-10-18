@@ -24,8 +24,9 @@ public partial class PartyMember : Godot.Node2D
     public bool downed = false;
     public bool eliminated = false;
     float cdTimer = 0.0f;
-    Godot.Node2D _tele; // child carrying the GDScript telegraph (C# _draw is dead in 4.7)
-    private static Godot.Script _teleScript;
+    Godot.Node2D _telePivot; // telegraph armature (pure nodes: C# _draw is dead in 4.7)
+    Godot.ColorRect[] _teleParts;
+    float _teleHold = 0.0f; // telegraph visibility timer, set on each swing
     public float facing = 0.0f;
     public float dmgMul = 1.0f;
     public float cdMul = 1.0f;
@@ -35,8 +36,7 @@ public partial class PartyMember : Godot.Node2D
     // down/death-save state (driven by the Game root)
     public float dsTimer = 0.0f;
     public int dsFails = 0;
-    public int dsSucceeds = 0;
-    public float reviveProgress = 0.0f;
+    public float dsDamageBuffer = 0.0f; // 2 s gap between damage-caused death-save fails
     public float dsHold = 0.0f; // countdown for SetDsTemp texts; 0 = persistent
 
     Godot.ColorRect _body;
@@ -57,12 +57,29 @@ public partial class PartyMember : Godot.Node2D
         _ds = new Label();
         _ds.Position = new Vector2(-24.0f, -40.0f);
         AddChild(_ds);
-        if (_teleScript == null)
-            _teleScript = GD.Load<Godot.Script>("res://src/AttackTelegraph.gd");
-        _tele = new Godot.Node2D();
-        _tele.Name = "Telegraph";
-        _tele.Set("script", _teleScript);
-        AddChild(_tele);
+        // telegraph: a pivot + thin ColorRect "spokes" radiating along facing. The
+        // maul shows the fan edges + middle; the rapier one solid stab line. Pure
+        // nodes because both the C# _draw hook and drawing outside _draw are dead
+        // ends in 4.7.
+        _telePivot = new Godot.Node2D();
+        _telePivot.Name = "Telegraph";
+        AddChild(_telePivot);
+        bool maul = arcHalf > 0.5f;
+        int spokes = maul ? 3 : 1;
+        float w = maul ? 5.0f : 7.0f;
+        Color col = maul ? new Color(1.0f, 0.55f, 0.2f, 0.45f)
+                         : new Color(0.5f, 1.0f, 1.0f, 0.55f);
+        _teleParts = new Godot.ColorRect[spokes];
+        for (int i = 0; i < spokes; i++)
+        {
+            Godot.ColorRect s = new Godot.ColorRect();
+            s.Size = new Vector2(range, w);
+            s.Position = new Vector2(0.0f, -w * 0.5f);
+            s.Rotation = spokes == 1 ? 0.0f : (float)(-arcHalf + 2.0 * arcHalf * i / (spokes - 1));
+            s.Color = col;
+            _telePivot.AddChild(s);
+            _teleParts[i] = s;
+        }
     }
 
     public void SetDsText(string s)
@@ -80,6 +97,8 @@ public partial class PartyMember : Godot.Node2D
     public override void _Process(double d)
     {
         float delta = (float)d;
+        if (dsDamageBuffer > 0.0f)
+            dsDamageBuffer -= delta; // ticks even while downed: the 2 s fail-buffer
         if (downed || eliminated)
             return;
         if (_flash > 0.0f)
@@ -97,6 +116,13 @@ public partial class PartyMember : Godot.Node2D
             dsHold -= delta;
             if (dsHold <= 0.0f && !downed && !eliminated)
                 _ds.Text = "";
+        }
+        if (_teleHold > 0.0f)
+        {
+            _teleHold -= delta;
+            float a = _teleHold <= 0.0f ? 0.0f : _teleHold / 0.18f;
+            foreach (Godot.ColorRect s in _teleParts)
+                s.Modulate = new Color(a, a, a, a);
         }
         if (cdTimer > 0.0f)
             return;
@@ -154,8 +180,9 @@ public partial class PartyMember : Godot.Node2D
         else
             ((Combatant)best).TakeDamage(dmg); // Rapier: single precise target
         _flash = 0.12f;
-        if (_tele != null)
-            _tele.Call("show_attack", range * rangeMul, arcHalf, facing, arcHalf > 0.5f ? 0 : 1);
+        _telePivot.Rotation = facing;
+        _telePivot.Scale = new Vector2(rangeMul, rangeMul);
+        _teleHold = 0.18f;
     }
 
     private static double angleDiff(double a, double b)

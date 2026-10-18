@@ -47,6 +47,7 @@ public partial class Boss : Combatant
         _phase = ratio > 0.66f ? 0 : (ratio > 0.33f ? 1 : 2);
 
         PartyMember target = g.GetLeader();
+        _contactCd -= delta;
         if (target != null && !target.downed && !target.eliminated)
         {
             Vector2 to = target.GlobalPosition - GlobalPosition;
@@ -55,12 +56,19 @@ public partial class Boss : Combatant
             // boss must settle inside that or it can never be struck
             if (dist > 100.0f)
                 GlobalPosition = g.ClampToArena(GlobalPosition + to.Normalized() * driftSpeed * delta);
-            _contactCd -= delta;
             if (dist < radius + g.MEMBER_RADIUS && _contactCd <= 0.0f)
             {
                 _contactCd = 0.8f;
                 g.TakeHit(target, 12.0);
             }
+        }
+        // downed bodies still get body-checked by the boss
+        PartyMember hitAny = g.NearestMemberAny(GlobalPosition);
+        if (hitAny != null && hitAny.downed &&
+            hitAny.GlobalPosition.DistanceTo(GlobalPosition) < radius + g.MEMBER_RADIUS && _contactCd <= 0.0f)
+        {
+            _contactCd = 0.8f;
+            g.TakeHit(hitAny, 12.0);
         }
 
         _eventTimer -= delta;
