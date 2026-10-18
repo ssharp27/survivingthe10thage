@@ -47,9 +47,10 @@ shows options — press **A / S / D** (confirm-any-time; the A/S/D letters also 
 **Death-state tester**: 10 s into a run a **big red diamond "reaper"** spawns **exactly once** — touching it
 **downs** whoever it touches (death saves start; it's a revival/STABLE test bench) and then it despawns.
 It doesn't outrun the party; walk into it yourself. Dead nodes are fully inert (`kind="dead"` early-return). Level-up picks are now **dmg +25%** ranks so kill-thresholds visibly shift (Mosiah one-shots
-goblins at 2 ranks). Death saves (locked): d20 every 6 s — nat 20 revives 25 %; 3 successes = **STABLE**,
+goblins at 2 ranks). Death saves (locked): d20 every **4 s** — nat 20 revives 25 %; 3 successes = **STABLE**,
 rolls stop and hits slay unless the Leader **stands still ~3 s on the body** (revive 50 %); 3 fails = OUT
-until the next campfire. **Revive protection (locked)**: a downed body being channeled is **immune** while
+until the next campfire. Campfires (locked): heal everyone **+25 % max HP** (clamped), eliminated members
+**return at 25 % HP**. **Revive protection (locked)**: a downed body being channeled is **immune** while
 the channel progresses (a swarm can't screw the rescue out), and every revive grants **2 s invulnerability**
 (pale-green tint); the reaper tester obeys immunity too — it only despawns after its down actually lands.
 

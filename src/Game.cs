@@ -20,12 +20,12 @@ public partial class Game : Godot.Node2D
     // shielded while the channel is actively progressing (reviveShield)
 
     // ---------- death saves (user-locked rules) ----------
-    // Downed allies roll a d20 every 6 s: nat 20 = revived at 25 % HP, 11-19 = a
+    // Downed allies roll a d20 every 4 s: nat 20 = revived at 25 % HP, 11-19 = a
     // success, 3 successes = STABLE (rolls stop; a hit then slays the body
     // outright unless the player revives it), 10 or below = a failure and 3
     // failures = out until the next campfire. Damage on a downed (unstable) body
     // is one failure, kept 2 s apart so a swarm can't insta-finish anyone.
-    readonly double DS_INTERVAL = 6.0;
+    readonly double DS_INTERVAL = 4.0; // d20 roll cadence while downed
     readonly int DS_FAIL_ON = 10; // roll <= this fails
     readonly int DS_REVIVE_ON = 20; // nat 20 revives at 25 % HP
     readonly int DS_FAIL_LIMIT = 3;
@@ -199,19 +199,39 @@ public partial class Game : Godot.Node2D
     {
         foreach (PartyMember m in _party)
         {
-            if (!m.eliminated && !m.downed)
+            if (m.eliminated)
+            {
+                // out since the last campfire: return at 25% HP
+                m.eliminated = false;
+                m.downed = false;
+                m.hp = m.maxHp * 0.25f;
+                m.stable = false;
+                m.dsFails = 0;
+                m.dsSucceeds = 0;
+                m.dsTimer = 0.0f;
+                m.dsDamageBuffer = 0.0f;
+                m.reviveProgress = 0.0f;
+                m.reviveShield = false;
+                m.SetDsTemp("back at camp", 2.5);
                 continue;
-            m.eliminated = false;
-            m.downed = false;
-            m.hp = m.maxHp * 0.5f;
-            m.stable = false;
-            m.dsFails = 0;
-            m.dsSucceeds = 0;
-            m.dsTimer = 0.0f;
-            m.dsDamageBuffer = 0.0f;
-            m.reviveProgress = 0.0f;
-            m.reviveShield = false;
-            m.SetDsTemp("back at camp", 2.5);
+            }
+            if (m.downed)
+            {
+                // a body at camp: stands back up, rolls reset
+                m.downed = false;
+                m.stable = false;
+                m.dsFails = 0;
+                m.dsSucceeds = 0;
+                m.dsTimer = 0.0f;
+                m.dsDamageBuffer = 0.0f;
+                m.reviveProgress = 0.0f;
+                m.reviveShield = false;
+                m.SetDsTemp("back at camp", 2.5);
+            }
+            // the campfire itself: everyone heals 25% of their max HP
+            m.hp = m.hp + m.maxHp * 0.25f;
+            if (m.hp > m.maxHp)
+                m.hp = m.maxHp;
         }
     }
 
@@ -249,7 +269,7 @@ public partial class Game : Godot.Node2D
             _stageT = 0.0;
             ClearEnemies();
             ReviveAllAtCampfire();
-            GD.Print("[10thAge] mini-boss slain — campfire: party back at half HP");
+            GD.Print("[10thAge] mini-boss slain — campfire: party +25% HP, the fallen return at 25%");
         }
         else if (_state == StageState.BOSS && kb == "final")
         {
@@ -646,7 +666,7 @@ public partial class Game : Godot.Node2D
         if (_camera != null && leader != null)
             _camera.GlobalPosition = _camera.GlobalPosition.Lerp(leader.GlobalPosition, 0.08f);
 
-        // death saves (locked rules): d20 every 6 s while downed - nat 20 revives
+        // death saves (locked rules): d20 every 4 s while downed - nat 20 revives
         // at 25 % HP, 11-19 is a success (3 successes = STABLE, rolls stop), 10 or
         // below is a failure (3 = out until the campfire). Damage on a downed body
         // is a buffered failure (TakeHit); damage on a STABLE body slays it (TakeHit).
