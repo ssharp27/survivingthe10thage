@@ -122,7 +122,7 @@ public partial class Game : Godot.Node2D
             m.eliminated = false;
             m.downed = false;
             m.hp = m.maxHp * 0.5f;
-            m.SetDsText("back at camp");
+            m.SetDsTemp("back at camp", 2.5);
         }
     }
 
@@ -514,7 +514,7 @@ public partial class Game : Godot.Node2D
                     {
                         m.downed = false;
                         m.hp = m.maxHp * 0.25f;
-                        m.SetDsText("stable!");
+                        m.SetDsTemp("stable!", 2.0);
                     }
                     else
                     {
@@ -545,7 +545,7 @@ public partial class Game : Godot.Node2D
                     m.downed = false;
                     m.reviveProgress = 0.0f;
                     m.hp = m.maxHp * 0.5f;
-                    m.SetDsText("revived!");
+                    m.SetDsTemp("revived!", 2.0);
                 }
             }
             else if (m.reviveProgress > 0.0f)

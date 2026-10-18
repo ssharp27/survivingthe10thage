@@ -36,6 +36,7 @@ public partial class PartyMember : Godot.Node2D
     public int dsFails = 0;
     public int dsSucceeds = 0;
     public float reviveProgress = 0.0f;
+    public float dsHold = 0.0f; // countdown for SetDsTemp texts; 0 = persistent
 
     Godot.ColorRect _body;
     Godot.Label _ds;
@@ -63,9 +64,17 @@ public partial class PartyMember : Godot.Node2D
             _ds.Text = s;
     }
 
+    public void SetDsTemp(string s, double hold)
+    {
+        SetDsText(s);
+        dsHold = (float)hold;
+    }
+
     // Greybox swing telegraph: the maul shows its AoE sector, the rapier its stab
     // line. Semi-transparent so they read over the enemy squares they cover.
-    public void _draw()
+    // C# 4.7 no longer invokes _draw() (the binding dropped the hook), so draw
+    // every frame from _Process instead: while attackVis > 0.
+    public void DrawTelegraph()
     {
         if (attackVis <= 0.0f)
             return;
@@ -108,6 +117,13 @@ public partial class PartyMember : Godot.Node2D
         cdTimer -= delta;
         if (attackVis > 0.0f)
             attackVis -= delta;
+        if (dsHold > 0.0f)
+        {
+            dsHold -= delta;
+            if (dsHold <= 0.0f && !downed && !eliminated)
+                _ds.Text = "";
+        }
+        DrawTelegraph();
         if (cdTimer > 0.0f)
             return;
         Vector2 p = GlobalPosition;
