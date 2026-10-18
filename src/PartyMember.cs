@@ -44,6 +44,7 @@ public partial class PartyMember : Godot.Node2D
     public override void _EnterTree()
     {
         AddToGroup("party");
+        z_index = 5; // members (and their _draw telegraphs) paint above enemy squares
         hp = maxHp;
         _body = new ColorRect();
         _body.Size = new Vector2(30.0f, 30.0f);
@@ -81,13 +82,13 @@ public partial class PartyMember : Godot.Node2D
                 fan[i + 1] = new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a)) * r;
             }
             for (int i = 0; i <= steps + 1; i++)
-                cols[i] = new Color(1.0f, 1.0f, 0.8f, 0.30f);
+                cols[i] = new Color(1.0f, 0.55f, 0.2f, 0.45f);
             DrawPolygon(fan, cols);
         }
         else
             DrawLine(new Vector2(0.0f, 0.0f),
                      new Vector2((float)System.Math.Cos(facing), (float)System.Math.Sin(facing)) * r,
-                     new Color(1.0f, 1.0f, 1.0f, 0.45f), 6.0f);
+                     new Color(0.5f, 1.0f, 1.0f, 0.55f), 7.0f);
     }
 
     public override void _Process(double d)
