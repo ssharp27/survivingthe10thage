@@ -592,15 +592,6 @@ public partial class Game : Godot.Node2D
         float sD = Input.GetActionStrength("move_down");
         if (sR + sL + sU + sD > 0.0f)
             _hud.Text += " | in " + (int)sR + (int)sL + (int)sU + (int)sD;
-        // TEMP debug 2: raw pressed-key codes — if these appear but "in" never does,
-        // the [input] bindings are wrong; if these never appear either, key events
-        // are not reaching the game process at all (window focus issue)
-        Array pressed = Input.GetPressedKeys();
-        string ks = "";
-        foreach (long k in pressed)
-            ks += (ks == "" ? "" : ",") + (int)k;
-        if (ks != "")
-            _hud.Text += " | keys " + ks;
         if (_pilot)
         {
             // one status line every 15s of sim time so a headless smoke run can follow the flow
