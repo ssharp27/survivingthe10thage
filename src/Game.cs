@@ -584,6 +584,12 @@ public partial class Game : Godot.Node2D
         _hud.Text = "Surviving the 10th Age - Tanurial Forest | Lv " + _level +
                     " | xp " + (int)_xp + "/" + (int)_xpNext +
                     " | " + StateName(_state) + " t=" + (int)_stageT + " | enemies " + _liveEnemies;
+        foreach (PartyMember m in _party)
+        {
+            string st = m.eliminated ? "OUT - next campfire"
+                        : (m.downed ? "DOWN - death saving" : (int)m.hp + "/" + (int)m.maxHp + " hp");
+            _hud.Text += "\n" + m.displayName + ": " + st;
+        }
         if (_pilot)
         {
             // one status line every 15s of sim time so a headless smoke run can follow the flow
@@ -682,7 +688,7 @@ public partial class Game : Godot.Node2D
             string a = _party.Count > 0 ? _party[0].displayName + " " + _party[0].weaponName : "A";
             string b = _party.Count > 1 ? _party[1].displayName + " " + _party[1].weaponName : "B";
             _pickerLabel.Text = "LEVEL UP: [A] " + a + " dmg +15%   [S] " + b +
-                                " dmg +15%   [D] heal party 25% (auto after 6s)";
+                                " dmg +15% (auto after 6s)";
         }
         if (!_pickerActive)
             return;
@@ -692,22 +698,12 @@ public partial class Game : Godot.Node2D
             choice = 0;
         else if (_party.Count > 1 && Input.GetActionStrength("pick_s") > 0.5f)
             choice = 1;
-        else if (Input.GetActionStrength("pick_d") > 0.5f)
-            choice = 2;
         else if (_pilot && _pickerWait >= 2.0)
-        {
-            // pilot picks like a human would: heal when the party is hurting,
-            // otherwise rotate through named member damage picks
-            bool hurting = false;
-            foreach (PartyMember mm in _party)
-            {
-                if (!mm.eliminated && mm.hp < mm.maxHp * 0.45f)
-                    hurting = true;
-            }
-            choice = hurting ? 2 : _level % 2;
-        }
+            choice = _level % 2; // pilot just rotates through named damage picks
         if (_pickerWait >= PICKER_AUTO_TIMEOUT)
-            choice = 2;
+            choice = _level % 2;
+        if (choice >= _party.Count)
+            choice = 0;
         if (choice < 0)
             return;
         ApplyUpgrade(choice);
@@ -717,19 +713,11 @@ public partial class Game : Godot.Node2D
 
     private void ApplyUpgrade(int choice)
     {
-        if (choice < 2 && choice < _party.Count)
+        // no HP restoration on level-up: healing lives only in campfires and revives
+        if (choice >= 0 && choice < _party.Count)
         {
             _party[choice].dmgMul *= 1.15f;
             GD.Print("[10thAge] upgrade: " + _party[choice].displayName + " dmg +15%");
-        }
-        else
-        {
-            foreach (PartyMember m in _party)
-            {
-                if (!m.eliminated)
-                    m.hp = (float)System.Math.Min(m.maxHp, m.hp + m.maxHp * 0.25);
-            }
-            GD.Print("[10thAge] upgrade: party healed 25%");
         }
     }
 

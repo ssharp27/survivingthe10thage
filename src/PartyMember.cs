@@ -24,6 +24,7 @@ public partial class PartyMember : Godot.Node2D
     public bool downed = false;
     public bool eliminated = false;
     float cdTimer = 0.0f;
+    float attackVis = 0.0f; // swing telegraph (sector/line in _draw) while > 0
     public float facing = 0.0f;
     public float dmgMul = 1.0f;
     public float cdMul = 1.0f;
@@ -61,6 +62,34 @@ public partial class PartyMember : Godot.Node2D
             _ds.Text = s;
     }
 
+    // Greybox swing telegraph: the maul shows its AoE sector, the rapier its stab
+    // line. Semi-transparent so they read over the enemy squares they cover.
+    public void _draw()
+    {
+        if (attackVis <= 0.0f)
+            return;
+        float r = range * rangeMul;
+        if (arcHalf > 0.5f)
+        {
+            const int steps = 12;
+            Vector2[] fan = new Vector2[steps + 2];
+            Godot.Color[] cols = new Godot.Color[steps + 2];
+            fan[0] = new Vector2(0.0f, 0.0f);
+            for (int i = 0; i <= steps; i++)
+            {
+                double a = facing - arcHalf + (2.0 * arcHalf) * i / steps;
+                fan[i + 1] = new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a)) * r;
+            }
+            for (int i = 0; i <= steps + 1; i++)
+                cols[i] = new Color(1.0f, 1.0f, 0.8f, 0.30f);
+            DrawPolygon(fan, cols);
+        }
+        else
+            DrawLine(new Vector2(0.0f, 0.0f),
+                     new Vector2((float)System.Math.Cos(facing), (float)System.Math.Sin(facing)) * r,
+                     new Color(1.0f, 1.0f, 1.0f, 0.45f), 6.0f);
+    }
+
     public override void _Process(double d)
     {
         float delta = (float)d;
@@ -69,11 +98,15 @@ public partial class PartyMember : Godot.Node2D
         if (_flash > 0.0f)
         {
             _flash -= delta;
-            _body.Modulate = new Color(3.0f, 3.0f, 3.0f);
+            // red tint, not a white multiply: Baldrun's near-white square barely
+            // changed under a 3x white modulate
+            _body.Modulate = new Color(1.0f, 0.35f, 0.35f);
         }
         else
             _body.Modulate = new Color(1.0f, 1.0f, 1.0f);
         cdTimer -= delta;
+        if (attackVis > 0.0f)
+            attackVis -= delta;
         if (cdTimer > 0.0f)
             return;
         Vector2 p = GlobalPosition;
@@ -130,6 +163,7 @@ public partial class PartyMember : Godot.Node2D
         else
             ((Combatant)best).TakeDamage(dmg); // Rapier: single precise target
         _flash = 0.12f;
+        attackVis = 0.18f;
     }
 
     private static double angleDiff(double a, double b)
