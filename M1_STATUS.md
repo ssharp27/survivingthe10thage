@@ -44,6 +44,13 @@ system dotnet is runtime-only). Run the main scene; **WASD or arrows** move the 
 party follows on the bodyguard ring, everyone auto-attacks. At a level-up the picker label
 shows options — press **A / S / D** (confirm-any-time; the A/S/D letters also walk — VS-style overlap).
 
+**Death-state tester**: 10 s into a run a **big red diamond "reaper"** spawns — touching it slays whoever it
+touches instantly (attack-proof, despawns after its first kill). It doesn't outrun the party; walk into it
+yourself. Level-up picks are now **dmg +25%** ranks so kill-thresholds visibly shift (Mosiah one-shots
+goblins at 2 ranks). Death saves (locked): d20 every 6 s — nat 20 revives 25 %; 3 successes = **STABLE**,
+rolls stop and hits slay unless the Leader **stands still ~3 s on the body** (revive 50 %); 3 fails = OUT
+until the next campfire.
+
 ## Godot 4.7 C# pitfalls (found empirically, keep for future work)
 
 - **C# `_draw()` is never invoked** (binding dropped the hook; a plain `public void _draw()`
@@ -74,8 +81,8 @@ shows options — press **A / S / D** (confirm-any-time; the A/S/D letters also 
 `M1_PILOT=1` env ⇒ leader autopilots (orbits around threats, boss strafe + face-lock), bullet volleys
 pass through, incoming party damage ×0.15, and the picker auto-confirms at 2 s with a
 heal-aware choice. Implemented in Game.cs (`_pilot`, `faceTo`, bullet-dodge gate,
-`PickerTick` pilot branch). The stand-still revive channel was removed with the
-dice-only death-save rules.
+`PickerTick` pilot branch). The stand-still revive channel is back with the STABLE
+rules (dice nat-20 revive coexists with it), so pilot walk-to-body still exercises it.
 
 ## Build + smoke recipe
 
