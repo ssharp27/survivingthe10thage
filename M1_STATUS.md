@@ -49,7 +49,9 @@ touches instantly (attack-proof, despawns after its first kill). It doesn't outr
 yourself. Level-up picks are now **dmg +25%** ranks so kill-thresholds visibly shift (Mosiah one-shots
 goblins at 2 ranks). Death saves (locked): d20 every 6 s — nat 20 revives 25 %; 3 successes = **STABLE**,
 rolls stop and hits slay unless the Leader **stands still ~3 s on the body** (revive 50 %); 3 fails = OUT
-until the next campfire.
+until the next campfire. **Revive protection (locked)**: a downed body being channeled is **immune** while
+the channel progresses (a swarm can't screw the rescue out), and every revive grants **2 s invulnerability**
+(pale-green tint); the reaper tester obeys immunity too — it only despawns after a kill actually lands.
 
 ## Godot 4.7 C# pitfalls (found empirically, keep for future work)
 

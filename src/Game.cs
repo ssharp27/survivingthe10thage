@@ -16,6 +16,8 @@ public partial class Game : Godot.Node2D
     // ---------- player revive (leader stands still near a body) ----------
     readonly double REVIVE_RANGE = 30.0;
     readonly double REVIVE_CHANNEL = 3.0;
+    readonly double REVIVE_INVULN = 2.0; // post-revive immunity; the body is also
+    // shielded while the channel is actively progressing (reviveShield)
 
     // ---------- death saves (user-locked rules) ----------
     // Downed allies roll a d20 every 6 s: nat 20 = revived at 25 % HP, 11-19 = a
@@ -130,6 +132,8 @@ public partial class Game : Godot.Node2D
     {
         if (m == null || m.eliminated)
             return;
+        if (m.invuln > 0.0f || m.reviveShield)
+            return; // post-revive shield, or the body is mid-rescue: immune
         if (m.downed)
         {
             if (m.stable)
@@ -170,17 +174,21 @@ public partial class Game : Godot.Node2D
         }
     }
 
-    public void OnReaperKill(PartyMember m)
+    public bool OnReaperKill(PartyMember m)
     {
         // TEST reaper (user death-state tester): whatever it touches is simply out
-        // until the next campfire — no roll, no saves.
+        // until the next campfire — no roll, no saves. Returns true only when the
+        // kill actually landed, so immunity lets the reaper keep lurking.
         if (m == null || m.eliminated)
-            return;
+            return false;
+        if (m.invuln > 0.0f || m.reviveShield)
+            return false;
         m.downed = false;
         m.stable = false;
         m.eliminated = true;
         m.SetDsText("SLAIN - next campfire");
         CheckTpk();
+        return true;
     }
 
     public void ReviveAllAtCampfire()
@@ -198,6 +206,7 @@ public partial class Game : Godot.Node2D
             m.dsTimer = 0.0f;
             m.dsDamageBuffer = 0.0f;
             m.reviveProgress = 0.0f;
+            m.reviveShield = false;
             m.SetDsTemp("back at camp", 2.5);
         }
     }
@@ -656,6 +665,8 @@ public partial class Game : Godot.Node2D
                         m.dsFails = 0;
                         m.dsSucceeds = 0;
                         m.dsDamageBuffer = 0.0f;
+                        m.reviveShield = false;
+                        m.invuln = (float)REVIVE_INVULN;
                         m.SetDsTemp("nat20 - revived 25%", 2.5);
                         continue;
                     }
@@ -684,9 +695,13 @@ public partial class Game : Godot.Node2D
                     }
                 }
             }
-            // player revive channel: leader stands still next to the body
-            bool inRange = leaderLive && leader.GlobalPosition.DistanceTo(m.GlobalPosition) < REVIVE_RANGE;
-            if (inRange && !moved)
+            // player revive channel: leader stands still next to the body. The body
+            // is immune while the channel is progressing (reviveShield) so a swarm
+            // can't screw the rescue out, plus 2 s of post-revive invulnerability.
+            bool channeling = leaderLive && !moved
+                              && leader.GlobalPosition.DistanceTo(m.GlobalPosition) < REVIVE_RANGE;
+            m.reviveShield = channeling;
+            if (channeling)
             {
                 m.reviveProgress += (float)d;
                 if (m.reviveProgress >= REVIVE_CHANNEL)
@@ -696,6 +711,8 @@ public partial class Game : Godot.Node2D
                     m.dsFails = 0;
                     m.dsSucceeds = 0;
                     m.reviveProgress = 0.0f;
+                    m.reviveShield = false;
+                    m.invuln = (float)REVIVE_INVULN;
                     m.hp = m.maxHp * 0.5f;
                     m.SetDsTemp("revived!", 2.0);
                 }

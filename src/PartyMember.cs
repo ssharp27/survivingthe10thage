@@ -39,6 +39,8 @@ public partial class PartyMember : Godot.Node2D
     public int dsSucceeds = 0; // rolls of 11-19; 3 of them = stable
     public bool stable = false; // 3 successes: rolls stop, hits now slay
     public float reviveProgress = 0.0f; // leader stand-still channel
+    public bool reviveShield = false; // body is mid-rescue: damage is ignored
+    public float invuln = 0.0f; // post-revive immunity timer (2 s)
     public float dsDamageBuffer = 0.0f; // 2 s gap between damage-caused death-save fails
     public float dsHold = 0.0f; // countdown for SetDsTemp texts; 0 = persistent
 
@@ -104,6 +106,8 @@ public partial class PartyMember : Godot.Node2D
         float delta = (float)d;
         if (dsDamageBuffer > 0.0f)
             dsDamageBuffer -= delta; // ticks even while downed: the 2 s fail-buffer
+        if (invuln > 0.0f)
+            invuln -= delta; // post-revive immunity window, ticks always
         if (downed || eliminated)
             return;
         if (_flash > 0.0f)
@@ -129,6 +133,8 @@ public partial class PartyMember : Godot.Node2D
             foreach (Godot.ColorRect s in _teleParts)
                 s.Modulate = new Color(a, a, a, a);
         }
+        if (invuln > 0.0f)
+            _body.Modulate = new Color(0.8f, 1.0f, 0.85f); // pale green = post-revive shield
         if (cdTimer > 0.0f)
             return;
         Vector2 p = GlobalPosition;

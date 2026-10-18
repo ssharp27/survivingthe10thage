@@ -57,9 +57,10 @@ public partial class Enemy : Combatant
             if (prey != null)
                 GlobalPosition = g.ClampToArena(GlobalPosition + (prey.GlobalPosition - GlobalPosition).Normalized() * speed * delta);
             PartyMember touch = g.NearestMemberAny(GlobalPosition);
-            if (touch != null && touch.GlobalPosition.DistanceTo(GlobalPosition) < 36.0f + g.MEMBER_RADIUS)
+            if (touch != null && touch.GlobalPosition.DistanceTo(GlobalPosition) < 36.0f + g.MEMBER_RADIUS
+                && g.OnReaperKill(touch))
             {
-                g.OnReaperKill(touch);
+                // only despawn when the kill actually landed; immune bodies let it keep lurking
                 kind = "dead";
                 GlobalPosition = new Vector2(0.0f, -10000.0f);
             }
