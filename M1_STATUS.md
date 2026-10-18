@@ -48,9 +48,10 @@ shows options — press **A / S / D** (confirm-any-time; the A/S/D letters also 
 
 - **C# `_draw()` is never invoked** (binding dropped the hook; a plain `public void _draw()`
   silently runs 0 times — probe proved it). Drawing *outside* `_draw` is engine-enforced
-  ("Drawing is only allowed inside this node's `_draw()`…"). **Workaround**: GDScript child
-  `src/AttackTelegraph.gd` (GDScript `_draw` works), attached from C# via
-  `Set("script", GD.Load<Godot.Script>(...))` and triggered with `Call("show_attack", …)`.
+  ("Drawing is only allowed inside this node's `_draw()`…"). A GDScript child worked in
+  theory but users still saw nothing, so the shipped workaround is **pure nodes**: a
+  pivot + thin ColorRect "spokes" (maul = 3-ray fan, rapier = solid line) rotated to
+  `facing` and alpha-faded each frame — node attributes, not draw commands.
 - 4.7 bindings renames/removals hit so far: no `Godot.GDScriptResource` class (use `Godot.Script`);
   no `Node.Script` property (use `Set("script", …)`, which returns **void**); no `z_index` field
   (use `ZIndex`); input serialization is `keycode`/`physical_keycode`; no `Input.GetPressedKeys`;
@@ -70,10 +71,11 @@ shows options — press **A / S / D** (confirm-any-time; the A/S/D letters also 
 
 ## Pilot note (verification-only, env-gated — never active in human play)
 
-`M1_PILOT=1` env ⇒ leader autopilots (orbit / walk-to-body + stand-still revive channel /
-boss strafe + face-lock), bullet volleys pass through, incoming party damage ×0.15, and the
-picker auto-confirms at 2 s with a heal-aware choice. Implemented in Game.cs
-(`_pilot`, `faceTo`, bullet-dodge gate, `PickerTick` pilot branch).
+`M1_PILOT=1` env ⇒ leader autopilots (orbits around threats, boss strafe + face-lock), bullet volleys
+pass through, incoming party damage ×0.15, and the picker auto-confirms at 2 s with a
+heal-aware choice. Implemented in Game.cs (`_pilot`, `faceTo`, bullet-dodge gate,
+`PickerTick` pilot branch). The stand-still revive channel was removed with the
+dice-only death-save rules.
 
 ## Build + smoke recipe
 
