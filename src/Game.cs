@@ -584,14 +584,6 @@ public partial class Game : Godot.Node2D
         _hud.Text = "Surviving the 10th Age - Tanurial Forest | Lv " + _level +
                     " | xp " + (int)_xp + "/" + (int)_xpNext +
                     " | " + StateName(_state) + " t=" + (int)_stageT + " | enemies " + _liveEnemies;
-        // TEMP debug: show the four movement action strengths (R,L,U,D) — proves
-        // key-press -> binding -> action pipeline end to end from a real GUI press
-        float sR = Input.GetActionStrength("move_right");
-        float sL = Input.GetActionStrength("move_left");
-        float sU = Input.GetActionStrength("move_up");
-        float sD = Input.GetActionStrength("move_down");
-        if (sR + sL + sU + sD > 0.0f)
-            _hud.Text += " | in " + (int)sR + (int)sL + (int)sU + (int)sD;
         if (_pilot)
         {
             // one status line every 15s of sim time so a headless smoke run can follow the flow

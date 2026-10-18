@@ -89,43 +89,47 @@ public partial class PartyMember : Godot.Node2D
             Combatant nc = (Combatant)n;
             if (nc == null || nc.kind == "dead")
                 continue;
-            float dd = n.GlobalPosition.DistanceTo(p);
-            if (dd < bestD)
-            {
-                bestD = dd;
-                best = n;
-            }
+            Vector2 v = n.GlobalPosition - p;
+            float dd = v.Length();
+            if (dd >= bestD)
+                continue;
+            // The leader swings where it walks, so it may only target what its facing
+            // arc covers (touching enemies always count). Targeting the absolute
+            // nearest and then bailing when it fell outside the arc starved both
+            // members dead the moment a player stood still and the horde wrapped
+            // around behind them.
+            if (isLeader && dd >= 40.0f &&
+                System.Math.Abs(angleDiff((float)System.Math.Atan2(v.Y, v.X), facing)) > arcHalf)
+                continue;
+            bestD = dd;
+            best = n;
         }
         if (best == null || bestD > range * rangeMul)
             return;
         cdTimer = cooldown * cdMul;
         Vector2 to = best.GlobalPosition - p;
         float ang = (float)System.Math.Atan2(to.Y, to.X);
-        if (System.Math.Abs(angleDiff(ang, facing)) <= arcHalf)
+        if (!isLeader)
+            facing = ang; // ring members auto-aim: the bodyguard bites its prey
+        float dmg = weaponDamage * dmgMul;
+        if (arcHalf > 0.5f)
         {
-            float dmg = weaponDamage * dmgMul;
-            if (arcHalf > 0.5f)
+            // Maul: every enemy within reach AND inside the arc (area damage)
+            for (int i = 0; i < enemies.Count; i++)
             {
-                // Maul: every enemy within reach AND inside the arc (area damage)
-                for (int i = 0; i < enemies.Count; i++)
-                {
-                    Godot.Node2D n = enemies[i];
-                    Combatant nc = (Combatant)n;
-                    if (nc == null || nc.kind == "dead")
-                        continue;
-                    Vector2 e = n.GlobalPosition - p;
-                    float dd = e.Length();
-                    if (dd <= range * rangeMul && System.Math.Abs(angleDiff((float)System.Math.Atan2(e.Y, e.X), facing)) <= arcHalf)
-                        nc.TakeDamage(dmg);
-                }
+                Godot.Node2D n = enemies[i];
+                Combatant nc = (Combatant)n;
+                if (nc == null || nc.kind == "dead")
+                    continue;
+                Vector2 e = n.GlobalPosition - p;
+                float dd = e.Length();
+                if (dd <= range * rangeMul && System.Math.Abs(angleDiff((float)System.Math.Atan2(e.Y, e.X), facing)) <= arcHalf)
+                    nc.TakeDamage(dmg);
             }
-            else
-            {
-                // Rapier: single precise target (narrow arc enforced above)
-                ((Combatant)best).TakeDamage(dmg);
-            }
-            _flash = 0.12f;
         }
+        else
+            ((Combatant)best).TakeDamage(dmg); // Rapier: single precise target
+        _flash = 0.12f;
     }
 
     private static double angleDiff(double a, double b)
