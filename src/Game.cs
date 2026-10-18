@@ -295,6 +295,7 @@ public partial class Game : Godot.Node2D
         vis.Size = size;
         vis.Position = -size * 0.5f;
         vis.Color = new Color(0.25f, 0.22f, 0.18f, 1.0f);
+        vis.ZIndex = -10; // above floor, below entities
         w.AddChild(vis);
         AddChild(w);
         return w;
@@ -323,6 +324,8 @@ public partial class Game : Godot.Node2D
         floor.Size = new Vector2((float)(ARENA_HW * 2.0), (float)(ARENA_HH * 2.0));
         floor.Position = -floor.Size * 0.5f;
         floor.Color = new Color(0.10f, 0.16f, 0.10f, 1.0f);
+        floor.ZIndex = -20; // the .tscn party/boss nodes predate this node in tree order;
+                            // without a negative z they'd be painted over by the floor
         AddChild(floor);
         BuildWall(new Vector2(0.0f, -(float)ARENA_HH - 40.0f), new Vector2((float)(ARENA_HW * 2.0 + 100.0), 80.0f));
         BuildWall(new Vector2(0.0f, (float)ARENA_HH + 40.0f), new Vector2((float)(ARENA_HW * 2.0 + 100.0), 80.0f));
