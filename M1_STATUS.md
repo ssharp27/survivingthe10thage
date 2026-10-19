@@ -19,7 +19,7 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
   set facing to the strafe tangent, showing the boss its back).
 - **Pilot bullet dodge**: boss bullets pass through the party when `M1_PILOT` is set
   (verification-only; simulates a human dodging telegraphed volleys).
-- **Pilot picker rotates the three named picks** (wider arc / quicker thrusts / deeper thrust) up to the
+- **Pilot picker rotates the three named picks** (wider cleave / quicker thrusts / deeper thrust) up to the
   rank cap. There is **no party-heal pick** — `OPT_LABEL` has three entries and level-ups never restore HP
   (healing lives only in campfires and revives). The old "heal-aware pilot / party healed 25%" text described
   a pick removed in `f700526`; that was doc drift F1, corrected here on 2026-10-19.
@@ -127,7 +127,11 @@ confirms a pick, and the arena is frozen while the card is up). After a run ends
 **Death-state tester**: 10 s into a run a **big red diamond "reaper"** spawns **exactly once** — touching it
 **downs** whoever it touches (death saves start; it's a revival/STABLE test bench) and then it despawns.
 It doesn't outrun the party; walk into it yourself. Dead nodes are fully inert (`kind="dead"` early-return).
-Level-up picks are **distinct per-option effects capped at rank 3** (wider arc ×1.18,
+**Baldrun's maul is a RADIAL CLEAVE (human-test locked)**: it hits every enemy inside its radius
+whatever way the body faces — telegraph is the full 12-spoke dial, and the "wider cleave" rank
+grows the radius (×1.18/rank). **Followers slowly ORBIT the Leader** (world-space clock, radius 64;
+the threat-facing slot made them feel glued to directional input) and auto-aim their strikes.
+Level-up picks are **distinct per-option effects capped at rank 3** (cleave radius ×1.18,
 quicker thrusts cooldown ×0.86, deeper thrust range ×1.16 + 1 pierce; damage ×1.08-1.12 per rank) — the old
 flat "+25% dmg" ranks from `f88de14` were replaced. Death saves (locked): d20 every **4 s** — nat 20 revives 25 %;
 3 successes = **STABLE**, rolls stop and hits slay unless the Leader **stands still ~3 s on the body** (revive 50 %);
@@ -144,7 +148,7 @@ the channel progresses (a swarm can't screw the rescue out), and every revive gr
   silently runs 0 times — probe proved it). Drawing *outside* `_draw` is engine-enforced
   ("Drawing is only allowed inside this node's `_draw()`…"). A GDScript child worked in
   theory but users still saw nothing, so the shipped workaround is **pure nodes**: a
-  pivot + thin ColorRect "spokes" (maul = 3-ray fan, rapier = solid line) rotated to
+  pivot + thin ColorRect "spokes" (maul = 12-spoke cleave dial, rapier = solid line) rotated to
   `facing` and alpha-faded each frame — node attributes, not draw commands.
 - 4.7 bindings renames/removals hit so far: no `Godot.GDScriptResource` class (use `Godot.Script`);
   no `Node.Script` property (use `Set("script", …)`, which returns **void**); no `z_index` field
@@ -158,7 +162,7 @@ the channel progresses (a swarm can't screw the rescue out), and every revive gr
 2. **Boss spectacle**: Enter-the-Gungeon feel — phase telegraphs exist in Boss.cs (3 phases,
    ring/fan volleys); needs wind-up visuals, boss body size/silhouette, named phases.
 3. **Roster growth**: 3 more campaign PCs (recruit = join-point narrative beats in this stage),
-   3-rank upgrade tracks + evolutions (Stormcaller / Viperkiss) currently stubbed as +15 % ranks.
+   3-rank upgrade tracks + evolutions (Stormcaller / Viperkiss) still stubbed (M2).
 4. **8-bit D&D aesthetic pass**: greybox ColorRects → pixel sprites + palette; battle-scene backdrops.
 5. **Meta-layer stub**: campfire screen (return eliminated members), campaign-path stage select.
 6. Nice-to-have: MCP plugin GUI boot + hub re-pin (untested since the DLL-placement fix).

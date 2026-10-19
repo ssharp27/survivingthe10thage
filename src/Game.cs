@@ -64,7 +64,7 @@ public partial class Game : Godot.Node2D
     // at 3 per DESIGN; the 4th rank would be the evolution (Stormcaller / Viperkiss), stubbed
     // for M2. This table is the data surface: a .tres pass copies these columns straight out.
     const int PICK_RANK_CAP = 3;
-    static readonly string[] OPT_LABEL = { "wider arc (maul area)", "quicker thrusts (cooldown)", "deeper thrust (reach + pierce)" };
+    static readonly string[] OPT_LABEL = { "wider cleave (radius)", "quicker thrusts (cooldown)", "deeper thrust (reach + pierce)" };
     static readonly int[] OPT_MEMBER = { 0, 1, 1 }; // targets one named member (DESIGN)
     static readonly float[] OPT_ARC = { 1.18f, 1.0f, 1.0f };
     static readonly float[] OPT_CD = { 1.0f, 0.86f, 1.0f };
@@ -857,61 +857,25 @@ public partial class Game : Godot.Node2D
             }
         }
 
-        // ---------- the ring is real geometry (locked design) ----------
-        // Followers take slots toward the nearest living threat (they interpose between
-        // the horde and the Leader) instead of orbiting a world-space clock, so the
-        // bodyguard ring actually stands in the path of the chasers. Slots are assigned
-        // by bearing around the leader, which keeps two members from stacking up.
+        // ---------- the bodyguard ring (human-test locked) ----------
+        // followers slowly ORBIT the leader on a world-space clock - the threat-facing
+        // slot system made them feel glued to the Leader's directional input. Auto-aim
+        // lives in PartyMember (the ring member bites its prey), so the rapier still
+        // lands while circling.
         {
-            Godot.Node2D threat = null;
-            float threatD = 1e9f;
-            for (int i = 0; i < _enemies.Count; i++)
-            {
-                Combatant c = (Combatant)_enemies[i];
-                if (c == null || c.kind == "dead")
-                    continue;
-                Godot.Node2D n = _enemies[i];
-                float dd = n.GlobalPosition.DistanceTo(leader.GlobalPosition);
-                if (dd < threatD)
-                {
-                    threatD = dd;
-                    threat = n;
-                }
-            }
-            foreach (Boss b in _bosses)
-            {
-                if (!b.active || b.hp <= 0.0f)
-                    continue;
-                float dd = b.GlobalPosition.DistanceTo(leader.GlobalPosition);
-                if (dd < threatD)
-                {
-                    threatD = dd;
-                    threat = b;
-                }
-            }
             Vector2 anchor = leader != null ? leader.GlobalPosition : new Vector2(0, 0);
-            Vector2 toThreat = threat != null ? threat.GlobalPosition - anchor : new Vector2(0, 0);
-            float baseAng = toThreat.LengthSquared() > 1.0f
-                              ? (float)System.Math.Atan2(toThreat.Y, toThreat.X)
-                              : (float)(System.Math.PI * 0.5 + _ringAngle);
             foreach (PartyMember m in _party)
             {
                 if (m.isLeader || m.downed || m.eliminated)
                     continue;
-                // 2..5 slots fanned around the threat-bearing, leader-side arcs left open
                 int k = m.memberIndex;
                 if (k < 2)
                     k = 2 + (k % 4);
-                double spread = System.Math.PI * 0.62;
-                double slot = k <= 5 ? (double)(k - 2) * (2.0 * spread / 3.0) - spread
-                                     : (double)k * System.Math.PI * 0.4;
-                Vector2 aim = new Vector2((float)System.Math.Cos(baseAng + slot),
-                                          (float)System.Math.Sin(baseAng + slot));
-                // the bodyguard steps OUT toward the threat: the hit lands on whoever
-                // stands in the lane, which is the whole point of the ring
-                float outward = threat != null ? 88.0f : (float)RING_RADIUS;
-                Vector2 target = ClampToArena(anchor + aim * outward);
-                m.GlobalPosition += (target - m.GlobalPosition).LimitLength(m.baseSpeed * m.speedMul * 1.4f * delta);
+                double slot = k * System.Math.PI * 0.4;
+                Vector2 aim = new Vector2((float)System.Math.Cos(_ringAngle + slot),
+                                          (float)System.Math.Sin(_ringAngle + slot));
+                Vector2 target = ClampToArena(anchor + aim * (float)RING_RADIUS);
+                m.GlobalPosition += (target - m.GlobalPosition).LimitLength(m.baseSpeed * m.speedMul * 0.9f * delta);
             }
         }
         if (_camera != null && leader != null)
