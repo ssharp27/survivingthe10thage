@@ -12,14 +12,15 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
   `physical_key`, mapped to physical codes 544-547 = A,B,C,D). Godot 4.7 parsed them with no error
   but bound nothing. Rewrote to `Object(InputEventKey,...)` serialization:
   move = WASD (W566/A544/S563/D547) + arrows (4194305-4194308); level-up picker = A/S/D
-  (shares the WASD letters — VS-style overlap, fine on a confirm-any-time picker).
+  (shares the WASD letters — VS-style overlap, fine on a confirm-any-time picker;
+  later superseded, picker moved to number keys — see the picker key-steal bullet).
 - **Pilot boss engagement**: standing still pinned the whole horde into permanent contact damage
   (AFK TPK 15 s into the mini-boss). Now the pilot strafes at 90-110 px around the active boss
   with a `faceTo` face-lock so the maul arc stays pointed at the boss (movement would otherwise
   set facing to the strafe tangent, showing the boss its back).
 - **Pilot bullet dodge**: boss bullets pass through the party when `M1_PILOT` is set
   (verification-only; simulates a human dodging telegraphed volleys).
-- **Pilot picker rotates the three named picks** (wider cleave / quicker thrusts / deeper thrust) up to the
+- **Pilot picker rotates the three named picks** (wider arc / quicker thrusts / deeper thrust) up to the
   rank cap. There is **no party-heal pick** — `OPT_LABEL` has three entries and level-ups never restore HP
   (healing lives only in campfires and revives). The old "heal-aware pilot / party healed 25%" text described
   a pick removed in `f700526`; that was doc drift F1, corrected here on 2026-10-19.
@@ -27,6 +28,10 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
   still share the A/S/D letters, but presses are now edge-read (`IsActionJustPressed`) and `_Process`
   returns early while the picker card is up, so a held A/S no longer walks AND confirms in the same frame,
   and arena/horde/party are frozen while you read the card.
+- **Picker moved to NUMBER keys (2026-10-19, human-test round)**: even edge-read A/S/D meant a human
+  *naturally tapping* A/S while walking picked a card unseen. `pick_1/pick_2/pick_3` (keycodes 49-51,
+  `physical_keycode:0` like the working `retry` entry) with the label split across three lines —
+  the old single long line ran past the 1280 px window edge and read as cut-off text.
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)
 
@@ -120,20 +125,27 @@ a codepage artifact of the redirected pipe, not a runtime issue.
 Desktop `.bat` launches the editor (prepends `C:\Users\Steve\dev-tools\dotnet` to PATH — required;
 system dotnet is runtime-only). Run the main scene; **WASD or arrows** move the Leader,
 party follows on the bodyguard ring, everyone auto-attacks. At a level-up the picker label
-shows options — press **A / S / D once** (press-edge read; holding a movement key no longer
-confirms a pick, and the arena is frozen while the card is up). After a run ends the
-**R** key retries the stage from the run-summary card (journal/menu are M4).
+shows options on three lines — press **1 / 2 / 3** (number keys so a WASD walk tap can never
+pick unseen; press-edge read, arena frozen while the card is up). After a run ends the
+**R** key retries the stage from the run-summary card (journal/menu are M4). The campfire
+card takes **mouse clicks** (rest card → COMMIT → REST NOW), with LEFT/RIGHT + SPACE as the
+keyboard fallback.
 
-**Death-state tester**: 10 s into a run a **big red diamond "reaper"** spawns **exactly once** — touching it
-**downs** whoever it touches (death saves start; it's a revival/STABLE test bench) and then it despawns.
-It doesn't outrun the party; walk into it yourself. Dead nodes are fully inert (`kind="dead"` early-return).
-**Baldrun's maul is a RADIAL CLEAVE (human-test locked)**: it hits every enemy inside its radius
-whatever way the body faces — telegraph is the full 12-spoke dial, and the "wider cleave" rank
-grows the radius (×1.18/rank). **Followers slowly ORBIT the Leader** (world-space clock, radius 64;
-the threat-facing slot made them feel glued to directional input) and auto-aim their strikes.
-Level-up picks are **distinct per-option effects capped at rank 3** (cleave radius ×1.18,
-quicker thrusts cooldown ×0.86, deeper thrust range ×1.16 + 1 pierce; damage ×1.08-1.12 per rank) — the old
-flat "+25% dmg" ranks from `f88de14` were replaced. Death saves (locked): d20 every **4 s** — nat 20 revives 25 %;
+**Death-state tester (TEST BENCH, default OFF)**: the reaper only spawns when `M1_REAPER=1` is in the
+environment — human play left it off once the revive rules tested clean, and nothing about it carries
+balance meaning. With it on: 10 s into a run a **big red diamond "reaper"** spawns **exactly once** —
+touching it **downs** whoever it touches (death saves start; it's a revival/STABLE test bench) and then
+it despawns. It doesn't outrun the party; walk into it yourself. Dead nodes are fully inert (`kind="dead"`
+early-return).
+**Baldrun's maul is a ~150° ARC CLEAVE with SPLIT damage (human-test locked)**: every enemy inside the
+fan is hit, but the swing's force divides among them — full 26 on a lone target, chip damage on a packed
+horde; telegraph is a 3-spoke fan, and the "wider arc" rank opens the fan ×1.18/rank. **Mosiah's rapier
+is single-target** with base damage bumped 10 → 14 so the two kits feel distinct (wide/split vs. narrow
+/heavy). **Followers slowly ORBIT the Leader** (world-space clock, radius 64; the threat-facing slot made
+them feel glued to directional input) and auto-aim their strikes.
+Level-up picks are **distinct per-option effects capped at rank 3** (maul arc ×1.18, quicker thrusts
+cooldown ×0.86, deeper thrust range ×1.16 + 1 pierce; damage ×1.08-1.12 per rank) — the old flat "+25%
+dmg" ranks from `f88de14` were replaced. Death saves (locked): d20 every **4 s** — nat 20 revives 25 %;
 3 successes = **STABLE**, rolls stop and hits slay unless the Leader **stands still ~3 s on the body** (revive 50 %);
 3 fails = OUT until the next campfire. Campfires (locked, rest-choice split): the camp beat lifts the fallen
 (**return at 25 % HP**) and stands bodies down→up without healing; **SHORT rest = the single +25 % max-HP heal**
@@ -148,7 +160,7 @@ the channel progresses (a swarm can't screw the rescue out), and every revive gr
   silently runs 0 times — probe proved it). Drawing *outside* `_draw` is engine-enforced
   ("Drawing is only allowed inside this node's `_draw()`…"). A GDScript child worked in
   theory but users still saw nothing, so the shipped workaround is **pure nodes**: a
-  pivot + thin ColorRect "spokes" (maul = 12-spoke cleave dial, rapier = solid line) rotated to
+  pivot + thin ColorRect "spokes" (maul = 3-spoke arc fan, rapier = solid line) rotated to
   `facing` and alpha-faded each frame — node attributes, not draw commands.
 - 4.7 bindings renames/removals hit so far: no `Godot.GDScriptResource` class (use `Godot.Script`);
   no `Node.Script` property (use `Set("script", …)`, which returns **void**); no `z_index` field
@@ -194,9 +206,10 @@ Proven cmd form (avoids PS 5.1's UTF-16 `>` and lack of `&&` — use this for th
 cmd /c 'set M1_PILOT=1&& "C:\AI Coding\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe" --path C:\GitHub\survivingthe10thage --headless --quit-after 60000 > C:\Users\Steve\AppData\Local\Temp\smoke.out 2> C:\Users\Steve\AppData\Local\Temp\smoke.err'
 ```
 
-`M1_SKIP_REAPER=1` (verification-only, pair with M1_PILOT) skips the reaper test bench so a smoke
-pilot reliably reaches the campfire branch; with the reaper ON the pilot TPKs ~often because its
-down targets the Leader and the deferred Leader-down rule leaves no rescue channel.
+The reaper is now **opt-in**: `M1_REAPER=1` (pair with M1_PILOT) re-enables the death/revive TEST BENCH
+for a smoke run; by default no reaper spawns, so a pilot smoke reliably reaches the campfire branch
+without any skip knob. With the reaper ON the pilot TPKs ~often because its down targets the Leader and
+the deferred Leader-down rule leaves no rescue channel — that is expected variance, not a bug.
 **Gate on the `VICTORY` / `TPK` line, not on the frame budget**: `--quit-after` is fragile (frame rate
 varies run to run). A run that ends in TPK legitimately has no VICTORY line — read the last log line to
 tell truncation apart from a real loss; rerun at 90000 frames only if the last line is a mid-stage status

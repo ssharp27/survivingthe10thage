@@ -32,10 +32,20 @@ var _sb_normal: StyleBoxFlat
 var _sb_selected: StyleBoxFlat
 func _ready() -> void:
 	set_process_input(true)
+	# the confirm modal freezes the tree; the rest card must stay live through it:
+	# ALWAYS keeps this node (and the whole UI subtree below it, children inherit)
+	# processing + taking mouse clicks during pause, and keeps this node's _input
+	# firing (human-test bug: SPACE/click died the moment COMMIT paused the tree).
+	# NOTE: 4.7 has NO Control.pause_picking property - assigning it throws and
+	# aborts _ready, which half-builds the whole card. process_mode is the knob.
+	set_process_mode(Node.PROCESS_MODE_ALWAYS)
 	if party_data.size() == 0:
 		_seed_demo()
 	_sb_normal = _stylebox_button(Color(0.957, 0.929, 0.847, 1), Color(0.78, 0.66, 0.42, 1))
 	_sb_selected = _stylebox_button(Color(0.90, 0.74, 0.42, 1), Color(0.70, 0.52, 0.26, 1))
+	# Frame had no stylebox bound, so its dark INK labels floated on the dimmed
+	# arena and read as smeared light-on-dark noise (human-test: "impossible to
+	# read"); grimoire_theme.tres now binds PanelContainer/panel to paper
 	modal.add_theme_stylebox_override("panel", _stylebox_modal())
 	_build()
 	_select(0)
@@ -322,6 +332,8 @@ func _input(event: InputEvent) -> void:
 		if modal.visible:
 			if event.keycode == KEY_ESCAPE:
 				_on_change_mind()
+			elif event.keycode in [KEY_ENTER, KEY_SPACE]:
+				_on_rest_now()
 			return
 		match event.keycode:
 			KEY_LEFT, KEY_A:

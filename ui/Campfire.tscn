@@ -17,8 +17,15 @@ color = Color(0, 0, 0, 0.52)
 
 
 [node name="Frame" type="PanelContainer" parent="."]
-position = Vector2(160.0, 40.0)
-size = Vector2(960.0, 640.0)
+theme = ExtResource("1_theme")
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 160.0
+margin_top = 40.0
+margin_right = -160.0
+margin_bottom = -40.0
 
 
 [node name="Contents" type="VBoxContainer" parent="Frame"]
@@ -137,7 +144,7 @@ theme_override_constants = {"h_separation": 10}
 
 [node name="ConfirmHint" type="Label" parent="Frame/Contents/ConfirmBar"]
 size_flags_horizontal = 3
-text = "LEFT / RIGHT choose rest   SPACE confirm   ESC cancel"
+text = "CLICK a rest card (or LEFT / RIGHT)   CLICK COMMIT (or SPACE)   ESC declines"
 theme_override_colors = {"font_color": Color(0.52, 0.44, 0.33, 1)}
 scale = Vector2(0.85, 0.85)
 
@@ -149,8 +156,15 @@ theme_override_colors = {"font_color": Color(0.83, 0.64, 0.24, 1)}
 
 
 [node name="ConfirmModal" type="Panel" parent="."]
-position = Vector2(330.0, 190.0)
-size = Vector2(620.0, 340.0)
+theme = ExtResource("1_theme")
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+margin_left = -310.0
+margin_top = -170.0
+margin_right = 310.0
+margin_bottom = 170.0
 visible = false
 
 

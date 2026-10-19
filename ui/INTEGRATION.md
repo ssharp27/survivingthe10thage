@@ -79,7 +79,10 @@ case StageState.CAMPFIRE:
 
 Director.cs already stops spawning during CAMPFIRE (Director.cs:21: `st != 0 && st != 3` returns), so
 the horde is paused while the screen is up. `get_tree().paused` is toggled by the GDScript only
-around the confirm modal; the campfire screen itself does not pause the tree.
+around the confirm modal; the campfire screen itself does not pause the tree. The screen opts out of
+pause anyway (root `process_mode = ALWAYS` + `pause_picking` on the two Control subtrees) so buttons
+and keys stay live *during* the modal pause — without it, the SPACE/click confirm dies the moment the
+modal freezes the tree (the human-test bug this fixed).
 
 ### 3. Populate + show (new Game helper)
 
@@ -210,7 +213,7 @@ Campfire screen (1280x720, 40px safe margins):
 2. Header: placeholder d20 token (dice flavor), then "THE CAMPFIRE" + "Tanurial Forest - camp between battles".
 3. "THE COMPANY" roster bar, then a 2-column x 3-row grid of member cards (leader marked "LEADER" in gold). Each card: name + class/weapon, HP bar with fill + "N / M hp", and a colored state chip — READY (sage), DOWN - death saving (blood), STABLE - no more rolls (amber), OUT - back at campfire (grey, card dimmed). Empty slots show "empty slot".
 4. "CHOOSE YOUR REST" then two cards: SHORT REST (safe, heals +25% max HP) vs LONG REST with a red "HORDE SCALING GROWS" risk chip — the required risk/reward copy. LEFT/RIGHT or clicking picks; the chosen card gets a gold border.
-5. Bottom bar: hint "LEFT / RIGHT choose rest SPACE confirm ESC cancel" + "COMMIT TO THE EMBERS".
+5. Bottom bar: hint "CLICK a rest card (or LEFT / RIGHT)   CLICK COMMIT (or SPACE)   ESC declines" + "COMMIT TO THE EMBERS".
 6. Confirm prompt (modal, gold-border panel): "COMMIT TO THE EMBERS?" + rest-specific consequence summary; "REST NOW" emits rest_chosen and closes the screen, "CHANGE MY MIND" / ESC returns to the choice.
 
 RunSummary screen:

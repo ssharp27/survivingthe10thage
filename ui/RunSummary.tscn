@@ -15,9 +15,15 @@ anchor_bottom = 1.0
 color = Color(0, 0, 0, 0.52)
 
 [node name="Frame" type="PanelContainer" parent="."]
-position = Vector2(270.0, 125.0)
-size = Vector2(740.0, 470.0)
 theme = ExtResource("1_theme")
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 270.0
+margin_top = 125.0
+margin_right = -270.0
+margin_bottom = -125.0
 
 [node name="Contents" type="VBoxContainer" parent="Frame"]
 anchor_left = 0.0

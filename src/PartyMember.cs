@@ -3,7 +3,8 @@ using Godot;
 /// <summary>
 /// One party member: HP, auto-attack driven by signature-weapon parameters, and the
 /// down/death-save/revive state fields (the state machine itself lives in Game).
-/// Baldrun = wide slow maul arc; Mosiah = narrow fast rapier line.
+/// Baldrun = wide ~150 deg arc cleave (damage split among everything in the fan);
+/// Mosiah = narrow fast rapier (single target + pierce, hits one body at a time).
 /// </summary>
 public partial class PartyMember : Godot.Node2D
 {
@@ -67,20 +68,19 @@ public partial class PartyMember : Godot.Node2D
         _ds = new Label();
         _ds.Position = new Vector2(-24.0f, -40.0f);
         AddChild(_ds);
-        // telegraph: a pivot + thin ColorRect "spokes" radiating out. The maul is a
-        // RADIAL CLEAVE (human-test locked): it hits everything in its radius no
-        // matter which way the body faces, so its telegraph is a full 12-spoke dial;
-        // the rapier stays one solid stab line. Pure nodes because both the C# _draw
-        // hook and drawing outside _draw are dead ends in 4.7.
+        // telegraph: a pivot + thin ColorRect "spokes" radiating along facing. The
+        // maul is a ~150 deg ARC CLEAVE (human-test locked): spokes show the fan
+        // edges + middle; the rapier stays one solid stab line. Pure nodes because
+        // both the C# _draw hook and drawing outside _draw are dead ends in 4.7.
         _telePivot = new Godot.Node2D();
         _telePivot.Name = "Telegraph";
         AddChild(_telePivot);
-        bool maul = arcHalf > 0.5f; // maul = cleaver: arcHalf only flags the kit
-        bool circle = maul;
-        int spokes = circle ? 12 : 1;
-        float w = circle ? 4.0f : 7.0f;
-        Color col = circle ? new Color(1.0f, 0.55f, 0.2f, 0.45f)
-                           : new Color(0.5f, 1.0f, 1.0f, 0.55f);
+        bool maul = arcHalf > 0.5f; // maul kit: arc cleave, split damage
+        bool circle = arcHalf > 3.0f; // only a deliberate 360 deg kit gets a dial
+        int spokes = circle ? 12 : (maul ? 3 : 1);
+        float w = circle ? 4.0f : (maul ? 5.0f : 7.0f);
+        Color col = circle || maul ? new Color(1.0f, 0.55f, 0.2f, 0.45f)
+                                   : new Color(0.5f, 1.0f, 1.0f, 0.55f);
         _teleParts = new Godot.ColorRect[spokes];
         for (int i = 0; i < spokes; i++)
         {
@@ -161,11 +161,10 @@ public partial class PartyMember : Godot.Node2D
         if (pg == null)
             return;
         Godot.Collections.Array<Godot.Node2D> enemies = pg.GetEnemies();
-        // the live arc: ranks widen the CLEAVE RADIUS for the maul; the rapier keeps
-        // its narrow lane
+        // the live arc: ranks open the maul FAN, the rapier keeps its narrow lane
         float arcEff = (float)System.Math.Min((double)arcHalf * (double)arcMul, System.Math.PI);
-        bool cleaver = arcHalf > 0.5f; // maul kit: reach grows with ranks, angle never gates
-        float reach = range * rangeMul * (cleaver ? arcMul : 1.0f);
+        bool cleaver = arcHalf > 0.5f; // maul kit: arc cleave with split damage
+        float reach = range * rangeMul;
         Godot.Node2D best = null;
         float bestD = 1e9f;
         for (int i = 0; i < enemies.Count; i++)
@@ -178,11 +177,11 @@ public partial class PartyMember : Godot.Node2D
             float dd = v.Length();
             if (dd >= bestD)
                 continue;
-            // The leader swings where it walks, so a LANES weapon (rapier) may only
-            // target what its facing arc covers (touching enemies always count). The
-            // maul is a radial cleave, so it targets the absolute nearest body: a
-            // player walking away from the horde still whacks anything in reach.
-            if (isLeader && !cleaver && dd >= 40.0f &&
+            // The leader swings where it walks, so it may only target what its facing
+            // arc covers (touching enemies always count). The maul's arc is a ~150
+            // deg cleave: wide enough to feel forgiving, narrow enough that walking
+            // away from the horde still costs you swings.
+            if (isLeader && dd >= 40.0f &&
                 System.Math.Abs(angleDiff((float)System.Math.Atan2(v.Y, v.X), facing)) > arcEff)
                 continue;
             bestD = dd;
@@ -198,7 +197,10 @@ public partial class PartyMember : Godot.Node2D
         float dmg = weaponDamage * dmgMul;
         if (cleaver)
         {
-            // Maul: RADIAL CLEAVE - every enemy within reach, any bearing (area damage)
+            // Maul: ARC CLEAVE with SPLIT damage (human-test locked tradeoff): every
+            // enemy in the fan is hit, but the swing's force divides among them -
+            // a lone target eats the full blow, a packed horde only gets chipped
+            int hits = 0;
             for (int i = 0; i < enemies.Count; i++)
             {
                 Godot.Node2D n = enemies[i];
@@ -206,8 +208,21 @@ public partial class PartyMember : Godot.Node2D
                 if (nc == null || nc.kind == "dead")
                     continue;
                 Vector2 e = n.GlobalPosition - p;
-                if (e.Length() <= reach)
-                    nc.TakeDamage(dmg);
+                if (e.Length() <= reach &&
+                    System.Math.Abs(angleDiff((float)System.Math.Atan2(e.Y, e.X), facing)) <= arcEff)
+                    hits++;
+            }
+            float each = dmg / (float)(hits > 0 ? hits : 1);
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                Godot.Node2D n = enemies[i];
+                Combatant nc = (Combatant)n;
+                if (nc == null || nc.kind == "dead")
+                    continue;
+                Vector2 e = n.GlobalPosition - p;
+                if (e.Length() <= reach &&
+                    System.Math.Abs(angleDiff((float)System.Math.Atan2(e.Y, e.X), facing)) <= arcEff)
+                    nc.TakeDamage(each);
             }
         }
         else
@@ -260,10 +275,15 @@ public partial class PartyMember : Godot.Node2D
         }
         _flash = 0.12f;
         _telePivot.Rotation = facing;
-        // the cleave dial scales with its rank-grown radius so the telegraph and the
-        // damage share one circle; the rapier line only follows range ranks
-        float teleScale = rangeMul * (cleaver ? arcMul : 1.0f);
-        _telePivot.Scale = new Vector2(teleScale, teleScale);
+        _telePivot.Scale = new Vector2(rangeMul, rangeMul);
+        // rebuild the spokes for the LIVE arc: ranks open the maul fan, and the
+        // rotations baked at load time only knew the base arcHalf
+        if (_teleParts != null && _teleParts.Length > 1 && arcHalf <= 3.0f)
+        {
+            int nsp = _teleParts.Length;
+            for (int i = 0; i < nsp; i++)
+                _teleParts[i].Rotation = (float)(-arcEff + 2.0 * arcEff * i / (nsp - 1));
+        }
         _teleHold = 0.18f;
     }
 

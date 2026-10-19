@@ -49,7 +49,7 @@ public partial class Game : Godot.Node2D
     // A big red instant-kill circle spawns 10 s into the run: attack-proof, it
     // kills the first body it touches and despawns right after. Test tool only.
     bool _reaperSpawned = false;
-    bool _skipReaperSmoke = false; // env-gated smoke-only: skip the reaper test bench
+    bool _reaperEnabled = false; // TEST BENCH default OFF; M1_REAPER=1 re-enables it
 
     // ---------- xp / level ----------
     double _xp = 0.0;
@@ -64,7 +64,7 @@ public partial class Game : Godot.Node2D
     // at 3 per DESIGN; the 4th rank would be the evolution (Stormcaller / Viperkiss), stubbed
     // for M2. This table is the data surface: a .tres pass copies these columns straight out.
     const int PICK_RANK_CAP = 3;
-    static readonly string[] OPT_LABEL = { "wider cleave (radius)", "quicker thrusts (cooldown)", "deeper thrust (reach + pierce)" };
+    static readonly string[] OPT_LABEL = { "wider arc (maul fan)", "quicker thrusts (cooldown)", "deeper thrust (reach + pierce)" };
     static readonly int[] OPT_MEMBER = { 0, 1, 1 }; // targets one named member (DESIGN)
     static readonly float[] OPT_ARC = { 1.18f, 1.0f, 1.0f };
     static readonly float[] OPT_CD = { 1.0f, 0.86f, 1.0f };
@@ -567,9 +567,11 @@ public partial class Game : Godot.Node2D
         GD.Print("[10thAge] squad: " + roster + " | leader: " +
                  (_leader != null ? _leader.displayName : "none"));
         _pilot = OS.GetEnvironment("M1_PILOT") != null && OS.GetEnvironment("M1_PILOT") != "";
-        // verification-only: M1_SKIP_REAPER=1 lets a smoke pilot reach the campfire branch
-        // without the reaper's deterministic Leader-down ending the run (human play never sets it)
-        _skipReaperSmoke = OS.GetEnvironment("M1_SKIP_REAPER") != null && OS.GetEnvironment("M1_SKIP_REAPER") != "";
+        // the reaper is a pure death/revive TEST BENCH (no balance meaning): human play
+        // left it OFF now that the revive rules work, and M1_REAPER=1 puts it back on
+        // for testing (a pilot smoke with it ON still TPKs often - the Leader-down rule
+        // we deferred leaves no rescue channel, which is variance, not a bug)
+        _reaperEnabled = OS.GetEnvironment("M1_REAPER") != null && OS.GetEnvironment("M1_REAPER") != "";
         Godot.ColorRect floor = new ColorRect();
         floor.Size = new Vector2((float)(ARENA_HW * 2.0), (float)(ARENA_HH * 2.0));
         floor.Position = -floor.Size * 0.5f;
@@ -642,9 +644,9 @@ public partial class Game : Godot.Node2D
         _stageT += d;
         _ringAngle += 0.15 * d;
         // P4: the reaper stays a spawn-once-at-10s TEST BENCH (locked behavior; no
-        // balance meaning). Its only changes here are where it drops in (outside the
-        // camera view, never on the party) and a slower lurk.
-        if (!_reaperSpawned && _stageT >= 10.0 && _state == StageState.PLAY1 && !_skipReaperSmoke)
+        // balance meaning), now OPT-IN via M1_REAPER=1. Its only changes here are where
+        // it drops in (outside the camera view, never on the party) and a slower lurk.
+        if (!_reaperSpawned && _stageT >= 10.0 && _state == StageState.PLAY1 && _reaperEnabled)
         {
             // TEST reaper: spawns ONCE 10 s into horde I, downs whoever it touches
             // (death-save tester), attack-proof (hp stays huge), despawns after its
@@ -1116,24 +1118,27 @@ public partial class Game : Godot.Node2D
             _xpNext = 5.0 + _level * 4.0;
             _pickerActive = true;
             _pickerWait = 0.0;
-            _pickerLabel.Text = "LEVEL UP - pick ONE (combat is frozen): [A] " + OptLabel(0) +
-                                "   [S] " + OptLabel(1) + "   [D] " + OptLabel(2) +
-                                "  - tap the letter, a held key does not confirm";
-            GD.Print("[10thAge] level " + _level + " picker up: [A] " + OptLabel(0) + " | [S] " +
-                     OptLabel(1) + " | [D] " + OptLabel(2));
+            // human test: one long line ran past the window edge - stack the three
+            // picks so they always fit, and read them with NUMBER keys (A/S/D were
+            // the movement keys, so a walk tap could end the card unseen)
+            _pickerLabel.Text = "LEVEL UP - pick ONE (combat is frozen):\n" +
+                                "[1] " + OptLabel(0) + "\n[2] " + OptLabel(1) + "\n[3] " + OptLabel(2);
+            GD.Print("[10thAge] level " + _level + " picker up: [1] " + OptLabel(0) + " | [2] " +
+                     OptLabel(1) + " | [3] " + OptLabel(2));
         }
         if (!_pickerActive)
             return;
         _pickerWait += d;
-        // P1: the picker letters ARE the WASD letters, so the old GetActionStrength
+        // P1: the picker used to ride on the WASD letters, so the old GetActionStrength
         // read confirmed the frame the card appeared for anyone still holding A/S.
-        // Edge-read only - a fresh tap is a deliberate pick, a held walk is not.
+        // NUMBER keys avoid the movement clash entirely - still edge-read only, so a
+        // fresh tap is a deliberate pick.
         int choice = -1;
-        if (Input.IsActionJustPressed("pick_a"))
+        if (Input.IsActionJustPressed("pick_1"))
             choice = 0;
-        else if (Input.IsActionJustPressed("pick_s"))
+        else if (Input.IsActionJustPressed("pick_2"))
             choice = 1;
-        else if (Input.IsActionJustPressed("pick_d"))
+        else if (Input.IsActionJustPressed("pick_3"))
             choice = 2;
         // pilot auto-confirm (verification only) + the AFK fallback: both take an
         // uncapped option, rotating so the pilot exercises all three stat tracks

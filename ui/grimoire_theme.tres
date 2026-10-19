@@ -92,6 +92,7 @@ StyleBoxFlat "button_disabled" = SubResource("sb_button_disabled")
 Colors/Label/font_color = Color(0.21, 0.17, 0.12, 1)
 Constants/Button/hseparation = 10
 Constants/Button/vseparation = 6
+Styles/PanelContainer/panel = SubResource("sb_paper")
 Styles/DefaultButton/normal = SubResource("sb_button_normal")
 Styles/DefaultButton/hover = SubResource("sb_button_hover")
 Styles/DefaultButton/pressed = SubResource("sb_button_pressed")
