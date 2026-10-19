@@ -30,9 +30,12 @@ public partial class Boss : Combatant
         _body.Color = kind == "mini" ? new Color(0.55f, 0.15f, 0.45f)
                                      : new Color(0.65f, 0.10f, 0.10f);
         AddChild(_body);
-        Game g0 = GetParent() as Game;
-        if (g0 != null)
-            g0.RegisterEnemy(this);
+        // P1: NO RegisterEnemy here. An inactive boss must not be in the hittable
+        // registry or weapons can pre-kill it (the old pre-killable mini softlocked
+        // the run at 90 s). Game.ActivateBoss brings it in the moment its stage
+        // engages; until then it is parked far offscreen.
+        active = false;
+        GlobalPosition = new Vector2(0.0f, -10000.0f);
     }
 
     public override void _Process(double d)
@@ -43,10 +46,14 @@ public partial class Boss : Combatant
         Game g = GetParent() as Game;
         if (g == null)
             return;
+        if (g.GetPickerActive())
+            return; // picker soft pause: the boss holds its volley mid-phase
         float ratio = hp / maxHp;
         _phase = ratio > 0.66f ? 0 : (ratio > 0.33f ? 1 : 2);
 
-        PartyMember target = g.GetLeader();
+        // body-check the NEAREST live member, not the Leader specifically: the boss
+        // must punish whoever stands in its way (downed bodies handled below)
+        PartyMember target = g.NearestMember(GlobalPosition);
         _contactCd -= delta;
         if (target != null && !target.downed && !target.eliminated)
         {
@@ -82,6 +89,9 @@ public partial class Boss : Combatant
             return;
         }
         _telegraph = false;
+        // the telegraph flash ends with the volley: without this reset the boss stays
+        // blown-out white forever after its first wind-up
+        _body.Modulate = new Color(1.0f, 1.0f, 1.0f);
         _eventTimer = 2.2f - 0.3f * (float)_phase;
         _ringOffset += 0.35f;
 

@@ -1,0 +1,99 @@
+[gd_resource type="Theme" load_steps=8 format=3]
+
+[sub_resource type="StyleBoxFlat" id="sb_paper"]
+bg_color = Color(0.957, 0.929, 0.847, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+shadow_size = 10.0
+shadow_color = Color(0, 0, 0, 0.28)
+
+[sub_resource type="StyleBoxFlat" id="sb_card"]
+bg_color = Color(0.991, 0.980, 0.941, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_size = 4.0
+shadow_color = Color(0, 0, 0, 0.14)
+
+[sub_resource type="StyleBoxFlat" id="sb_button_normal"]
+bg_color = Color(0.957, 0.929, 0.847, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="sb_button_hover"]
+bg_color = Color(1.0, 0.976, 0.902, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="sb_button_pressed"]
+bg_color = Color(0.90, 0.74, 0.42, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="sb_button_focus"]
+bg_color = Color(0.957, 0.929, 0.847, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="sb_button_disabled"]
+bg_color = Color(0.86, 0.82, 0.76, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[resource]
+StyleBoxFlat "paper" = SubResource("sb_paper")
+StyleBoxFlat "card" = SubResource("sb_card")
+StyleBoxFlat "button_normal" = SubResource("sb_button_normal")
+StyleBoxFlat "button_hover" = SubResource("sb_button_hover")
+StyleBoxFlat "button_pressed" = SubResource("sb_button_pressed")
+StyleBoxFlat "button_focus" = SubResource("sb_button_focus")
+StyleBoxFlat "button_disabled" = SubResource("sb_button_disabled")
+Colors/Label/font_color = Color(0.21, 0.17, 0.12, 1)
+Constants/Button/hseparation = 10
+Constants/Button/vseparation = 6
+Styles/DefaultButton/normal = SubResource("sb_button_normal")
+Styles/DefaultButton/hover = SubResource("sb_button_hover")
+Styles/DefaultButton/pressed = SubResource("sb_button_pressed")
+Styles/DefaultButton/focus = SubResource("sb_button_focus")
+Styles/DefaultButton/disabled = SubResource("sb_button_disabled")

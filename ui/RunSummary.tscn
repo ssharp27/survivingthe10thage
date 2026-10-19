@@ -1,0 +1,121 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Theme" path="res://ui/grimoire_theme.tres" id="1_theme"]
+[ext_resource type="Script" path="res://ui/RunSummary.gd" id="2_runsummary_gd"]
+
+[node name="RunSummary" type="CanvasLayer"]
+script = ExtResource("2_runsummary_gd")
+layer = 3
+
+[node name="Backdrop" type="ColorRect" parent="."]
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.52)
+
+[node name="Frame" type="PanelContainer" parent="."]
+position = Vector2(270.0, 125.0)
+size = Vector2(740.0, 470.0)
+theme = ExtResource("1_theme")
+
+[node name="Contents" type="VBoxContainer" parent="Frame"]
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+margin_left = 28.0
+margin_top = 24.0
+margin_right = -28.0
+margin_bottom = -24.0
+theme_override_constants = {"v_separation": 14}
+
+[node name="Banner" type="Label" parent="Frame/Contents"]
+text = "VICTORY - Tanurial Forest cleared"
+custom_minimum_size = Vector2(0.0, 56.0)
+valign = 1
+theme_override_colors = {"font_color": Color(0.83, 0.64, 0.24, 1)}
+
+[node name="BannerDivider" type="ColorRect" parent="Frame/Contents"]
+custom_minimum_size = Vector2(0.0, 2.0)
+color = Color(0.78, 0.66, 0.42, 0.7)
+
+[node name="StatsRow" type="HBoxContainer" parent="Frame/Contents"]
+size_flags_horizontal = 3
+theme_override_constants = {"h_separation": 16}
+
+[node name="StageStat" type="VBoxContainer" parent="Frame/Contents/StatsRow"]
+size_flags_horizontal = 3
+theme_override_constants = {"v_separation": 4}
+
+[node name="Value" type="Label" parent="Frame/Contents/StatsRow/StageStat"]
+text = "Tanurial Forest"
+theme_override_colors = {"font_color": Color(0.21, 0.17, 0.12, 1)}
+scale = Vector2(1.05, 1.05)
+
+[node name="Key" type="Label" parent="Frame/Contents/StatsRow/StageStat"]
+text = "STAGE"
+theme_override_colors = {"font_color": Color(0.52, 0.44, 0.33, 1)}
+scale = Vector2(0.8, 0.8)
+
+[node name="LevelStat" type="VBoxContainer" parent="Frame/Contents/StatsRow"]
+size_flags_horizontal = 3
+theme_override_constants = {"v_separation": 4}
+
+[node name="Value" type="Label" parent="Frame/Contents/StatsRow/LevelStat"]
+text = "7"
+theme_override_colors = {"font_color": Color(0.21, 0.17, 0.12, 1)}
+scale = Vector2(1.6, 1.6)
+
+[node name="Key" type="Label" parent="Frame/Contents/StatsRow/LevelStat"]
+text = "LEVEL"
+theme_override_colors = {"font_color": Color(0.52, 0.44, 0.33, 1)}
+scale = Vector2(0.8, 0.8)
+
+[node name="XPStat" type="VBoxContainer" parent="Frame/Contents/StatsRow"]
+size_flags_horizontal = 3
+theme_override_constants = {"v_separation": 4}
+
+[node name="Value" type="Label" parent="Frame/Contents/StatsRow/XPStat"]
+text = "130"
+theme_override_colors = {"font_color": Color(0.21, 0.17, 0.12, 1)}
+scale = Vector2(1.6, 1.6)
+
+[node name="Key" type="Label" parent="Frame/Contents/StatsRow/XPStat"]
+text = "XP TOTAL"
+theme_override_colors = {"font_color": Color(0.52, 0.44, 0.33, 1)}
+scale = Vector2(0.8, 0.8)
+
+[node name="StatsDivider" type="ColorRect" parent="Frame/Contents"]
+custom_minimum_size = Vector2(0.0, 2.0)
+color = Color(0.78, 0.66, 0.42, 0.7)
+
+[node name="RosterLabel" type="Label" parent="Frame/Contents"]
+text = "THE COMPANY - PICK HISTORY"
+theme_override_colors = {"font_color": Color(0.83, 0.64, 0.24, 1)}
+
+[node name="Roster" type="VBoxContainer" parent="Frame/Contents"]
+size_flags_vertical = 3
+theme_override_constants = {"v_separation": 10}
+
+[node name="FooterDivider" type="ColorRect" parent="Frame/Contents"]
+custom_minimum_size = Vector2(0.0, 2.0)
+color = Color(0.78, 0.66, 0.42, 0.7)
+
+[node name="Footer" type="HBoxContainer" parent="Frame/Contents"]
+theme_override_constants = {"h_separation": 16}
+custom_minimum_size = Vector2(0.0, 46.0)
+
+[node name="JournalSpacer" type="Control" parent="Frame/Contents/Footer"]
+size_flags_horizontal = 3
+
+[node name="Journal" type="Button" parent="Frame/Contents/Footer"]
+text = "Return to campaign"
+focus_mode = 0
+custom_minimum_size = Vector2(180.0, 42.0)
+
+[node name="Menu" type="Button" parent="Frame/Contents/Footer"]
+text = "Main Menu"
+focus_mode = 0
+custom_minimum_size = Vector2(150.0, 42.0)
+theme_override_colors = {"font_color": Color(0.83, 0.64, 0.24, 1)}

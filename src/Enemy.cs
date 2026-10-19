@@ -10,6 +10,10 @@ public partial class Enemy : Combatant
     public float speed = 75.0f;
     public float xpValue = 1.0f;
     float _contactCd = 0.0f;
+    // ownership flag for Game's live-enemy counter: exactly one ReleaseLiveCount per
+    // registration (weapon kill, reaper self-despawn, ClearEnemies, kill-scan cleanup),
+    // so the horde cap can never leak upward and stop binding
+    public bool counted = false;
 
     Godot.ColorRect _body;
 
@@ -49,6 +53,8 @@ public partial class Enemy : Combatant
         Game g = GetParent() as Game;
         if (g == null)
             return;
+        if (g.GetPickerActive())
+            return; // picker soft pause: the horde holds still while the card is read
         Vector2 p = GlobalPosition;
         if (kind == "reaper")
         {
@@ -66,6 +72,9 @@ public partial class Enemy : Combatant
                 // despawn only when a down actually landed: immune bodies let it lurk
                 kind = "dead";
                 GlobalPosition = new Vector2(0.0f, -10000.0f);
+                // the counter is owned by the enemy: self-despawn must release its slot
+                // too, or every leak would make the live-cap readout drift upward
+                g.ReleaseLiveCount(this);
             }
             return;
         }
@@ -79,18 +88,18 @@ public partial class Enemy : Combatant
             Vector2 dir = (to + new Vector2(wobble * 0.4f, wobble)).Normalized();
             GlobalPosition += dir * speed * delta;
             GlobalPosition = g.ClampToArena(GlobalPosition);
-            if (dist < 12.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
+            if (dist < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
             {
-                _contactCd = 0.6f;
+                _contactCd = 1.0f;
                 g.TakeHit(m, contactDamage);
             }
         }
         // downed bodies are still run into even though nobody chases them
         PartyMember hitAny = g.NearestMemberAny(p);
         if (hitAny != null && hitAny.downed &&
-            hitAny.GlobalPosition.DistanceTo(p) < 12.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
+            hitAny.GlobalPosition.DistanceTo(p) < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
         {
-            _contactCd = 0.6f;
+            _contactCd = 1.0f;
             g.TakeHit(hitAny, contactDamage);
         }
         // separation: n-bounded push apart (spatial hash replaces this in M2)

@@ -32,6 +32,10 @@ public partial class PartyMember : Godot.Node2D
     public float cdMul = 1.0f;
     public float rangeMul = 1.0f;
     public float speedMul = 1.0f;
+    public float arcMul = 1.0f; // "wider arc" rank track: the maul fan opens with it
+    public int pierce = 0; // "deeper thrust": the rapier lane can skewer extra bodies
+    public string class_ = ""; // display class for the ui/ cards (empty = weapon fallback)
+    public string pickHistory = ""; // tracks taken so far, rendered on the run-summary card
 
     // down/death-save state (driven by the Game root)
     public float dsTimer = 0.0f;
@@ -43,6 +47,7 @@ public partial class PartyMember : Godot.Node2D
     public float invuln = 0.0f; // post-revive immunity timer (2 s)
     public float dsDamageBuffer = 0.0f; // 2 s gap between damage-caused death-save fails
     public float dsHold = 0.0f; // countdown for SetDsTemp texts; 0 = persistent
+    public bool campReturned = false; // lifted to 25% by the camp beat: long rest won't full-heal it
 
     Godot.ColorRect _body;
     Godot.Label _ds;
@@ -103,11 +108,24 @@ public partial class PartyMember : Godot.Node2D
 
     public override void _Process(double d)
     {
+        Game pg0 = GetParent() as Game;
+        if (pg0 != null && pg0.GetPickerActive())
+            return; // picker soft pause: nobody swings while the pick card is up
         float delta = (float)d;
         if (dsDamageBuffer > 0.0f)
             dsDamageBuffer -= delta; // ticks even while downed: the 2 s fail-buffer
         if (invuln > 0.0f)
             invuln -= delta; // post-revive immunity window, ticks always
+        // eliminated = out until the next campfire: the body, telegraph and ds label
+        // go hidden; writing visibility every frame is what un-hides a member when
+        // the campfire lifts them back up
+        bool hidden = eliminated;
+        if (_body != null)
+            _body.Visible = !hidden;
+        if (_telePivot != null)
+            _telePivot.Visible = !hidden;
+        if (_ds != null)
+            _ds.Visible = !hidden;
         if (downed || eliminated)
             return;
         if (_flash > 0.0f)
@@ -142,6 +160,8 @@ public partial class PartyMember : Godot.Node2D
         if (pg == null)
             return;
         Godot.Collections.Array<Godot.Node2D> enemies = pg.GetEnemies();
+        // the live arc: ranks widen the fan, and the maul only closes on 360 deg data
+        float arcEff = (float)System.Math.Min((double)arcHalf * (double)arcMul, System.Math.PI);
         Godot.Node2D best = null;
         float bestD = 1e9f;
         for (int i = 0; i < enemies.Count; i++)
@@ -160,7 +180,7 @@ public partial class PartyMember : Godot.Node2D
             // members dead the moment a player stood still and the horde wrapped
             // around behind them.
             if (isLeader && dd >= 40.0f &&
-                System.Math.Abs(angleDiff((float)System.Math.Atan2(v.Y, v.X), facing)) > arcHalf)
+                System.Math.Abs(angleDiff((float)System.Math.Atan2(v.Y, v.X), facing)) > arcEff)
                 continue;
             bestD = dd;
             best = n;
@@ -173,7 +193,7 @@ public partial class PartyMember : Godot.Node2D
         if (!isLeader)
             facing = ang; // ring members auto-aim: the bodyguard bites its prey
         float dmg = weaponDamage * dmgMul;
-        if (arcHalf > 0.5f)
+        if (arcEff > 0.5f)
         {
             // Maul: every enemy within reach AND inside the arc (area damage)
             for (int i = 0; i < enemies.Count; i++)
@@ -184,15 +204,69 @@ public partial class PartyMember : Godot.Node2D
                     continue;
                 Vector2 e = n.GlobalPosition - p;
                 float dd = e.Length();
-                if (dd <= range * rangeMul && System.Math.Abs(angleDiff((float)System.Math.Atan2(e.Y, e.X), facing)) <= arcHalf)
+                if (dd <= range * rangeMul && System.Math.Abs(angleDiff((float)System.Math.Atan2(e.Y, e.X), facing)) <= arcEff)
                     nc.TakeDamage(dmg);
             }
         }
         else
-            ((Combatant)best).TakeDamage(dmg); // Rapier: single precise target
+        {
+            // Rapier: thrust + pierce. The point lands on the pick; ranks let up to
+            // 1+pierce bodies share the lane and get skewered by the same lunge.
+            Godot.Node2D[] lane = new Godot.Node2D[1 + (pierce > 3 ? 3 : pierce)];
+            lane[0] = best;
+            float laneHalf = (float)System.Math.Max((double)arcEff, 0.16);
+            for (int s = 1; s < lane.Length; s++)
+            {
+                Godot.Node2D n = null;
+                float nd = 1e9f;
+                for (int i = 0; i < enemies.Count; i++)
+                {
+                    Godot.Node2D c = enemies[i];
+                    Combatant nc = (Combatant)c;
+                    if (nc == null || nc.kind == "dead")
+                        continue;
+                    bool already = false;
+                    for (int q = 0; q < lane.Length; q++)
+                    {
+                        if (lane[q] != null && lane[q].GetInstanceId() == c.GetInstanceId())
+                        {
+                            already = true;
+                            break;
+                        }
+                    }
+                    if (already)
+                        continue;
+                    Vector2 e = c.GlobalPosition - p;
+                    float dd = e.Length();
+                    if (dd <= range * rangeMul && dd < nd &&
+                        System.Math.Abs(angleDiff((float)System.Math.Atan2(e.Y, e.X), facing)) <= laneHalf)
+                    {
+                        nd = dd;
+                        n = c;
+                    }
+                }
+                if (n == null)
+                    break;
+                lane[s] = n;
+            }
+            foreach (Godot.Node2D hit in lane)
+            {
+                // pierce widens the lane but the rays past the last body stay empty
+                if (hit != null)
+                    ((Combatant)hit).TakeDamage(dmg);
+            }
+        }
         _flash = 0.12f;
         _telePivot.Rotation = facing;
         _telePivot.Scale = new Vector2(rangeMul, rangeMul);
+        // rebuild the spokes for the LIVE arc: ranks widen the maul fan, and rotations
+        // baked at load time only knew the base arcHalf
+        if (_teleParts != null && _teleParts.Length > 1 && arcHalf <= 3.0f)
+        {
+            int nsp = _teleParts.Length;
+            for (int i = 0; i < nsp; i++)
+                _teleParts[i].Rotation = (float)(-arcEff + 2.0 * arcEff * i / (nsp - 1));
+        }
         _teleHold = 0.18f;
     }
 
