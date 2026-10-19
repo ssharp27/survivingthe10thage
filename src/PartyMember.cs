@@ -177,11 +177,13 @@ public partial class PartyMember : Godot.Node2D
             float dd = v.Length();
             if (dd >= bestD)
                 continue;
-            // The leader swings where it walks, so it may only target what its facing
-            // arc covers (touching enemies always count). The maul's arc is a ~150
-            // deg cleave: wide enough to feel forgiving, narrow enough that walking
-            // away from the horde still costs you swings.
-            if (isLeader && dd >= 40.0f &&
+            // Targeting gate is LANES-only (rapier): a lane weapon may only attack
+            // what its facing arc covers (touching enemies always count). The maul
+            // Mosiah-aims: it attacks the ABSOLUTE nearest body whatever way the
+            // body faces, and the ~150 deg arc rides the swing (below), not the
+            // walk direction - so a Baldrun walking away from the horde still
+            // turns its cleave to the nearest threat instead of whiffing air.
+            if (isLeader && !cleaver && dd >= 40.0f &&
                 System.Math.Abs(angleDiff((float)System.Math.Atan2(v.Y, v.X), facing)) > arcEff)
                 continue;
             bestD = dd;
@@ -192,13 +194,16 @@ public partial class PartyMember : Godot.Node2D
         cdTimer = cooldown * cdMul;
         Vector2 to = best.GlobalPosition - p;
         float ang = (float)System.Math.Atan2(to.Y, to.X);
-        if (!isLeader)
-            facing = ang; // ring members auto-aim: the bodyguard bites its prey
+        if (!isLeader || cleaver)
+            facing = ang; // auto-aim: the cleave swings at its prey (Mosiah-style),
+                          // so the ~150 deg fan is centered on the swing toward the
+                          // closest body; only lane weapons respect walk facing
         float dmg = weaponDamage * dmgMul;
         if (cleaver)
         {
-            // Maul: ARC CLEAVE with SPLIT damage (human-test locked tradeoff): every
-            // enemy in the fan is hit, but the swing's force divides among them -
+            // Maul: ARC CLEAVE with SPLIT damage (human-test locked tradeoff): the
+            // fan is centered on the swing toward the closest body (auto-aim above);
+            // everything inside it is hit, but the swing's force divides among them -
             // a lone target eats the full blow, a packed horde only gets chipped
             int hits = 0;
             for (int i = 0; i < enemies.Count; i++)

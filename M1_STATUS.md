@@ -137,9 +137,11 @@ balance meaning. With it on: 10 s into a run a **big red diamond "reaper"** spaw
 touching it **downs** whoever it touches (death saves start; it's a revival/STABLE test bench) and then
 it despawns. It doesn't outrun the party; walk into it yourself. Dead nodes are fully inert (`kind="dead"`
 early-return).
-**Baldrun's maul is a ~150° ARC CLEAVE with SPLIT damage (human-test locked)**: every enemy inside the
-fan is hit, but the swing's force divides among them — full 26 on a lone target, chip damage on a packed
-horde; telegraph is a 3-spoke fan, and the "wider arc" rank opens the fan ×1.18/rank. **Mosiah's rapier
+**Baldrun's maul is a ~150° ARC CLEAVE with SPLIT damage (human-test locked)**: it **Mosiah-aims** — the
+swing targets the absolute nearest body whatever way the body walks, and the fan is centered on that swing
+(the arc never depends on walk facing); every enemy inside the fan is hit, but the swing's force divides
+among them — full 26 on a lone target, chip damage on a packed horde; telegraph is a 3-spoke fan, and the
+"wider arc" rank opens the fan ×1.18/rank. **Mosiah's rapier
 is single-target** with base damage bumped 10 → 14 so the two kits feel distinct (wide/split vs. narrow
 /heavy). **Followers slowly ORBIT the Leader** (world-space clock, radius 64; the threat-facing slot made
 them feel glued to directional input) and auto-aim their strikes.
