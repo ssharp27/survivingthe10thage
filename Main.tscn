@@ -21,9 +21,9 @@ memberIndex = 0
 isLeader = true
 maxHp = 200.0
 baseSpeed = 128.0
-weaponDamage = 26.0
+weaponDamage = 30.0
 cooldown = 1.4
-range = 115.0
+range = 130.0
 arcHalf = 1.3
 class_ = "Rune Knight"
 
@@ -34,9 +34,9 @@ weaponName = "Rapier"
 memberIndex = 1
 maxHp = 160.0
 baseSpeed = 140.0
-weaponDamage = 14.0
+weaponDamage = 15.0
 cooldown = 0.6
-range = 130.0
+range = 115.0
 arcHalf = 0.35
 class_ = "Bard"
 

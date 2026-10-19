@@ -77,10 +77,19 @@ public partial class Game : Godot.Node2D
     int[] _pickRank = new int[6];
     int[] _optRoll = { -1, -1, -1 }; // this level-up's three offered options (slot -> option)
 
-    // ---------- dash (SPACE; sanity-check numbers, balance approval is the user's) ----------
+    // ---------- dash (SPACE; user-approved balance round) ----------
+    // Leader lunges 240 px on a 1.5 s cooldown; every live ring member lunges with
+    // them at half the distance on its own 6 s cooldown (user: "Mosiah dashes with
+    // Baldrun - halve the distance, 6 s cooldown"). The cooldown gets a readout: a
+    // gold fill bar over Baldrun's head that grows back as the dash recharges.
     readonly double DASH_IMPULSE = 240.0; // px burst per dash
     readonly double DASH_CD = 1.5;        // seconds between dashes
     double _dashCdT = 0.0;                // cooldown countdown (ready at <= 0)
+    readonly double MEMBER_DASH_IMPULSE = 120.0; // px burst per ring member
+    readonly double MEMBER_DASH_CD = 6.0;        // seconds between squad lunges
+    double _memberDashCdT = 0.0;
+    Godot.Node2D _dashBarPivot = null;    // ride-along pivot over the leader's head
+    Godot.ColorRect _dashBarFill = null;  // the gold fill, re-sized every frame
 
     // ---------- rest -> horde scaling (long rest costs the party its safety) ----------
     // Director.cs reads this and densifies spawns; the long-rest risk chip on the
@@ -616,6 +625,24 @@ public partial class Game : Godot.Node2D
         _pickerLabel = new Label();
         _pickerLabel.Position = new Vector2(24.0f, 130.0f);
         hudl.AddChild(_pickerLabel);
+        // dash-cooldown bar over the Leader's head: dark track + gold fill (resized
+        // every frame in _Process). ZIndex 7 rides above member bodies (members sit
+        // at 5); world-space pivot so it tracks Baldrun without a canvas layer.
+        _dashBarPivot = new Godot.Node2D();
+        AddChild(_dashBarPivot);
+        Godot.ColorRect barBg = new Godot.ColorRect();
+        barBg.Size = new Vector2(44.0f, 5.0f);
+        barBg.Position = new Vector2(-22.0f, 0.0f);
+        barBg.Color = new Color(0.12f, 0.11f, 0.10f, 0.92f);
+        barBg.ZIndex = 7;
+        _dashBarPivot.AddChild(barBg);
+        _dashBarFill = new Godot.ColorRect();
+        _dashBarFill.Size = new Vector2(44.0f, 5.0f);
+        _dashBarFill.Position = new Vector2(0.0f, 0.0f);
+        _dashBarFill.Color = new Color(0.83f, 0.64f, 0.24f, 1.0f); // grimoire gold
+        _dashBarFill.ZIndex = 8;
+        barBg.AddChild(_dashBarFill);
+        _dashBarPivot.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
         for (int i = 0; i < 240; i++)
         {
             Godot.Node2D gem = new Node2D();
@@ -821,20 +848,35 @@ public partial class Game : Godot.Node2D
                 }
             }
         }
-        // ---------- dash (SPACE, human-test addition) ----------
-        // Short forward burst toward the walk direction (or the way Baldrun is
-        // facing when standing still) on a cooldown. Sanity numbers pending the
-        // user's balance approval; instant impulse so it reads as a dodge, not a
-        // speed buff that makes holding a direction feel slippery.
+        // ---------- dash (SPACE, user-approved balance round) ----------
+        // Instant impulse toward the walk direction (or facing when idle). The whole
+        // live squad lunges: the Leader 240 px on 1.5 s, ring members 120 px on their
+        // own 6 s. The ring-follow below reels members back to their slot, so the
+        // squad dash reads as a lunge-and-recover, not a permanent formation break.
         _dashCdT -= delta;
-        if (leaderLive && _dashCdT <= 0.0 && Input.IsActionJustPressed("dash"))
+        _memberDashCdT -= delta;
+        if (leaderLive && Input.IsActionJustPressed("dash"))
         {
             Vector2 burst = dir;
             if (burst.LengthSquared() <= 0.0025f)
                 burst = new Vector2((float)System.Math.Cos(leader.facing),
                                     (float)System.Math.Sin(leader.facing));
-            leader.GlobalPosition = ClampToArena(leader.GlobalPosition + burst.Normalized() * (float)DASH_IMPULSE);
-            _dashCdT = DASH_CD;
+            burst = burst.Normalized();
+            if (_dashCdT <= 0.0)
+            {
+                leader.GlobalPosition = ClampToArena(leader.GlobalPosition + burst * (float)DASH_IMPULSE);
+                _dashCdT = DASH_CD;
+            }
+            if (_memberDashCdT <= 0.0)
+            {
+                foreach (PartyMember m in _party)
+                {
+                    if (m.isLeader || m.downed || m.eliminated)
+                        continue; // fallen bodies stay where they fell
+                    m.GlobalPosition = ClampToArena(m.GlobalPosition + burst * (float)MEMBER_DASH_IMPULSE);
+                }
+                _memberDashCdT = MEMBER_DASH_CD;
+            }
         }
         bool moved = dir.LengthSquared() > 0.0025f;
         if (moved)
@@ -906,6 +948,23 @@ public partial class Game : Godot.Node2D
         }
         if (_camera != null && leader != null)
             _camera.GlobalPosition = _camera.GlobalPosition.Lerp(leader.GlobalPosition, 0.08f);
+        // dash-cooldown readout over Baldrun: the gold fill grows back as the
+        // Leader's dash recharges (parked offscreen when the leader is gone)
+        if (_dashBarPivot != null && _dashBarFill != null)
+        {
+            if (leader != null)
+            {
+                _dashBarPivot.GlobalPosition = leader.GlobalPosition + new Vector2(0.0f, -34.0f);
+                double ready = _dashCdT <= 0.0 ? 1.0 : 1.0 - _dashCdT / DASH_CD;
+                if (ready < 0.0)
+                    ready = 0.0;
+                if (ready > 1.0)
+                    ready = 1.0;
+                _dashBarFill.Size = new Vector2((float)(44.0 * ready), 5.0f);
+            }
+            else
+                _dashBarPivot.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+        }
 
         // death saves (locked rules): d20 every 4 s while downed - nat 20 revives
         // at 25 % HP, 11-19 is a success (3 successes = STABLE, rolls stop), 10 or
@@ -1337,7 +1396,9 @@ public partial class Game : Godot.Node2D
                     m.hp = m.maxHp;
             }
             ApplyUpgrade(OpenOption(1));
-            _hordeScale += 0.35;
+            // user-approved: HP scaling now grows x1.20 per long rest (was +0.35
+            // additive); Director multiplies pacing AND the live cap by this
+            _hordeScale *= 1.20;
             GD.Print("[10thAge] LONG rest: living party fully healed, the fallen stay at 25% hp, horde "
                      + "scaling x" + (float)((int)(_hordeScale * 100.0)) / 100.0);
         }

@@ -1,9 +1,10 @@
 using Godot;
 
 /// <summary>
-/// M1 greybox baseline enemies. Two archetypes: goblin (slow swarm clump) and wolf
-/// (fast straight chaser). No physics bodies: pooled Node2Ds with circle overlap math;
-/// separation is a cheap n-bounded push.
+/// M1 greybox baseline enemies. Three archetypes: goblin (slow swarm clump), hobgoblin
+/// (tough dark-green bruiser, one per ten goblins), and wolf (fast straight chaser).
+/// No physics bodies: pooled Node2Ds with circle overlap math; separation is a cheap
+/// n-bounded push.
 /// </summary>
 public partial class Enemy : Combatant
 {
@@ -33,12 +34,14 @@ public partial class Enemy : Combatant
             AddChild(_body);
             return;
         }
-        float w = kind == "wolf" ? 34.0f : 26.0f;
+        float w = kind == "wolf" ? 34.0f : (kind == "hobgoblin" ? 32.0f : 26.0f);
         _body = new ColorRect();
         _body.Size = new Vector2(w, w * 0.8f);
         _body.Position = -_body.Size * 0.5f;
+        // hobgoblin: a darker, meaner green than the goblin clump (user art note)
         _body.Color = kind == "wolf" ? new Color(0.55f, 0.58f, 0.62f)
-                                     : new Color(0.30f, 0.48f, 0.23f);
+                      : kind == "hobgoblin" ? new Color(0.13f, 0.26f, 0.12f)
+                                            : new Color(0.30f, 0.48f, 0.23f);
         AddChild(_body);
     }
 

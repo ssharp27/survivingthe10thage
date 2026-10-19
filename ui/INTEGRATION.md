@@ -220,6 +220,16 @@ Campfire screen (1280x720, 40px safe margins):
    (2026-10-19 human-test: the 64 px title strip was the only clickable strip, so clicks on the card
    body felt dead; the Button now stretches the full card with the body/chip Labels as its children)
    — LEFT/RIGHT or clicking anywhere on a card picks; the chosen card gets a gold border.
+    **Click routing, round 2 (2026-10-19)**: whole-card Buttons alone STILL wouldn't fire `pressed`
+    when clicked (the modal's Buttons did). Two-pronged fix - (a) the Contents minimums overflowed the
+    592 px inner frame (rest row landed at screen y~568+, COMMIT fully off the 720 px screen): cards
+    168->138, dice 56->48, v-seps 16->10 / 14->8, rest cards 150->130 - everything fits and COMMIT is
+    visible; (b) belt-and-braces: `Campfire.gd._input` routes raw left-clicks through each Button's
+    rect via `rect_has_point(get_local_mouse_position())` (Button-local space, stretch/canvas-safe),
+    guarded by `!modal.visible` so the modal's working Buttons keep their own path; `_select` and
+    `_on_commit_pressed` are idempotent with the `pressed` handlers. Containers (Backdrop/Frame/Contents
+    /rows/cards) are now `mouse_passable = false` so nothing swallows a pick. NOTE: Campfire.gd is
+    TAB-indented - its edits went in via byte-exact python replaces, verify with a `repr()` dump.
 5. Bottom bar: hint "CLICK anywhere on a rest card (or LEFT / RIGHT)   CLICK COMMIT (or ENTER)
    ESC declines" + "COMMIT TO THE EMBERS". ENTER/RETURN replaced SPACE because SPACE is now the
    Leader's in-world dash.

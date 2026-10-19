@@ -13,11 +13,13 @@ anchor_left = 0.0
 anchor_top = 0.0
 anchor_right = 1.0
 anchor_bottom = 1.0
+mouse_passable = false
 color = Color(0.09, 0.08, 0.07, 1)
 
 
 [node name="Frame" type="PanelContainer" parent="."]
 theme = ExtResource("1_theme")
+mouse_passable = false
 anchor_left = 0.0
 anchor_top = 0.0
 anchor_right = 1.0
@@ -33,18 +35,20 @@ anchor_left = 0.0
 anchor_top = 0.0
 anchor_right = 1.0
 anchor_bottom = 1.0
+mouse_passable = false
 margin_left = 24.0
 margin_top = 24.0
 margin_right = -24.0
 margin_bottom = -24.0
-theme_override_constants = {"v_separation": 14}
+theme_override_constants = {"v_separation": 8}
 
 [node name="Header" type="HBoxContainer" parent="Frame/Contents"]
 size_flags_horizontal = 3
 theme_override_constants = {"h_separation": 20, "v_separation": 6}
 
 [node name="DiceToken" type="Panel" parent="Frame/Contents/Header"]
-custom_minimum_size = Vector2(56.0, 56.0)
+mouse_passable = false
+custom_minimum_size = Vector2(48.0, 48.0)
 
 [node name="DiceFace" type="Label" parent="Frame/Contents/Header/DiceToken"]
 anchor_left = 0.0
@@ -71,6 +75,7 @@ theme_override_colors = {"font_color": Color(0.52, 0.44, 0.33, 1)}
 scale = Vector2(0.9, 0.9)
 
 [node name="RosterBar" type="HBoxContainer" parent="Frame/Contents"]
+mouse_passable = false
 size_flags_horizontal = 3
 theme_override_constants = {"h_separation": 10, "v_separation": 6}
 
@@ -83,20 +88,23 @@ custom_minimum_size = Vector2(0.0, 2.0)
 color = Color(0.78, 0.66, 0.42, 0.7)
 
 [node name="PartyGrid" type="GridContainer" parent="Frame/Contents"]
+mouse_passable = false
 columns = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_constants = {"h_separation": 18, "v_separation": 16}
+theme_override_constants = {"h_separation": 18, "v_separation": 10}
 
 [node name="RestLabel" type="Label" parent="Frame/Contents"]
 text = "CHOOSE YOUR REST"
 theme_override_colors = {"font_color": Color(0.83, 0.64, 0.24, 1)}
 
 [node name="RestRow" type="HBoxContainer" parent="Frame/Contents"]
+mouse_passable = false
 size_flags_horizontal = 3
 theme_override_constants = {"h_separation": 24}
 
 [node name="ShortCard" type="VBoxContainer" parent="Frame/Contents/RestRow"]
+mouse_passable = false
 size_flags_horizontal = 3
 theme_override_constants = {"v_separation": 8}
 
@@ -105,7 +113,7 @@ text = "SHORT REST"
 focus_mode = 0
 size_flags_horizontal = 3
 size_flags_vertical = 3
-custom_minimum_size = Vector2(0.0, 150.0)
+custom_minimum_size = Vector2(0.0, 130.0)
 
 [node name="ShortBody" type="Label" parent="Frame/Contents/RestRow/ShortCard/ShortRest"]
 anchor_left = 0.06
@@ -125,6 +133,7 @@ text = "safe - heals +25% max HP"
 theme_override_colors = {"font_color": Color(0.34, 0.48, 0.30, 1)}
 
 [node name="LongCard" type="VBoxContainer" parent="Frame/Contents/RestRow"]
+mouse_passable = false
 size_flags_horizontal = 3
 theme_override_constants = {"v_separation": 8}
 
@@ -133,7 +142,7 @@ text = "LONG REST"
 focus_mode = 0
 size_flags_horizontal = 3
 size_flags_vertical = 3
-custom_minimum_size = Vector2(0.0, 150.0)
+custom_minimum_size = Vector2(0.0, 130.0)
 
 [node name="LongBody" type="Label" parent="Frame/Contents/RestRow/LongCard/LongRest"]
 anchor_left = 0.06
@@ -153,6 +162,7 @@ text = "HORDE SCALING GROWS"
 theme_override_colors = {"font_color": Color(0.62, 0.20, 0.20, 1)}
 
 [node name="ConfirmBar" type="HBoxContainer" parent="Frame/Contents"]
+mouse_passable = false
 size_flags_horizontal = 3
 theme_override_constants = {"h_separation": 10}
 

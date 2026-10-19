@@ -20,7 +20,9 @@ battles/chapters we fought at the table.
 ## Stages (replaces the earlier "Ages" concept)
 
 - Meta-map = the **campaign path**; each **stage = one battle/chapter** from the campaign, with its actual set pieces (special enemies, hazards, mini-boss from that encounter).
-- **Campfire rests** between stages: the camp beat itself only lifts the fallen (back at 25%) and stands bodies up. **SHORT rest = the single locked +25 % heal** (never stacked with the beat); **long rest = full heal for the already-standing company while the fallen still return at 25 %**, plus next-stage power — at the price of horde scaling.
+- **Campfire rests** between stages: the camp beat itself only lifts the fallen (back at 25%) and stands bodies up. **SHORT rest = the single locked +25 % heal** (never stacked with the beat); **long rest = full heal for the already-standing company while the fallen still return at 25 %**, plus next-stage power — at the price of horde scaling (**user-approved rework: ×1.20 multiplicative
+  per long rest — HP, spawn cadence, AND the Director's live cap 40 × scale, so the next horde runs
+  bigger and denser, not just faster**).
 - **Campfires also sit after mini-bosses**, mid-run: an un-revived downed member becomes eliminated and **revives at the next campfire**, so 2–3 campfires per run are the party-recovery beats.
 - Bosses run the **data-driven attack-timeline engine**: phases at 100/66/33% HP, every move is telegraph → attack → recovery, composed from reusable pattern primitives (spokes, rings, sweeps, walls, chases).
 

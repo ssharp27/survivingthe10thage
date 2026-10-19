@@ -1,16 +1,20 @@
 using Godot;
 
 /// <summary>
-/// Horde director for M1: budget-curve spawning of goblins/wolves around the leader,
-/// ramping within each half; paused during campfire and boss phases.
+/// Horde director for M1: budget-curve spawning of goblins/wolves/hobgoblins around the
+/// leader, ramping within each half; paused during campfire and boss phases.
 /// </summary>
 public partial class Director : Godot.Node2D
 {
-    // ---------- horde director for M1: budget-curve spawning of goblins/wolves around the
-    // leader, ramping within each half; paused during campfire and boss phases ----------
+    // ---------- horde director for M1: budget-curve spawning of goblins/wolves/hobgoblins
+    // around the leader, ramping within each half; paused during campfire and boss phases ----------
     float _spawnTimer = 4.0f;
-    // VS-authentic on-screen cap: the horde applies pressure but can't snowball past this
+    // VS-authentic on-screen cap: horde scale (long rest) multiplies this too, so a
+    // long rest spawns MORE live bodies, not just faster ones (user rule)
     const int MAX_LIVE = 40;
+    // one hobgoblin per ten goblins spawned (user rule); counts real spawns only,
+    // rolls rejected by the near-party guard burn the timer but not this counter
+    int _goblinsSinceHob = 0;
 
     public override void _Process(double d)
     {
@@ -25,7 +29,9 @@ public partial class Director : Godot.Node2D
         _spawnTimer -= (float)d;
         if (_spawnTimer > 0.0f)
             return;
-        if (g.GetLiveEnemies() >= MAX_LIVE)
+        // horde scale multiplies the cap too: a long-rest horde runs bigger AND denser
+        float scale = (float)g.GetHordeScale();
+        if (g.GetLiveEnemies() >= (int)(MAX_LIVE * scale))
             return; // at cap: stop spawning, don't reset the timer either
         double t = g.GetStageT();
         double half = st == 0 ? g.GetFirstHalf() : g.GetSecondHalf();
@@ -34,7 +40,6 @@ public partial class Director : Godot.Node2D
             _spawnTimer *= 0.67f; // post-mini-boss: the horde runs 50 % denser
         // the long rest's price lands here: horde scale densifies pacing AND beefs up
         // whatever the next stage spawns (Game._hordeScale -> GetHordeScale)
-        float scale = (float)g.GetHordeScale();
         _spawnTimer /= scale;
         Vector2 near = g.GetLeader() != null ? g.GetLeader().GlobalPosition : new Vector2(0, 0);
         Spawn(g, near, scale);
@@ -52,16 +57,27 @@ public partial class Director : Godot.Node2D
             return; // an arena clamp may have dragged the spawn into the party: skip, the
                     // timer already burned this roll
         bool wolf = (float)GD.Randf() < 0.30f;
+        bool hob = false;
+        if (!wolf)
+        {
+            // user rule: one hobgoblin per ten goblins spawned
+            _goblinsSinceHob++;
+            if (_goblinsSinceHob >= 10)
+            {
+                hob = true;
+                _goblinsSinceHob = 0;
+            }
+        }
         Enemy e = new Enemy();
-        e.kind = wolf ? "wolf" : "goblin";
-        // HP no longer sits under the maul's base swing: a greybox trash hit should take
-        // more than one clean strike, so the live cap can actually bind (horde scale only
-        // bumps this on a long rest)
-        e.maxHp = (wolf ? 96.0f : 48.0f) * hordeScale;
+        e.kind = wolf ? "wolf" : (hob ? "hobgoblin" : "goblin");
+        // user-approved balance round: goblin 30 / hobgoblin 60 / wolf 70 base HP,
+        // still over a single hit on a packed cleave but a lone target dies in one
+        // clean maul swing (30 dmg) - horde scale only bumps this on a long rest
+        e.maxHp = (wolf ? 70.0f : (hob ? 60.0f : 30.0f)) * hordeScale;
         e.hp = e.maxHp;
-        e.speed = wolf ? 120.0f : 90.0f;
-        e.contactDamage = wolf ? 3.0f : 2.0f;
-        e.xpValue = wolf ? 2.0f : 1.0f;
+        e.speed = wolf ? 120.0f : (hob ? 100.0f : 90.0f);
+        e.contactDamage = wolf ? 3.0f : (hob ? 3.0f : 2.0f);
+        e.xpValue = wolf ? 2.0f : (hob ? 3.0f : 1.0f);
         e.GlobalPosition = pos;
         g.RegisterEnemy(e);
         g.AddChild(e);

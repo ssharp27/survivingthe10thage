@@ -99,7 +99,10 @@ func _build() -> void:
 func _make_card() -> Panel:
 	var card: Panel = Panel.new()
 	card.name = "MemberCard"
-	card.custom_minimum_size = Vector2(0.0, 168.0)
+	# 138 (was 168): the full stack (header + roster + grid + rest row +
+	# confirm bar) must fit the 592 px inner frame or lower controls spill
+	# past the 720 px screen and become unclickable (human-test rounds 1-2)
+	card.custom_minimum_size = Vector2(0.0, 138.0)
 	card.add_theme_stylebox_override("panel", _stylebox_card())
 	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.name = "VBox"
@@ -326,6 +329,22 @@ func _on_change_mind() -> void:
 	get_tree().paused = false
 	modal.hide()
 func _input(event: InputEvent) -> void:
+	# human-test rounds 1-2: even as whole-card Buttons the SHORT/LONG
+	# still wouldn't fire Button.pressed when clicked (the modal's Buttons
+	# do), so belt-and-braces: _input always sees the raw mouse events and
+	# repeats the click test in each Button's OWN space (get_local_mouse_position
+	# is stretch/canvas-safe, exactly what Button uses to accept a click).
+	if event is InputEventMouseButton:
+		if not modal.visible and event.pressed and event.button_name == "left":
+			if btn_short.rect_has_point(btn_short.get_local_mouse_position()):
+				_select(0)
+			if btn_long.rect_has_point(btn_long.get_local_mouse_position()):
+				_select(1)
+			if commit.rect_has_point(commit.get_local_mouse_position()):
+				_on_commit_pressed()
+		# releases need no routing; modal-area clicks use the Buttons' pressed
+		# path, already confirmed working there
+		return
 	if not event.is_pressed():
 		return
 	if event is InputEventKey:

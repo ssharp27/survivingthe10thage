@@ -2,7 +2,7 @@
 
 M1 greybox of "Surviving the 10th Age" (Tanurial Forest) builds green, is **human-playable**,
 and the full campaign-battle loop is verified in-engine headless:
-roster → horde I → mini-boss slain → campfire → horde II (live-cap 40) → BOSS engaged →
+roster → horde I → mini-boss slain → campfire → horde II (live-cap 40 × hordeScale) → BOSS engaged →
 `VICTORY — Tanurial Forest cleared`. The 2026-10-19 pass (bug fixes P1, ui wiring P5,
 instrumentation P6) is **uncommitted** and verified by the smoke runs below.
 
@@ -67,6 +67,26 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
   gated on the Leader being live; the picker early-returns before it so a frozen arena can't dash.
   Numbers are SANITY CHECK ONLY - balance approval is the user's. Input action `dash`
   (keycode 32 / physical_keycode 0, mirroring the working `pick_*` serialization).
+- **USER-APPROVED BALANCE ROUND (2026-10-19, second human-test round)**: Baldrun 30 dmg/swing
+  with 130 px reach; Mosiah 15 dmg/thrust with 115 px reach; goblin 30 HP, wolf 70 HP (numbers in
+  Director.cs). **New enemy: hobgoblin** - 60 HP / 100 speed / 3 contact / 3 XP, one per ten goblins
+  spawned (`_goblinsSinceHob` counter, counts real spawns only), drawn darker green + a hair bigger
+  than the goblin clump. **Horde scale reworked**: long rest is now multiplicative ×1.20 on HP AND
+  the Director multiplies the live cap (40 × scale) on top of the existing spawn-interval ÷ scale,
+  so a long rest spawns MORE concurrent bodies, not just faster ones. **Squad dash**: live ring
+  members lunge with the Leader at half the distance (120 px) on their own 6 s cooldown; the ring-
+  follow reels them back, so it reads as lunge-and-recover. **Dash cooldown readout**: a 44×5 gold
+  fill bar over Baldrun's head (world-space pivot, ZIndex 7/8, parked offscreen when the leader is
+  gone) grows back as the Leader's dash recharges.
+- **Rest-card clicks STILL dead round 2 (2026-10-19 human-test round 2)**: even as whole-card
+  Buttons, SHORT/LONG clicks wouldn't fire (modal clicks did). Two-pronged fix: (a) the Contents
+  minimums (dice 56 + 2×168 grid + 150 rest cards + 46 confirm + separations) overflowed the 592 px
+  inner frame - the rest row landed at screen y≈568+ and COMMIT ran fully off the 720 px screen;
+  shrunk to fit (cards 168→138, dice 56→48, v-seps 16→10 / 14→8, rest cards 150→130); (b)
+  belt-and-braces in Campfire.gd `_input`: raw left-clicks are routed through the Buttons' rects
+  via `rect_has_point(get_local_mouse_position())` - Button-local space, exactly the coordinate
+  space Buttons pick in - so clicks land whether or not the Control picker routes them. NOTE:
+  Campfire.gd edits went in via python byte-exact replaces (tab-indent trips the edit matcher).
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)
 
@@ -163,8 +183,10 @@ party follows on the bodyguard ring, everyone auto-attacks. At a level-up the pi
 shows options on three lines — press **1 / 2 / 3** (number keys so a WASD walk tap can never
 pick unseen; press-edge read, arena frozen while the card is up). After a run ends the
 **R** key retries the stage from the run-summary card (journal/menu are M4). **SPACE dashes**
-the Leader (short 240 px burst on a 1.5 s cooldown, sanity numbers pending balance approval).
-The campfire card takes **mouse clicks anywhere on the card** (rest card → COMMIT → REST NOW),
+the whole live squad: Baldrun 240 px / 1.5 s, ring members 120 px / 6 s (user-approved numbers),
+and a gold bar over Baldrun's head fills as its dash recharges.
+The campfire card takes **mouse clicks anywhere on the card** (rest card → COMMIT → REST NOW;
+raw left-clicks are also rect-routed in `_input` as a fallback for the Control picker),
 with LEFT/RIGHT + **ENTER** as the keyboard fallback (SPACE is the dash now, so the campfire
 reads ENTER/RETURN only).
 
@@ -177,24 +199,27 @@ early-return).
 **Baldrun's maul is a ~150° ARC CLEAVE with SPLIT damage (human-test locked)**: it **Mosiah-aims** — the
 swing targets the absolute nearest body whatever way the body walks, and the fan is centered on that swing
 (the arc never depends on walk facing); every enemy inside the fan is hit, but the swing's force divides
-among them — full 26 on a lone target, chip damage on a packed horde; telegraph is a 3-spoke fan. The
+among them — full 30 on a lone target (user-approved), chip damage on a packed horde; telegraph is a
+3-spoke fan. The
 "wider arc" rank was **REMOVED** (user-locked): the fan stays a fixed arc and Baldrun's upgrade pool
 went to reach / damage / cooldown instead. **Mosiah's rapier
-is single-target** with base damage bumped 10 → 14 so the two kits feel distinct (wide/split vs. narrow
-/heavy). **Followers slowly ORBIT the Leader** (world-space clock, radius 64; the threat-facing slot made
+is single-target** at 15 dmg / 115 px reach (user-approved) so the two kits feel distinct (wide/split
+vs. narrow /heavy). **Followers slowly ORBIT the Leader** (world-space clock, radius 64; the threat-facing slot made
 them feel glued to directional input) and auto-aim their strikes.
 Level-up picks come from a **SMART-RANDOM 3-of-6 pool, each capped at rank 3** — Baldrun: longer reach
 (range ×1.15) / heavier blows (damage ×1.10) / swifter swings (cooldown ×0.86); Mosiah: quicker thrusts
 (cooldown ×0.86) / deeper thrust (range ×1.16 + 1 pierce) / sharper points (damage ×1.10). Each level-up
 rolls one guaranteed upgrade per member plus one fully wild slot, so kits get variety instead of the
 same three lines every time; the old fixed card and its maul-arc ×1.18 track are gone (arc stays fixed).
-**Dash on SPACE** (240 px impulse / 1.5 s cooldown) is a movement verb, never an upgrade — HP, speed and
-healing stay off the picker (they live in campfires and revives). Death saves (locked): d20 every **4 s** — nat 20 revives 25 %;
+**Dash on SPACE** (Leader 240 px / 1.5 s, live ring members 120 px / 6 s, user-approved) is a movement
+verb, never an upgrade — HP, speed and healing stay off the picker (they live in campfires and revives);
+the gold bar over Baldrun's head is the Leader dash's cooldown readout. Death saves (locked): d20 every **4 s** — nat 20 revives 25 %;
 3 successes = **STABLE**, rolls stop and hits slay unless the Leader **stands still ~3 s on the body** (revive 50 %);
 3 fails = OUT until the next campfire. Campfires (locked, rest-choice split): the camp beat lifts the fallen
 (**return at 25 % HP**) and stands bodies down→up without healing; **SHORT rest = the single +25 % max-HP heal**
 (clamped, never stacked); **LONG rest** fully heals the already-standing company while the lifted fallen **stay at
-25 %**, grants one free rank, and grows horde scaling ×+0.35. **Revive protection (locked)**: a downed body being channeled is **immune** while
+25 %**, grants one free rank, and grows horde scaling to ×1.20 per long rest (HP ×1.20, spawn cadence ÷ scale
+AND the live cap × scale — user-approved rework of the old +0.35 additive). **Revive protection (locked)**: a downed body being channeled is **immune** while
 the channel progresses (a swarm can't screw the rescue out), and every revive grants **2 s invulnerability**
 (pale-green tint); the reaper tester obeys immunity too — it only despawns after its down actually lands.
 
