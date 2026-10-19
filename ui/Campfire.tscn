@@ -13,7 +13,7 @@ anchor_left = 0.0
 anchor_top = 0.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-color = Color(0, 0, 0, 0.52)
+color = Color(0.09, 0.08, 0.07, 1)
 
 
 [node name="Frame" type="PanelContainer" parent="."]
@@ -104,18 +104,25 @@ theme_override_constants = {"v_separation": 8}
 text = "SHORT REST"
 focus_mode = 0
 size_flags_horizontal = 3
-custom_minimum_size = Vector2(0.0, 64.0)
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0.0, 150.0)
 
-[node name="ShortBody" type="Label" parent="Frame/Contents/RestRow/ShortCard"]
+[node name="ShortBody" type="Label" parent="Frame/Contents/RestRow/ShortCard/ShortRest"]
+anchor_left = 0.06
+anchor_top = 0.50
+anchor_right = 0.94
+anchor_bottom = 0.84
 text = "Bind wounds and keep watch. The company heals +25% max HP (clamped). The horde holds its pace."
 autowrap = true
-theme_override_colors = {"font_color": Color(0.52, 0.44, 0.33, 1)}
-scale = Vector2(0.9, 0.9)
+theme_override_colors = {"font_color": Color(0.42, 0.35, 0.26, 1)}
 
-[node name="ShortChip" type="Label" parent="Frame/Contents/RestRow/ShortCard"]
+[node name="ShortChip" type="Label" parent="Frame/Contents/RestRow/ShortCard/ShortRest"]
+anchor_left = 0.06
+anchor_top = 0.85
+anchor_right = 0.94
+anchor_bottom = 0.97
 text = "safe - heals +25% max HP"
-theme_override_colors = {"font_color": Color(0.44, 0.58, 0.40, 1)}
-scale = Vector2(0.85, 0.85)
+theme_override_colors = {"font_color": Color(0.34, 0.48, 0.30, 1)}
 
 [node name="LongCard" type="VBoxContainer" parent="Frame/Contents/RestRow"]
 size_flags_horizontal = 3
@@ -125,18 +132,25 @@ theme_override_constants = {"v_separation": 8}
 text = "LONG REST"
 focus_mode = 0
 size_flags_horizontal = 3
-custom_minimum_size = Vector2(0.0, 64.0)
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0.0, 150.0)
 
-[node name="LongBody" type="Label" parent="Frame/Contents/RestRow/LongCard"]
-text = "Sleep through the night. Full heal for all; the fallen return at 25% HP. One member trains overnight (+1 damage rank). But the horde scales - the next stage hits harder."
+[node name="LongBody" type="Label" parent="Frame/Contents/RestRow/LongCard/LongRest"]
+anchor_left = 0.06
+anchor_top = 0.42
+anchor_right = 0.94
+anchor_bottom = 0.84
+text = "Sleep through the night. Full heal for all; the fallen return at 25% HP. One member trains overnight (one free upgrade rank). But the horde scales - the next stage hits harder."
 autowrap = true
-theme_override_colors = {"font_color": Color(0.52, 0.44, 0.33, 1)}
-scale = Vector2(0.9, 0.9)
+theme_override_colors = {"font_color": Color(0.42, 0.35, 0.26, 1)}
 
-[node name="LongChip" type="Label" parent="Frame/Contents/RestRow/LongCard"]
+[node name="LongChip" type="Label" parent="Frame/Contents/RestRow/LongCard/LongRest"]
+anchor_left = 0.06
+anchor_top = 0.85
+anchor_right = 0.94
+anchor_bottom = 0.97
 text = "HORDE SCALING GROWS"
-theme_override_colors = {"font_color": Color(0.70, 0.26, 0.26, 1)}
-scale = Vector2(0.85, 0.85)
+theme_override_colors = {"font_color": Color(0.62, 0.20, 0.20, 1)}
 
 [node name="ConfirmBar" type="HBoxContainer" parent="Frame/Contents"]
 size_flags_horizontal = 3
@@ -144,7 +158,7 @@ theme_override_constants = {"h_separation": 10}
 
 [node name="ConfirmHint" type="Label" parent="Frame/Contents/ConfirmBar"]
 size_flags_horizontal = 3
-text = "CLICK a rest card (or LEFT / RIGHT)   CLICK COMMIT (or SPACE)   ESC declines"
+text = "CLICK anywhere on a rest card (or LEFT / RIGHT)   CLICK COMMIT (or ENTER)   ESC declines"
 theme_override_colors = {"font_color": Color(0.52, 0.44, 0.33, 1)}
 scale = Vector2(0.85, 0.85)
 

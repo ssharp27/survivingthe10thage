@@ -32,6 +32,41 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
   *naturally tapping* A/S while walking picked a card unseen. `pick_1/pick_2/pick_3` (keycodes 49-51,
   `physical_keycode:0` like the working `retry` entry) with the label split across three lines —
   the old single long line ran past the 1280 px window edge and read as cut-off text.
+- **Campfire rest cards were misclick-dead (2026-10-19 human-test round)**: SHORT/LONG Buttons
+  only covered their 64 px title strip, so clicking the card body (where the text is) did nothing
+  and the human fell back to LEFT/RIGHT + SPACE. Root cause was layout, not signal wiring: the
+  modal's COMMIT/REST NOW clicks always worked because ConfirmModal is the LAST subtree (topmost
+  pick), while the rest row's buttons had a dead zone around them. Fixed in Campfire.tscn by
+  making each Button the WHOLE card (`size_flags_vertical = 3` stretch + `custom_minimum_size`),
+  with the body/chip Labels moved as CHILDREN of the Button (Labels are mouse-passable, so the
+  click reaches the Button) - any click on a card now selects it.
+- **Rest-card boxes un-dimmed (2026-10-19 human-test round)**: the only transparency on the screen
+  was the full-rect Backdrop `Color(0, 0, 0, 0.52)` letting grass/projectiles show behind the
+  text (every StyleBoxFlat in Campfire.tscn + grimoire_theme.tres was already alpha 1). Backdrop
+  is now opaque dark `Color(0.09, 0.08, 0.07, 1)`.
+- **Campfire confirm moved SPACE → ENTER/RETURN (2026-10-19 human-test round)**: SPACE is the
+  Leader's dash (see the dash bullet), so the COMMIT trigger and the modal confirm both read
+  KEY_ENTER only. WARNING for future edits: Campfire.gd is TAB-indented, and the edit tool must
+  receive literal tabs - the first pass on this block went in malformed (broken elif + mixed
+  tab/space indent = GDScript syntax error) and was repaired by a scripted rewrite of the whole
+  `_input` func, then verified byte-exact with a repr() tab dump.
+- **Level-up picker is now SMART-RANDOM 3-of-6 (2026-10-19 human-test round)**: the fixed
+  3-option card read same-y every level. Pool grew to 6 named upgrades (3 per member); every
+  level-up rolls slot 1 = one still-open Baldrun upgrade, slot 2 = one still-open Mosiah upgrade,
+  slot 3 = fully wild from everything still open. Capped options never show, no option shows
+  twice on one card, a fully-capped member borrows the wild pool, and if NOTHING is open the
+  picker stays closed (the level-up just banks xp). Code: `RollOptions()` + `int[] _optRoll`
+  (slot -> option) + `_pickRank[6]`; `OptLabel(slot)` resolves through the roll.
+- **Baldrun's arc-widening upgrade REPLACED (2026-10-19 human-test round, user-locked)**: the
+  maul fan stays a fixed ~150° arc (`arcMul` deleted outright from PartyMember.cs); Baldrun's
+  pool is longer reach (range ×1.15) / heavier blows (damage ×1.10) / swifter swings
+  (cooldown ×0.86). Mosiah keeps quicker thrusts + deeper thrust and gains sharper points
+  (damage ×1.10).
+- **Dash added on SPACE (2026-10-19 human-test round)**: instant 240 px impulse toward the walk
+  direction (or Baldrun's facing when standing still), 1.5 s cooldown, arena-clamped, Leader only,
+  gated on the Leader being live; the picker early-returns before it so a frozen arena can't dash.
+  Numbers are SANITY CHECK ONLY - balance approval is the user's. Input action `dash`
+  (keycode 32 / physical_keycode 0, mirroring the working `pick_*` serialization).
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)
 
@@ -127,9 +162,11 @@ system dotnet is runtime-only). Run the main scene; **WASD or arrows** move the 
 party follows on the bodyguard ring, everyone auto-attacks. At a level-up the picker label
 shows options on three lines — press **1 / 2 / 3** (number keys so a WASD walk tap can never
 pick unseen; press-edge read, arena frozen while the card is up). After a run ends the
-**R** key retries the stage from the run-summary card (journal/menu are M4). The campfire
-card takes **mouse clicks** (rest card → COMMIT → REST NOW), with LEFT/RIGHT + SPACE as the
-keyboard fallback.
+**R** key retries the stage from the run-summary card (journal/menu are M4). **SPACE dashes**
+the Leader (short 240 px burst on a 1.5 s cooldown, sanity numbers pending balance approval).
+The campfire card takes **mouse clicks anywhere on the card** (rest card → COMMIT → REST NOW),
+with LEFT/RIGHT + **ENTER** as the keyboard fallback (SPACE is the dash now, so the campfire
+reads ENTER/RETURN only).
 
 **Death-state tester (TEST BENCH, default OFF)**: the reaper only spawns when `M1_REAPER=1` is in the
 environment — human play left it off once the revive rules tested clean, and nothing about it carries
@@ -140,14 +177,19 @@ early-return).
 **Baldrun's maul is a ~150° ARC CLEAVE with SPLIT damage (human-test locked)**: it **Mosiah-aims** — the
 swing targets the absolute nearest body whatever way the body walks, and the fan is centered on that swing
 (the arc never depends on walk facing); every enemy inside the fan is hit, but the swing's force divides
-among them — full 26 on a lone target, chip damage on a packed horde; telegraph is a 3-spoke fan, and the
-"wider arc" rank opens the fan ×1.18/rank. **Mosiah's rapier
+among them — full 26 on a lone target, chip damage on a packed horde; telegraph is a 3-spoke fan. The
+"wider arc" rank was **REMOVED** (user-locked): the fan stays a fixed arc and Baldrun's upgrade pool
+went to reach / damage / cooldown instead. **Mosiah's rapier
 is single-target** with base damage bumped 10 → 14 so the two kits feel distinct (wide/split vs. narrow
 /heavy). **Followers slowly ORBIT the Leader** (world-space clock, radius 64; the threat-facing slot made
 them feel glued to directional input) and auto-aim their strikes.
-Level-up picks are **distinct per-option effects capped at rank 3** (maul arc ×1.18, quicker thrusts
-cooldown ×0.86, deeper thrust range ×1.16 + 1 pierce; damage ×1.08-1.12 per rank) — the old flat "+25%
-dmg" ranks from `f88de14` were replaced. Death saves (locked): d20 every **4 s** — nat 20 revives 25 %;
+Level-up picks come from a **SMART-RANDOM 3-of-6 pool, each capped at rank 3** — Baldrun: longer reach
+(range ×1.15) / heavier blows (damage ×1.10) / swifter swings (cooldown ×0.86); Mosiah: quicker thrusts
+(cooldown ×0.86) / deeper thrust (range ×1.16 + 1 pierce) / sharper points (damage ×1.10). Each level-up
+rolls one guaranteed upgrade per member plus one fully wild slot, so kits get variety instead of the
+same three lines every time; the old fixed card and its maul-arc ×1.18 track are gone (arc stays fixed).
+**Dash on SPACE** (240 px impulse / 1.5 s cooldown) is a movement verb, never an upgrade — HP, speed and
+healing stay off the picker (they live in campfires and revives). Death saves (locked): d20 every **4 s** — nat 20 revives 25 %;
 3 successes = **STABLE**, rolls stop and hits slay unless the Leader **stands still ~3 s on the body** (revive 50 %);
 3 fails = OUT until the next campfire. Campfires (locked, rest-choice split): the camp beat lifts the fallen
 (**return at 25 % HP**) and stands bodies down→up without healing; **SHORT rest = the single +25 % max-HP heal**
@@ -184,8 +226,9 @@ the channel progresses (a swarm can't screw the rescue out), and every revive gr
 ## Pilot note (verification-only, env-gated — never active in human play)
 
 `M1_PILOT=1` env ⇒ leader autopilots (orbits around threats, boss strafe + face-lock), bullet volleys
-pass through, incoming party damage ×0.15, and the picker auto-confirms at 2 s with a **rotating named
-pick** (there is no heal pick). Implemented in Game.cs (`_pilot`, `faceTo`, bullet-dodge gate,
+pass through, incoming party damage ×0.15, and the picker auto-confirms at 2 s by taking the **first
+open slot of the current roll** (`_optRoll`, which `RollOptions()` seeded) — there is still no heal
+pick, and the pilot never presses `dash`, so the dash path is only exercised by human play. Implemented in Game.cs (`_pilot`, `faceTo`, bullet-dodge gate,
 `PickerTick` pilot branch). The stand-still revive channel is back with the STABLE rules (dice nat-20
 revive coexists with it), so pilot walk-to-body still exercises it — but only while the **Leader** is live;
 with the Leader downed the pilot has no body to walk, which is the deferred rule in DESIGN.

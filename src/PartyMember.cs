@@ -33,7 +33,8 @@ public partial class PartyMember : Godot.Node2D
     public float cdMul = 1.0f;
     public float rangeMul = 1.0f;
     public float speedMul = 1.0f;
-    public float arcMul = 1.0f; // "wider arc" rank track: the maul fan opens with it
+    // "wider arc" rank track REMOVED per human test: Baldrun's upgrade pool went to
+    // reach / damage / cooldown instead, so the maul fan stays a fixed ~150 deg arc.
     public int pierce = 0; // "deeper thrust": the rapier lane can skewer extra bodies
     public string class_ = ""; // display class for the ui/ cards (empty = weapon fallback)
     public string pickHistory = ""; // tracks taken so far, rendered on the run-summary card
@@ -162,7 +163,7 @@ public partial class PartyMember : Godot.Node2D
             return;
         Godot.Collections.Array<Godot.Node2D> enemies = pg.GetEnemies();
         // the live arc: ranks open the maul FAN, the rapier keeps its narrow lane
-        float arcEff = (float)System.Math.Min((double)arcHalf * (double)arcMul, System.Math.PI);
+        float arcEff = (float)System.Math.Min((double)arcHalf, System.Math.PI);
         bool cleaver = arcHalf > 0.5f; // maul kit: arc cleave with split damage
         float reach = range * rangeMul;
         Godot.Node2D best = null;

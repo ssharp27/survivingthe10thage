@@ -316,7 +316,7 @@ func _on_commit_pressed() -> void:
 func _rest_summary() -> String:
 	if _selection == 0:
 		return "Short rest - bind wounds and keep watch.\nThe company heals +25% max HP (clamped). The horde holds its pace."
-	return "Long rest - sleep through the night.\nFull heal for all; the fallen return at 25% HP.\nOne member trains overnight (+1 damage rank).\nBut the horde scales - the next stage hits harder."
+	return "Long rest - sleep through the night.\nFull heal for all; the fallen return at 25% HP.\nOne member trains overnight (one free upgrade rank).\nBut the horde scales - the next stage hits harder."
 func _on_rest_now() -> void:
 	get_tree().paused = false
 	modal.hide()
@@ -330,9 +330,12 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventKey:
 		if modal.visible:
+			# human-test change: SPACE became the leader's dash mid-world, so
+			# the campfire confirm moved to ENTER/RETURN only (clicks still
+			# confirm: the card root keeps process_mode ALWAYS through the pause)
 			if event.keycode == KEY_ESCAPE:
 				_on_change_mind()
-			elif event.keycode in [KEY_ENTER, KEY_SPACE]:
+			elif event.keycode == KEY_ENTER:
 				_on_rest_now()
 			return
 		match event.keycode:
@@ -340,7 +343,8 @@ func _input(event: InputEvent) -> void:
 				_select(0)
 			KEY_RIGHT, KEY_D:
 				_select(1)
-			KEY_ENTER, KEY_SPACE:
+			# SPACE is the leader's dash now: the campfire confirm is ENTER/RETURN
+			KEY_ENTER:
 				_on_commit_pressed()
 			KEY_ESCAPE:
 				cancelled.emit()

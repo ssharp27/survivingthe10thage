@@ -58,20 +58,29 @@ public partial class Game : Godot.Node2D
     double _xpNext = 6.0;
     readonly double PICKER_AUTO_TIMEOUT = 6.0;
 
-    // ---------- level-up picker: targeted, DAMAGE FAMILY ONLY, 3 ranks then cap ----------
-    // Every option bumps only offensive stats (arc / cooldown / reach / damage) - never
-    // HP, speed or healing, which stays locked to campfires and revives. Ranks are capped
-    // at 3 per DESIGN; the 4th rank would be the evolution (Stormcaller / Viperkiss), stubbed
-    // for M2. This table is the data surface: a .tres pass copies these columns straight out.
+    // ---------- level-up picker: SMART-RANDOM 3 OF 6 named upgrades, 3 ranks then cap ----------
+    // Human-test: the fixed 3-option card felt the same every level - roll variety instead.
+    // Two slots guarantee one still-open upgrade per member (Baldrun, Mosiah), the last
+    // slot is fully random from the whole pool, and capped options never show. Offense
+    // only - never HP, speed or healing (those live in campfires and revives). Ranks cap
+    // at 3 per DESIGN; the 4th rank would be the evolution (Stormcaller / Viperkiss),
+    // stubbed for M2. This table is the data surface: a .tres pass copies these out.
     const int PICK_RANK_CAP = 3;
-    static readonly string[] OPT_LABEL = { "wider arc (maul fan)", "quicker thrusts (cooldown)", "deeper thrust (reach + pierce)" };
-    static readonly int[] OPT_MEMBER = { 0, 1, 1 }; // targets one named member (DESIGN)
-    static readonly float[] OPT_ARC = { 1.18f, 1.0f, 1.0f };
-    static readonly float[] OPT_CD = { 1.0f, 0.86f, 1.0f };
-    static readonly float[] OPT_RANGE = { 1.0f, 1.0f, 1.16f };
-    static readonly float[] OPT_DMG = { 1.10f, 1.08f, 1.12f };
-    static readonly int[] OPT_PIERCE = { 0, 0, 1 };
-    int[] _pickRank = new int[3];
+    static readonly string[] OPT_LABEL = { "longer reach (maul)", "heavier blows (maul damage)",
+                                           "swifter swings (cooldown)", "quicker thrusts (cooldown)",
+                                           "deeper thrust (reach + pierce)", "sharper points (damage)" };
+    static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1 }; // targets one named member (DESIGN)
+    static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f };
+    static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f };
+    static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f };
+    static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0 };
+    int[] _pickRank = new int[6];
+    int[] _optRoll = { -1, -1, -1 }; // this level-up's three offered options (slot -> option)
+
+    // ---------- dash (SPACE; sanity-check numbers, balance approval is the user's) ----------
+    readonly double DASH_IMPULSE = 240.0; // px burst per dash
+    readonly double DASH_CD = 1.5;        // seconds between dashes
+    double _dashCdT = 0.0;                // cooldown countdown (ready at <= 0)
 
     // ---------- rest -> horde scaling (long rest costs the party its safety) ----------
     // Director.cs reads this and densifies spawns; the long-rest risk chip on the
@@ -726,7 +735,7 @@ public partial class Game : Godot.Node2D
         if (_pickerActive)
         {
             PickerTick(d);
-            _hud.Text = "LEVEL UP - pick ONE (press A / S / D once, releases do not count)"
+            _hud.Text = "LEVEL UP - pick ONE (press 1 / 2 / 3 once, releases do not count)"
                         + " | combat holds while you read | Lv " + _level + " | xp " + (int)_xp + "/"
                         + (int)_xpNext + " | " + StateName(_state) + " t=" + (int)_stageT +
                         " | enemies " + _liveEnemies;
@@ -811,6 +820,21 @@ public partial class Game : Godot.Node2D
                         faceTo = nearest.GlobalPosition - leader.GlobalPosition;
                 }
             }
+        }
+        // ---------- dash (SPACE, human-test addition) ----------
+        // Short forward burst toward the walk direction (or the way Baldrun is
+        // facing when standing still) on a cooldown. Sanity numbers pending the
+        // user's balance approval; instant impulse so it reads as a dodge, not a
+        // speed buff that makes holding a direction feel slippery.
+        _dashCdT -= delta;
+        if (leaderLive && _dashCdT <= 0.0 && Input.IsActionJustPressed("dash"))
+        {
+            Vector2 burst = dir;
+            if (burst.LengthSquared() <= 0.0025f)
+                burst = new Vector2((float)System.Math.Cos(leader.facing),
+                                    (float)System.Math.Sin(leader.facing));
+            leader.GlobalPosition = ClampToArena(leader.GlobalPosition + burst.Normalized() * (float)DASH_IMPULSE);
+            _dashCdT = DASH_CD;
         }
         bool moved = dir.LengthSquared() > 0.0025f;
         if (moved)
@@ -1116,15 +1140,23 @@ public partial class Game : Godot.Node2D
             _xp -= _xpNext;
             _level++;
             _xpNext = 5.0 + _level * 4.0;
-            _pickerActive = true;
-            _pickerWait = 0.0;
-            // human test: one long line ran past the window edge - stack the three
-            // picks so they always fit, and read them with NUMBER keys (A/S/D were
-            // the movement keys, so a walk tap could end the card unseen)
-            _pickerLabel.Text = "LEVEL UP - pick ONE (combat is frozen):\n" +
-                                "[1] " + OptLabel(0) + "\n[2] " + OptLabel(1) + "\n[3] " + OptLabel(2);
-            GD.Print("[10thAge] level " + _level + " picker up: [1] " + OptLabel(0) + " | [2] " +
-                     OptLabel(1) + " | [3] " + OptLabel(2));
+            // human-test: fixed cards felt same-y every level - roll a smart-random
+            // three instead (see RollOptions): one upgrade per member is guaranteed,
+            // the third slot is fully wild
+            if (RollOptions())
+            {
+                _pickerActive = true;
+                _pickerWait = 0.0;
+                // human test: one long line ran past the window edge - stack the three
+                // picks so they always fit, and read them with NUMBER keys (A/S/D were
+                // the movement keys, so a walk tap could end the card unseen)
+                _pickerLabel.Text = "LEVEL UP - pick ONE (combat is frozen):\n" +
+                                    "[1] " + OptLabel(0) + "\n[2] " + OptLabel(1) + "\n[3] " + OptLabel(2);
+                GD.Print("[10thAge] level " + _level + " picker up: [1] " + OptLabel(0) + " | [2] " +
+                         OptLabel(1) + " | [3] " + OptLabel(2));
+            }
+            else
+                GD.Print("[10thAge] level " + _level + ": every upgrade capped - no pick offered");
         }
         if (!_pickerActive)
             return;
@@ -1132,18 +1164,27 @@ public partial class Game : Godot.Node2D
         // P1: the picker used to ride on the WASD letters, so the old GetActionStrength
         // read confirmed the frame the card appeared for anyone still holding A/S.
         // NUMBER keys avoid the movement clash entirely - still edge-read only, so a
-        // fresh tap is a deliberate pick.
+        // fresh tap is a deliberate pick. Slots map through _optRoll (this card's roll).
         int choice = -1;
         if (Input.IsActionJustPressed("pick_1"))
-            choice = 0;
+            choice = _optRoll[0];
         else if (Input.IsActionJustPressed("pick_2"))
-            choice = 1;
+            choice = _optRoll[1];
         else if (Input.IsActionJustPressed("pick_3"))
-            choice = 2;
+            choice = _optRoll[2];
         // pilot auto-confirm (verification only) + the AFK fallback: both take an
         // uncapped option, rotating so the pilot exercises all three stat tracks
         if (choice < 0 && (_pickerWait >= PICKER_AUTO_TIMEOUT || (_pilot && _pickerWait >= 2.0)))
-            choice = OpenOption(_level);
+        {
+            for (int s = 0; s < 3; s++)
+            {
+                if (_optRoll[s] >= 0)
+                {
+                    choice = _optRoll[s];
+                    break;
+                }
+            }
+        }
         if (choice < 0)
             return;
         ApplyUpgrade(choice);
@@ -1151,14 +1192,59 @@ public partial class Game : Godot.Node2D
         _pickerLabel.Text = "";
     }
 
-    private string OptLabel(int i)
+    private string OptLabel(int slot)
     {
+        if (slot < 0 || slot >= _optRoll.Length)
+            return "-";
+        int i = _optRoll[slot];
         if (i < 0 || i >= OPT_LABEL.Length)
             return "-";
         PartyMember m = GetMemberByIndex(OPT_MEMBER[i]);
         if (m == null)
             return "-";
         return m.displayName + " " + m.weaponName + ": " + OPT_LABEL[i];
+    }
+
+    // ---------- smart-random level-up roll (human-test: variety, not same-y cards) ----------
+    // Slots 0/1 each draw one still-open upgrade for member 0 and member 1 (so every
+    // character is always represented), slot 2 is fully wild from everything still
+    // open. No option is ever offered twice on one card. A member whose whole pool is
+    // capped borrows from the wild pool instead; if NOTHING is open the picker stays
+    // closed and the level-up just banks the xp.
+    private bool RollOptions()
+    {
+        bool[] open = new bool[OPT_LABEL.Length];
+        int[] cand = new int[OPT_LABEL.Length];
+        int openCount = 0;
+        for (int o = 0; o < OPT_LABEL.Length; o++)
+        {
+            open[o] = OPT_MEMBER[o] < _party.Count && _pickRank[o] < PICK_RANK_CAP;
+            if (open[o])
+                openCount++;
+        }
+        if (openCount == 0)
+            return false;
+        for (int slot = 0; slot < 3; slot++)
+        {
+            int c = 0;
+            int wantMember = (slot < 2 && slot < _party.Count) ? slot : -1;
+            for (int o = 0; o < OPT_LABEL.Length; o++)
+                if (open[o] && (wantMember < 0 || OPT_MEMBER[o] == wantMember))
+                    cand[c++] = o;
+            if (c == 0) // this member is fully capped: fall back to the wild pool
+                for (int o = 0; o < OPT_LABEL.Length; o++)
+                    if (open[o])
+                        cand[c++] = o;
+            if (c == 0)
+            {
+                _optRoll[slot] = -1;
+                continue;
+            }
+            int pick = cand[(int)(Rng.Randf() * (float)c) % c];
+            _optRoll[slot] = pick;
+            open[pick] = false; // never offer the same upgrade twice on one card
+        }
+        return _optRoll[0] >= 0 || _optRoll[1] >= 0 || _optRoll[2] >= 0;
     }
 
     // never hand back a capped track: 3 ranks then the evolution, which is M2 content
@@ -1200,7 +1286,6 @@ public partial class Game : Godot.Node2D
         m.dmgMul *= OPT_DMG[option];
         m.cdMul *= OPT_CD[option];
         m.rangeMul *= OPT_RANGE[option];
-        m.arcMul *= OPT_ARC[option];
         m.pierce += OPT_PIERCE[option];
         m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
                          OPT_LABEL[option] + " x" + _pickRank[option];
