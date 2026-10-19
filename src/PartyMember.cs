@@ -49,7 +49,18 @@ public partial class PartyMember : Godot.Node2D
     public float invuln = 0.0f; // post-revive immunity timer (2 s)
     public float dsDamageBuffer = 0.0f; // 2 s gap between damage-caused death-save fails
     public float dsHold = 0.0f; // countdown for SetDsTemp texts; 0 = persistent
-    public bool campReturned = false; // lifted to 25% by the camp beat: long rest won't full-heal it
+    public bool campReturned = false; // lifted by the camp beat (pass 5: the LONG rest now tops these to full)
+
+    // on-body death-save readout (DESIGN:12 - the die lives ON the downed body, the
+    // save is not log-only): Game writes dsColor/dsLastRoll, the body shows them
+    public Color dsColor = new Color(1.0f, 1.0f, 1.0f); // chip mood: blood/amber/sage/grey
+    public int dsLastRoll = 0;                         // the die face the chip shows
+    public float reviveChannelTotal = 3.0f;            // mirrors Game.REVIVE_CHANNEL (bar width)
+    Godot.ColorRect _chipRing = null;                  // state ring behind the die face
+    Godot.ColorRect _chipFace = null;                  // grimoire-paper die face
+    Godot.Label _chipNum = null;                       // the roll itself
+    Godot.ColorRect _chanBg = null;                    // STAND STILL channel bar (player revive)
+    Godot.ColorRect _chanFill = null;
 
     Godot.ColorRect _body;
     Godot.Label _ds;
@@ -67,8 +78,40 @@ public partial class PartyMember : Godot.Node2D
                                        : new Color(0.78f, 0.63f, 0.44f);
         AddChild(_body);
         _ds = new Label();
-        _ds.Position = new Vector2(-24.0f, -40.0f);
+        _ds.Position = new Vector2(-24.0f, -58.0f); // clears the 64x8 dash bar at y-42
         AddChild(_ds);
+        // d20 death-save chip (DESIGN:12): paper face + ink number + state ring, parked
+        // to the body's right so it never fights the ds label (y-58), the dash bar
+        // (y-42) or the channel bar (y-30). Pure ColorRects/Labels - the C# _draw hook
+        // is dead in 4.7.
+        _chipRing = new Godot.ColorRect();
+        _chipRing.Size = new Vector2(32.0f, 32.0f);
+        _chipRing.Position = new Vector2(16.0f, -16.0f);
+        _chipRing.Color = new Color(0.70f, 0.70f, 0.70f, 1.0f);
+        _chipRing.ZIndex = 6;
+        AddChild(_chipRing);
+        _chipFace = new Godot.ColorRect();
+        _chipFace.Size = new Vector2(28.0f, 28.0f);
+        _chipFace.Position = new Vector2(18.0f, -14.0f);
+        _chipFace.Color = new Color(0.957f, 0.929f, 0.847f, 1.0f); // grimoire paper
+        _chipFace.ZIndex = 7;
+        AddChild(_chipFace);
+        _chipNum = new Label();
+        _chipNum.Position = new Vector2(21.0f, -22.0f);
+        _chipNum.ZIndex = 8;
+        AddChild(_chipNum);
+        _chanBg = new Godot.ColorRect();
+        _chanBg.Size = new Vector2(48.0f, 6.0f);
+        _chanBg.Position = new Vector2(-24.0f, -30.0f);
+        _chanBg.Color = new Color(0.12f, 0.11f, 0.10f, 0.9f);
+        _chanBg.ZIndex = 7;
+        AddChild(_chanBg);
+        _chanFill = new Godot.ColorRect();
+        _chanFill.Size = new Vector2(0.0f, 6.0f);
+        _chanFill.Position = new Vector2(-24.0f, -30.0f);
+        _chanFill.Color = new Color(0.83f, 0.64f, 0.24f, 1.0f); // gold = rescue channel running
+        _chanFill.ZIndex = 8;
+        AddChild(_chanFill);
         // telegraph: a pivot + thin ColorRect "spokes" radiating along facing. The
         // maul is a ~150 deg ARC CLEAVE (human-test locked): spokes show the fan
         // edges + middle; the rapier stays one solid stab line. Pure nodes because
@@ -128,6 +171,48 @@ public partial class PartyMember : Godot.Node2D
             _telePivot.Visible = !hidden;
         if (_ds != null)
             _ds.Visible = !hidden;
+        // ---- downed-body readout: the d20 chip + the STAND STILL channel bar ----
+        bool downChip = downed && !eliminated;
+        float chanTotal = reviveChannelTotal > 0.0f ? reviveChannelTotal : 3.0f;
+        bool channeling = downChip && reviveProgress > 0.0f;
+        if (_chipRing != null)
+        {
+            _chipRing.Visible = downChip;
+            if (downChip)
+                _chipRing.Color = stable ? new Color(0.95f, 0.75f, 0.35f, 1.0f)
+                                         : (dsFails > 0 ? new Color(0.88f, 0.42f, 0.42f, 1.0f)
+                                                        : new Color(0.70f, 0.70f, 0.70f, 1.0f));
+        }
+        if (_chipFace != null)
+            _chipFace.Visible = downChip;
+        if (_chipNum != null)
+        {
+            _chipNum.Visible = downChip;
+            _chipNum.Text = dsLastRoll > 0 ? "" + dsLastRoll : "d20";
+        }
+        if (_chanBg != null)
+            _chanBg.Visible = channeling;
+        if (_chanFill != null)
+        {
+            _chanFill.Visible = channeling;
+            float frac = channeling ? reviveProgress / chanTotal : 0.0f;
+            if (frac > 1.0f)
+                frac = 1.0f;
+            _chanFill.Size = new Vector2(48.0f * frac, 6.0f);
+        }
+        if (channeling && _ds != null)
+        {
+            // what the player is DOING owns the chip, so the countdown beats a stale
+            // death-save line (the ring + gold bar show the same channel visually)
+            float rem = chanTotal - reviveProgress;
+            int left = (int)rem; // ceil without Math.ceil (4.7 Math lacks it)
+            if ((float)left < rem)
+                left++;
+            _ds.Text = "STAND STILL " + left + "s";
+            _ds.Modulate = new Color(0.95f, 0.75f, 0.35f, 1.0f);
+        }
+        else if (_ds != null)
+            _ds.Modulate = dsColor;
         if (downed || eliminated)
             return;
         if (_flash > 0.0f)
@@ -154,7 +239,15 @@ public partial class PartyMember : Godot.Node2D
                 s.Modulate = new Color(a, a, a, a);
         }
         if (invuln > 0.0f)
+        {
             _body.Modulate = new Color(0.8f, 1.0f, 0.85f); // pale green = post-revive shield
+            if (_ds != null)
+            {
+                // locked rule made visible: the player can see WHY a hit just bounced
+                _ds.Text = "immune " + ((int)(invuln * 10.0f)) / 10.0f + "s";
+                _ds.Modulate = new Color(0.60f, 0.84f, 0.60f, 1.0f); // sage = immunity
+            }
+        }
         if (cdTimer > 0.0f)
             return;
         Vector2 p = GlobalPosition;

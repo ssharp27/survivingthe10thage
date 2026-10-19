@@ -95,7 +95,7 @@ size_flags_vertical = 3
 theme_override_constants = {"h_separation": 18, "v_separation": 10}
 
 [node name="RestLabel" type="Label" parent="Frame/Contents"]
-text = "CHOOSE YOUR REST"
+text = "CHOOSE YOUR REST - both feed the horde x1.20"
 theme_override_colors = {"font_color": Color(0.83, 0.64, 0.24, 1)}
 
 [node name="RestRow" type="HBoxContainer" parent="Frame/Contents"]
@@ -113,14 +113,14 @@ text = "SHORT REST"
 focus_mode = 0
 size_flags_horizontal = 3
 size_flags_vertical = 3
-custom_minimum_size = Vector2(0.0, 130.0)
+custom_minimum_size = Vector2(0.0, 100.0)
 
 [node name="ShortBody" type="Label" parent="Frame/Contents/RestRow/ShortCard/ShortRest"]
 anchor_left = 0.06
 anchor_top = 0.50
 anchor_right = 0.94
 anchor_bottom = 0.84
-text = "Bind wounds and keep watch. The company heals +25% max HP (clamped). The horde holds its pace."
+text = "Bind wounds and keep watch. Heals the company +25% max HP (clamped) AND one member trains overnight: you pick a free upgrade rank. The horde scales too - x1.20."
 autowrap = true
 theme_override_colors = {"font_color": Color(0.42, 0.35, 0.26, 1)}
 
@@ -129,7 +129,7 @@ anchor_left = 0.06
 anchor_top = 0.85
 anchor_right = 0.94
 anchor_bottom = 0.97
-text = "safe - heals +25% max HP"
+text = "heal +25% + 1 free rank - horde x1.20"
 theme_override_colors = {"font_color": Color(0.34, 0.48, 0.30, 1)}
 
 [node name="LongCard" type="VBoxContainer" parent="Frame/Contents/RestRow"]
@@ -142,14 +142,14 @@ text = "LONG REST"
 focus_mode = 0
 size_flags_horizontal = 3
 size_flags_vertical = 3
-custom_minimum_size = Vector2(0.0, 130.0)
+custom_minimum_size = Vector2(0.0, 100.0)
 
 [node name="LongBody" type="Label" parent="Frame/Contents/RestRow/LongCard/LongRest"]
 anchor_left = 0.06
 anchor_top = 0.42
 anchor_right = 0.94
 anchor_bottom = 0.84
-text = "Sleep through the night. Full heal for all; the fallen return at 25% HP. One member trains overnight (one free upgrade rank). But the horde scales - the next stage hits harder."
+text = "Sleep through the night. Full revive + full heal for the WHOLE squad - the fallen rise at full HP, not 25%. No free upgrade rank. The horde scales the same x1.20."
 autowrap = true
 theme_override_colors = {"font_color": Color(0.42, 0.35, 0.26, 1)}
 
@@ -158,7 +158,7 @@ anchor_left = 0.06
 anchor_top = 0.85
 anchor_right = 0.94
 anchor_bottom = 0.97
-text = "HORDE SCALING GROWS"
+text = "FULL HEAL, NO RANK - HORDE X1.20"
 theme_override_colors = {"font_color": Color(0.62, 0.20, 0.20, 1)}
 
 [node name="ConfirmBar" type="HBoxContainer" parent="Frame/Contents"]

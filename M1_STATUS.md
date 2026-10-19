@@ -142,6 +142,28 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
   gap and permanently trailed. Reworked: home at max(own speed x1.15, leader speed +40) so catch-up
   is guaranteed, plus a hard 120 px leash that pulls any strayed body back onto the ring. Downed/
   eliminated bodies stay where they fell (unchanged); the orbit feel stays on the world-space clock.
+- **UX/UI + campfire-safety pass 6 (user-approved clusters A,B,C,D,E,F,I; 2026-10-19)**: from the
+  six-agent review pass; G (balance) declined - x1.20 horde scaling stays exactly as the user set it,
+  H (art) queued. Shipped: (A) campfire copy SYNCED to the pass-5 economy - ShortBody/ShortChip/LongBody/
+  LongChip + `_rest_summary()` popup + "both feed the horde x1.20" header in Campfire.tscn/gd; (B) the
+  SHORT rest's free rank is now a CHOICE - EndCampfire opens the same smart-random 3-of-6 picker
+  (RollOptions) with a "SHORT REST GIFT" card instead of ApplyUpgrade(OpenOption(3)) dealing it silently;
+  (C) camp safety gate - ClearBullets() sweeps in-flight boss bullets the moment the camp card goes up,
+  ActivateBoss opens a 2 s party immunity window (_engageInvulnT, TakeHit early-return) so the engage can't
+  free-hit, and downed bodies get a gold STAND STILL channel bar + countdown; (D) HP floors at 0 the frame
+  a body falls (overkill never poisons the +25% heal nor reads as a negative bar); (E) the d20 lives ON
+  the downed body - paper chip + ink number + state ring (blood pending-fail / amber STABLE / grey out)
+  with color-coded chips (CHIP_BLOOD/AMBER/SAGE/GREY light-end grimoire tints, Game.cs -> m.dsColor/dsLastRoll);
+  (F) HUD strips - 6 slots of name label + 110x7 bar (gold leader / bronze others) + state dot (sage/blood/
+  amber/grey) replacing the stacked text lines, dash bar 64x8 at y-42 (clears the -58 ds chip and -30 channel
+  bar) with a sawtooth ready-flash when charged, picker labels carry "(x/3)" rank progress, and an "EVERY
+  RANK CAPPED - xp banked" notice with a 4 s timer; (I) campfire layout headroom - grid slots 4->6, member
+  cards 138->100 px, rest buttons 130->100 px so M2's 6-member party fits the 592 px inner frame. NEW 4.7
+  C# DRIFT: `System.Math.sin` / `System.Math.ceil` DO NOT exist on Godot's Math class - sawtooth triangle +
+  integer ceil instead. Also `out` is a reserved word (isOut). Gate: smokeCT9 TPK lv 9 + .err 0 bytes, and
+  the whole campfire chain reads live in the log: 2 s engage window -> "41 in-flight boss bullets swept"
+  -> gift card with (2/3) labels -> pilot picked it -> heal math 8->28 of 80 (+25%) -> horde x1.2.
+
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)
 

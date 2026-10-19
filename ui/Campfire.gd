@@ -87,7 +87,7 @@ func _build() -> void:
 	for c in _cards:
 		c.queue_free()
 	_cards.clear()
-	var slots: int = 4
+	var slots: int = 6
 	for i in range(slots):
 		var card: Panel = _make_card()
 		grid.add_child(card)
@@ -102,7 +102,7 @@ func _make_card() -> Panel:
 	# 138 (was 168): the full stack (header + roster + grid + rest row +
 	# confirm bar) must fit the 592 px inner frame or lower controls spill
 	# past the 720 px screen and become unclickable (human-test rounds 1-2)
-	card.custom_minimum_size = Vector2(0.0, 138.0)
+	card.custom_minimum_size = Vector2(0.0, 100.0)
 	card.add_theme_stylebox_override("panel", _stylebox_card())
 	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.name = "VBox"
@@ -318,8 +318,8 @@ func _on_commit_pressed() -> void:
 	get_tree().paused = true
 func _rest_summary() -> String:
 	if _selection == 0:
-		return "Short rest - bind wounds and keep watch.\nThe company heals +25% max HP (clamped). The horde holds its pace."
-	return "Long rest - sleep through the night.\nFull heal for all; the fallen return at 25% HP.\nOne member trains overnight (one free upgrade rank).\nBut the horde scales - the next stage hits harder."
+		return "Short rest - bind wounds and keep watch.\nThe company heals +25% max HP (clamped) and one member trains overnight (one free upgrade rank, chosen on the level-up card).\nEven so, the horde scales x1.20 hp, pace and heads."
+	return "Long rest - sleep through the night.\nFull revive + full heal for the WHOLE squad - the fallen rise at full HP.\nNo free upgrade rank. The horde scales the same x1.20 hp, pace and heads."
 func _on_rest_now() -> void:
 	get_tree().paused = false
 	modal.hide()
