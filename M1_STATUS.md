@@ -112,6 +112,14 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
   - members are effectively welded to their orbit slot; drift is physically impossible, shoves/dashes
   snap back within one frame. Orbit clock bumped 0.15 -> 0.22 rad/s ("rotate a little faster"). Dash
   readout bar follows automatically (it divides by DASH_CD).
+- **Balance pass 5 - rest economy (user-approved, 2026-10-19)**: risk-vs-reward rework. **LONG** = full
+  revive + full heal for the WHOLE squad (the campReturned guard gone - lifted fallen now top to full)
+  and NO free upgrade rank. **SHORT** = +25% max-HP heal + ONE free upgrade rank (OpenOption(3) fresh
+  seed) + the SAME x1.20 horde scaling as long. So: long = safety, short = power; both feed the horde
+  scale. Applied in EndCampfire. **No-timeout lock**: human level-up picker and campfire NEVER default
+  on a timer - they wait for a real selection forever; the 25 s campfire + pilot picker fallbacks now
+  run only under M1_PILOT (or the missing-campfire-scene soft-lock guard). PICKER_AUTO_TIMEOUT constant
+  intentionally unused for human play.
 - **Rest-card click CRASH round 4 (2026-10-19 human-test)**: after the button_index fix, clicking
   threw "Nonexistent function 'rect_has_point' in base 'Button'" - 4.7's Control dropped that method
   too. Routing now uses Rect2 math: `get_global_rect().has_point(get_global_mouse_position())`

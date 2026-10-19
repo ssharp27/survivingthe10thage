@@ -56,6 +56,8 @@ public partial class Game : Godot.Node2D
     double _xpTotal = 0.0;
     int _level = 1;
     double _xpNext = 6.0;
+    // (human pickers never time out now - user-locked; this constant is intentionally
+    // unused in human play, kept as the tuning knob in case the pilot gate ever needs it)
     readonly double PICKER_AUTO_TIMEOUT = 6.0;
 
     // ---------- level-up picker: SMART-RANDOM 3 OF 6 named upgrades, 3 ranks then cap ----------
@@ -727,15 +729,17 @@ public partial class Game : Godot.Node2D
                 break;
             case StageState.CAMPFIRE:
                 // player-driven rest beat: the ui/Campfire screen emits rest_chosen and
-                // Game._OnCampfireChosen advances to PLAY2. The timeout only exists so an
-                // AFK player / headless smoke run can never hang the stage.
+                // Game._OnCampfireChosen advances to PLAY2. user-locked (2026-10-19): a
+                // human campfire NEVER times out - it waits for a real choice forever.
+                // The timeout valve now only runs for the pilot autopilot (verification
+                // smokes) or when the campfire scene itself is missing (soft-lock guard).
                 if (!_campfireWaiting)
                 {
                     _campfireWaiting = true;
                     _stageT = 0.0;
                     ShowCampfire();
                 }
-                else if (_stageT >= CAMPFIRE_WAIT_TIMEOUT)
+                else if ((_pilot || _campfire == null) && _stageT >= CAMPFIRE_WAIT_TIMEOUT)
                 {
                     GD.Print("[10thAge] campfire: nobody chose a rest after " + (int)CAMPFIRE_WAIT_TIMEOUT
                              + "s - defaulting to a short rest");
@@ -1263,9 +1267,10 @@ public partial class Game : Godot.Node2D
             choice = _optRoll[1];
         else if (Input.IsActionJustPressed("pick_3"))
             choice = _optRoll[2];
-        // pilot auto-confirm (verification only) + the AFK fallback: both take an
-        // uncapped option, rotating so the pilot exercises all three stat tracks
-        if (choice < 0 && (_pickerWait >= PICKER_AUTO_TIMEOUT || (_pilot && _pickerWait >= 2.0)))
+        // user-locked (2026-10-19): the picker NEVER times out for human play - it waits
+        // for a real 1/2/3 press forever. Only the pilot autopilot auto-confirms (2 s) so
+        // verification smokes keep moving; it takes an uncapped slot from this card's roll.
+        if (choice < 0 && _pilot && _pickerWait >= 2.0)
         {
             for (int s = 0; s < 3; s++)
             {
@@ -1419,28 +1424,27 @@ public partial class Game : Godot.Node2D
         _campfireChoice = "";
         if (restType == "long")
         {
-            // LONG REST (DESIGN): full heal for the already-standing company - bodies the
-            // camp beat just lifted stay at the locked 25 % (no full-heal cheat for the
-            // fallen) - one member trains overnight, at the price of horde scaling.
+            // user-approved rest rebalance (2026-10-19): LONG = safety. Full revive + full
+            // heal for the WHOLE squad - bodies the camp beat lifted now top off to full
+            // hp too (the campReturned guard is gone). NO free upgrade rank anymore. The
+            // x1.20 horde-scaling price stays.
             foreach (PartyMember m in _party)
-            {
-                if (!m.campReturned)
-                    m.hp = m.maxHp;
-            }
-            ApplyUpgrade(OpenOption(1));
-            // user-approved: HP scaling now grows x1.20 per long rest (was +0.35
-            // additive); Director multiplies pacing AND the live cap by this
+                m.hp = m.maxHp;
             _hordeScale *= 1.20;
-            GD.Print("[10thAge] LONG rest: living party fully healed, the fallen stay at 25% hp, horde "
+            GD.Print("[10thAge] LONG rest: whole squad revived to full hp, no free rank, horde "
                      + "scaling x" + (float)((int)(_hordeScale * 100.0)) / 100.0);
         }
         else
         {
-            // SHORT REST: this IS the locked campfire heal - +25 % max HP, clamped, applied
-            // exactly once (the camp beat itself did not heal). Nobody gets lifted back up
-            // from OUT here - that is the long rest's price.
+            // user-approved rest rebalance (2026-10-19): SHORT = power. +25% max-HP heal
+            // (clamped, applied once - the camp beat itself still does not heal) PLUS one
+            // free upgrade rank, at the SAME x1.20 horde scaling as long. Risk-vs-reward:
+            // long = full heal / no rank; short = less heal / free rank.
             ReviveAllAtCampfire(true);
-            GD.Print("[10thAge] SHORT rest: company healed +25% max HP (clamped), horde pace unchanged");
+            ApplyUpgrade(OpenOption(3)); // fresh rotation seed so the short-rest gift rarely shadows the last long one
+            _hordeScale *= 1.20;
+            GD.Print("[10thAge] SHORT rest: +25% max HP heal, one free upgrade rank, horde "
+                     + "scaling x" + (float)((int)(_hordeScale * 100.0)) / 100.0);
         }
         foreach (PartyMember m in _party)
             m.campReturned = false;
