@@ -332,15 +332,15 @@ func _input(event: InputEvent) -> void:
 	# human-test rounds 1-2: even as whole-card Buttons the SHORT/LONG
 	# still wouldn't fire Button.pressed when clicked (the modal's Buttons
 	# do), so belt-and-braces: _input always sees the raw mouse events and
-	# repeats the click test in each Button's OWN space (get_local_mouse_position
+	# repeats the click test in global rect space (get_global_rect + get_global_mouse
 	# is stretch/canvas-safe, exactly what Button uses to accept a click).
 	if event is InputEventMouseButton:
 		if not modal.visible and event.pressed and event.button_index == 1:  # MOUSE_BUTTON_LEFT (4.7 has no button_name)
-			if btn_short.rect_has_point(btn_short.get_local_mouse_position()):
+			if btn_short.get_global_rect().has_point(btn_short.get_global_mouse_position()):
 				_select(0)
-			if btn_long.rect_has_point(btn_long.get_local_mouse_position()):
+			if btn_long.get_global_rect().has_point(btn_long.get_global_mouse_position()):
 				_select(1)
-			if commit.rect_has_point(commit.get_local_mouse_position()):
+			if commit.get_global_rect().has_point(commit.get_global_mouse_position()):
 				_on_commit_pressed()
 		# releases need no routing; modal-area clicks use the Buttons' pressed
 		# path, already confirmed working there

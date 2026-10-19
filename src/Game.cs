@@ -1217,22 +1217,14 @@ public partial class Game : Godot.Node2D
             _xp -= _xpNext;
             _level++;
             _xpNext = 5.0 + _level * 4.0;
-            // user-approved growth (2026-10-19): every level-up ALSO grants each party
-            // member a flat +1 weapon damage automatically, plus one free upgrade rank
-            // on a signature track: the Leader (Baldrun's maul) gets the same reach rank
-            // as "longer reach" (x1.15), ring members (Mosiah's rapier) the same speed
-            // rank as "quicker thrusts" (x0.86). Stacks under the card's pick, and lands
-            // even when every rank is capped (the level itself always counts).
+            // user-approved growth (2026-10-19): every level-up also grants each party
+            // member a flat +1 weapon damage automatically, stacking under the card's
+            // pick (and landing even when every rank is capped). The first cut also
+            // offered a free reach rank (leader) / speed rank (ring) per level - the
+            // user reverted those; damage-only stands.
             foreach (PartyMember m in _party)
-            {
                 m.weaponDamage += 1.0f;
-                if (m.isLeader)
-                    m.rangeMul *= 1.15f;
-                else
-                    m.cdMul *= 0.86f;
-            }
-            GD.Print("[10thAge] level " + _level + " growth: all members +1 weapon dmg; " +
-                     "leader +1 reach rank (x1.15), ring members +1 speed rank (x0.86)");
+            GD.Print("[10thAge] level " + _level + " growth: all members +1 weapon dmg flat");
             // human-test: fixed cards felt same-y every level - roll a smart-random
             // three instead (see RollOptions): one upgrade per member is guaranteed,
             // the third slot is fully wild

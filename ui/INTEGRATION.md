@@ -225,7 +225,8 @@ Campfire screen (1280x720, 40px safe margins):
     592 px inner frame (rest row landed at screen y~568+, COMMIT fully off the 720 px screen): cards
     168->138, dice 56->48, v-seps 16->10 / 14->8, rest cards 150->130 - everything fits and COMMIT is
     visible; (b) belt-and-braces: `Campfire.gd._input` routes raw left-clicks through each Button's
-    rect via `rect_has_point(get_local_mouse_position())` (Button-local space, stretch/canvas-safe),
+    rect via `get_global_rect().has_point(get_global_mouse_position())` (4.7 has NEITHER rect_has_point
+    nor button_name on these events - Rect2 math on Control primitives is the safe route),
     guarded by `!modal.visible` so the modal's working Buttons keep their own path; `_select` and
     `_on_commit_pressed` are idempotent with the `pressed` handlers. Containers (Backdrop/Frame/Contents
     /rows/cards) are now `mouse_passable = false` so nothing swallows a pick. NOTE: Campfire.gd is
