@@ -678,7 +678,7 @@ public partial class Game : Godot.Node2D
         _hud.Position = new Vector2(24.0f, 24.0f);
         hudl.AddChild(_hud);
         _pickerLabel = new Label();
-        _pickerLabel.Position = new Vector2(24.0f, 210.0f); // clears the 6-row HP strip block
+        _pickerLabel.Position = new Vector2(24.0f, 250.0f); // clears the taller 6-row HP strip block
         hudl.AddChild(_pickerLabel);
         // dash-cooldown bar over the Leader's head: dark track + gold fill (resized
         // every frame in _Process). Human-test UX pass: the old 44x5 sliver was
@@ -1418,28 +1418,30 @@ public partial class Game : Godot.Node2D
             _hpStripsBuilt = true;
             for (int i = 0; i < 6; i++)
             {
-                float y = 60.0f + i * 22.0f;
+                float y = 60.0f + i * 28.0f; // roomier rows: the bar under the label
+                                             // used to cut through the name text (16 px
+                                             // font in a 22 px row)
                 Godot.Label n = new Godot.Label();
                 n.Position = new Vector2(24.0f, y);
                 n.ZIndex = 12;
                 _hudLayer.AddChild(n);
                 _hpName.Add(n);
                 Godot.ColorRect bg = new Godot.ColorRect();
-                bg.Position = new Vector2(24.0f, y + 11.0f);
+                bg.Position = new Vector2(24.0f, y + 18.0f);
                 bg.Size = new Vector2(110.0f, 7.0f);
                 bg.Color = new Color(0.12f, 0.11f, 0.10f, 0.9f);
                 bg.ZIndex = 12;
                 _hudLayer.AddChild(bg);
                 _hpBg.Add(bg);
                 Godot.ColorRect f = new Godot.ColorRect();
-                f.Position = new Vector2(24.0f, y + 11.0f);
+                f.Position = new Vector2(24.0f, y + 18.0f);
                 f.Size = new Vector2(0.0f, 7.0f);
                 f.Color = new Color(0.83f, 0.64f, 0.24f, 1.0f);
                 f.ZIndex = 13;
                 _hudLayer.AddChild(f);
                 _hpFill.Add(f);
                 Godot.ColorRect dot = new Godot.ColorRect();
-                dot.Position = new Vector2(140.0f, y + 11.0f);
+                dot.Position = new Vector2(140.0f, y + 18.0f);
                 dot.Size = new Vector2(7.0f, 7.0f);
                 dot.ZIndex = 13;
                 _hudLayer.AddChild(dot);
@@ -1643,6 +1645,28 @@ public partial class Game : Godot.Node2D
             _hordeScale *= 1.20;
             GD.Print("[10thAge] SHORT rest: +25% max HP heal, one free upgrade rank, horde "
                      + "scaling x" + (float)((int)(_hordeScale * 100.0)) / 100.0);
+        }
+        // user-approved camp benefit (2026-10-20): the campfire vacuums the map, like
+        // VS's magnet - every xp gem still lying around is reeled into the Leader's
+        // pickup ring. The existing UpdateGems magnet (110 px / 380 px/s) flies and
+        // collects them, so the xp math + despawn path are untouched and no gem is
+        // silently skipped on rest.
+        if (_leader != null)
+        {
+            int reeled = 0;
+            for (int i = 0; i < _gems.Count; i++)
+            {
+                if (_gems[i].GlobalPosition.X < -8000.0f)
+                    continue;
+                double ang = Rng.Randf() * 6.2831853;
+                float ring = 40.0f + (float)Rng.Randf() * 30.0f;
+                _gems[i].GlobalPosition = _leader.GlobalPosition +
+                                          new Vector2((float)System.Math.Cos(ang) * ring,
+                                                      (float)System.Math.Sin(ang) * ring);
+                reeled++;
+            }
+            GD.Print("[10thAge] camp vacuum: " + reeled + " xp gem(s) reeled to the "
+                     + "Leader's pickup ring");
         }
         foreach (PartyMember m in _party)
             m.campReturned = false;

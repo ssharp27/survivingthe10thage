@@ -163,6 +163,17 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
   integer ceil instead. Also `out` is a reserved word (isOut). Gate: smokeCT9 TPK lv 9 + .err 0 bytes, and
   the whole campfire chain reads live in the log: 2 s engage window -> "41 in-flight boss bullets swept"
   -> gift card with (2/3) labels -> pilot picked it -> heal math 8->28 of 80 (+25%) -> horde x1.2.
+- **Camp + display pass 7 (user-approved, 2026-10-20)**: (1) campfire VACUUMS the map - EndCampfire
+   reels every uncollected xp gem into the Leader's pickup ring (40-70 px ring, existing UpdateGems
+   magnet does the flight + collection so no xp path is forked; logs "camp vacuum: N gems reeled");
+   (2) HP-strip spacing bug FIXED - the 110x7 bars sat at y+11 and cut through the 16 px name text:
+   rows 22->28 px, bar/dot y+11->y+18, picker label 210->250; (3) bigger auto-scaling window per user
+   (VS-style): project.godot display = 1920x1080 viewport, stretch/mode="canvas_items", stretch/aspect=
+   "expand" (no letterbox on any monitor aspect; swap the pair for a 3:2 base like 1620x1080 if wanted).
+   NOTE: the campfire `_was_click_on` helper already accepts all three click coordinate spaces, so
+   stretch scaling never breaks rest clicks. Gate: smokeCT15 TPK lv 9 + .err 0 bytes, and the log carries
+   the new "camp vacuum: 2 xp gem(s) reeled to the Leader's pickup ring" line plus the full SHORT-gift
+   picker chain.
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)
