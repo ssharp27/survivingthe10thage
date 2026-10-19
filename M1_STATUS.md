@@ -103,6 +103,15 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
   10) - the autopilot never dashes and stands still during revivals, so it now dies where it used to
   clear; smoke gating is VICTORY **or** TPK + 0-byte .err from here, and human skill (dash, dodge
   timing, campfire economy) is what decides a run.
+- **Balance pass 4 (user-approved, 2026-10-19 human-test)**: dash halved to 120 px and cooldown raised
+  to 6 s (DASH_IMPULSE/DASH_CD, Game.cs) - the run felt too safe, dash was eating too much ground.
+  Side effect: the leader lunge (120) now EQUALS the member lunge (MEMBER_DASH_IMPULSE 120), so the
+  squad lunge is symmetric and the ring formation survives the dash intact (this is the fix for
+  "Mosiah doesn't dash with Baldrun, he has to catch up"). **Attachment re-tightened**: ring follow
+  homes at max(own x1.5, leader +80) with a hard 48 px leash from the slot (was x1.15/+40 and 120 px)
+  - members are effectively welded to their orbit slot; drift is physically impossible, shoves/dashes
+  snap back within one frame. Orbit clock bumped 0.15 -> 0.22 rad/s ("rotate a little faster"). Dash
+  readout bar follows automatically (it divides by DASH_CD).
 - **Rest-card click CRASH round 4 (2026-10-19 human-test)**: after the button_index fix, clicking
   threw "Nonexistent function 'rect_has_point' in base 'Button'" - 4.7's Control dropped that method
   too. Routing now uses Rect2 math: `get_global_rect().has_point(get_global_mouse_position())`

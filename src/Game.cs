@@ -77,15 +77,17 @@ public partial class Game : Godot.Node2D
     int[] _pickRank = new int[6];
     int[] _optRoll = { -1, -1, -1 }; // this level-up's three offered options (slot -> option)
 
-    // ---------- dash (SPACE; user-approved balance round) ----------
-    // Leader lunges 240 px on a 1.5 s cooldown; every live ring member lunges with
-    // them at half the distance on its own 6 s cooldown (user: "Mosiah dashes with
-    // Baldrun - halve the distance, 6 s cooldown"). The cooldown gets a readout: a
-    // gold fill bar over Baldrun's head that grows back as the dash recharges.
-    readonly double DASH_IMPULSE = 240.0; // px burst per dash
-    readonly double DASH_CD = 1.5;        // seconds between dashes
+    // ---------- dash (SPACE; balance pass 4, user-approved) ----------
+    // Leader lunges 120 px (halved from 240 per user: "covers less ground") on a
+    // 6 s cooldown (up from 1.5 s per user); every live ring member lunges the
+    // SAME 120 px on its own 6 s cooldown - with the leader halved the impulses
+    // are symmetric, so the ring formation is preserved through the squad lunge.
+    // The cooldown gets a readout: a gold fill bar over Baldrun's head that
+    // grows back as the dash recharges.
+    readonly double DASH_IMPULSE = 120.0; // px burst per dash (user halved it)
+    readonly double DASH_CD = 6.0;        // seconds between dashes (user raised it)
     double _dashCdT = 0.0;                // cooldown countdown (ready at <= 0)
-    readonly double MEMBER_DASH_IMPULSE = 120.0; // px burst per ring member
+    readonly double MEMBER_DASH_IMPULSE = 120.0; // px burst per ring member (now == leader)
     readonly double MEMBER_DASH_CD = 6.0;        // seconds between squad lunges
     double _memberDashCdT = 0.0;
     Godot.Node2D _dashBarPivot = null;    // ride-along pivot over the leader's head
@@ -678,7 +680,7 @@ public partial class Game : Godot.Node2D
     {
         float delta = (float)d;
         _stageT += d;
-        _ringAngle += 0.15 * d;
+        _ringAngle += 0.22 * d; // orbit clock (user: "rotate a little faster" - was 0.15)
         // P4: the reaper stays a spawn-once-at-10s TEST BENCH (locked behavior; no
         // balance meaning), now OPT-IN via M1_REAPER=1. Its only changes here are where
         // it drops in (outside the camera view, never on the party) and a slower lurk.
@@ -951,17 +953,21 @@ public partial class Game : Godot.Node2D
                 double gap = (double)to.Length();
                 if (gap <= 0.0009)
                     continue;
-                // catch-up is guaranteed: home at max(own speed x1.15, leader speed +40)
-                float home = (float)System.Math.Max((double)m.baseSpeed * (double)m.speedMul * 1.15,
-                                                    (double)leadSpeed + 40.0);
+                // attachment-first follow (user-locked): homing far above walk
+                // speed so a gap never persists - the member behaves as welded
+                // to the slot, never as a chaser
+                float home = (float)System.Math.Max((double)m.baseSpeed * (double)m.speedMul * 1.5,
+                                                    (double)leadSpeed + 80.0);
                 double step = (double)home * (double)delta;
                 Vector2 move = step >= gap ? to : to * (float)(step / gap);
                 m.GlobalPosition = ClampToArena(m.GlobalPosition + move);
-                // hard leash: never further than 120 px from the ring slot
+                // hard leash: never further than 48 px from the ring slot (was
+                // 120 - the user still saw Mosiah "catching up"; a tight clamp
+                // makes drift physically impossible, dashes/shoves snap back)
                 Vector2 slack = m.GlobalPosition - target;
                 double leash = (double)slack.Length();
-                if (leash > 120.0)
-                    m.GlobalPosition = ClampToArena(target - slack * (float)(120.0 / leash));
+                if (leash > 48.0)
+                    m.GlobalPosition = ClampToArena(target - slack * (float)(48.0 / leash));
             }
         }
         if (_camera != null && leader != null)
