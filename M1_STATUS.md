@@ -92,10 +92,17 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
   so the long-rest click threw "Invalid access to property 'button_name'" inside _input. Fixed to
   the stable `event.button_index == 1` (MOUSE_BUTTON_LEFT).
 - **Level-up growth (user-approved, 2026-10-19)**: every level-up now ALSO auto-grants each party
-  member +1 FLAT weapon damage (added to base, before upgrade multipliers), stacking under the card's
-  pick and landing even when every rank is capped. The first cut ALSO offered a free signature rank
-  per level (leader reach x1.15 / ring speed x0.86) - **user REVERTED those**; damage-only stands.
+  member +0.5 FLAT weapon damage (reduced from the +1 the first cut shipped - players were trending
+  too strong), added to base before upgrade multipliers, stacking under the card's pick and landing
+  even when every rank is capped. The free signature ranks stay REVERTED per user; damage-only stands.
   Applied in PickerTick right at the level step.
+- **HP nerf round (user-approved, 2026-10-19, third balance pass)**: players too strong post-balance -
+  Baldrun maxHp 200 -> 80, Mosiah maxHp 160 -> 50 (Main.tscn). Party pool is now 130 total vs the
+  previous 360; down/death-save economy unchanged, so squishy bodies + buffered fails are the pressure
+  curve from here. NOTE: both 2026-10-19 pilot smoke runs under the new numbers ended TPK (lv 6 / lv
+  10) - the autopilot never dashes and stands still during revivals, so it now dies where it used to
+  clear; smoke gating is VICTORY **or** TPK + 0-byte .err from here, and human skill (dash, dodge
+  timing, campfire economy) is what decides a run.
 - **Rest-card click CRASH round 4 (2026-10-19 human-test)**: after the button_index fix, clicking
   threw "Nonexistent function 'rect_has_point' in base 'Button'" - 4.7's Control dropped that method
   too. Routing now uses Rect2 math: `get_global_rect().has_point(get_global_mouse_position())`

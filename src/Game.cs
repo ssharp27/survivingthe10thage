@@ -1218,13 +1218,13 @@ public partial class Game : Godot.Node2D
             _level++;
             _xpNext = 5.0 + _level * 4.0;
             // user-approved growth (2026-10-19): every level-up also grants each party
-            // member a flat +1 weapon damage automatically, stacking under the card's
-            // pick (and landing even when every rank is capped). The first cut also
-            // offered a free reach rank (leader) / speed rank (ring) per level - the
-            // user reverted those; damage-only stands.
+            // member a flat +0.5 weapon damage automatically (reduced from the +1 the
+            // first cut shipped - players were trending too strong), stacking under the
+            // card's pick (and landing even when every rank is capped). The free
+            // reach/speed ranks stay reverted per user; damage-only stands.
             foreach (PartyMember m in _party)
-                m.weaponDamage += 1.0f;
-            GD.Print("[10thAge] level " + _level + " growth: all members +1 weapon dmg flat");
+                m.weaponDamage += 0.5f;
+            GD.Print("[10thAge] level " + _level + " growth: all members +0.5 weapon dmg flat");
             // human-test: fixed cards felt same-y every level - roll a smart-random
             // three instead (see RollOptions): one upgrade per member is guaranteed,
             // the third slot is fully wild
