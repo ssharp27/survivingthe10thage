@@ -925,17 +925,21 @@ public partial class Game : Godot.Node2D
             }
         }
 
-        // ---------- the bodyguard ring (human-test locked) ----------
-        // followers slowly ORBIT the leader on a world-space clock - the threat-facing
-        // slot system made them feel glued to the Leader's directional input. Auto-aim
-        // lives in PartyMember (the ring member bites its prey), so the rapier still
-        // lands while circling.
+        // ---------- the bodyguard ring (human-test locked + "always attached" locked) ----------
+        // Party members are ALWAYS attached to and orbiting the Leader unless they are
+        // downed or dead. Homing speed exceeds the Leader's walk speed (the old
+        // baseSpeed*0.9 cap maxed at 126 px/s - under Baldrun's 128 px/s stride, so
+        // Mosiah permanently trailed), and a hard 120 px leash guarantees a stray push
+        // can never leave a body lagging. The orbit feel stays: it rides the world-space
+        // clock (_ringAngle), and auto-aim lives in PartyMember (the ring member bites
+        // its prey), so the rapier still lands while circling.
         {
             Vector2 anchor = leader != null ? leader.GlobalPosition : new Vector2(0, 0);
+            float leadSpeed = leader != null ? leader.baseSpeed * leader.speedMul : 128.0f;
             foreach (PartyMember m in _party)
             {
                 if (m.isLeader || m.downed || m.eliminated)
-                    continue;
+                    continue; // fallen bodies stay where they fell (locked)
                 int k = m.memberIndex;
                 if (k < 2)
                     k = 2 + (k % 4);
@@ -943,7 +947,21 @@ public partial class Game : Godot.Node2D
                 Vector2 aim = new Vector2((float)System.Math.Cos(_ringAngle + slot),
                                           (float)System.Math.Sin(_ringAngle + slot));
                 Vector2 target = ClampToArena(anchor + aim * (float)RING_RADIUS);
-                m.GlobalPosition += (target - m.GlobalPosition).LimitLength(m.baseSpeed * m.speedMul * 0.9f * delta);
+                Vector2 to = target - m.GlobalPosition;
+                double gap = (double)to.Length();
+                if (gap <= 0.0009)
+                    continue;
+                // catch-up is guaranteed: home at max(own speed x1.15, leader speed +40)
+                float home = (float)System.Math.Max((double)m.baseSpeed * (double)m.speedMul * 1.15,
+                                                    (double)leadSpeed + 40.0);
+                double step = (double)home * (double)delta;
+                Vector2 move = step >= gap ? to : to * (float)(step / gap);
+                m.GlobalPosition = ClampToArena(m.GlobalPosition + move);
+                // hard leash: never further than 120 px from the ring slot
+                Vector2 slack = m.GlobalPosition - target;
+                double leash = (double)slack.Length();
+                if (leash > 120.0)
+                    m.GlobalPosition = ClampToArena(target - slack * (float)(120.0 / leash));
             }
         }
         if (_camera != null && leader != null)
@@ -1199,6 +1217,22 @@ public partial class Game : Godot.Node2D
             _xp -= _xpNext;
             _level++;
             _xpNext = 5.0 + _level * 4.0;
+            // user-approved growth (2026-10-19): every level-up ALSO grants each party
+            // member a flat +1 weapon damage automatically, plus one free upgrade rank
+            // on a signature track: the Leader (Baldrun's maul) gets the same reach rank
+            // as "longer reach" (x1.15), ring members (Mosiah's rapier) the same speed
+            // rank as "quicker thrusts" (x0.86). Stacks under the card's pick, and lands
+            // even when every rank is capped (the level itself always counts).
+            foreach (PartyMember m in _party)
+            {
+                m.weaponDamage += 1.0f;
+                if (m.isLeader)
+                    m.rangeMul *= 1.15f;
+                else
+                    m.cdMul *= 0.86f;
+            }
+            GD.Print("[10thAge] level " + _level + " growth: all members +1 weapon dmg; " +
+                     "leader +1 reach rank (x1.15), ring members +1 speed rank (x0.86)");
             // human-test: fixed cards felt same-y every level - roll a smart-random
             // three instead (see RollOptions): one upgrade per member is guaranteed,
             // the third slot is fully wild

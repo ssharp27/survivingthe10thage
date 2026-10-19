@@ -335,7 +335,7 @@ func _input(event: InputEvent) -> void:
 	# repeats the click test in each Button's OWN space (get_local_mouse_position
 	# is stretch/canvas-safe, exactly what Button uses to accept a click).
 	if event is InputEventMouseButton:
-		if not modal.visible and event.pressed and event.button_name == "left":
+		if not modal.visible and event.pressed and event.button_index == 1:  # MOUSE_BUTTON_LEFT (4.7 has no button_name)
 			if btn_short.rect_has_point(btn_short.get_local_mouse_position()):
 				_select(0)
 			if btn_long.rect_has_point(btn_long.get_local_mouse_position()):

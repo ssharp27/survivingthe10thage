@@ -87,6 +87,20 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
   via `rect_has_point(get_local_mouse_position())` - Button-local space, exactly the coordinate
   space Buttons pick in - so clicks land whether or not the Control picker routes them. NOTE:
   Campfire.gd edits went in via python byte-exact replaces (tab-indent trips the edit matcher).
+- **Rest-card click CRASH round 3 (2026-10-19 human-test)**: the manual routing used
+  `event.button_name == "left"` - 4.7's InputEventMouseButton has NO button_name in this build,
+  so the long-rest click threw "Invalid access to property 'button_name'" inside _input. Fixed to
+  the stable `event.button_index == 1` (MOUSE_BUTTON_LEFT).
+- **Level-up growth (user-approved, 2026-10-19)**: every level-up now ALSO auto-grants each party
+  member +1 FLAT weapon damage, plus one free upgrade rank on a signature track - Leader (Baldrun)
+  gets the same reach rank as "longer reach" (rangeMul x1.15), ring members (Mosiah) the same speed
+  rank as "quicker thrusts" (cdMul x0.86). Applied in PickerTick right at the level step, so it lands
+  even when every picker rank is capped (the level itself always counts); the card pick stacks on top.
+- **Party always attached (user-locked, 2026-10-19)**: the ring follow had a baseSpeed x0.9 cap
+  (Mosiah 140 x0.9 = 126 px/s) BELOW Baldrun's 128 px/s stride, so a member could never close the
+  gap and permanently trailed. Reworked: home at max(own speed x1.15, leader speed +40) so catch-up
+  is guaranteed, plus a hard 120 px leash that pulls any strayed body back onto the ring. Downed/
+  eliminated bodies stay where they fell (unchanged); the orbit feel stays on the world-space clock.
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)
 
