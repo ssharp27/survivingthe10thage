@@ -101,6 +101,18 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
   too. Routing now uses Rect2 math: `get_global_rect().has_point(get_global_mouse_position())`
   (both exist on Control in 4.x; the rect and the mouse query share the global-transform space).
   LESSON: 4.7's Control API surface keeps missing legacy methods - prefer Rect2/2D primitives.
+- **Rest-card clicks STILL dead round 5 (2026-10-19 human-test)**: clicks reached _input (the crash
+  traces proved that path) and passed the pressed/index guards, but the global-rect has_point test
+  kept returning false with no other symptom - guessing at spaces was done with. New belt-and-braces:
+  a `_was_click_on(b, ev)` helper accepts the hit if ANY coordinate space agrees (global rect vs
+  Control get_global_mouse_position, global rect vs raw ev.position - identical when window == base
+  viewport, the default 1280x720 run - and local rect Rect2(0,0,b.size) vs get_local_mouse_position),
+  plus a `[campfire] left-click at <pos> short= <rect> long= <rect> commit= <rect>` print dumping
+  everything to the editor Output panel on every choice-phase click. UX change too: clicking a rest
+  card now SELECTS and OPENS the popup in one click (the popup is the last gate, confirm with
+  ENTER/click) - earlier rounds felt "dead" because a click only set a subtle gold border and the
+  player still needed ENTER. If clicks STILL do nothing, the Output line is the ground truth: read
+  the event position vs the three rects and stop theorizing.
 - **Party always attached (user-locked, 2026-10-19)**: the ring follow had a baseSpeed x0.9 cap
   (Mosiah 140 x0.9 = 126 px/s) BELOW Baldrun's 128 px/s stride, so a member could never close the
   gap and permanently trailed. Reworked: home at max(own speed x1.15, leader speed +40) so catch-up

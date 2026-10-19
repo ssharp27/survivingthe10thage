@@ -328,19 +328,46 @@ func _on_rest_now() -> void:
 func _on_change_mind() -> void:
 	get_tree().paused = false
 	modal.hide()
+func _was_click_on(b: Button, ev: InputEvent) -> bool:
+	# 4.7 keeps dropping legacy hit-test helpers (rect_has_point and the event
+	# button_name both gone) and round 4's global-rect test still left the rest
+	# cards inert, so accept a click if ANY space agrees the cursor is over the
+	# button: Control-space mouse vs global rect, raw event position vs global
+	# rect (window == base viewport on the default 1280x720 run), or the button's
+	# own local rect vs its local mouse.
+	var gr: Rect2 = b.get_global_rect()
+	if gr.has_point(b.get_global_mouse_position()):
+		return true
+	if gr.has_point(ev.position):
+		return true
+	if b.size.x > 1.0 and b.size.y > 1.0:
+		var lr: Rect2 = Rect2(Vector2(0.0, 0.0), b.size)
+		if lr.has_point(b.get_local_mouse_position()):
+			return true
+	return false
 func _input(event: InputEvent) -> void:
-	# human-test rounds 1-2: even as whole-card Buttons the SHORT/LONG
-	# still wouldn't fire Button.pressed when clicked (the modal's Buttons
-	# do), so belt-and-braces: _input always sees the raw mouse events and
-	# repeats the click test in global rect space (get_global_rect + get_global_mouse
-	# is stretch/canvas-safe, exactly what Button uses to accept a click).
+	# human-test rounds 1-4: even as whole-card Buttons the SHORT/LONG still
+	# wouldn't fire Button.pressed when clicked (the modal's Buttons do), so
+	# _input routes the raw mouse events. 4.7 lost legacy APIs along the way
+	# (button_name gone, rect_has_point gone); round 5 adds the multi-space
+	# hit-test (see _was_click_on), a click-seen print for the Output panel,
+	# and click = choose + popup (the popup itself is the last gate).
 	if event is InputEventMouseButton:
 		if not modal.visible and event.pressed and event.button_index == 1:  # MOUSE_BUTTON_LEFT (4.7 has no button_name)
-			if btn_short.get_global_rect().has_point(btn_short.get_global_mouse_position()):
+			# round-5 diagnostic: the editor Output panel shows whether the routing
+			# sees the click and what the rects really are; if a click does nothing,
+			# this print is the answer
+			print("[campfire] left-click at ", event.position, " short=", btn_short.get_global_rect(), " long=", btn_long.get_global_rect(), " commit=", commit.get_global_rect())
+			if _was_click_on(btn_short, event):
 				_select(0)
-			if btn_long.get_global_rect().has_point(btn_long.get_global_mouse_position()):
+				# one click on a rest card = choose + open the popup: the popup is
+				# the last gate, so asking for a second click/ENTER to commit felt
+				# like a dead button to the player (human-test round 5)
+				_on_commit_pressed()
+			elif _was_click_on(btn_long, event):
 				_select(1)
-			if commit.get_global_rect().has_point(commit.get_global_mouse_position()):
+				_on_commit_pressed()
+			elif _was_click_on(commit, event):
 				_on_commit_pressed()
 		# releases need no routing; modal-area clicks use the Buttons' pressed
 		# path, already confirmed working there
