@@ -291,6 +291,16 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     - Gate: CT46-48 all TPK + 0-byte .err (pilot dies under the new boss-phase horde -
       expected variance); CT52-53-54 M1_DEV_SKIP=camp: camp beat + Campfire screen exercised
       in every run, all TPK + 0-byte .err.
+  - **Pass-13 (2026-10-20, campfire data-truth fix)**: the "Mosiah always DOWN / 0-120 hp" lie was
+    DEMO data. Root cause (headless oracle print in Campfire.gd _ready): C# `Set("party_data", ...)`
+    SILENTLY no-ops on a typed `Array[Dictionary]` export - Godot.Collections.Array arrives as an
+    untyped variant, the typed setter rejects it with no error line anywhere (.err AND godot.log), so
+    _ready saw `[]` and fell to `_seed_demo()` placeholders. Fix: untype the export to `Array` (lands);
+    `_refresh_bars` now fully re-populates each card via `_populate_card` (Game.cs re-Sets party_data
+    on the SAME node after a cancel with no _ready re-run, so label text built once at _ready would
+    linger stale); fill math guarded for `inner >= 0` (bar_wrap size is 0 before layout). _seed_demo
+    kept only as the empty-data fallback. Gate: CT57 (oracle print showed REAL rows - Baldrun 80/80
+    true stats, no demo) + CT58/59 plain pilot + CT60 M1_DEV_SKIP=camp, all TPK + 0-byte .err.
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)

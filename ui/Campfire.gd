@@ -15,7 +15,11 @@ var AMBER = Color(0.82, 0.58, 0.20, 1)
 var GREY = Color(0.62, 0.62, 0.62, 1)
 var BAR_BG = Color(0.78, 0.70, 0.58, 1)
 # ---------- data bound by Game.cs at integration time ----------
-@export var party_data: Array[Dictionary] = []
+# 2026-10-20 oracle: Array[Dictionary] made Game.cs' Set("party_data", ...) SILENTLY
+# no-op (Godot.Collections.Array is an untyped variant; typed setter rejects it, no
+# error line), so every run's campfire painted the _seed_demo() placeholders instead
+# - the "Mosiah always DOWN / 0-120 hp" bug was the demo data. Untyped lands.
+@export var party_data: Array = []
 @export var stage_name: String = "Tanurial Forest"
 @onready var grid: GridContainer = $Frame/Contents/PartyGrid
 @onready var btn_short: Button = $Frame/Contents/RestRow/ShortCard/ShortRest
@@ -67,21 +71,10 @@ func _refresh_bars() -> void:
 		card.visible = i < party_data.size()
 		if i >= party_data.size():
 			continue
-		var vbox: VBoxContainer = card.get_node("VBox") as VBoxContainer
-		var hp_row: HBoxContainer = vbox.get_node("HPRow") as HBoxContainer
-		var bar_wrap: Control = hp_row.get_node("BarWrap") as Control
-		var bar_bg: ColorRect = bar_wrap.get_node("BarBg") as ColorRect
-		var fill: ColorRect = bar_bg.get_node("Fill") as ColorRect
-		var data: Dictionary = party_data[i]
-		var hp: float = float(data.get("hp", 0))
-		var max_hp: float = float(data.get("max_hp", 0))
-		var pct: float = 0.0
-		if max_hp > 0:
-			pct = clamp(hp / max_hp, 0.0, 1.0)
-		var inner: float = bar_wrap.size.x - 4.0
-		if inner > 0:
-			fill.size = Vector2(inner * pct, 12.0)
-			fill.position = Vector2(2.0, 2.0)
+		# 2026-10-20: full re-render per refresh, not just the bar: after a cancel Game.cs
+		# re-Sets party_data on the SAME node (no _ready re-run), so stale labels would linger
+		# if the party changed during the camp beat. _populate_card repaints labels and bar.
+		_populate_card(card, party_data[i])
 func _seed_demo() -> void:
 	party_data = [
 		{"name": "Baldrun", "klass": "Rune Knight", "weapon": "Maul", "hp": 58, "max_hp": 150, "state": "up", "leader": true},
@@ -276,6 +269,10 @@ func _populate_card(card: Panel, data: Dictionary) -> void:
 	if max_hp > 0:
 		pct = clamp(hp / max_hp, 0.0, 1.0)
 	var inner: float = bar_wrap.size.x - 4.0
+	# 2026-10-20 guard: before layout bar_wrap.size.x is 0, so inner must never
+	# go negative (negative ColorRect size draws inverted).
+	if inner < 0.0:
+		inner = 0.0
 	fill.size = Vector2(inner * pct, 12.0)
 	fill.position = Vector2(2.0, 2.0)
 	var state: String = str(data.get("state", "up"))
