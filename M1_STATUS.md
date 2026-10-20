@@ -174,6 +174,14 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
    stretch scaling never breaks rest clicks. Gate: smokeCT15 TPK lv 9 + .err 0 bytes, and the log carries
    the new "camp vacuum: 2 xp gem(s) reeled to the Leader's pickup ring" line plus the full SHORT-gift
    picker chain.
+- **Human-play pass 8 (user report + approval, 2026-10-20)**: (1) WINDOW - user: 1920x1080 base did not "stretch
+   to the monitor"; added `window/size/mode=4` (MODE_EXCLUSIVE_FULLSCREEN: window resizes to the monitor, and
+   canvas_items stretch + expand aspect then auto-scale the 1920x1080 design onto any monitor aspect, no border,
+   no letterbox - the VS-style behavior). Docs: mode=3 keeps a 1px border (GUI apps), 4 is the game mode. (2) HP
+   strips wanted a few more px: rows 28->32, bar/dot y+18->y+21, picker label 250->274. (3) d20 chip "not noticed"
+   root-caused: the roll Label NEVER got an ink color - Label's theme default is near-WHITE on the paper-white face
+   (invisible), and the state ring was a 2 px lip. Fixed: dark grimoire ink (0.10,0.09,0.08), chip 32->40 px ring
+   / 28->34 px face, number moved inside the face. Gate: smokeCT16 TPK lv 7 + .err 0 bytes; death-save lines live.
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)

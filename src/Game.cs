@@ -678,7 +678,7 @@ public partial class Game : Godot.Node2D
         _hud.Position = new Vector2(24.0f, 24.0f);
         hudl.AddChild(_hud);
         _pickerLabel = new Label();
-        _pickerLabel.Position = new Vector2(24.0f, 250.0f); // clears the taller 6-row HP strip block
+        _pickerLabel.Position = new Vector2(24.0f, 274.0f); // clears the 6-row HP strip block
         hudl.AddChild(_pickerLabel);
         // dash-cooldown bar over the Leader's head: dark track + gold fill (resized
         // every frame in _Process). Human-test UX pass: the old 44x5 sliver was
@@ -1418,7 +1418,7 @@ public partial class Game : Godot.Node2D
             _hpStripsBuilt = true;
             for (int i = 0; i < 6; i++)
             {
-                float y = 60.0f + i * 28.0f; // roomier rows: the bar under the label
+                float y = 60.0f + i * 32.0f; // human pass-8: a few more px between rows
                                              // used to cut through the name text (16 px
                                              // font in a 22 px row)
                 Godot.Label n = new Godot.Label();
@@ -1427,21 +1427,21 @@ public partial class Game : Godot.Node2D
                 _hudLayer.AddChild(n);
                 _hpName.Add(n);
                 Godot.ColorRect bg = new Godot.ColorRect();
-                bg.Position = new Vector2(24.0f, y + 18.0f);
+                bg.Position = new Vector2(24.0f, y + 21.0f);
                 bg.Size = new Vector2(110.0f, 7.0f);
                 bg.Color = new Color(0.12f, 0.11f, 0.10f, 0.9f);
                 bg.ZIndex = 12;
                 _hudLayer.AddChild(bg);
                 _hpBg.Add(bg);
                 Godot.ColorRect f = new Godot.ColorRect();
-                f.Position = new Vector2(24.0f, y + 18.0f);
+                f.Position = new Vector2(24.0f, y + 21.0f);
                 f.Size = new Vector2(0.0f, 7.0f);
                 f.Color = new Color(0.83f, 0.64f, 0.24f, 1.0f);
                 f.ZIndex = 13;
                 _hudLayer.AddChild(f);
                 _hpFill.Add(f);
                 Godot.ColorRect dot = new Godot.ColorRect();
-                dot.Position = new Vector2(140.0f, y + 18.0f);
+                dot.Position = new Vector2(140.0f, y + 21.0f);
                 dot.Size = new Vector2(7.0f, 7.0f);
                 dot.ZIndex = 13;
                 _hudLayer.AddChild(dot);

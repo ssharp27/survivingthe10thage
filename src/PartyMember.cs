@@ -85,19 +85,22 @@ public partial class PartyMember : Godot.Node2D
         // (y-42) or the channel bar (y-30). Pure ColorRects/Labels - the C# _draw hook
         // is dead in 4.7.
         _chipRing = new Godot.ColorRect();
-        _chipRing.Size = new Vector2(32.0f, 32.0f);
-        _chipRing.Position = new Vector2(16.0f, -16.0f);
+        _chipRing.Size = new Vector2(40.0f, 40.0f);
+        _chipRing.Position = new Vector2(12.0f, -20.0f);
         _chipRing.Color = new Color(0.70f, 0.70f, 0.70f, 1.0f);
         _chipRing.ZIndex = 6;
         AddChild(_chipRing);
         _chipFace = new Godot.ColorRect();
-        _chipFace.Size = new Vector2(28.0f, 28.0f);
-        _chipFace.Position = new Vector2(18.0f, -14.0f);
+        _chipFace.Size = new Vector2(34.0f, 34.0f);
+        _chipFace.Position = new Vector2(15.0f, -17.0f);
         _chipFace.Color = new Color(0.957f, 0.929f, 0.847f, 1.0f); // grimoire paper
         _chipFace.ZIndex = 7;
         AddChild(_chipFace);
         _chipNum = new Label();
-        _chipNum.Position = new Vector2(21.0f, -22.0f);
+        _chipNum.Position = new Vector2(23.0f, -14.0f); // ink sits INSIDE the face
+        // the invisible-chip bug: a Label's default theme color is near-white on a
+        // paper-white face - the roll never showed. Dark grimoire ink instead.
+        _chipNum.Modulate = new Color(0.10f, 0.09f, 0.08f, 1.0f);
         _chipNum.ZIndex = 8;
         AddChild(_chipNum);
         _chanBg = new Godot.ColorRect();
