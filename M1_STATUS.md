@@ -407,6 +407,11 @@ the channel progresses (a swarm can't screw the rescue out), and every revive gr
 
 ## Godot 4.7 C# pitfalls (found empirically, keep for future work)
 
+- **Input-map special keycodes are a minefield** (human bug 2026-10-20: Escape moved the leader up): the four
+  movement actions had bound 4194305..4194308 = Escape/Tab/Backtab/Backspace, NOT the arrows. Real arrow codes:
+  Left=4194319, Up=4194320, Right=4194321, Down=4194322 (verified via OS.get_keycode_string headless oracle).
+  Escape is now free for the future pause/menu key.
+
 - **C# `_draw()` is never invoked** (binding dropped the hook; a plain `public void _draw()`
   silently runs 0 times — probe proved it). Drawing *outside* `_draw` is engine-enforced
   ("Drawing is only allowed inside this node's `_draw()`…"). A GDScript child worked in
