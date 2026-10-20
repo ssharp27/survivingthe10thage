@@ -432,14 +432,17 @@ the channel progresses (a swarm can't screw the rescue out), and every revive gr
 
 ## Still open — vision work (pick priority with user)
 
-1. **Balance/feel pass for human play**: contact pressure, XP curve, campfire heal economy;
-   numbers live in Game.cs / Director.cs / Main.tscn (cheap tuning surface).
-2. **Boss spectacle**: Enter-the-Gungeon feel — phase telegraphs exist in Boss.cs (3 phases,
-   ring/fan volleys); needs wind-up visuals, boss body size/silhouette, named phases.
-3. **Roster growth**: 3 more campaign PCs (recruit = join-point narrative beats in this stage),
-   3-rank upgrade tracks + evolutions (Stormcaller / Viperkiss) still stubbed (M2).
-4. **8-bit D&D aesthetic pass**: greybox ColorRects → pixel sprites + palette; battle-scene backdrops.
-5. **Meta-layer stub**: campfire screen (return eliminated members), campaign-path stage select.
+RE-PRIORITIZED 2026-10-20 by user decision:
+1. ~~Balance/feel~~ -> user playtest says balance/feel is GOOD so far; runs end early (no 20-min
+   curve yet - the extended-run curve stays a standing workstream across ALL later milestones, not
+   an M1 task).
+2. **8-bit D&D aesthetic pass -> NOW 32-bit 32x32**: user owns the art idea (explained next round);
+   user-supplied 32x32 models exist for Baldrun/Mosiah (may need fixes - TBD with user). This is
+   the NEXT M1 gate: finish the art idea, then M1 success = art pass + meta stub overlap fix.
+3. **Boss spectacle MOVED to a later milestone** - M1 stays the basic loop, no Gungeon-spectacle work.
+4. **Meta-layer stub**: DONE mechanically but overlapping layout - user will send screenshot, fix
+   before declaring M1 success.
+5. Roster growth stays M2.
 6. Nice-to-have: MCP plugin GUI boot + hub re-pin (untested since the DLL-placement fix).
 
 ## Pilot note (verification-only, env-gated — never active in human play)
