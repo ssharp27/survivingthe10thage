@@ -738,7 +738,9 @@ public partial class Game : Godot.Node2D
         if (_floorRect != null)
         {
             _floorRect.Size = new Vector2((float)_wrapW, (float)_wrapH);
-            _floorRect.Position = -_floorRect.Size * 0.5f; // keep the rect centered on its node
+            // no pivot trick: the headless oracle (pivot_test) proved pivot_offset is
+            // a NO-OP for translation - global_position setter just writes position.
+            // The pin below therefore pins TOP-LEFT = camera - size/2.
         }
         RescatterFloorPatches();
         GD.Print("[10thAge] window measured: frame " + (int)(_visHalf.X * 2.0f) + "x" +
@@ -876,7 +878,11 @@ public partial class Game : Godot.Node2D
         MeasureWindow();
         Godot.ColorRect floor = new ColorRect();
         floor.Size = new Vector2((float)_wrapW, (float)_wrapH);
-        floor.Position = -floor.Size * 0.5f;
+        floor.Position = -floor.Size * 0.5f; // top-left offset = centered on origin; the
+        // pin below writes TOP-LEFT = camera - size/2 every frame, so this only seeds
+        // frame 0. (2026-10-20 human bug: pinning ORIGIN=camera left the rect covering
+        // only the bottom-right quadrant; the headless pivot_test proved pivot_offset
+        // is a no-op for translation, so centering must happen in the pin itself)
         floor.Color = new Color(0.10f, 0.16f, 0.10f, 1.0f);
         floor.ZIndex = -20; // the .tscn party/boss nodes predate this node in tree order;
                             // without a negative z they'd be painted over by the floor
@@ -1312,7 +1318,7 @@ public partial class Game : Godot.Node2D
         // it cannot pop a seam), while the patches fold like every other entity - that
         // is what keeps the ground scrolling AND looping as the motion readout
         if (_floorRect != null)
-            _floorRect.GlobalPosition = GetCameraCenter();
+            _floorRect.GlobalPosition = GetCameraCenter() - _floorRect.Size * 0.5f;
         for (int fp = 0; fp < _floorPatches.Count; fp++)
             _floorPatches[fp].GlobalPosition = WrapNearCamera(_floorPatches[fp].GlobalPosition);
         // recruit arrow: rides above the Leader and points at the stranded PC. Pure

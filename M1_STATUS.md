@@ -260,6 +260,14 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     (2) Mosiah popped into the world before his beat: PartyMember now hides any not-yet-joined PC that is not the
     pending recruit (GetRecruitPending instance-id gate; camp/escort joins flip joined and lift it). Smoke gate
     CT34/CT35/CT36: VICTORY lv 6/7/6, all .err 0 bytes.
+  - **Pass 12b addendum (same day, human round 2)**: floor STILL pinned its top-LEFT corner at the camera. Root cause
+    was not sizing - the per-frame pin `_floorRect.GlobalPosition = GetCameraCenter()` IS `Position` (root parent,
+    identity) and overwrites the -size/2 seed every frame, so the rect only ever covered the bottom-right quadrant;
+    the old 2400x1800 rect merely spilled past the assumed frame so it looked fine. A headless oracle (src/_pivot_test
+    .gd run through the console binary on a 1-node tscn) proved pivot_offset is a NO-OP for pure translation
+    (gp stayed == pos after setting it) - do not trust "set pivot, pin origin" as a centering idiom. Fix: the pin now
+    writes TOP-LEFT = GetCameraCenter() - Size*0.5f, which is correct under both semantics. Gate CT37/CT38/CT39:
+    VICTORY lv 6/6/6, all .err 0 bytes.
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)
