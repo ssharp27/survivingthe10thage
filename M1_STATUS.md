@@ -247,6 +247,19 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     escort branch now tracks the recruit's live position, not the spawn-time escortHold). Smoke gate CT31/CT32/CT33:
     all VICTORY (lv 6/7/7), .err 0 bytes - recruit drop prints 1119px out cleanly. Caveat: wrap-awareness covers
     chase/contact; enemy-to-enemy separation still uses raw coords (opposite-seam pairs under-count, greybox-tolerable).
+ - **Pass 12b (2026-10-20, human-found wrap fallout)**: (1) the pinned floor covered ~1/4 of the frame on the user's
+    fullscreen window - the 960x540 assumption was WRONG (DPI-scaled fullscreen with canvas_items stretch sees far more
+    world). Frame + wrap period are now MEASURED, not hardcoded: a hidden full-rect anchor Control (_winProbe, anchors
+    0,0-1,1) reports the REAL visible canvas rect after layout (ground truth from the renderer, no viewport singleton
+    needed - Godot 4.7 C# has no GetRoot()/Window-singleton access and Camera2D.GetViewport() is NULL for the main
+    camera - a null-ref there spammed 200MB of stderr and froze flow, caught by the CT34 gate). MeasureWindow runs at
+    run start AND every _Process frame (layout is stale on frame 1; the >64 sanity guard rejects garbage); the floor
+    resizes, the patch field re-scatters with density held to area (cap 400), Director spawns walk out PAST the
+    measured frame (the old fixed 800 px popped goblins on-screen on big windows), and volley bolts now die just
+    outside the measured frame. Headless smoke measures 1920x1080 = the old numbers, so smoke behavior is unchanged.
+    (2) Mosiah popped into the world before his beat: PartyMember now hides any not-yet-joined PC that is not the
+    pending recruit (GetRecruitPending instance-id gate; camp/escort joins flip joined and lift it). Smoke gate
+    CT34/CT35/CT36: VICTORY lv 6/7/6, all .err 0 bytes.
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)
