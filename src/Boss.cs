@@ -33,8 +33,10 @@ public partial class Boss : Combatant
         // P1: NO RegisterEnemy here. An inactive boss must not be in the hittable
         // registry or weapons can pre-kill it (the old pre-killable mini softlocked
         // the run at 90 s). Game.ActivateBoss brings it in the moment its stage
-        // engages; until then it is parked far offscreen.
+        // engages; until then it is parked far offscreen AND hidden, because a
+        // wrapping world has no offscreen: absolute coords loop back into frame.
         active = false;
+        Visible = false;
         GlobalPosition = new Vector2(0.0f, -10000.0f);
     }
 
@@ -57,22 +59,23 @@ public partial class Boss : Combatant
         _contactCd -= delta;
         if (target != null && !target.downed && !target.eliminated)
         {
-            Vector2 to = target.GlobalPosition - GlobalPosition;
+            Vector2 to = g.WrapDelta(GlobalPosition, target.GlobalPosition);
             float dist = to.Length();
             // close to melee reach: party signature weapons top out ~130px, so the
             // boss must settle inside that or it can never be struck
             if (dist > 100.0f)
-                GlobalPosition = g.ClampToArena(GlobalPosition + to.Normalized() * driftSpeed * delta);
+                GlobalPosition = g.WrapNearCamera(GlobalPosition + to.Normalized() * driftSpeed * delta);
             if (dist < radius + g.MEMBER_RADIUS && _contactCd <= 0.0f)
             {
                 _contactCd = 0.8f;
                 g.TakeHit(target, 12.0);
             }
         }
-        // downed bodies still get body-checked by the boss
+        // downed bodies still get body-checked by the boss (toroidal: a body across a
+        // seam IS within reach, so measure the wrap-short way)
         PartyMember hitAny = g.NearestMemberAny(GlobalPosition);
         if (hitAny != null && hitAny.downed &&
-            hitAny.GlobalPosition.DistanceTo(GlobalPosition) < radius + g.MEMBER_RADIUS && _contactCd <= 0.0f)
+            g.WrapDelta(GlobalPosition, hitAny.GlobalPosition).Length() < radius + g.MEMBER_RADIUS && _contactCd <= 0.0f)
         {
             _contactCd = 0.8f;
             g.TakeHit(hitAny, 12.0);
@@ -97,8 +100,8 @@ public partial class Boss : Combatant
 
         Vector2 p = GlobalPosition;
         PartyMember tgt = g.NearestMember(p);
-        float aim = tgt != null ? (float)System.Math.Atan2(tgt.GlobalPosition.Y - p.Y,
-                                                          tgt.GlobalPosition.X - p.X) : 0.0f;
+        Vector2 aimv = tgt != null ? g.WrapDelta(p, tgt.GlobalPosition) : new Vector2(1.0f, 0.0f);
+        float aim = (float)System.Math.Atan2(aimv.Y, aimv.X);
         float speed = 110.0f + 25.0f * (float)_phase;
 
         // ring primitive

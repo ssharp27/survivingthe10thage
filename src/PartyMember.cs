@@ -164,6 +164,13 @@ public partial class PartyMember : Godot.Node2D
         if (pg0 != null && pg0.GetWorldPause())
             return; // picker / join-banner soft pause: nobody swings while a card is up
         float delta = (float)d;
+        // looping world: fold every body but the Leader into the wrap box around the
+        // camera (the Leader IS the anchor; folding it would pop the camera across a
+        // seam). This is what keeps downed/eliminated bodies and the stranded recruit
+        // reachable forever - walk any direction and the world loops back to them.
+        // Live ring members are welded near the Leader, so the fold is a no-op for them.
+        if (pg0 != null && !isLeader)
+            GlobalPosition = pg0.WrapNearCamera(GlobalPosition);
         if (dsDamageBuffer > 0.0f)
             dsDamageBuffer -= delta; // ticks even while downed: the 2 s fail-buffer
         if (invuln > 0.0f)

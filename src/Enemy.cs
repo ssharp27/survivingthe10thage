@@ -72,14 +72,17 @@ public partial class Enemy : Combatant
             // freeing (kill scan drops the registry entry, no XP).
             PartyMember prey = g.NearestMember(p);
             if (prey != null)
-                GlobalPosition = g.ClampToArena(GlobalPosition + (prey.GlobalPosition - GlobalPosition).Normalized() * speed * delta);
+                GlobalPosition = g.WrapNearCamera(GlobalPosition +
+                                             g.WrapDelta(GlobalPosition, prey.GlobalPosition).Normalized() * speed * delta);
             PartyMember touch = g.NearestMemberAny(GlobalPosition);
-            if (touch != null && touch.GlobalPosition.DistanceTo(GlobalPosition) < 36.0f + g.MEMBER_RADIUS
+            if (touch != null && g.WrapDelta(GlobalPosition, touch.GlobalPosition).Length() < 36.0f + g.MEMBER_RADIUS
                 && g.OnReaperDown(touch))
             {
                 // despawn only when a down actually landed: immune bodies let it lurk
                 kind = "dead";
                 GlobalPosition = new Vector2(0.0f, -10000.0f);
+                Visible = false; // a wrapping world has no offscreen: absolute parking
+                                 // loops back into frame, so hidden is the real despawn
                 // the counter is owned by the enemy: self-despawn must release its slot
                 // too, or every leak would make the live-cap readout drift upward
                 g.ReleaseLiveCount(this);
@@ -94,10 +97,15 @@ public partial class Enemy : Combatant
             // recruit. they still never swing at the living squad
             if (g.RecruitInView())
             {
-                Vector2 hold = escortHold - p;
+                // track the RECRUIT'S LIVE (folded) position, not the spawn-time hold:
+                // the PC wraps like every other entity, so a stale absolute point would
+                // send the cage shuffling off-world once the beat folds across a seam
+                PartyMember pc = g.GetRecruitPending();
+                Vector2 goal = pc != null ? pc.GlobalPosition : escortHold;
+                Vector2 hold = g.WrapDelta(p, goal);
                 float hl = hold.Length();
                 if (hl > 18.0f)
-                    GlobalPosition = g.ClampToArena(GlobalPosition +
+                    GlobalPosition = g.WrapNearCamera(GlobalPosition +
                                    hold.Normalized() * speed * g.GetEscortCrawl() * delta);
                 _contactCd -= delta;
                 if (hl < 30.0f && _contactCd <= 0.0f)
@@ -113,12 +121,14 @@ public partial class Enemy : Combatant
             _contactCd -= delta;
             if (m != null)
             {
-                Vector2 to = m.GlobalPosition - p;
+                // chase measures the WRAP-short way: an ally just across a seam is
+                // 100 px away, not the 2300 px the raw coords would read
+                Vector2 to = g.WrapDelta(p, m.GlobalPosition);
                 float dist = to.Length();
                 float wobble = kind == "goblin" ? (float)System.Math.Sin(p.X * 0.05 + p.Y * 0.03) * 26.0f : 0.0f;
                 Vector2 dir = (to + new Vector2(wobble * 0.4f, wobble)).Normalized();
                 GlobalPosition += dir * speed * delta;
-                GlobalPosition = g.ClampToArena(GlobalPosition);
+                GlobalPosition = g.WrapNearCamera(GlobalPosition); // fold instead of walls
                 if (dist < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
                 {
                     _contactCd = 1.0f;
@@ -128,7 +138,7 @@ public partial class Enemy : Combatant
             // downed bodies are still run into even though nobody chases them
             PartyMember hitAny = g.NearestMemberAny(p);
             if (hitAny != null && hitAny.downed &&
-                hitAny.GlobalPosition.DistanceTo(p) < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
+                g.WrapDelta(p, hitAny.GlobalPosition).Length() < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
             {
                 _contactCd = 1.0f;
                 g.TakeHit(hitAny, contactDamage);

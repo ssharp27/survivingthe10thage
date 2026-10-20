@@ -232,6 +232,21 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     join-HP cost is readable (agent addition on top of the user rule; vetoable). Smoke gate CT21/CT22 VICTORY lv 6
     (join print shows the new 60/60hp) + CT23 TPK lv 6, all .err 0 bytes; escort contact damage and the STRANDED
     strip are human-only paths (the pilot never walks to the rescue site, so it joins at full HP via the camp sweep).
+ - **Wrap-world conversion (user fix, 2026-10-20 human-found bug)**: goblin escort staging collapsed completely
+    when a PC spawned near an arena edge (ClampToArena squashed the ring). The stage now has NO walls: ARENA_HW/HH
+    became the WRAP PERIOD (2400x1800 torus). ClampToArena -> WrapNearCamera (every entity folded into the half-period
+    box around the camera - 1200x900 vs the 960x540 screen, so seam folds sit outside frame and never pop) plus
+    WrapDelta for toroidal chase/contact math (Enemy normal/reaper/escort branches, Boss drift/aim/contact, downed-body
+    contacts). PartyMember._Process folds every body but the Leader (the Leader IS the camera anchor); gems fold in
+    UpdateGems; the floor rect rides the camera while the 60 patches fold (motion readout stays); bullets now despawn
+    camera-relative. Walls retired (BuildWall no longer called); HELP!/arrow track the recruit's FOLDED position;
+    SpawnFieldRecruit staging simplified (retry loop + clamp removed - staging cannot fail when there are no edges).
+    "Absolute offscreen parking" is no longer a hiding spot in a looping world: Bosses start and die HIDDEN
+    (_EnterTree + OnBossKilled Visible=false, ActivateBoss Visible=true), the dead TEST reaper hides itself too.
+    Escort goblins that survive a camp-sweep join become ordinary horde goblins (no shuffling to a dead hold point;
+    escort branch now tracks the recruit's live position, not the spawn-time escortHold). Smoke gate CT31/CT32/CT33:
+    all VICTORY (lv 6/7/7), .err 0 bytes - recruit drop prints 1119px out cleanly. Caveat: wrap-awareness covers
+    chase/contact; enemy-to-enemy separation still uses raw coords (opposite-seam pairs under-count, greybox-tolerable).
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)

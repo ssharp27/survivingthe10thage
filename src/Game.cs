@@ -9,7 +9,13 @@ using Godot;
 /// </summary>
 public partial class Game : Godot.Node2D
 {
-    // ---------- arena / squad geometry ----------
+    // ---------- wrap / squad geometry ----------
+    // user bugfix 2026-10-20: goblin escort staging collapsed when a PC spawned near an
+    // arena edge. The stage has NO walls now: ARENA_HW/HH define the WRAP PERIOD of a
+    // looping world (walk any direction forever and you meet the same relative scene
+    // again). Every entity is folded into the half-period box (1200x900) around the
+    // camera; the screen shows 960x540, so the folds sit 240/360 px outside frame and
+    // a seam pop can never be seen.
     public readonly double ARENA_HW = 1200.0;
     public const double ARENA_HH = 900.0;
     public readonly float MEMBER_RADIUS = 16.0f;
@@ -174,6 +180,11 @@ public partial class Game : Godot.Node2D
     PartyMember _leader = null;
     Godot.Collections.Array<Godot.Node2D> _gems = new();
     Godot.Collections.Array<double> _gemVals = new();
+    // looping-world decor: the flat floor rect rides the camera (solid color, so pinning
+    // it is seam-invisible) while the scattered patches fold like every other entity,
+    // which keeps them scrolling AND looping as the motion readout
+    Godot.ColorRect _floorRect = null;
+    Godot.Collections.Array<Godot.ColorRect> _floorPatches = new();
     Godot.Collections.Array<Godot.Node2D> _bullets = new();
     Godot.Collections.Array<Vector2> _bulletVel = new();
     Godot.Collections.Array<double> _bulletDmg = new();
@@ -198,10 +209,30 @@ public partial class Game : Godot.Node2D
                                         // telling the player to click a dead card)
 
     // ---------- public surface used by the other scripts ----------
-    public Vector2 ClampToArena(Vector2 p)
+    // the world LOOPS: instead of walls, every position is folded into the half-period
+    // box around the camera (Asteroids-style torus). The Leader is the anchor and must
+    // NOT be folded - folding it would pop the camera across a seam.
+    public Vector2 WrapNearCamera(Vector2 p)
     {
-        return new Vector2((float)System.Math.Clamp(p.X, -ARENA_HW + 24.0, ARENA_HW - 24.0),
-                           (float)System.Math.Clamp(p.Y, -ARENA_HH + 24.0, ARENA_HH - 24.0));
+        Vector2 c = GetCameraCenter();
+        double pw = ARENA_HW * 2.0;
+        double ph = ARENA_HH * 2.0;
+        double dx = p.X - c.X;
+        double dy = p.Y - c.Y;
+        dx -= System.Math.Round(dx / pw) * pw;
+        dy -= System.Math.Round(dy / ph) * ph;
+        return new Vector2((float)(c.X + dx), (float)(c.Y + dy));
+    }
+
+    // shortest step on the looping world: chase/move math must use this or an entity
+    // two steps from a seam tries the 2400 px way around instead of the 100 px hop
+    public Vector2 WrapDelta(Vector2 from, Vector2 to)
+    {
+        double dx = to.X - from.X;
+        double dy = to.Y - from.Y;
+        dx -= System.Math.Round(dx / (ARENA_HW * 2.0)) * (ARENA_HW * 2.0);
+        dy -= System.Math.Round(dy / (ARENA_HH * 2.0)) * (ARENA_HH * 2.0);
+        return new Vector2((float)dx, (float)dy);
     }
 
     public PartyMember GetLeader()
@@ -429,9 +460,12 @@ public partial class Game : Godot.Node2D
         string kb = b.kind; // capture before we overwrite it below
         // slain bosses must despawn visually but NOT QueueFree: _bosses and the
         // scene still reference them. kind "dead" drops the registry entry in the
-        // kill scan (so nothing targets it again); the body parks offscreen.
+        // kill scan (so nothing targets it again); the body parks offscreen AND goes
+        // hidden - in a wrapping world "offscreen" absolute coords no longer exist,
+        // a long-enough walk loops right back to them
         b.kind = "dead";
         ((Boss)b).active = false;
+        b.Visible = false;
         b.GlobalPosition = new Vector2(0.0f, -10000.0f);
         if (_state == StageState.MINIBOSS && kb == "mini")
         {
@@ -484,6 +518,9 @@ public partial class Game : Godot.Node2D
             if (b.kind != kind || b.active || b.hp <= 0.0f)
                 continue;
             b.active = true;
+            b.Visible = true; // parked bosses start HIDDEN now (see Boss._EnterTree):
+                              // in a looping world absolute offscreen parking is not a
+                              // hiding spot, so visibility is the real gate
             // user-approved camp-safety gate: the engage itself is a 2 s free window
             // (TakeHit drops everything while this runs), then normal damage resumes.
             _engageInvulnT = REVIVE_INVULN;
@@ -502,7 +539,7 @@ public partial class Game : Godot.Node2D
             if (!registered)
             {
                 // drop in just outside the camera view so the player sees it arrive
-                Vector2 entry = ClampToArena(near + new Vector2(0.0f, -430.0f));
+                Vector2 entry = WrapNearCamera(near + new Vector2(0.0f, -430.0f));
                 b.GlobalPosition = entry;
                 _enemies.Add(b);
                 GD.Print("[10thAge] boss " + kind + " deployed at " + (int)b.GlobalPosition.X + ","
@@ -778,6 +815,8 @@ public partial class Game : Godot.Node2D
         floor.ZIndex = -20; // the .tscn party/boss nodes predate this node in tree order;
                             // without a negative z they'd be painted over by the floor
         AddChild(floor);
+        _floorRect = floor; // rides the camera every frame: the looping world has no
+                            // edge, so the plain ground just keeps covering the frame
         // scattered floor patches = motion reference. the camera keeps the leader centered,
         // so a single-color floor made movement LOOK frozen even when input worked
         Rng = new Godot.RandomNumberGenerator();
@@ -792,11 +831,11 @@ public partial class Game : Godot.Node2D
             p.Color = new Color(0.13f, 0.20f, 0.13f, 1.0f);
             p.ZIndex = -15;
             AddChild(p);
+            _floorPatches.Add(p); // folded per frame like every other entity: the ground
+                                  // cover scrolls AND loops, so the wrap reads seamless
         }
-        BuildWall(new Vector2(0.0f, -(float)ARENA_HH - 40.0f), new Vector2((float)(ARENA_HW * 2.0 + 100.0), 80.0f));
-        BuildWall(new Vector2(0.0f, (float)ARENA_HH + 40.0f), new Vector2((float)(ARENA_HW * 2.0 + 100.0), 80.0f));
-        BuildWall(new Vector2(-(float)ARENA_HW - 40.0f, 0.0f), new Vector2(80.0f, (float)(ARENA_HH * 2.0 + 100.0)));
-        BuildWall(new Vector2((float)ARENA_HW + 40.0f, 0.0f), new Vector2(80.0f, (float)(ARENA_HH * 2.0 + 100.0)));
+        // walls are retired with the wrap (user fix 2026-10-20): there is no edge to
+        // bump into anymore, and a painted border would fight the invisible fold box
         _camera = GetNode("Camera2D") as Godot.Camera2D;
         Godot.CanvasLayer hudl = new CanvasLayer();
         AddChild(hudl);
@@ -895,7 +934,7 @@ public partial class Game : Godot.Node2D
             // spawn just OUTSIDE the camera view, never dropped on the party: the old
             // ClampToArena(leader + 500,0) could land right on top of the squad
             Vector2 cen = GetCameraCenter();
-            r.GlobalPosition = ClampToArena(cen + new Vector2(820.0f, 140.0f));
+            r.GlobalPosition = cen + new Vector2(820.0f, 140.0f);
             RegisterEnemy(r);
             AddChild(r);
             GD.Print("[10thAge] TEST reaper live");
@@ -1089,7 +1128,7 @@ public partial class Game : Godot.Node2D
             burst = burst.Normalized();
             if (_dashCdT <= 0.0)
             {
-                leader.GlobalPosition = ClampToArena(leader.GlobalPosition + burst * (float)DASH_IMPULSE);
+                leader.GlobalPosition = leader.GlobalPosition + burst * (float)DASH_IMPULSE;
                 _dashCdT = DASH_CD;
             }
             if (_memberDashCdT <= 0.0)
@@ -1099,7 +1138,7 @@ public partial class Game : Godot.Node2D
                     if (!m.joined || m.isLeader || m.downed || m.eliminated)
                         continue; // fallen bodies stay where they fell; a stranded recruit
                                   // does not lunge with the squad - it is not in it yet
-                    m.GlobalPosition = ClampToArena(m.GlobalPosition + burst * (float)MEMBER_DASH_IMPULSE);
+                    m.GlobalPosition = WrapNearCamera(m.GlobalPosition + burst * (float)MEMBER_DASH_IMPULSE);
                 }
                 _memberDashCdT = MEMBER_DASH_CD;
             }
@@ -1108,7 +1147,7 @@ public partial class Game : Godot.Node2D
         if (moved)
         {
             dir = dir.Normalized();
-            leader.GlobalPosition = ClampToArena(leader.GlobalPosition + dir * leader.baseSpeed * leader.speedMul * delta);
+            leader.GlobalPosition = leader.GlobalPosition + dir * leader.baseSpeed * leader.speedMul * delta;
             if (faceTo.X != 0.0f || faceTo.Y != 0.0f)
                 leader.facing = (float)System.Math.Atan2(faceTo.Y, faceTo.X);
             else
@@ -1173,7 +1212,7 @@ public partial class Game : Godot.Node2D
                 double slot = k * System.Math.PI * 0.4;
                 Vector2 aim = new Vector2((float)System.Math.Cos(_ringAngle + slot),
                                           (float)System.Math.Sin(_ringAngle + slot));
-                Vector2 target = ClampToArena(anchor + aim * (float)RING_RADIUS);
+                Vector2 target = anchor + aim * (float)RING_RADIUS;
                 Vector2 to = target - m.GlobalPosition;
                 double gap = (double)to.Length();
                 if (gap <= 0.0009)
@@ -1185,25 +1224,37 @@ public partial class Game : Godot.Node2D
                                                     (double)leadSpeed + 80.0);
                 double step = (double)home * (double)delta;
                 Vector2 move = step >= gap ? to : to * (float)(step / gap);
-                m.GlobalPosition = ClampToArena(m.GlobalPosition + move);
+                m.GlobalPosition = m.GlobalPosition + move;
                 // hard leash: never further than 48 px from the ring slot (was
                 // 120 - the user still saw Mosiah "catching up"; a tight clamp
                 // makes drift physically impossible, dashes/shoves snap back)
                 Vector2 slack = m.GlobalPosition - target;
                 double leash = (double)slack.Length();
                 if (leash > 48.0)
-                    m.GlobalPosition = ClampToArena(target - slack * (float)(48.0 / leash));
+                    m.GlobalPosition = target - slack * (float)(48.0 / leash);
             }
         }
         if (_camera != null && leader != null)
             _camera.GlobalPosition = _camera.GlobalPosition.Lerp(leader.GlobalPosition, 0.08f);
+        // looping world: the flat floor rect rides the camera (solid color, so pinning
+        // it cannot pop a seam), while the patches fold like every other entity - that
+        // is what keeps the ground scrolling AND looping as the motion readout
+        if (_floorRect != null)
+            _floorRect.GlobalPosition = GetCameraCenter();
+        for (int fp = 0; fp < _floorPatches.Count; fp++)
+            _floorPatches[fp].GlobalPosition = WrapNearCamera(_floorPatches[fp].GlobalPosition);
         // recruit arrow: rides above the Leader and points at the stranded PC. Pure
-        // guidance - the user asked for "an arrow pointing to their location (HELP!)"
+        // guidance - the user asked for "an arrow pointing to their location (HELP!)".
+        // both the arrow and the HELP! label now track the RECRUIT'S FOLDED position,
+        // so when the beat wraps across a seam the guidance follows instead of hanging
+        // in the void at a stale absolute spot
         if (_recruitPending != null && _recruitArrow != null)
         {
             if (_leader != null)
                 _recruitArrow.GlobalPosition = _leader.GlobalPosition;
             _recruitArrow.LookAt(_recruitPending.GlobalPosition);
+            if (_helpLabel != null)
+                _helpLabel.GlobalPosition = _recruitPending.GlobalPosition + new Vector2(-26.0f, -62.0f);
         }
         // dash-cooldown readout over Baldrun: the gold fill grows back as the Leader's
         // dash recharges. Human-test UX pass: 64x8 track at y-42, and once the dash IS
@@ -1410,6 +1461,9 @@ public partial class Game : Godot.Node2D
             Godot.Node2D gem = _gems[i];
             if (gem.GlobalPosition.X < -8000.0f)
                 continue;
+            // gems sit where bodies died: fold them like everything else, so a player
+            // who wanders off loops back to them instead of losing them off-world
+            gem.GlobalPosition = WrapNearCamera(gem.GlobalPosition);
             if (leaderLive)
             {
                 Vector2 to = leader.GlobalPosition - gem.GlobalPosition;
@@ -1444,7 +1498,11 @@ public partial class Game : Godot.Node2D
                 continue;
             b.GlobalPosition += _bulletVel[i] * delta;
             Vector2 p = b.GlobalPosition;
-            if (System.Math.Abs(p.X) > ARENA_HW - 8.0 || System.Math.Abs(p.Y) > ARENA_HH - 8.0)
+            // no arena to die against anymore: a volley bolt expires once it is past the
+            // fold box around the camera (just inside the half-period, so it never gets
+            // a chance to wrap and loop back around the player)
+            Vector2 bc = GetCameraCenter();
+            if (System.Math.Abs(p.X - bc.X) > ARENA_HW - 8.0 || System.Math.Abs(p.Y - bc.Y) > ARENA_HH - 8.0)
             {
                 DespawnBullet(i);
                 continue;
@@ -1898,30 +1956,20 @@ public partial class Game : Godot.Node2D
             return; // roster already whole: the beat is a no-op
         // human fix (2026-10-20): the beat drops OFF CAMERA. Landing 300 px out put the
         // PC and its escort inside the frame, so the party walked into a pop-in. Walk
-        // outward until the site clears the visible rect; the arena clamp can pull a
-        // candidate back into frame, so other bearings get a retry before giving up.
+        // outward until the site clears the visible rect. And the world WRAPS now (same
+        // day, user bug: near an arena edge the goblin staging collapsed completely) -
+        // with no edges staging cannot fail: land past the frame on any bearing and no
+        // clamp can drag it back. reach stays <= ~1050 px, inside the 1200x900 fold box,
+        // so the drop is never even folded by its own spawn.
         Vector2 cen = GetCameraCenter();
         Vector2 half = GetVisibleHalfExtents();
-        m.GlobalPosition = cen;
-        bool staged = false;
-        for (int attempt = 0; attempt < 8; attempt++)
-        {
-            double drop = Rng.Randf() * 6.2831853;
-            Vector2 dir = new Vector2((float)System.Math.Cos(drop), (float)System.Math.Sin(drop));
-            // distance along dir to the visible rect's border, then land past it
-            double tx = System.Math.Abs(dir.X) > 0.001 ? half.X / System.Math.Abs(dir.X) : 1e30;
-            double ty = System.Math.Abs(dir.Y) > 0.001 ? half.Y / System.Math.Abs(dir.Y) : 1e30;
-            double reach = System.Math.Max(RECRUIT_DIST, System.Math.Min(tx, ty) + RECRUIT_MARGIN);
-            Vector2 cand = ClampToArena(cen + dir * (float)reach);
-            if (System.Math.Abs(cand.X - cen.X) > half.X || System.Math.Abs(cand.Y - cen.Y) > half.Y)
-            {
-                m.GlobalPosition = cand;
-                staged = true;
-                break;
-            }
-        }
-        if (!staged)
-            m.GlobalPosition = ClampToArena(cen + new Vector2(0.0f, half.Y + (float)RECRUIT_MARGIN));
+        double drop = Rng.Randf() * 6.2831853;
+        Vector2 dir = new Vector2((float)System.Math.Cos(drop), (float)System.Math.Sin(drop));
+        // distance along dir to the visible rect's border, then land past it
+        double tx = System.Math.Abs(dir.X) > 0.001 ? half.X / System.Math.Abs(dir.X) : 1e30;
+        double ty = System.Math.Abs(dir.Y) > 0.001 ? half.Y / System.Math.Abs(dir.Y) : 1e30;
+        double reach = System.Math.Max(RECRUIT_DIST, System.Math.Min(tx, ty) + RECRUIT_MARGIN);
+        m.GlobalPosition = cen + dir * (float)reach;
         GD.Print("[10thAge] field recruit: " + m.displayName + " stranded "
                  + (int)m.GlobalPosition.DistanceTo(cen) + "px out, off camera | escort "
                  + ESCORT_COUNT + " goblins hold still until the party is in sight of the rescue");
@@ -1960,10 +2008,12 @@ public partial class Game : Godot.Node2D
             double ea = 6.2831853 * i / ESCORT_COUNT + 0.3;
             e.escortHold = m.GlobalPosition;
             // human fix: they open wide of the stranded PC, so the ring closes in over
-            // several seconds instead of materialising already on top of the rescue
-            e.GlobalPosition = ClampToArena(m.GlobalPosition +
-                                            new Vector2((float)System.Math.Cos(ea),
-                                                        (float)System.Math.Sin(ea)) * (float)ESCORT_RING);
+            // several seconds instead of materialising already on top of the rescue.
+            // fold them too: recruit + 520 px can sit past the fold box, and the folded
+            // side IS the short way around, which is exactly how the cage should read
+            e.GlobalPosition = WrapNearCamera(m.GlobalPosition +
+                                              new Vector2((float)System.Math.Cos(ea),
+                                                          (float)System.Math.Sin(ea)) * (float)ESCORT_RING);
             RegisterEnemy(e);
             AddChild(e);
             _escortLeft++;
@@ -1994,6 +2044,14 @@ public partial class Game : Godot.Node2D
             _recruitArrow.Visible = false;
         if (_helpLabel != null)
             _helpLabel.Visible = false;
+        // the beat is over: any escorts that survived the rescue (camp-sweep joins) stop
+        // shuffling toward a hold point that no longer means anything in a wrapping
+        // world and just become ordinary horde goblins
+        for (int i = 0; i < _enemies.Count; i++)
+        {
+            if (_enemies[i] is Enemy en && en.escort)
+                en.escort = false;
+        }
         // join ceremony: the art slot ("X JOINS THE BATTLE!" posing with their weapon)
         // is a greybox banner + click gate for now. The human gate never times out
         // (same no-timer rule as the picker/campfire); the pilot clears it instantly.
