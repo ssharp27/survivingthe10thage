@@ -60,8 +60,12 @@ public partial class Game : Godot.Node2D
     // edge, the escort goblins open wide of the PC, and they shamble in.
     readonly double RECRUIT_DIST = 300.0; // floor distance from the camera (see SpawnFieldRecruit)
     const double RECRUIT_MARGIN = 90.0;   // px past the visible rect the stranded PC lands at
-    readonly double ESCORT_RING = 340.0;  // escort goblins start this wide of the stranded PC
-    readonly double ESCORT_CRAWL = 0.22;  // creep factor on goblin speed: pressure, not a chase
+    // human pass 11 (2026-10-20): even wider and even slower - the beat should read as a
+    // hunt - and escort goblins now CLOSE ON the PC and chip him on contact, so dawdling
+    // on the rescue trades away the HP he joins with (floored, see JoinRecruit)
+    readonly double ESCORT_RING = 520.0;  // escort goblins start this wide of the stranded PC
+    readonly double ESCORT_CRAWL = 0.12;  // creep factor on goblin speed: pressure, not a chase
+    const float RECRUIT_JOIN_FLOOR = 0.25f; // floored fraction of max HP the PC joins at
     readonly double TIER2_AT = 45.0;
     readonly double BOSS_AT = 150.0;
     // stage name shown on the ui/ cards; hardcoded until the meta-map exists (M3)
@@ -244,8 +248,9 @@ public partial class Game : Godot.Node2D
 
     public void TakeHit(PartyMember m, double amount)
     {
-        // a stranded recruit is un-hittable until it joins: only the escort cage pressures
-        // the party around it (user design 2026-10-20)
+        // the horde can never touch a stranded recruit: only escort goblins chip him
+        // on contact (EscortHitRecruit), and that damage never runs the rescue down
+        // (user design 2026-10-20 pass 11: contact damage shapes the join HP)
         if (m == null || !m.joined || m.eliminated)
             return;
         if (_engageInvulnT > 0.0)
@@ -667,6 +672,27 @@ public partial class Game : Godot.Node2D
     public float GetEscortCrawl()
     {
         return (float)ESCORT_CRAWL;
+    }
+
+    public PartyMember GetRecruitPending()
+    {
+        return _recruitPending;
+    }
+
+    // escort contact damage on the stranded PC (user pass 11): every goblin that walks
+    // onto him chips his HP, and JoinRecruit brings in whatever survived. floored -
+    // the escort pressures the rescue clock, it can never run the PC down outright
+    public void EscortHitRecruit(PartyMember m, double amount)
+    {
+        if (m == null || m.joined)
+            return;
+        float floor = m.maxHp * RECRUIT_JOIN_FLOOR;
+        float nh = m.hp - (float)amount;
+        if (nh < floor)
+            nh = floor;
+        m.hp = nh;
+        GD.Print("[10thAge] escort touch: " + m.displayName + " chipped to " +
+                 (int)m.hp + "/" + (int)m.maxHp + "hp");
     }
 
     public Vector2 GetCameraCenter()
@@ -1605,10 +1631,12 @@ public partial class Game : Godot.Node2D
             Godot.ColorRect bg = _hpBg[i];
             Godot.ColorRect f = _hpFill[i];
             Godot.ColorRect dot = _hpDot[i];
-            if (i >= _party.Count || !_party[i].joined)
+            if (i >= _party.Count || (!_party[i].joined && _recruitPending != _party[i]))
             {
-                // unused slot / not-yet-recruited PC: fully invisible, never a phantom
-                // bodyguard or a spoiler strip telling the player who is coming next
+                // unused slot / not-yet-arrived PC: fully invisible, never a phantom
+                // bodyguard or a spoiler strip telling the player who is coming next.
+                // once the field beat lands the strip goes live (pass 11): the escort
+                // chips HP and the join brings in whatever survives, so it must read
                 n.Text = "";
                 f.Size = new Vector2(0.0f, 7.0f);
                 bg.Color = new Color(0.12f, 0.11f, 0.10f, 0.0f);
@@ -1624,15 +1652,18 @@ public partial class Game : Godot.Node2D
             if (frac > 1.0f)
                 frac = 1.0f;
             string tag = (m.isLeader ? "* " : "") + m.displayName;
-            n.Text = isOut ? tag + " OUT (campfire)"
-                         : (down ? tag + (m.stable ? " STABLE" : " DOWN")
-                                : tag + " " + (int)m.hp + "/" + (int)m.maxHp);
+            bool stranded = !m.joined; // field beat only: live strip tracks the join HP
+            n.Text = stranded ? tag + " STRANDED " + (int)m.hp + "/" + (int)m.maxHp
+                             : (isOut ? tag + " OUT (campfire)"
+                                    : (down ? tag + (m.stable ? " STABLE" : " DOWN")
+                                          : tag + " " + (int)m.hp + "/" + (int)m.maxHp));
             f.Size = new Vector2(110.0f * frac, 7.0f);
             f.Color = m.isLeader ? new Color(0.83f, 0.64f, 0.24f, 1.0f)
                                  : new Color(0.62f, 0.52f, 0.38f, 1.0f);
             bg.Color = new Color(0.12f, 0.11f, 0.10f, 0.9f);
-            dot.Color = isOut ? CHIP_GREY
-                            : (down ? (m.stable ? CHIP_AMBER : CHIP_BLOOD) : CHIP_SAGE);
+            dot.Color = stranded ? CHIP_AMBER
+                                : (isOut ? CHIP_GREY
+                                       : (down ? (m.stable ? CHIP_AMBER : CHIP_BLOOD) : CHIP_SAGE));
         }
     }
 
@@ -1650,9 +1681,11 @@ public partial class Game : Godot.Node2D
         for (int o = 0; o < OPT_LABEL.Length; o++)
         {
             // not-yet-recruited members never leak onto a card (their weapon is not
-            // unlocked yet - recruiting IS the weapon unlock, user rule)
+            // unlocked yet - recruiting IS the weapon unlock, user rule); pass-11 human
+            // QOL: bodies OUT until the next campfire stop leaking too, so level-ups
+            // feed the members that can still save the run
             open[o] = OPT_MEMBER[o] < _party.Count && _pickRank[o] < PICK_RANK_CAP
-                      && MemberJoinedAt(OPT_MEMBER[o]);
+                      && MemberInPlay(OPT_MEMBER[o]);
             if (open[o])
                 openCount++;
         }
@@ -1691,23 +1724,25 @@ public partial class Game : Godot.Node2D
         {
             int o = ((seed + k) % n + n) % n;
             if (_pickRank[o] < PICK_RANK_CAP && OPT_MEMBER[o] < _party.Count
-                && MemberJoinedAt(OPT_MEMBER[o]))
+                && MemberInPlay(OPT_MEMBER[o]))
                 return o;
         }
         for (int i = 0; i < n; i++)
         {
-            if (OPT_MEMBER[i] < _party.Count && MemberJoinedAt(OPT_MEMBER[i]))
+            if (OPT_MEMBER[i] < _party.Count && MemberInPlay(OPT_MEMBER[i]))
                 return i;
         }
         return 0;
     }
 
-    // is the roster PC with this memberIndex already IN the squad?
-    private bool MemberJoinedAt(int idx)
+    // is the roster PC with this memberIndex IN the squad AND still on the run?
+    // (pass 11: eliminated-until-campfire bodies are filtered out here too, which is
+    // what keeps dead members off every level-up and rest-gift card)
+    private bool MemberInPlay(int idx)
     {
         foreach (PartyMember pm in _party)
             if (pm.memberIndex == idx)
-                return pm.joined;
+                return pm.joined && !pm.eliminated;
         return false;
     }
 
@@ -1843,9 +1878,11 @@ public partial class Game : Godot.Node2D
 
     // ---------- field recruit (user-approved 2026-10-20) ----------
     // The drop: a not-yet-party PC lands RECRUIT_DIST px out with HELP! + an arrow from
-    // the Leader. ESCORT_COUNT goblins close in slowly and hold a ring; clearing all of
-    // them joins the PC at FULL HP with a rank-0 upgrade track (no catch-up gifts).
-    // The banner holds the "X JOINS THE BATTLE!" art slot and waits for a real click.
+    // the Leader. ESCORT_COUNT goblins open ESCORT_RING wide, hold still until the party
+    // can SEE the rescue, then shamble in and close ON the PC: contact chips his HP, and
+    // the join brings in whatever survives (floored) - dawdling costs a maimed recruit.
+    // Clearing all of them (or the campfire sweep) joins the PC with a rank-0 upgrade
+    // track (no catch-up gifts). The banner holds the "X JOINS THE BATTLE!" art slot.
     private void SpawnFieldRecruit()
     {
         PartyMember m = null;
@@ -1905,7 +1942,9 @@ public partial class Game : Godot.Node2D
         shaft.Color = new Color(0.95f, 0.85f, 0.35f, 0.9f);
         shaft.ZIndex = 10;
         _recruitArrow.AddChild(shaft);
-        // escort cage: spawns wide, walks in slow (Enemy escort branch), holds a ring
+        // escort cage: spawns wide (ESCORT_RING), crawls in (ESCORT_CRAWL), and the
+        // hold point is the PC HIMSELF (pass 11): they walk onto him and chip him
+        // on contact, no more honest-distance ring keeping the scene decorative
         _recruitPending = m;
         _escortLeft = 0;
         for (int i = 0; i < ESCORT_COUNT; i++)
@@ -1919,8 +1958,7 @@ public partial class Game : Godot.Node2D
             e.xpValue = 1.0f;
             e.escort = true;
             double ea = 6.2831853 * i / ESCORT_COUNT + 0.3;
-            e.escortHold = m.GlobalPosition +
-                           new Vector2((float)System.Math.Cos(ea), (float)System.Math.Sin(ea)) * 52.0f;
+            e.escortHold = m.GlobalPosition;
             // human fix: they open wide of the stranded PC, so the ring closes in over
             // several seconds instead of materialising already on top of the rescue
             e.GlobalPosition = ClampToArena(m.GlobalPosition +
@@ -1939,7 +1977,14 @@ public partial class Game : Godot.Node2D
         if (m == null)
             return;
         m.joined = true;
-        m.hp = m.maxHp; // user rule: joins at full HP, rank 0 - upgrades start at zero
+        // user rule (pass 11): the PC joins at the HP the player PRESERVED - escort
+        // contact ate into him on the beat - floored so no rescue ever lands a corpse
+        if (m.hp < m.maxHp * RECRUIT_JOIN_FLOOR)
+            m.hp = m.maxHp * RECRUIT_JOIN_FLOOR;
+        if (m.hp > m.maxHp)
+            m.hp = m.maxHp;
+        GD.Print("[10thAge] join: " + m.displayName + " returns at " + (int)m.hp + "/" +
+                 (int)m.maxHp + "hp | rank 0 upgrades start at zero");
         m.dsFails = 0;
         m.dsSucceeds = 0;
         m.dsDamageBuffer = 0.0f;

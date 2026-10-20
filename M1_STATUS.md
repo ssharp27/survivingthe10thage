@@ -218,6 +218,20 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     twice behind the camp. Gate: smokeCT18 TPK lv 4 + smokeCT19 VICTORY lv 6 + smokeCT20 TPK lv 4, all .err 0 bytes;
     CT19 logged the drop 1119 px off camera, the camp-sweep join, the pilot join-banner clear, the SHORT rest and
     the BOSS/VICTORY line.
+ - **Balance pass 11 + recruit-beat rework (user-approved, 2026-10-20 human-test)**: (1) Mosiah maxHp 50 -> 60
+    (Main.tscn, user ask). (2) PICKER QOL - eliminated-until-campfire bodies stop leaking onto level-up cards:
+    MemberJoinedAt -> MemberInPlay (joined && !eliminated), applied at all 3 picker call sites, so picks feed the
+    bodies that can still save the run; campfire revival re-opens their tracks automatically. (3) ESCORT HUNT -
+    escort goblins open ESCORT_RING 340 -> 520 px wide and crawl 0.22 -> 0.12 (both agent sanity-check numbers on
+    the user's "further/slower" ask), and they now CLOSE ON the PC instead of holding a decorative ring (escortHold
+    = the PC, Enemy escort branch stops at 18 px, damages on contact within 30 px, contactDamage 2 on a 1 s cd).
+    (4) JOIN HP - EscortHitRecruit chips the stranded PC's hp (floored at RECRUIT_JOIN_FLOOR 0.25 of max, proposal
+    number), and JoinRecruit brings him in at whatever survived instead of full HP (supersedes the old "joins at
+    FULL HP" user rule). The horde still can never touch a stranded recruit; the escort can never run him down.
+    (5) HUD readout - while the beat is pending the HP strip goes live showing "Mosiah STRANDED 44/60" so the
+    join-HP cost is readable (agent addition on top of the user rule; vetoable). Smoke gate CT21/CT22 VICTORY lv 6
+    (join print shows the new 60/60hp) + CT23 TPK lv 6, all .err 0 bytes; escort contact damage and the STRANDED
+    strip are human-only paths (the pilot never walks to the rescue site, so it joins at full HP via the camp sweep).
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)

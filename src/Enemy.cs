@@ -88,16 +88,23 @@ public partial class Enemy : Combatant
         }
         if (escort)
         {
-            // escort cage: hold still until the party can SEE the rescue (human fix: the
-            // beat used to animate off-camera, so it read as motion that started by
-            // itself), then shamble in slowly and stop at the ring - they pressure the
-            // scene instead of dogging the Leader
+            // escort cage (pass 11): hold still until the party can SEE the rescue,
+            // then close ON the stranded PC himself. contact chips his HP - whatever
+            // survives is what joins - so dawdling on the rescue costs a maimed
+            // recruit. they still never swing at the living squad
             if (g.RecruitInView())
             {
                 Vector2 hold = escortHold - p;
-                if (hold.Length() > 44.0f)
+                float hl = hold.Length();
+                if (hl > 18.0f)
                     GlobalPosition = g.ClampToArena(GlobalPosition +
                                    hold.Normalized() * speed * g.GetEscortCrawl() * delta);
+                _contactCd -= delta;
+                if (hl < 30.0f && _contactCd <= 0.0f)
+                {
+                    _contactCd = 1.0f;
+                    g.EscortHitRecruit(g.GetRecruitPending(), contactDamage);
+                }
             }
         }
         else
