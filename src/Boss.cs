@@ -46,8 +46,8 @@ public partial class Boss : Combatant
         Game g = GetParent() as Game;
         if (g == null)
             return;
-        if (g.GetPickerActive())
-            return; // picker soft pause: the boss holds its volley mid-phase
+        if (g.GetWorldPause())
+            return; // picker / join-banner soft pause: the boss holds its volley mid-phase
         float ratio = hp / maxHp;
         _phase = ratio > 0.66f ? 0 : (ratio > 0.33f ? 1 : 2);
 

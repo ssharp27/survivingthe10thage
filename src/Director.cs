@@ -21,8 +21,8 @@ public partial class Director : Godot.Node2D
         Game g = GetParent() as Game;
         if (g == null)
             return;
-        if (g.GetPickerActive())
-            return; // picker soft pause: the horde holds its march while the card is up
+        if (g.GetWorldPause())
+            return; // picker / join-banner soft pause: the horde holds its march while a card is up
         int st = g.GetStageState();
         if (st != 0 && st != 3) // PLAY1 / PLAY2 only
             return;

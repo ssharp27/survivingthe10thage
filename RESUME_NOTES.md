@@ -3,28 +3,20 @@
 Session stopped on request. Resume here first — everything below the 2026-10-20 block is older history (keep as archive; M1_STATUS.md remains the single source of truth for flow/pitfalls/balance passes).
 
 ## Where we are (2026-10-20 shutdown)
-- HEAD = `3e4dfa0` on `main` — **balance/UX pass 7** (camp + display), 3 files (`src/Game.cs`, `project.godot`, `M1_STATUS.md`). Local-only, nothing ever pushed. Chain: `3e4dfa0` > `0282b65` (pass 6) > `b1ef845` > `50c73cb` > `79db32d` > `daf2d53` > `8a85ffc` > `6de42a7` > `46e3fcb` > older.
-- Pass 7 shipped (user-approved 2026-10-20):
-  1. **Campfire XP vacuum** — `EndCampfire` reels every uncollected gem into a 40–70 px ring on the Leader; the existing 110 px/380 px-s magnet flies + collects them (no forked xp path). Prints `camp vacuum: N gems reeled`.
-  2. **HUD HP-strip spacing fix** — rows 22→28 px, bar/dot `y+11→y+18`, picker label 210→250 (bars were cutting through the 16 px name text).
-  3. **Display** — `project.godot`: viewport 1920×1080, `stretch/mode="canvas_items"`, `stretch/aspect="expand"` (VS-style auto-scale, no letterbox; user can swap pair for 3:2, e.g. 1620×1080). `_was_click_on` already accepts all 3 click coordinate spaces, so stretch can't break rest clicks.
-- Gate evidence: `smokeCT15` TPK lv 9, `.err` 0 bytes, vacuum line + full SHORT-gift picker chain in log. (CT13 was pre-fix; CT10/12/14 died pre-Hob so no vacuum line — variance, not bugs.)
-- **First human playtest round on pass 7 has NOT happened yet** — resume starts there: rest-choice tension, gift-card picker feel, camp safety visibility (sweep/immunity/channel bar), on-body d20 chip + new strip spacing legibility, orbit/dash feel at the bigger window, HP pressure curve.
+- HEAD = **pass-10 commit (the one you are looking at)** on `main` — three pass-9 human-playtest bug reports fixed. Chain: pass 9 `1524c6e` > pass 8 `058f762` > resume notes `c96b1d8` > pass 7 `3e4dfa0` > older. Local-only, nothing ever pushed.
+- Pass 10 shipped (all three reports, plus the leak the reports exposed):
+  1. **Rescue staging** — the stranded PC lands PAST the camera edge (`SpawnFieldRecruit` walks a random bearing out to the visible rect's exit + `RECRUIT_MARGIN` 90 px, floor `RECRUIT_DIST` 300, 8 retries because `ClampToArena` can pull a candidate back into frame); escort goblins open `ESCORT_RING` 340 px wide of the PC (was 160).
+  2. **Crawl gate** — an escort goblin does not move until `Game.RecruitInView()` (PC inside the ~960x540 camera rect); creep factor 0.4 → `ESCORT_CRAWL` 0.22. So the beat no longer animates off-camera and reads as "they are coming for him".
+  3. **Join banner = SOFT pause** — `Game.GetWorldPause()` = `_pickerActive || _joinWaiting`; the 4 external gates (`Enemy`, `PartyMember`, `Boss`, `Director`) switched to it, `_Process` gained a freeze block after `UpdateHpStrips`, and the run-clock guard now excludes `_joinWaiting` too. Deliberately NOT a tree pause: the CLICK TO CONTINUE gate needs input frames.
+  4. **Hint leak** — the CLICK TO CONTINUE Label was a LOCAL inside `JoinRecruit`, so `ClearJoinBanner` never had a handle on it and it stayed painted over the HUD for the rest of the run (that stale prompt next to the SHORT REST GIFT picker is what read as a frozen game). Now a field `_joinHint`, hidden with the card.
+  5. **Campfire freeze/crash** — after `EndCampfire` hides the card, a hidden Control still receives `_input` and its rect still answers, so a stray click or ENTER re-ran `_on_commit_pressed` (`modal.show()` + `get_tree().paused = true` with nothing visible and nothing left to un-pause it). `Campfire.gd` now bails `if not visible` at the top of `_input`, and `_on_rest_now` bails `if not modal.visible` so a rest cannot resolve twice behind the camp. NOTE: the exact crash line never reached the log (buffer lost on crash); the hidden-card routing is the confirmed freeze mechanism, so if a human run still crashes on the short rest, say so and we hunt it with the runtime-error capture instead.
+- Gate evidence: `smokeCT18` TPK lv 4, `smokeCT19` VICTORY lv 6 (xp 88), `smokeCT20` TPK lv 4 — all `.err` 0 bytes. CT19 logged the drop 1119 px off camera, the camp-sweep join, the pilot join-banner clear, the SHORT-rest chain, BOSS and VICTORY.
+- **NEXT: one more human playtest round on pass 10.** Ask the player: does the off-camera rescue read the way they wanted (they must walk to it), does the escort now creep in slowly enough, does the join banner actually pause so they can look at the art, and is the short rest clean? Pilot smokes never walk to the rescue site, so escort-KILL joins are still only human-tested (the camp-sweep join is smoke-covered).
+- Balance hold: escort goblin HP (30 × horde) and base speed stay user-side; `ESCORT_RING` / `ESCORT_CRAWL` / `RECRUIT_MARGIN` are staging dials, re-take them on request.
 
-## RECRUITMENT PLANNING — proposals held for user approval (NOTHING implemented)
-Context: M1 spawning Mosiah at start = test scaffolding only; real playthroughs recruit at campaign join points. Locked: party of 5, Leader = first PC owned, recruit = weapon unlock.
-- **A. Join beats as stage events**: battle/stage records carry a `joins` field; recruit instantiates into orbit ring with a 2 s engage-style immunity window + banner ("MOSIAH JOINS THE PARTY").
-  - **Open Q1 (answer first):** recruit happens AT the campfire ceremony (rest + meet-new-member in one beat, campaign-faithful) vs SEPARATE mid-battle cutscene beat (VS-style).
-- **B. Recruited member = zero special casing**: enters rank 0, full 3-rank track (+ evolution in M2); smart-random 3-of-6 picker pool and the 6-slot HUD strips already scale.
-- **C. Party math stays locked** (shared HP pool, d20 saves, camp-return) from frame one.
-  - **Open Q2:** join at FULL HP vs current pool fraction.
-- **D. M2 roster shape**: Baldrun (Maul) + Mosiah (Rapier) + 3 campaign PCs, one weapon archetype each, scripted join beats on the meta-path.
-  - **Open Q3:** demo the mechanism in M1 now (Mosiah spawns at the M1 campfire instead of at start — halves Act 1's pool, difficulty call) or leave for M2.
-
-## Still open / queued (from M1_STATUS.md)
-- Game-tester background smoke (dispatched 2026-10-19, subagent session `ses_eab6eb201ffePgiGoxtygLEqT1`, logs `tester1.out`/`tester1.err` in `C:\Users\Steve\AppData\Local\Temp\`) — completion notification never received this session; on resume, re-check those files and decide on its **2 latent campfire/rest-flow bug findings** (awaiting user decision).
-- Queued vision slices: art/8-bit slice H (artist report feeds it — enemy silhouettes, attack FX, atlas/palette, boss spectacle), M2 roster slice (3 PCs + recruit beats + evolutions), campfire/meta-map stub.
-- Optional cleanup: SDK artifacts (`sdk-bak-8.0.108`, zip); decide whether `RESUME_NOTES.md` / `.opencode/` get tracked (both untracked now).
+## Queued vision slices (unchanged, from M1_STATUS.md)
+- art/8-bit slice H (artist report: enemy silhouettes, attack FX, atlas/palette, boss spectacle), M2 roster slice (3 PCs + join beats + evolutions), campfire/meta-map stub.
+- Optional cleanup: SDK artifacts (`sdk-bak-8.0.108`, zip); decide whether `RESUME_NOTES.md` / `.opencode/` get tracked (`RESUME_NOTES.md` is now tracked since this commit, `.opencode/` still untracked).
 
 ## Resume recipe (unchanged — details in M1_STATUS.md)
 - Build: `& 'C:\Users\Steve\dev-tools\dotnet\dotnet.exe' build survivingthe10thage.csproj --no-incremental -nologo` (no `-o`; OutputPath baked to `.godot\mono\temp\bin\Debug\`).

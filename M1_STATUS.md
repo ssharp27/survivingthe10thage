@@ -198,6 +198,26 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     PLAY1/MINIBOSS/PLAY2 only (camp beat and picker soft-pause excluded). Gate: smokeCT17 VICTORY lv 5 +
     .err 0 bytes; recruit drop + join lines both fired in the pilot log (join via the camp-sweep path since
     the pilot never walks to the rescue site).
+ - **Human-play pass 10 (three pass-9 bug reports fixed, 2026-10-20)**: (1) STAGING - the beat must read as a
+    rescue the party rides toward, so the stranded PC lands PAST the camera edge (distance = the visible rect's
+    exit along the chosen bearing + RECRUIT_MARGIN 90 px, floored at RECRUIT_DIST 300; 8 bearing retries, because
+    ClampToArena can pull a candidate back into frame) and the escort goblins open ESCORT_RING 340 px wide of the
+    PC (was 160). (2) CRAWL GATE - an escort goblin does not move at all until Game.RecruitInView() says the PC is
+    inside the ~960x540 camera rect, and the creep factor dropped 0.4 -> ESCORT_CRAWL 0.22, so the goblins shamble
+    in over the screen instead of animating off-camera. (3) JOIN PAUSE - the banner is now a SOFT pause exactly like
+    the picker/camp screens: Game.GetWorldPause() = _pickerActive || _joinWaiting, the 4 external gates (Enemy,
+    PartyMember, Boss, Director) read it, a freeze block after UpdateHpStrips holds the sim, and `_joinWaiting` was
+    added to the run-clock guard. It is NOT a tree pause on purpose: the CLICK TO CONTINUE gate needs input frames.
+    (4) HINT LEAK - the CLICK TO CONTINUE Label was a LOCAL inside JoinRecruit, so ClearJoinBanner never had a
+    handle on it and the prompt stayed painted over the HUD for the rest of the run (in the pass-9 human run that
+    stale prompt next to the SHORT REST GIFT picker is exactly what read as a frozen game); it is a field `_joinHint`
+    now, hidden with the card. (5) CAMPFIRE FREEZE/CRASH - after EndCampfire hides the card a hidden Control still
+    receives _input and its rect still answers, so a stray click or ENTER re-ran _on_commit_pressed (modal.show() +
+    get_tree().paused = true with nothing visible on screen, and nothing left to un-pause it): Campfire.gd now bails
+    `if not visible` at the top of _input, and _on_rest_now bails `if not modal.visible` so a rest cannot resolve
+    twice behind the camp. Gate: smokeCT18 TPK lv 4 + smokeCT19 VICTORY lv 6 + smokeCT20 TPK lv 4, all .err 0 bytes;
+    CT19 logged the drop 1119 px off camera, the camp-sweep join, the pilot join-banner clear, the SHORT rest and
+    the BOSS/VICTORY line.
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)

@@ -55,7 +55,13 @@ public partial class Game : Godot.Node2D
     // BOSS_AT is the big-boss gate in run time for the recruit test (2m30s).
     readonly double RECRUIT_AT = 25.0;
     const int ESCORT_COUNT = 6;
-    readonly double RECRUIT_DIST = 300.0; // px from the Leader the stranded PC lands at
+    // human-playtest fix (2026-10-20): the beat must read as a rescue the party rides
+    // toward, not a pop-in next to the Leader - the stranded PC lands PAST the camera
+    // edge, the escort goblins open wide of the PC, and they shamble in.
+    readonly double RECRUIT_DIST = 300.0; // floor distance from the camera (see SpawnFieldRecruit)
+    const double RECRUIT_MARGIN = 90.0;   // px past the visible rect the stranded PC lands at
+    readonly double ESCORT_RING = 340.0;  // escort goblins start this wide of the stranded PC
+    readonly double ESCORT_CRAWL = 0.22;  // creep factor on goblin speed: pressure, not a chase
     readonly double TIER2_AT = 45.0;
     readonly double BOSS_AT = 150.0;
     // stage name shown on the ui/ cards; hardcoded until the meta-map exists (M3)
@@ -182,6 +188,10 @@ public partial class Game : Godot.Node2D
     bool _joinWaiting = false;          // join banner up, waiting for the click
     Godot.Label _joinBanner = null;
     Godot.ColorRect _joinBtn = null;
+    Godot.Label _joinHint = null;       // CLICK TO CONTINUE under the gold card: it is a
+                                        // field, not a local, so ClearJoinBanner can actually
+                                        // take it away (human fix: the stale hint kept
+                                        // telling the player to click a dead card)
 
     // ---------- public surface used by the other scripts ----------
     public Vector2 ClampToArena(Vector2 p)
@@ -627,6 +637,38 @@ public partial class Game : Godot.Node2D
         return _pickerActive;
     }
 
+    // world freeze = the picker card OR the join-banner card: both are read-the-card soft
+    // pauses (the arena is drawn, nothing acts, nothing takes damage). The join banner got
+    // this treatment instead of a tree pause so its CLICK gate keeps receiving input.
+    public bool GetWorldPause()
+    {
+        return _pickerActive || _joinWaiting;
+    }
+
+    // how wide the camera can see: the base viewport is 1920x1080 with canvas_items
+    // stretch and no camera zoom, so the frame is ~960 x 540 world px around the camera
+    public Vector2 GetVisibleHalfExtents()
+    {
+        return new Vector2(960.0f, 540.0f);
+    }
+
+    // the escort must not shamble before the party can see the rescue (human fix: the
+    // beat read as an off-camera animation that started mid-walk)
+    public bool RecruitInView()
+    {
+        if (_recruitPending == null)
+            return false;
+        Vector2 cen = GetCameraCenter();
+        Vector2 half = GetVisibleHalfExtents();
+        Vector2 p = _recruitPending.GlobalPosition;
+        return System.Math.Abs(p.X - cen.X) <= half.X && System.Math.Abs(p.Y - cen.Y) <= half.Y;
+    }
+
+    public float GetEscortCrawl()
+    {
+        return (float)ESCORT_CRAWL;
+    }
+
     public Vector2 GetCameraCenter()
     {
         return _camera != null ? _camera.GlobalPosition : (_leader != null ? _leader.GlobalPosition
@@ -799,9 +841,9 @@ public partial class Game : Godot.Node2D
         if (_engageInvulnT > 0.0)
             _engageInvulnT -= delta; // boss-engage immunity window (set in ActivateBoss)
         // run clock drives the field-recruit drop and the boss gate; the camp beat is
-        // excluded because it is a read-the-card pause, and the picker soft-pause keeps
+        // excluded because it is a read-the-card pause, and the picker/join soft-pauses keep
         // stage beats honest while a human reads the card
-        if (!_pickerActive && (_state == StageState.PLAY1 || _state == StageState.MINIBOSS
+        if (!_pickerActive && !_joinWaiting && (_state == StageState.PLAY1 || _state == StageState.MINIBOSS
                                || _state == StageState.PLAY2))
             _runT += d;
         // the join banner's click gate is a HUMAN gate (no-timeout rule): pilot smokes
@@ -896,6 +938,25 @@ public partial class Game : Godot.Node2D
         // the per-member readout is strips + state dots now (built once the party is
         // known), so it refreshes on every path including the picker soft-pause
         UpdateHpStrips(delta);
+
+        // ---------- join ceremony = soft pause (same read-the-card rule) ----------
+        // human fix 2026-10-20: the banner must pause the game like the level-up and camp
+        // screens so the player can actually look at the art. A tree pause would eat the
+        // CLICK TO CONTINUE gate, so this is the picker's soft pause: the world is drawn,
+        // nobody acts, nothing takes damage, and the run clock that gates the recruit drop
+        // and the bosses already holds still (same _stageT bookkeeping as the picker).
+        if (_joinWaiting)
+        {
+            _hud.Text = "RECRUIT JOINS THE BATTLE - click the gold card to continue"
+                        + " | combat holds while you read | Lv " + _level + " | enemies " + _liveEnemies;
+            return;
+        }
+        if (_joinWaiting)
+        {
+            _hud.Text = "RECRUIT JOINS THE BATTLE - click the gold card to continue"
+                        + " | combat holds while you read | Lv " + _level + " | enemies " + _liveEnemies;
+            return;
+        }
 
         // ---------- level-up picker = soft pause ----------
         // P1: the picker used to share the WASD letters, so a held A/S walked AND
@@ -1798,13 +1859,35 @@ public partial class Game : Godot.Node2D
         }
         if (m == null)
             return; // roster already whole: the beat is a no-op
-        GD.Print("[10thAge] field recruit: " + m.displayName + " stranded " + (int)RECRUIT_DIST
-                 + "px out | escort " + ESCORT_COUNT + " goblins closing in - clear them to recruit");
-        double drop = Rng.Randf() * 6.2831853;
-        m.GlobalPosition = ClampToArena((_leader != null ? _leader.GlobalPosition
-                                                         : new Vector2(0, 0))
-                                        + new Vector2((float)System.Math.Cos(drop),
-                                                      (float)System.Math.Sin(drop)) * (float)RECRUIT_DIST);
+        // human fix (2026-10-20): the beat drops OFF CAMERA. Landing 300 px out put the
+        // PC and its escort inside the frame, so the party walked into a pop-in. Walk
+        // outward until the site clears the visible rect; the arena clamp can pull a
+        // candidate back into frame, so other bearings get a retry before giving up.
+        Vector2 cen = GetCameraCenter();
+        Vector2 half = GetVisibleHalfExtents();
+        m.GlobalPosition = cen;
+        bool staged = false;
+        for (int attempt = 0; attempt < 8; attempt++)
+        {
+            double drop = Rng.Randf() * 6.2831853;
+            Vector2 dir = new Vector2((float)System.Math.Cos(drop), (float)System.Math.Sin(drop));
+            // distance along dir to the visible rect's border, then land past it
+            double tx = System.Math.Abs(dir.X) > 0.001 ? half.X / System.Math.Abs(dir.X) : 1e30;
+            double ty = System.Math.Abs(dir.Y) > 0.001 ? half.Y / System.Math.Abs(dir.Y) : 1e30;
+            double reach = System.Math.Max(RECRUIT_DIST, System.Math.Min(tx, ty) + RECRUIT_MARGIN);
+            Vector2 cand = ClampToArena(cen + dir * (float)reach);
+            if (System.Math.Abs(cand.X - cen.X) > half.X || System.Math.Abs(cand.Y - cen.Y) > half.Y)
+            {
+                m.GlobalPosition = cand;
+                staged = true;
+                break;
+            }
+        }
+        if (!staged)
+            m.GlobalPosition = ClampToArena(cen + new Vector2(0.0f, half.Y + (float)RECRUIT_MARGIN));
+        GD.Print("[10thAge] field recruit: " + m.displayName + " stranded "
+                 + (int)m.GlobalPosition.DistanceTo(cen) + "px out, off camera | escort "
+                 + ESCORT_COUNT + " goblins hold still until the party is in sight of the rescue");
         m.Visible = true;
         // HELP! floats over the stranded PC
         _helpLabel = new Godot.Label();
@@ -1838,9 +1921,11 @@ public partial class Game : Godot.Node2D
             double ea = 6.2831853 * i / ESCORT_COUNT + 0.3;
             e.escortHold = m.GlobalPosition +
                            new Vector2((float)System.Math.Cos(ea), (float)System.Math.Sin(ea)) * 52.0f;
+            // human fix: they open wide of the stranded PC, so the ring closes in over
+            // several seconds instead of materialising already on top of the rescue
             e.GlobalPosition = ClampToArena(m.GlobalPosition +
                                             new Vector2((float)System.Math.Cos(ea),
-                                                        (float)System.Math.Sin(ea)) * 160.0f);
+                                                        (float)System.Math.Sin(ea)) * (float)ESCORT_RING);
             RegisterEnemy(e);
             AddChild(e);
             _escortLeft++;
@@ -1870,7 +1955,7 @@ public partial class Game : Godot.Node2D
         _joinWaiting = true;
         _joinBanner = new Godot.Label();
         _joinBanner.Position = new Vector2(430.0f, 300.0f);
-        _joinBanner.Text = m.displayName + " JOINS THE BATTLE! (art slot: weapon pose) - click to continue";
+        _joinBanner.Text = m.displayName + " JOINS THE BATTLE! (art slot: weapon pose)";
         _joinBanner.ZIndex = 14;
         _hudLayer.AddChild(_joinBanner);
         _joinBtn = new Godot.ColorRect();
@@ -1879,11 +1964,14 @@ public partial class Game : Godot.Node2D
         _joinBtn.Color = new Color(0.83f, 0.64f, 0.24f, 0.9f);
         _joinBtn.ZIndex = 14;
         _hudLayer.AddChild(_joinBtn);
-        Godot.Label hint = new Godot.Label();
-        hint.Position = new Vector2(448.0f, 368.0f);
-        hint.Text = "CLICK TO CONTINUE";
-        hint.ZIndex = 15;
-        _hudLayer.AddChild(hint);
+        // the hint is a FIELD, not a local: ClearJoinBanner had no handle on a local, so
+        // "CLICK TO CONTINUE" stayed painted over the HUD for the rest of the run (human
+        // pass-9 report: a stale prompt next to a live picker read as a frozen game)
+        _joinHint = new Godot.Label();
+        _joinHint.Position = new Vector2(448.0f, 368.0f);
+        _joinHint.Text = "CLICK TO CONTINUE";
+        _joinHint.ZIndex = 15;
+        _hudLayer.AddChild(_joinHint);
         GD.Print("[10thAge] RECRUIT JOINED: " + m.displayName + " at full hp, rank 0 | ring slot "
                  + m.memberIndex + " opens - escort cleared");
     }
@@ -1895,6 +1983,8 @@ public partial class Game : Godot.Node2D
             _joinBanner.Visible = false;
         if (_joinBtn != null)
             _joinBtn.Visible = false;
+        if (_joinHint != null)
+            _joinHint.Visible = false; // human fix: the prompt leaves with the card
         GD.Print("[10thAge] join banner cleared (" + why + ") - the squad marches on");
     }
 

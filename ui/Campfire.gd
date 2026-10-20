@@ -321,6 +321,11 @@ func _rest_summary() -> String:
 		return "Short rest - bind wounds and keep watch.\nThe company heals +25% max HP (clamped) and one member trains overnight (one free upgrade rank, chosen on the level-up card).\nEven so, the horde scales x1.20 hp, pace and heads."
 	return "Long rest - sleep through the night.\nFull revive + full heal for the WHOLE squad - the fallen rise at full HP.\nNo free upgrade rank. The horde scales the same x1.20 hp, pace and heads."
 func _on_rest_now() -> void:
+	# human-test pass-9 fix: the rest resolves once. The modal's Buttons keep answering
+	# picks after the card is hidden (their rects ignored hide()), so a stale click must
+	# not re-run EndCampfire a second time behind the camp
+	if not modal.visible:
+		return
 	get_tree().paused = false
 	modal.hide()
 	rest_chosen.emit("short" if _selection == 0 else "long")
@@ -352,6 +357,13 @@ func _input(event: InputEvent) -> void:
 	# (button_name gone, rect_has_point gone); round 5 adds the multi-space
 	# hit-test (see _was_click_on), a click-seen print for the Output panel,
 	# and click = choose + popup (the popup itself is the last gate).
+	# human-test pass-9 fix: the short-rest click froze and crashed the run. Once the rest
+	# lands, EndCampfire hides the whole card - but a hidden Control still receives _input
+	# and its rect still answers, so a stray click or ENTER re-ran _on_commit_pressed and
+	# left the tree paused with nothing on screen. A hidden card owns no input at all; the
+	# pilot / timeout valve resolves in C# (EndCampfire) and never comes through here.
+	if not visible:
+		return
 	if event is InputEventMouseButton:
 		if not modal.visible and event.pressed and event.button_index == 1:  # MOUSE_BUTTON_LEFT (4.7 has no button_name)
 			# round-5 diagnostic: the editor Output panel shows whether the routing

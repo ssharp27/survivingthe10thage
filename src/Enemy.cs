@@ -61,8 +61,8 @@ public partial class Enemy : Combatant
         Game g = GetParent() as Game;
         if (g == null)
             return;
-        if (g.GetPickerActive())
-            return; // picker soft pause: the horde holds still while the card is read
+        if (g.GetWorldPause())
+            return; // picker / join-banner soft pause: the horde holds still while the card is read
         Vector2 p = GlobalPosition;
         if (kind == "reaper")
         {
@@ -88,12 +88,17 @@ public partial class Enemy : Combatant
         }
         if (escort)
         {
-            // escort cage: close in SLOWLY (40 % creep) and hold a ring at the hold
-            // radius; they never re-home to the Leader, so the rescue site stays a site
-            Vector2 hold = escortHold - p;
-            if (hold.Length() > 44.0f)
-                GlobalPosition = g.ClampToArena(GlobalPosition +
-                                                 hold.Normalized() * speed * 0.4f * delta);
+            // escort cage: hold still until the party can SEE the rescue (human fix: the
+            // beat used to animate off-camera, so it read as motion that started by
+            // itself), then shamble in slowly and stop at the ring - they pressure the
+            // scene instead of dogging the Leader
+            if (g.RecruitInView())
+            {
+                Vector2 hold = escortHold - p;
+                if (hold.Length() > 44.0f)
+                    GlobalPosition = g.ClampToArena(GlobalPosition +
+                                   hold.Normalized() * speed * g.GetEscortCrawl() * delta);
+            }
         }
         else
         {

@@ -161,8 +161,8 @@ public partial class PartyMember : Godot.Node2D
     public override void _Process(double d)
     {
         Game pg0 = GetParent() as Game;
-        if (pg0 != null && pg0.GetPickerActive())
-            return; // picker soft pause: nobody swings while the pick card is up
+        if (pg0 != null && pg0.GetWorldPause())
+            return; // picker / join-banner soft pause: nobody swings while a card is up
         float delta = (float)d;
         if (dsDamageBuffer > 0.0f)
             dsDamageBuffer -= delta; // ticks even while downed: the 2 s fail-buffer
