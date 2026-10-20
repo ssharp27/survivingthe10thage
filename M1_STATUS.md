@@ -182,6 +182,22 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
    root-caused: the roll Label NEVER got an ink color - Label's theme default is near-WHITE on the paper-white face
    (invisible), and the state ring was a 2 px lip. Fixed: dark grimoire ink (0.10,0.09,0.08), chip 32->40 px ring
    / 28->34 px face, number moved inside the face. Gate: smokeCT16 TPK lv 7 + .err 0 bytes; death-save lines live.
+- **Field-recruit + pacing pass 9 (user-approved 2026-10-20, their own design)**: (1) at t=25 s RUN time a not-yet-joined
+    PC drops 300 px from the Leader with a HELP! label + a gold arrow riding over the Leader aimed at it;
+    6 escort goblins spawn wide and creep in slowly (40 % speed, hold a 52 px ring, never re-home) - the
+    recruit is UN-HITTABLE and cannot attack until cleared; killing all 6 joins it at FULL HP / rank 0.
+    Join ceremony = banner "X JOINS THE BATTLE!" (art slot) + CLICK-TO-CONTINUE gold button; the click gate
+    is human-gated (no-timeout rule), pilot clears instantly. If the cage survives the mini-boss, the camp
+    sweep joins the PC instead (no soft-lock). (2) joined flag on PartyMember: unjoined PCs are excluded from
+    HP pool, ring follow, member dash, death saves, TPK count, contact targeting, enemy targeting, HUD strips,
+    campfire/summary cards and every picker option (recruiting IS the weapon unlock). Picker seed order
+    generalized to member-0..member-4 + wild (`slot < 5`). (3) pacing: tier gate - ONLY goblins until runT
+    45 s, wolves+hobgoblins from then (tier 3/4 hooks planned later); PLAY1 (pre-mini-boss) spawn interval
+    x2 (half rate) so the long window keeps pressure without count inflation; mini-boss stays 90 s; FINAL
+    BOSS moved to a run-clock gate at 150 s (BOSS_AT, test value per user). Run clock `_runT` advances in
+    PLAY1/MINIBOSS/PLAY2 only (camp beat and picker soft-pause excluded). Gate: smokeCT17 VICTORY lv 5 +
+    .err 0 bytes; recruit drop + join lines both fired in the pilot log (join via the camp-sweep path since
+    the pilot never walks to the rescue site).
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)
@@ -331,6 +347,13 @@ the channel progresses (a swarm can't screw the rescue out), and every revive gr
   no `Node.Script` property (use `Set("script", …)`, which returns **void**); no `z_index` field
   (use `ZIndex`); input serialization is `keycode`/`physical_keycode`; no `Input.GetPressedKeys`;
   `DrawPolygon` wants per-vertex `Godot.Color[]`; `_draw` not virtual (never `override`).
+- **Input-event handling (2026-10-20)**: the C# virtual is `public override void _Input(InputEvent ev)`
+  (the `Input(Map<InputEvent>)` form does NOT exist — `Map<>` has no C# alias; `Input(InputEvent)`
+  without the underscore fails). The base `InputEvent` class carries NO `Button`/`Pressed` fields —
+  match the subclass: `ev is Godot.InputEventMouseButton mb` and read `mb.ButtonIndex` whose enum
+  type is `Godot.MouseButton` with **PascalCase members** (`Godot.MouseButton.Left`, not `LEFT`,
+  not `MOUSE_BUTTON_LEFT`; sibling members read as `WheelUp`/`WheelDown` style). `mb.Pressed` (press
+  vs release) lives on the subclass too.
 
 ## Still open — vision work (pick priority with user)
 

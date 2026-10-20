@@ -50,6 +50,10 @@ public partial class PartyMember : Godot.Node2D
     public float dsDamageBuffer = 0.0f; // 2 s gap between damage-caused death-save fails
     public float dsHold = 0.0f; // countdown for SetDsTemp texts; 0 = persistent
     public bool campReturned = false; // lifted by the camp beat (pass 5: the LONG rest now tops these to full)
+    // field-recruit rule (user 2026-10-20): the Leader starts in the squad; every other
+    // roster PC waits for its join beat. Unjoined = no follow, no attacks, un-hittable,
+    // outside the HP pool and the cards - Game flips this when the escort cage clears.
+    public bool joined = false;
 
     // on-body death-save readout (DESIGN:12 - the die lives ON the downed body, the
     // save is not log-only): Game writes dsColor/dsLastRoll, the body shows them
@@ -216,8 +220,8 @@ public partial class PartyMember : Godot.Node2D
         }
         else if (_ds != null)
             _ds.Modulate = dsColor;
-        if (downed || eliminated)
-            return;
+        if (!joined || downed || eliminated)
+            return; // a stranded recruit cannot swing: its weapon unlocks ON the join
         if (_flash > 0.0f)
         {
             _flash -= delta;

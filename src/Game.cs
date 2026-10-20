@@ -44,7 +44,20 @@ public partial class Game : Godot.Node2D
 
     // ---------- stage pacing (tanurial forest M1) ----------
     readonly double FIRST_HALF = 90.0;
-    readonly double SECOND_HALF = 100.0;
+    readonly double SECOND_HALF = 100.0; // only shapes the PLAY2 spawn curve now: the
+                                         // boss gates on RUN time (BOSS_AT)
+    // ---------- field recruit (user-approved 2026-10-20) ----------
+    // RECRUIT_AT run-seconds: a not-yet-party PC drops into the world with HELP! and
+    // an arrow from the Leader. ESCORT_COUNT goblins slowly close in; clearing them all
+    // joins the PC at FULL HP with a rank-0 track (user rule). The join banner holds
+    // the "MOSIAH JOINS THE BATTLE!" art slot and waits for a click. TIER2_AT gates
+    // enemy variety (only goblins before it - a solo Leader must not fight wolves);
+    // BOSS_AT is the big-boss gate in run time for the recruit test (2m30s).
+    readonly double RECRUIT_AT = 25.0;
+    const int ESCORT_COUNT = 6;
+    readonly double RECRUIT_DIST = 300.0; // px from the Leader the stranded PC lands at
+    readonly double TIER2_AT = 45.0;
+    readonly double BOSS_AT = 150.0;
     // stage name shown on the ui/ cards; hardcoded until the meta-map exists (M3)
     private const string STAGE_NAME = "Tanurial Forest";
     // CAMPFIRE_LEN is gone: the campfire beat is player-driven (the ui/ Campfire
@@ -158,6 +171,17 @@ public partial class Game : Godot.Node2D
     Godot.Collections.Array<Boss> _bosses = new();
     int _liveEnemies = 0;
     double _ringAngle = 0.0;
+    // ---------- field-recruit state ----------
+    double _runT = 0.0;                 // run clock: PLAY1/MINIBOSS/PLAY2 only (camp and
+                                        // picker pauses do not burn stage beats)
+    bool _recruitBeatDone = false;      // the drop fires at most once per run
+    PartyMember _recruitPending = null; // stranded PC awaiting escort clear
+    int _escortLeft = 0;                // escort goblins still alive
+    Godot.Node2D _recruitArrow = null;  // arrow above the Leader, aimed at the PC
+    Godot.Label _helpLabel = null;      // HELP! floating over the stranded PC
+    bool _joinWaiting = false;          // join banner up, waiting for the click
+    Godot.Label _joinBanner = null;
+    Godot.ColorRect _joinBtn = null;
 
     // ---------- public surface used by the other scripts ----------
     public Vector2 ClampToArena(Vector2 p)
@@ -177,8 +201,8 @@ public partial class Game : Godot.Node2D
         double bestD = 1e18;
         foreach (PartyMember m in _party)
         {
-            if (m.downed || m.eliminated)
-                continue;
+            if (!m.joined || m.downed || m.eliminated)
+                continue; // a stranded recruit is not squad yet: escorts do not chase it
             double dd = m.GlobalPosition.DistanceSquaredTo(from);
             if (dd < bestD)
             {
@@ -196,7 +220,7 @@ public partial class Game : Godot.Node2D
         double bestD = 1e18;
         foreach (PartyMember m in _party)
         {
-            if (m.eliminated)
+            if (!m.joined || m.eliminated)
                 continue;
             double dd = m.GlobalPosition.DistanceSquaredTo(from);
             if (dd < bestD)
@@ -210,7 +234,9 @@ public partial class Game : Godot.Node2D
 
     public void TakeHit(PartyMember m, double amount)
     {
-        if (m == null || m.eliminated)
+        // a stranded recruit is un-hittable until it joins: only the escort cage pressures
+        // the party around it (user design 2026-10-20)
+        if (m == null || !m.joined || m.eliminated)
             return;
         if (_engageInvulnT > 0.0)
             return; // user-approved camp-safety gate: a boss engage opens on a 2 s
@@ -278,7 +304,7 @@ public partial class Game : Godot.Node2D
         // TEST reaper (user death-state tester): whatever it touches goes DOWN and
         // starts the d20 death-save cycle — this is the revival test bench. Returns
         // true only when the down actually landed, so immunity lets it keep lurking.
-        if (m == null || m.eliminated || m.downed)
+        if (m == null || !m.joined || m.eliminated || m.downed)
             return false;
         if (m.invuln > 0.0f || m.reviveShield)
             return false;
@@ -302,6 +328,8 @@ public partial class Game : Godot.Node2D
     {
         foreach (PartyMember m in _party)
         {
+            if (!m.joined)
+                continue; // a PC not in the squad yet has nothing to lift at camp
             if (m.eliminated)
             {
                 // out since the last campfire: return at 25% HP
@@ -365,6 +393,15 @@ public partial class Game : Godot.Node2D
         {
             OnBossKilled(c);
             return;
+        }
+        // field recruit: escort goblins dying IS the rescue meter (user design 2026-10-20)
+        if (((Enemy)c).escort && _recruitPending != null && _escortLeft > 0)
+        {
+            _escortLeft--;
+            GD.Print("[10thAge] escort down: " + _escortLeft + "/" + ESCORT_COUNT +
+                     " left to rescue " + _recruitPending.displayName);
+            if (_escortLeft <= 0)
+                JoinRecruit();
         }
         SpawnGem(c.GlobalPosition, ((Enemy)c).xpValue);
         c.kind = "dead";
@@ -543,6 +580,11 @@ public partial class Game : Godot.Node2D
             c.QueueFree();
             _enemies.RemoveAt(i);
         }
+        // the camp sweep must not orphan a field recruit: whatever escort cage survived
+        // the mini-boss dies with the horde, so the party regroups and the PC joins at
+        // camp instead of soft-locking an unreachable rescue on the rest of the stage
+        if (_recruitPending != null && _escortLeft > 0)
+            JoinRecruit();
     }
 
     public int GetStageState()
@@ -563,6 +605,17 @@ public partial class Game : Godot.Node2D
     public double GetSecondHalf()
     {
         return SECOND_HALF;
+    }
+
+    // run-time readout for the tier gate + boss pacing
+    public double GetRunT()
+    {
+        return _runT;
+    }
+
+    public double GetTier2At()
+    {
+        return TIER2_AT;
     }
 
     // ---------- gates + readouts the other scripts consume ----------
@@ -629,6 +682,12 @@ public partial class Game : Godot.Node2D
                 _party.Add(pm);
                 if (pm.isLeader)
                     _leader = pm;
+                // field-recruit rule (user 2026-10-20): only the Leader starts in the
+                // squad; every other roster PC waits for its join beat and is parked
+                // off-arena (hidden in the roster print, not on the map) until then
+                pm.joined = pm.isLeader;
+                if (!pm.joined)
+                    pm.GlobalPosition = new Vector2(-9500.0f, -9500.0f);
             }
             else if (n is Boss b)
                 _bosses.Add(b);
@@ -739,6 +798,16 @@ public partial class Game : Godot.Node2D
         _dashPulse += d;         // free-running clock for the dash-ready flash
         if (_engageInvulnT > 0.0)
             _engageInvulnT -= delta; // boss-engage immunity window (set in ActivateBoss)
+        // run clock drives the field-recruit drop and the boss gate; the camp beat is
+        // excluded because it is a read-the-card pause, and the picker soft-pause keeps
+        // stage beats honest while a human reads the card
+        if (!_pickerActive && (_state == StageState.PLAY1 || _state == StageState.MINIBOSS
+                               || _state == StageState.PLAY2))
+            _runT += d;
+        // the join banner's click gate is a HUMAN gate (no-timeout rule): pilot smokes
+        // clear it instantly so verification keeps advancing
+        if (_joinWaiting && _pilot)
+            ClearJoinBanner("pilot autopilot");
         // P4: the reaper stays a spawn-once-at-10s TEST BENCH (locked behavior; no
         // balance meaning), now OPT-IN via M1_REAPER=1. Its only changes here are where
         // it drops in (outside the camera view, never on the party) and a slower lurk.
@@ -766,6 +835,12 @@ public partial class Game : Godot.Node2D
         switch (_state)
         {
             case StageState.PLAY1:
+                // field recruit drops 25 s into the run (user design 2026-10-20)
+                if (!_recruitBeatDone && _runT >= RECRUIT_AT)
+                {
+                    _recruitBeatDone = true;
+                    SpawnFieldRecruit();
+                }
                 if (_stageT >= FIRST_HALF)
                 {
                     _state = StageState.MINIBOSS;
@@ -775,7 +850,9 @@ public partial class Game : Godot.Node2D
                 }
                 break;
             case StageState.PLAY2:
-                if (_stageT >= SECOND_HALF)
+                // user pacing (2026-10-20): big boss gates 2m30s into the RUN (test value
+                // while we exercise recruitment + tier gates; will move with the 20-min plan)
+                if (_runT >= BOSS_AT)
                 {
                     _state = StageState.BOSS;
                     _stageT = 0.0;
@@ -932,8 +1009,9 @@ public partial class Game : Godot.Node2D
             {
                 foreach (PartyMember m in _party)
                 {
-                    if (m.isLeader || m.downed || m.eliminated)
-                        continue; // fallen bodies stay where they fell
+                    if (!m.joined || m.isLeader || m.downed || m.eliminated)
+                        continue; // fallen bodies stay where they fell; a stranded recruit
+                                  // does not lunge with the squad - it is not in it yet
                     m.GlobalPosition = ClampToArena(m.GlobalPosition + burst * (float)MEMBER_DASH_IMPULSE);
                 }
                 _memberDashCdT = MEMBER_DASH_CD;
@@ -999,8 +1077,9 @@ public partial class Game : Godot.Node2D
             float leadSpeed = leader != null ? leader.baseSpeed * leader.speedMul : 128.0f;
             foreach (PartyMember m in _party)
             {
-                if (m.isLeader || m.downed || m.eliminated)
-                    continue; // fallen bodies stay where they fell (locked)
+                if (!m.joined || m.isLeader || m.downed || m.eliminated)
+                    continue; // fallen bodies stay where they fell (locked); a stranded
+                              // recruit stands where it fell IN, welded to its own spot
                 int k = m.memberIndex;
                 if (k < 2)
                     k = 2 + (k % 4);
@@ -1031,6 +1110,14 @@ public partial class Game : Godot.Node2D
         }
         if (_camera != null && leader != null)
             _camera.GlobalPosition = _camera.GlobalPosition.Lerp(leader.GlobalPosition, 0.08f);
+        // recruit arrow: rides above the Leader and points at the stranded PC. Pure
+        // guidance - the user asked for "an arrow pointing to their location (HELP!)"
+        if (_recruitPending != null && _recruitArrow != null)
+        {
+            if (_leader != null)
+                _recruitArrow.GlobalPosition = _leader.GlobalPosition;
+            _recruitArrow.LookAt(_recruitPending.GlobalPosition);
+        }
         // dash-cooldown readout over Baldrun: the gold fill grows back as the Leader's
         // dash recharges. Human-test UX pass: 64x8 track at y-42, and once the dash IS
         // ready the fill flashes bright gold twice a second, so the 6 s recharge has an
@@ -1067,7 +1154,7 @@ public partial class Game : Godot.Node2D
         // The player revives a body by walking the leader onto it and standing still.
         foreach (PartyMember m in _party)
         {
-            if (m.eliminated || !m.downed)
+            if (!m.joined || m.eliminated || !m.downed)
                 continue;
             if (!m.stable)
             {
@@ -1202,7 +1289,8 @@ public partial class Game : Godot.Node2D
         PickerTick(d);
         _hud.Text = "Surviving the 10th Age - Tanurial Forest | Lv " + _level +
                     " | xp " + (int)_xp + "/" + (int)_xpNext +
-                    " | " + StateName(_state) + " t=" + (int)_stageT + " | enemies " + _liveEnemies;
+                    " | " + StateName(_state) + " t=" + (int)_stageT + " | enemies " + _liveEnemies +
+                    (_recruitPending != null ? " | escort " + _escortLeft : "");
         // member HP/state is the strip block (UpdateHpStrips), not stacked label lines
         if (_pilot)
         {
@@ -1214,6 +1302,8 @@ public partial class Game : Godot.Node2D
                 string hps = "";
                 foreach (PartyMember mm in _party)
                 {
+                    if (!mm.joined)
+                        continue; // not squad yet: no phantom hp readout
                     hps += (hps == "" ? "" : "  ") + mm.displayName +
                            (mm.eliminated ? " OUT" : (mm.downed ? " down " + mm.dsFails + "/" + DS_FAIL_LIMIT : " " + (int)mm.hp + "hp"));
                 }
@@ -1454,9 +1544,10 @@ public partial class Game : Godot.Node2D
             Godot.ColorRect bg = _hpBg[i];
             Godot.ColorRect f = _hpFill[i];
             Godot.ColorRect dot = _hpDot[i];
-            if (i >= _party.Count)
+            if (i >= _party.Count || !_party[i].joined)
             {
-                // unused slot: fully invisible, never a phantom bodyguard
+                // unused slot / not-yet-recruited PC: fully invisible, never a phantom
+                // bodyguard or a spoiler strip telling the player who is coming next
                 n.Text = "";
                 f.Size = new Vector2(0.0f, 7.0f);
                 bg.Color = new Color(0.12f, 0.11f, 0.10f, 0.0f);
@@ -1497,7 +1588,10 @@ public partial class Game : Godot.Node2D
         int openCount = 0;
         for (int o = 0; o < OPT_LABEL.Length; o++)
         {
-            open[o] = OPT_MEMBER[o] < _party.Count && _pickRank[o] < PICK_RANK_CAP;
+            // not-yet-recruited members never leak onto a card (their weapon is not
+            // unlocked yet - recruiting IS the weapon unlock, user rule)
+            open[o] = OPT_MEMBER[o] < _party.Count && _pickRank[o] < PICK_RANK_CAP
+                      && MemberJoinedAt(OPT_MEMBER[o]);
             if (open[o])
                 openCount++;
         }
@@ -1506,7 +1600,9 @@ public partial class Game : Godot.Node2D
         for (int slot = 0; slot < 3; slot++)
         {
             int c = 0;
-            int wantMember = (slot < 2 && slot < _party.Count) ? slot : -1;
+            // seed order generalizes with the roster per the user's lock: member-0,
+            // member-1, member-2, member-3, member-4, then wild
+            int wantMember = (slot < 5 && slot < _party.Count) ? slot : -1;
             for (int o = 0; o < OPT_LABEL.Length; o++)
                 if (open[o] && (wantMember < 0 || OPT_MEMBER[o] == wantMember))
                     cand[c++] = o;
@@ -1533,15 +1629,25 @@ public partial class Game : Godot.Node2D
         for (int k = 0; k < n; k++)
         {
             int o = ((seed + k) % n + n) % n;
-            if (_pickRank[o] < PICK_RANK_CAP && OPT_MEMBER[o] < _party.Count)
+            if (_pickRank[o] < PICK_RANK_CAP && OPT_MEMBER[o] < _party.Count
+                && MemberJoinedAt(OPT_MEMBER[o]))
                 return o;
         }
         for (int i = 0; i < n; i++)
         {
-            if (OPT_MEMBER[i] < _party.Count)
+            if (OPT_MEMBER[i] < _party.Count && MemberJoinedAt(OPT_MEMBER[i]))
                 return i;
         }
         return 0;
+    }
+
+    // is the roster PC with this memberIndex already IN the squad?
+    private bool MemberJoinedAt(int idx)
+    {
+        foreach (PartyMember pm in _party)
+            if (pm.memberIndex == idx)
+                return pm.joined;
+        return false;
     }
 
     private void ApplyUpgrade(int option)
@@ -1674,6 +1780,138 @@ public partial class Game : Godot.Node2D
         _stageT = 0.0;
     }
 
+    // ---------- field recruit (user-approved 2026-10-20) ----------
+    // The drop: a not-yet-party PC lands RECRUIT_DIST px out with HELP! + an arrow from
+    // the Leader. ESCORT_COUNT goblins close in slowly and hold a ring; clearing all of
+    // them joins the PC at FULL HP with a rank-0 upgrade track (no catch-up gifts).
+    // The banner holds the "X JOINS THE BATTLE!" art slot and waits for a real click.
+    private void SpawnFieldRecruit()
+    {
+        PartyMember m = null;
+        foreach (PartyMember pm in _party)
+        {
+            if (!pm.joined)
+            {
+                m = pm;
+                break;
+            }
+        }
+        if (m == null)
+            return; // roster already whole: the beat is a no-op
+        GD.Print("[10thAge] field recruit: " + m.displayName + " stranded " + (int)RECRUIT_DIST
+                 + "px out | escort " + ESCORT_COUNT + " goblins closing in - clear them to recruit");
+        double drop = Rng.Randf() * 6.2831853;
+        m.GlobalPosition = ClampToArena((_leader != null ? _leader.GlobalPosition
+                                                         : new Vector2(0, 0))
+                                        + new Vector2((float)System.Math.Cos(drop),
+                                                      (float)System.Math.Sin(drop)) * (float)RECRUIT_DIST);
+        m.Visible = true;
+        // HELP! floats over the stranded PC
+        _helpLabel = new Godot.Label();
+        _helpLabel.Text = "HELP!";
+        _helpLabel.GlobalPosition = m.GlobalPosition + new Vector2(-26.0f, -62.0f);
+        _helpLabel.ZIndex = 12;
+        AddChild(_helpLabel);
+        // arrow rides over the Leader, aimed at the PC (updated per frame while pending)
+        _recruitArrow = new Godot.Node2D();
+        _recruitArrow.ZIndex = 10;
+        AddChild(_recruitArrow);
+        Godot.ColorRect shaft = new Godot.ColorRect();
+        shaft.Size = new Vector2(26.0f, 4.0f);
+        shaft.Position = new Vector2(26.0f, -2.0f);
+        shaft.Color = new Color(0.95f, 0.85f, 0.35f, 0.9f);
+        shaft.ZIndex = 10;
+        _recruitArrow.AddChild(shaft);
+        // escort cage: spawns wide, walks in slow (Enemy escort branch), holds a ring
+        _recruitPending = m;
+        _escortLeft = 0;
+        for (int i = 0; i < ESCORT_COUNT; i++)
+        {
+            Enemy e = new Enemy();
+            e.kind = "goblin";
+            e.maxHp = 30.0f * (float)GetHordeScale();
+            e.hp = e.maxHp;
+            e.speed = 90.0f;
+            e.contactDamage = 2.0f;
+            e.xpValue = 1.0f;
+            e.escort = true;
+            double ea = 6.2831853 * i / ESCORT_COUNT + 0.3;
+            e.escortHold = m.GlobalPosition +
+                           new Vector2((float)System.Math.Cos(ea), (float)System.Math.Sin(ea)) * 52.0f;
+            e.GlobalPosition = ClampToArena(m.GlobalPosition +
+                                            new Vector2((float)System.Math.Cos(ea),
+                                                        (float)System.Math.Sin(ea)) * 160.0f);
+            RegisterEnemy(e);
+            AddChild(e);
+            _escortLeft++;
+        }
+    }
+
+    private void JoinRecruit()
+    {
+        PartyMember m = _recruitPending;
+        _recruitPending = null;
+        if (m == null)
+            return;
+        m.joined = true;
+        m.hp = m.maxHp; // user rule: joins at full HP, rank 0 - upgrades start at zero
+        m.dsFails = 0;
+        m.dsSucceeds = 0;
+        m.dsDamageBuffer = 0.0f;
+        m.downed = false;
+        m.stable = false;
+        if (_recruitArrow != null)
+            _recruitArrow.Visible = false;
+        if (_helpLabel != null)
+            _helpLabel.Visible = false;
+        // join ceremony: the art slot ("X JOINS THE BATTLE!" posing with their weapon)
+        // is a greybox banner + click gate for now. The human gate never times out
+        // (same no-timer rule as the picker/campfire); the pilot clears it instantly.
+        _joinWaiting = true;
+        _joinBanner = new Godot.Label();
+        _joinBanner.Position = new Vector2(430.0f, 300.0f);
+        _joinBanner.Text = m.displayName + " JOINS THE BATTLE! (art slot: weapon pose) - click to continue";
+        _joinBanner.ZIndex = 14;
+        _hudLayer.AddChild(_joinBanner);
+        _joinBtn = new Godot.ColorRect();
+        _joinBtn.Position = new Vector2(430.0f, 356.0f);
+        _joinBtn.Size = new Vector2(300.0f, 44.0f);
+        _joinBtn.Color = new Color(0.83f, 0.64f, 0.24f, 0.9f);
+        _joinBtn.ZIndex = 14;
+        _hudLayer.AddChild(_joinBtn);
+        Godot.Label hint = new Godot.Label();
+        hint.Position = new Vector2(448.0f, 368.0f);
+        hint.Text = "CLICK TO CONTINUE";
+        hint.ZIndex = 15;
+        _hudLayer.AddChild(hint);
+        GD.Print("[10thAge] RECRUIT JOINED: " + m.displayName + " at full hp, rank 0 | ring slot "
+                 + m.memberIndex + " opens - escort cleared");
+    }
+
+    private void ClearJoinBanner(string why)
+    {
+        _joinWaiting = false;
+        if (_joinBanner != null)
+            _joinBanner.Visible = false;
+        if (_joinBtn != null)
+            _joinBtn.Visible = false;
+        GD.Print("[10thAge] join banner cleared (" + why + ") - the squad marches on");
+    }
+
+    // click gate for the join banner: MOUSE_BUTTON_LEFT == 1; presses only (releases are
+    // Pressed=false) so the click lands on the banner, never on the walk
+    public override void _Input(InputEvent ev)
+    {
+        if (!_joinWaiting)
+            return;
+        // the base InputEvent carries no fields here (4.7 drift): match the mouse-button
+        // subclass and read ITS button/pressed
+        // MOUSE_BUTTON_LEFT == 1; presses only (a release is Pressed=false)
+        if (ev is Godot.InputEventMouseButton mb && mb.ButtonIndex == Godot.MouseButton.Left
+            && mb.Pressed)
+            ClearJoinBanner("click");
+    }
+
     private void _OnCampfireChosen(string restType)
     {
         EndCampfire(restType);
@@ -1752,6 +1990,9 @@ public partial class Game : Godot.Node2D
         Godot.Collections.Array rows = new();
         foreach (PartyMember m in _party)
         {
+            if (!m.joined)
+                continue; // the campfire only ever shows the squad; recruits appear once
+                          // their field beat clears them in
             Godot.Collections.Dictionary card = new();
             card["name"] = m.displayName;
             card["klass"] = m.class_ == "" ? m.weaponName : m.class_;
@@ -1770,6 +2011,8 @@ public partial class Game : Godot.Node2D
         Godot.Collections.Array rows = new();
         foreach (PartyMember m in _party)
         {
+            if (!m.joined)
+                continue; // never joined: not a party member to report on
             Godot.Collections.Dictionary card = new();
             card["name"] = m.displayName;
             card["state"] = m.eliminated ? "fallen"
@@ -1786,6 +2029,9 @@ public partial class Game : Godot.Node2D
         // saves). Downed members still roll death saves or wait for a campfire.
         foreach (PartyMember m in _party)
         {
+            if (!m.joined)
+                continue; // a PC that never joined is not part of the party - it cannot
+                          // hold off a TPK (or rescue a stranded one)
             if (!m.eliminated)
                 return;
         }

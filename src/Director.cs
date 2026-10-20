@@ -38,6 +38,9 @@ public partial class Director : Godot.Node2D
         _spawnTimer = (float)System.Math.Max(0.35, 1.1 - 0.6 * (t / half));
         if (st == 3)
             _spawnTimer *= 0.67f; // post-mini-boss: the horde runs 50 % denser
+        else if (st == 0)
+            _spawnTimer *= 2.0f;  // user pacing (2026-10-20): half rate through the long
+                                  // pre-mini-boss window - pressure stays, the count does not
         // the long rest's price lands here: horde scale densifies pacing AND beefs up
         // whatever the next stage spawns (Game._hordeScale -> GetHordeScale)
         _spawnTimer /= scale;
@@ -56,13 +59,17 @@ public partial class Director : Godot.Node2D
         if (g.GetLeader() != null && pos.DistanceTo(g.GetLeader().GlobalPosition) < 260.0f)
             return; // an arena clamp may have dragged the spawn into the party: skip, the
                     // timer already burned this roll
-        bool wolf = (float)GD.Randf() < 0.30f;
+        // user tier gate (2026-10-20): ONLY tier 1 (goblins) until TIER2_AT run-seconds,
+        // then tier 2 (wolves + hobgoblins) mixes in. Tier 3/4 hooks land with later stages
+        // - variety without handing a solo Leader a wolf pack at t=10s.
+        bool tier2 = g.GetRunT() >= g.GetTier2At();
+        bool wolf = tier2 && (float)GD.Randf() < 0.30f;
         bool hob = false;
         if (!wolf)
         {
             // user rule: one hobgoblin per ten goblins spawned
             _goblinsSinceHob++;
-            if (_goblinsSinceHob >= 10)
+            if (tier2 && _goblinsSinceHob >= 10)
             {
                 hob = true;
                 _goblinsSinceHob = 0;

@@ -15,6 +15,11 @@ public partial class Enemy : Combatant
     // registration (weapon kill, reaper self-despawn, ClearEnemies, kill-scan cleanup),
     // so the horde cap can never leak upward and stop binding
     public bool counted = false;
+    // field-recruit escort (user design 2026-10-20): the goblins that cage a stranded
+    // PC creep toward escortHold and stop - they pressure the scene instead of dogging
+    // the Leader like the rest of the horde. Killing them all is what recruits the PC.
+    public bool escort = false;
+    public Vector2 escortHold = new Vector2();
 
     Godot.ColorRect _body;
 
@@ -81,29 +86,41 @@ public partial class Enemy : Combatant
             }
             return;
         }
-        PartyMember m = g.NearestMember(GlobalPosition);
-        _contactCd -= delta;
-        if (m != null)
+        if (escort)
         {
-            Vector2 to = m.GlobalPosition - p;
-            float dist = to.Length();
-            float wobble = kind == "goblin" ? (float)System.Math.Sin(p.X * 0.05 + p.Y * 0.03) * 26.0f : 0.0f;
-            Vector2 dir = (to + new Vector2(wobble * 0.4f, wobble)).Normalized();
-            GlobalPosition += dir * speed * delta;
-            GlobalPosition = g.ClampToArena(GlobalPosition);
-            if (dist < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
+            // escort cage: close in SLOWLY (40 % creep) and hold a ring at the hold
+            // radius; they never re-home to the Leader, so the rescue site stays a site
+            Vector2 hold = escortHold - p;
+            if (hold.Length() > 44.0f)
+                GlobalPosition = g.ClampToArena(GlobalPosition +
+                                                 hold.Normalized() * speed * 0.4f * delta);
+        }
+        else
+        {
+            PartyMember m = g.NearestMember(GlobalPosition);
+            _contactCd -= delta;
+            if (m != null)
+            {
+                Vector2 to = m.GlobalPosition - p;
+                float dist = to.Length();
+                float wobble = kind == "goblin" ? (float)System.Math.Sin(p.X * 0.05 + p.Y * 0.03) * 26.0f : 0.0f;
+                Vector2 dir = (to + new Vector2(wobble * 0.4f, wobble)).Normalized();
+                GlobalPosition += dir * speed * delta;
+                GlobalPosition = g.ClampToArena(GlobalPosition);
+                if (dist < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
+                {
+                    _contactCd = 1.0f;
+                    g.TakeHit(m, contactDamage);
+                }
+            }
+            // downed bodies are still run into even though nobody chases them
+            PartyMember hitAny = g.NearestMemberAny(p);
+            if (hitAny != null && hitAny.downed &&
+                hitAny.GlobalPosition.DistanceTo(p) < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
             {
                 _contactCd = 1.0f;
-                g.TakeHit(m, contactDamage);
+                g.TakeHit(hitAny, contactDamage);
             }
-        }
-        // downed bodies are still run into even though nobody chases them
-        PartyMember hitAny = g.NearestMemberAny(p);
-        if (hitAny != null && hitAny.downed &&
-            hitAny.GlobalPosition.DistanceTo(p) < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
-        {
-            _contactCd = 1.0f;
-            g.TakeHit(hitAny, contactDamage);
         }
         // separation: n-bounded push apart (spatial hash replaces this in M2)
         foreach (Godot.Node2D n in g.GetEnemies())
