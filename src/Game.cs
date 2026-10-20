@@ -9,15 +9,18 @@ using Godot;
 /// </summary>
 public partial class Game : Godot.Node2D
 {
-    // ---------- wrap / squad geometry ----------
+    // ---------- looping world / squad geometry ----------
     // user bugfix 2026-10-20: goblin escort staging collapsed when a PC spawned near an
-    // arena edge. The stage has NO walls now: ARENA_HW/HH define the WRAP PERIOD of a
-    // looping world (walk any direction forever and you meet the same relative scene
-    // again). Every entity is folded into the half-period box (1200x900) around the
-    // camera; the screen shows 960x540, so the folds sit 240/360 px outside frame and
-    // a seam pop can never be seen.
-    public readonly double ARENA_HW = 1200.0;
-    public const double ARENA_HH = 900.0;
+    // arena edge. The stage has NO walls now: the world LOOPS (torus). The wrap period
+    // is NOT hardcoded: the fullscreen window (canvas_items stretch, aspect expand) can
+    // see far more world than the 1920x1080 base viewport at DPI-scaled sizes, and the
+    // frame is MEASURED per run (human bug 2026-10-20 part 2: the pinned floor covered
+    // only ~1/4 of the frame). period = 2x the measured half-extent + 480 px slack, so
+    // every entity's fold box strictly contains the frame and seam folds can never pop
+    // in view, on any window.
+    Vector2 _visHalf = new Vector2(960.0f, 540.0f); // overwritten by MeasureWindow()
+    double _wrapW = 2400.0;
+    double _wrapH = 1800.0;
     public readonly float MEMBER_RADIUS = 16.0f;
     public const double RING_RADIUS = 64.0; // bodyguard ring; sized so REVIVE_RANGE
     // wraps a ring slot: a downed bodyguard is in arm's reach of the rescue
@@ -184,6 +187,9 @@ public partial class Game : Godot.Node2D
     // it is seam-invisible) while the scattered patches fold like every other entity,
     // which keeps them scrolling AND looping as the motion readout
     Godot.ColorRect _floorRect = null;
+    // hidden full-rect Control: after layout its Size IS the visible canvas rect
+    // (anchors 0,0-1,1 resolve against the root viewport) - the window measurement
+    Godot.Control _winProbe = null;
     Godot.Collections.Array<Godot.ColorRect> _floorPatches = new();
     Godot.Collections.Array<Godot.Node2D> _bullets = new();
     Godot.Collections.Array<Vector2> _bulletVel = new();
@@ -215,8 +221,8 @@ public partial class Game : Godot.Node2D
     public Vector2 WrapNearCamera(Vector2 p)
     {
         Vector2 c = GetCameraCenter();
-        double pw = ARENA_HW * 2.0;
-        double ph = ARENA_HH * 2.0;
+        double pw = _wrapW;
+        double ph = _wrapH;
         double dx = p.X - c.X;
         double dy = p.Y - c.Y;
         dx -= System.Math.Round(dx / pw) * pw;
@@ -230,8 +236,8 @@ public partial class Game : Godot.Node2D
     {
         double dx = to.X - from.X;
         double dy = to.Y - from.Y;
-        dx -= System.Math.Round(dx / (ARENA_HW * 2.0)) * (ARENA_HW * 2.0);
-        dy -= System.Math.Round(dy / (ARENA_HH * 2.0)) * (ARENA_HH * 2.0);
+        dx -= System.Math.Round(dx / _wrapW) * _wrapW;
+        dy -= System.Math.Round(dy / _wrapH) * _wrapH;
         return new Vector2((float)dx, (float)dy);
     }
 
@@ -687,11 +693,67 @@ public partial class Game : Godot.Node2D
         return _pickerActive || _joinWaiting;
     }
 
-    // how wide the camera can see: the base viewport is 1920x1080 with canvas_items
-    // stretch and no camera zoom, so the frame is ~960 x 540 world px around the camera
+    // how wide the camera can actually see: NOT assumed anymore. A DPI-scaled
+    // fullscreen window (canvas_items stretch, aspect expand) sees far more world than
+    // the 1920x1080 base viewport - the old hardcoded 960x540 left the pinned floor
+    // covering ~1/4 of the frame (human bug 2026-10-20). MeasureWindow() refreshes
+    // _visHalf (and the wrap period) from the camera itself, every frame.
     public Vector2 GetVisibleHalfExtents()
     {
-        return new Vector2(960.0f, 540.0f);
+        return _visHalf;
+    }
+
+    // measures the REAL visible rect, so the wrap period (and staging distances)
+    // always strictly contain the frame on any window size / DPI scale. The source
+    // is ground truth from the renderer's own layout pass: a hidden Control with
+    // full-rect anchors (0,0)-(1,1) resolves to exactly the visible canvas rect,
+    // and world<->canvas is 1:1 at zoom 1. Runs at run start AND every _Process
+    // frame: layout has not happened on the first frames, so the sanity guard
+    // rejects garbage and later frames correct it.
+    private void MeasureWindow()
+    {
+        if (_winProbe == null)
+        {
+            _winProbe = new Godot.Control();
+            // full-rect anchors: layout stretches this node to the visible canvas rect
+            _winProbe.SetAnchor(Godot.Side.Left, 0.0f);
+            _winProbe.SetAnchor(Godot.Side.Top, 0.0f);
+            _winProbe.SetAnchor(Godot.Side.Right, 1.0f);
+            _winProbe.SetAnchor(Godot.Side.Bottom, 1.0f);
+            _winProbe.Visible = false; // measurement only: never drawn
+            AddChild(_winProbe);
+        }
+        Godot.Vector2 vs = _winProbe.Size;
+        double hx = (double)vs.X * 0.5;
+        double hy = (double)vs.Y * 0.5;
+        if (hx < 64.0 || hy < 64.0)
+            return; // stale / garbage: keep the previous value
+        double w = hx * 2.0 + 480.0;
+        double h = hy * 2.0 + 480.0;
+        if (System.Math.Abs(w - _wrapW) < 2.0 && System.Math.Abs(h - _wrapH) < 2.0)
+            return; // same period, nothing to do
+        _visHalf = new Vector2((float)hx, (float)hy);
+        _wrapW = w;
+        _wrapH = h;
+        if (_floorRect != null)
+        {
+            _floorRect.Size = new Vector2((float)_wrapW, (float)_wrapH);
+            _floorRect.Position = -_floorRect.Size * 0.5f; // keep the rect centered on its node
+        }
+        RescatterFloorPatches();
+        GD.Print("[10thAge] window measured: frame " + (int)(_visHalf.X * 2.0f) + "x" +
+                 (int)(_visHalf.Y * 2.0f) + " world px | wrap period " + (int)_wrapW + "x" + (int)_wrapH);
+    }
+
+    // re-scatter the motion-cue patches over the (possibly grown) wrap period
+    private void RescatterFloorPatches()
+    {
+        if (_floorRect == null || _floorPatches.Count == 0)
+            return; // Rng only exists once the patches do; safe guard for frame 1
+        Vector2 cen = GetCameraCenter();
+        foreach (Godot.ColorRect p in _floorPatches)
+            p.GlobalPosition = new Vector2(cen.X + (float)(Rng.Randf() * _wrapW - _wrapW * 0.5),
+                                           cen.Y + (float)(Rng.Randf() * _wrapH - _wrapH * 0.5));
     }
 
     // the escort must not shamble before the party can see the rescue (human fix: the
@@ -808,8 +870,12 @@ public partial class Game : Godot.Node2D
         // for testing (a pilot smoke with it ON still TPKs often - the Leader-down rule
         // we deferred leaves no rescue channel, which is variance, not a bug)
         _reaperEnabled = OS.GetEnvironment("M1_REAPER") != null && OS.GetEnvironment("M1_REAPER") != "";
+        // camera first, so the frame (and wrap period) are MEASURED from the real window
+        // before any stage geometry is built
+        _camera = GetNode("Camera2D") as Godot.Camera2D;
+        MeasureWindow();
         Godot.ColorRect floor = new ColorRect();
-        floor.Size = new Vector2((float)(ARENA_HW * 2.0), (float)(ARENA_HH * 2.0));
+        floor.Size = new Vector2((float)_wrapW, (float)_wrapH);
         floor.Position = -floor.Size * 0.5f;
         floor.Color = new Color(0.10f, 0.16f, 0.10f, 1.0f);
         floor.ZIndex = -20; // the .tscn party/boss nodes predate this node in tree order;
@@ -821,13 +887,18 @@ public partial class Game : Godot.Node2D
         // so a single-color floor made movement LOOK frozen even when input worked
         Rng = new Godot.RandomNumberGenerator();
         Rng.SetSeed(9001);
-        for (int i = 0; i < 60; i++)
+        // patch DENSITY is kept constant to the measured period, so big windows keep the
+        // same motion cues per screen area
+        int patchCount = (int)(60.0 * _wrapW * _wrapH / (2400.0 * 1800.0));
+        if (patchCount > 400)
+            patchCount = 400;
+        for (int i = 0; i < patchCount; i++)
         {
             Godot.ColorRect p = new ColorRect();
             float s = 6.0f + (float)Rng.Randf() * 10.0f;
             p.Size = new Vector2(s, s);
-            p.GlobalPosition = new Vector2((float)Rng.Randf() * (float)ARENA_HW * 2.0f - (float)ARENA_HW,
-                                           (float)Rng.Randf() * (float)ARENA_HH * 2.0f - (float)ARENA_HH);
+            p.GlobalPosition = new Vector2((float)Rng.Randf() * (float)_wrapW - (float)(_wrapW * 0.5),
+                                           (float)Rng.Randf() * (float)_wrapH - (float)(_wrapH * 0.5));
             p.Color = new Color(0.13f, 0.20f, 0.13f, 1.0f);
             p.ZIndex = -15;
             AddChild(p);
@@ -900,6 +971,7 @@ public partial class Game : Godot.Node2D
     public override void _Process(double d)
     {
         float delta = (float)d;
+        MeasureWindow(); // keep frame/period honest for any window size (DPI scaling)
         _stageT += d;
         _ringAngle += 0.22 * d; // orbit clock (user: "rotate a little faster" - was 0.15)
         _dashPulse += d;         // free-running clock for the dash-ready flash
@@ -1498,11 +1570,11 @@ public partial class Game : Godot.Node2D
                 continue;
             b.GlobalPosition += _bulletVel[i] * delta;
             Vector2 p = b.GlobalPosition;
-            // no arena to die against anymore: a volley bolt expires once it is past the
-            // fold box around the camera (just inside the half-period, so it never gets
-            // a chance to wrap and loop back around the player)
+            // no arena to die against anymore: a volley bolt expires once it is a touch
+            // past the measured frame (just inside the fold box, so it never gets a
+            // chance to wrap and loop back around the player)
             Vector2 bc = GetCameraCenter();
-            if (System.Math.Abs(p.X - bc.X) > ARENA_HW - 8.0 || System.Math.Abs(p.Y - bc.Y) > ARENA_HH - 8.0)
+            if (System.Math.Abs(p.X - bc.X) > _visHalf.X + 64.0 || System.Math.Abs(p.Y - bc.Y) > _visHalf.Y + 64.0)
             {
                 DespawnBullet(i);
                 continue;

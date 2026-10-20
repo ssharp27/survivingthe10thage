@@ -55,9 +55,14 @@ public partial class Director : Godot.Node2D
         // on top of the squad
         Vector2 cen = g.GetCameraCenter();
         float a = (float)GD.Randf() * (float)(System.Math.PI * 2.0);
-        // spawn just off the visible rect: 800 px out is inside the fold box, so no
-        // wrap is needed and the world has no edges left to stage against
-        Vector2 pos = cen + new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a)) * 800.0f;
+        // spawn just OUTSIDE the MEASURED frame: 800 px assumed a 960 half-width, and
+        // on DPI-scaled windows that landed goblins right inside frame = pop-in
+        Vector2 half = g.GetVisibleHalfExtents();
+        Vector2 unit = new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a));
+        double tx = System.Math.Abs(unit.X) > 0.001 ? half.X / System.Math.Abs(unit.X) : 1e30;
+        double ty = System.Math.Abs(unit.Y) > 0.001 ? half.Y / System.Math.Abs(unit.Y) : 1e30;
+        double reach = System.Math.Min(tx, ty) + 60.0;
+        Vector2 pos = cen + unit * (float)reach;
         if (g.GetLeader() != null && pos.DistanceTo(g.GetLeader().GlobalPosition) < 260.0f)
             return; // an arena clamp may have dragged the spawn into the party: skip, the
                     // timer already burned this roll

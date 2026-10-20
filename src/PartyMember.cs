@@ -179,6 +179,13 @@ public partial class PartyMember : Godot.Node2D
         // go hidden; writing visibility every frame is what un-hides a member when
         // the campfire lifts them back up
         bool hidden = eliminated;
+        // user bug 2026-10-20: Mosiah popped into the world long before his beat. A
+        // not-yet-joined PC stays hidden until the recruit event makes it the pending
+        // one (the HELP! arrow target); camp/escort joins lift the gate because joined
+        // becomes true
+        PartyMember pend = pg0 != null ? pg0.GetRecruitPending() : null;
+        if (!joined && !isLeader && (pend == null || pend.GetInstanceId() != GetInstanceId()))
+            hidden = true;
         if (_body != null)
             _body.Visible = !hidden;
         if (_telePivot != null)
