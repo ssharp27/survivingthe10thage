@@ -275,6 +275,22 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     stable as the roster grows). Camp-card body texts hard-broken with \n (4.7 autowrap did NOT
     constrain Label width - same reason the COMMIT modal body ran off-screen): modal widened to
     ±380 and summaries line-broken manually. Gate CT43/CT44/CT45: VICTORY lv 6/7/6, all .err 0.
+  - **Pass-12c (2026-10-20, second screenshot round + two user asks)**:
+    - Camp card label overlaps: NAME had the HBox expand flag so LeaderTag painted past the
+      card edge, and BarWrap expand pushed the "xx/yy hp" text into the neighbour card -
+      name now natural width, bar fixed 150 px. Rest-card buttons 100->170 min height with
+      body/chip Labels scaled 0.85/0.8 (they overflowed the paper before).
+    - USER-APPROVED pacing: Director now spawns during MINIBOSS and BOSS too (only
+      CAMPFIRE/terminal states hold it back) at x2 timer = 50 % rate.
+    - Dev skip keys (input map dev_camp/dev_boss/dev_join = C/V/J): C stages the mini-boss
+      beat AND instant-slays through the REAL kill scan - OnBossKilled only routes
+      MINIBOSS->CAMPFIRE, so the skip sets MINIBOSS first (learned via CT50/51 dead-flag
+      mishap). Pilot mirror M1_DEV_SKIP=camp lets smoke load Campfire.tscn/.gd every run.
+    - EscortHitRecruit gained a DEAD/VICTORY guard: TPK runs kept ticking escorts, spamming
+      "chipped" ~3000 lines after the summary (CT50/51 flood).
+    - Gate: CT46-48 all TPK + 0-byte .err (pilot dies under the new boss-phase horde -
+      expected variance); CT52-53-54 M1_DEV_SKIP=camp: camp beat + Campfire screen exercised
+      in every run, all TPK + 0-byte .err.
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)

@@ -154,6 +154,10 @@ public partial class Game : Godot.Node2D
     // everyone is up, walks onto a downed body and stops there so the stand-still
     // revive can channel. No gameplay values are touched.
     bool _pilot = false;
+    // smoke helper mirroring the dev_camp key: M1_DEV_SKIP=camp makes a PILOT run
+    // skip to the campfire immediately, so CI runs actually load Campfire.tscn/.gd
+    // (layout edits would otherwise go unvalidated in TPK-heavy runs)
+    string _devSkip = "";
     double _pilotTick = 0.0;
     Godot.RandomNumberGenerator Rng;
 
@@ -787,6 +791,10 @@ public partial class Game : Godot.Node2D
     {
         if (m == null || m.joined)
             return;
+        // terminal runs (TPK/VICTORY screens) still tick the world; escort contact used
+        // to spam "chipped" forever behind the summary (CT50/51 log flood)
+        if (_state == StageState.DEAD || _state == StageState.VICTORY)
+            return;
         float floor = m.maxHp * RECRUIT_JOIN_FLOOR;
         float nh = m.hp - (float)amount;
         if (nh < floor)
@@ -867,6 +875,7 @@ public partial class Game : Godot.Node2D
         GD.Print("[10thAge] squad: " + roster + " | leader: " +
                  (_leader != null ? _leader.displayName : "none"));
         _pilot = OS.GetEnvironment("M1_PILOT") != null && OS.GetEnvironment("M1_PILOT") != "";
+        _devSkip = OS.GetEnvironment("M1_DEV_SKIP") == null ? "" : OS.GetEnvironment("M1_DEV_SKIP");
         // the reaper is a pure death/revive TEST BENCH (no balance meaning): human play
         // left it OFF now that the revive rules work, and M1_REAPER=1 puts it back on
         // for testing (a pilot smoke with it ON still TPKs often - the Leader-down rule
@@ -1016,6 +1025,49 @@ public partial class Game : Godot.Node2D
             RegisterEnemy(r);
             AddChild(r);
             GD.Print("[10thAge] TEST reaper live");
+        }
+        // DEV SKIP KEYS (human-test alignment probes, added 2026-10-20 on request; C#-side
+        // convenience like `retry`, no balance effect):
+        //   C: straight to the campfire beat - from PLAY1/PLAY2 engage the mini and instant-
+        //      slay it through the REAL kill scan (OnBossKilled: bullets swept, camp opens);
+        //      mid-MINIBOSS it just slays.   V: park runT at the final-boss gate (PLAY2).
+        //   J: park runT at the recruit-drop beat (PLAY1) so the escort beat fires next frame.
+        if (Input.IsActionJustPressed("dev_camp") || (_pilot && _devSkip == "camp"))
+        {
+            if (_state == StageState.PLAY1)
+            {
+                ActivateBoss("mini");
+                // OnBossKilled only routes MINIBOSS -> CAMPFIRE (user-locked flow), so
+                // stage through the real branch before slaying, or the kill dead-flags
+                // the boss in PLAY1 and the run just continues (learned in CT50/51)
+                _state = StageState.MINIBOSS;
+                _stageT = 0.0;
+                GD.Print("[10thAge] (dev) mini-boss stage engaged for the skip");
+            }
+            if (_state == StageState.PLAY1 || _state == StageState.MINIBOSS
+                    || _state == StageState.PLAY2)
+            {
+                foreach (Boss b in _bosses)
+                    if (b.kind == "mini" && b.hp > 0.0f)
+                    {
+                        b.hp = -1.0f; // next-frame kill scan runs the real OnBossKilled
+                        GD.Print("[10thAge] (dev) mini-boss instant-slain -> camp");
+                    }
+            }
+        }
+        if (Input.IsActionJustPressed("dev_boss") || (_pilot && _devSkip == "boss"))
+        {
+            if (_state == StageState.PLAY2)
+            {
+                _runT = BOSS_AT; // the PLAY2 gate engages on the real path next frame
+                GD.Print("[10thAge] (dev) runT parked at boss gate");
+            }
+        }
+        if (Input.IsActionJustPressed("dev_join") && _state == StageState.PLAY1
+                && !_recruitBeatDone)
+        {
+            _runT = RECRUIT_AT; // the PLAY1 drop fires on the real path next frame
+            GD.Print("[10thAge] (dev) runT parked at recruit drop");
         }
         switch (_state)
         {

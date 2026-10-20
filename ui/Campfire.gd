@@ -132,7 +132,9 @@ func _make_card() -> Panel:
 	var name_l: Label = Label.new()
 	name_l.name = "Name"
 	name_l.add_theme_color_override("font_color", INK)
-	name_l.size_flags_horizontal = 3
+	# human bug 2026-10-20: expand flag made the NAME take the whole 270 px
+	# row, pushing LeaderTag past the card edge (it painted over the next card)
+	#name_l.size_flags_horizontal = 3
 	var leader_l: Label = Label.new()
 	leader_l.name = "LeaderTag"
 	leader_l.text = "LEADER"
@@ -162,8 +164,11 @@ func _make_card() -> Panel:
 	bar_wrap.anchor_top = 0.0
 	bar_wrap.anchor_right = 1.0
 	bar_wrap.anchor_bottom = 1.0
-	bar_wrap.size_flags_horizontal = 3
-	bar_wrap.custom_minimum_size = Vector2(0.0, 16.0)
+	# human bug 2026-10-20: expand flag let BarWrap eat the whole HPRow,
+	# pushing the "xx/yy hp" label out of the card and over the neighbour.
+	# Fixed 150 px bar; the hp text label keeps the rest of the row.
+	#bar_wrap.size_flags_horizontal = 3
+	bar_wrap.custom_minimum_size = Vector2(150.0, 16.0)
 	var bar_bg: ColorRect = ColorRect.new()
 	bar_bg.name = "BarBg"
 	bar_bg.anchor_left = 0.0

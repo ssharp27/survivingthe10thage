@@ -113,23 +113,25 @@ text = "SHORT REST"
 focus_mode = 0
 size_flags_horizontal = 3
 size_flags_vertical = 3
-custom_minimum_size = Vector2(0.0, 100.0)
+custom_minimum_size = Vector2(0.0, 170.0)
 
 [node name="ShortBody" type="Label" parent="Frame/Contents/RestRow/ShortCard/ShortRest"]
 anchor_left = 0.06
-anchor_top = 0.58
+anchor_top = 0.55
 anchor_right = 0.94
 anchor_bottom = 0.84
-text = "Bind wounds and keep watch.\nHeals the company +25% max HP (clamped)\nAND one member trains overnight:\nyou pick one free upgrade rank."
+text = "Bind wounds and keep watch.\nHeals the company +25% max HP (clamped).\nAND one member trains overnight:"
 autowrap = true
+scale = Vector2(0.85, 0.85)
 theme_override_colors = {"font_color": Color(0.42, 0.35, 0.26, 1)}
 
 [node name="ShortChip" type="Label" parent="Frame/Contents/RestRow/ShortCard/ShortRest"]
 anchor_left = 0.06
-anchor_top = 0.85
+anchor_top = 0.87
 anchor_right = 0.94
-anchor_bottom = 0.97
+anchor_bottom = 0.98
 text = "heal +25% + 1 free rank - horde x1.20"
+scale = Vector2(0.8, 0.8)
 theme_override_colors = {"font_color": Color(0.34, 0.48, 0.30, 1)}
 
 [node name="LongCard" type="VBoxContainer" parent="Frame/Contents/RestRow"]
@@ -142,23 +144,25 @@ text = "LONG REST"
 focus_mode = 0
 size_flags_horizontal = 3
 size_flags_vertical = 3
-custom_minimum_size = Vector2(0.0, 100.0)
+custom_minimum_size = Vector2(0.0, 170.0)
 
 [node name="LongBody" type="Label" parent="Frame/Contents/RestRow/LongCard/LongRest"]
 anchor_left = 0.06
-anchor_top = 0.58
+anchor_top = 0.55
 anchor_right = 0.94
 anchor_bottom = 0.84
-text = "Sleep through the night.\nFull revive + full heal for the WHOLE squad\n- the fallen rise at full HP, not 25%.\nNo free upgrade rank. The horde scales the same x1.20."
+text = "Sleep through the night.\nFull revive + full heal for the WHOLE squad\n- the fallen rise at full HP, not 25%."
 autowrap = true
+scale = Vector2(0.85, 0.85)
 theme_override_colors = {"font_color": Color(0.42, 0.35, 0.26, 1)}
 
 [node name="LongChip" type="Label" parent="Frame/Contents/RestRow/LongCard/LongRest"]
 anchor_left = 0.06
-anchor_top = 0.85
+anchor_top = 0.87
 anchor_right = 0.94
-anchor_bottom = 0.97
+anchor_bottom = 0.98
 text = "FULL HEAL, NO RANK - HORDE X1.20"
+scale = Vector2(0.8, 0.8)
 theme_override_colors = {"font_color": Color(0.62, 0.20, 0.20, 1)}
 
 [node name="ConfirmBar" type="HBoxContainer" parent="Frame/Contents"]

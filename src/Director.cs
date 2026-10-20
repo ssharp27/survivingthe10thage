@@ -24,7 +24,10 @@ public partial class Director : Godot.Node2D
         if (g.GetWorldPause())
             return; // picker / join-banner soft pause: the horde holds its march while a card is up
         int st = g.GetStageState();
-        if (st != 0 && st != 3) // PLAY1 / PLAY2 only
+        // user pacing (2026-10-20): the horde keeps spawning DURING the mini-boss and the
+        // big boss, but at a 50 % reduced rate (st 1/4 timer x2 below) - pressure without
+        // overwhelming. Only the camp pause and terminal states hold the march back.
+        if (st == 2 || st >= 5) // CAMPFIRE / DEAD / VICTORY
             return;
         _spawnTimer -= (float)d;
         if (_spawnTimer > 0.0f)
@@ -41,6 +44,8 @@ public partial class Director : Godot.Node2D
         else if (st == 0)
             _spawnTimer *= 2.0f;  // user pacing (2026-10-20): half rate through the long
                                   // pre-mini-boss window - pressure stays, the count does not
+        else if (st == 1 || st == 4)
+            _spawnTimer *= 2.0f;  // boss phases: horde runs at 50 % rate (user 2026-10-20)
         // the long rest's price lands here: horde scale densifies pacing AND beefs up
         // whatever the next stage spawns (Game._hordeScale -> GetHordeScale)
         _spawnTimer /= scale;
