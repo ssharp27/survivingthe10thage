@@ -268,6 +268,13 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     (gp stayed == pos after setting it) - do not trust "set pivot, pin origin" as a centering idiom. Fix: the pin now
     writes TOP-LEFT = GetCameraCenter() - Size*0.5f, which is correct under both semantics. Gate CT37/CT38/CT39:
     VICTORY lv 6/6/6, all .err 0 bytes.
+  - **Campfire screen layout fix (2026-10-20, human screenshot round)**: party cards collapsed to
+    slivers (GridContainer columns size to CHILD MIN width - min width 0 => all card text painted
+    over itself at top-left); cards now 270x100 min. Empty slots no longer paint: _refresh_bars
+    derives card.visible from party_data membership (cards stay in the tree so grid positions are
+    stable as the roster grows). Camp-card body texts hard-broken with \n (4.7 autowrap did NOT
+    constrain Label width - same reason the COMMIT modal body ran off-screen): modal widened to
+    ±380 and summaries line-broken manually. Gate CT43/CT44/CT45: VICTORY lv 6/7/6, all .err 0.
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)

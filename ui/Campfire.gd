@@ -60,9 +60,13 @@ func _ready() -> void:
 	call_deferred("_refresh_bars")
 func _refresh_bars() -> void:
 	for i in range(_cards.size()):
+		var card: Panel = _cards[i]
+		# user 2026-10-20: empty slots must not paint at all; visibility is re-derived
+		# from party_data on every refresh, so a member arriving later shows up
+		# (the card stays in the tree so grid positions never shift)
+		card.visible = i < party_data.size()
 		if i >= party_data.size():
 			continue
-		var card: Panel = _cards[i]
 		var vbox: VBoxContainer = card.get_node("VBox") as VBoxContainer
 		var hp_row: HBoxContainer = vbox.get_node("HPRow") as HBoxContainer
 		var bar_wrap: Control = hp_row.get_node("BarWrap") as Control
@@ -99,10 +103,14 @@ func _build() -> void:
 func _make_card() -> Panel:
 	var card: Panel = Panel.new()
 	card.name = "MemberCard"
-	# 138 (was 168): the full stack (header + roster + grid + rest row +
+# 138 (was 168): the full stack (header + roster + grid + rest row +
 	# confirm bar) must fit the 592 px inner frame or lower controls spill
-	# past the 720 px screen and become unclickable (human-test rounds 1-2)
-	card.custom_minimum_size = Vector2(0.0, 100.0)
+	# past the 720 px screen and become unclickable (human-test rounds 1-2).
+	# WIDTH matters too (human bug 2026-10-20): GridContainer columns size to
+	# the CHILD MIN width - a 0 min width collapsed every card to a sliver at
+	# top-left and all its text painted over itself. 2 cols x 270 + 18 sep
+	# fits the 592 px inner frame.
+	card.custom_minimum_size = Vector2(270.0, 100.0)
 	card.add_theme_stylebox_override("panel", _stylebox_card())
 	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.name = "VBox"
@@ -317,9 +325,11 @@ func _on_commit_pressed() -> void:
 	modal.show()
 	get_tree().paused = true
 func _rest_summary() -> String:
+	# human bug 2026-10-20: 4.7 autowrap did NOT constrain the modal body (it ran
+	# past the panel and off-screen), so break the lines short ourselves.
 	if _selection == 0:
-		return "Short rest - bind wounds and keep watch.\nThe company heals +25% max HP (clamped) and one member trains overnight (one free upgrade rank, chosen on the level-up card).\nEven so, the horde scales x1.20 hp, pace and heads."
-	return "Long rest - sleep through the night.\nFull revive + full heal for the WHOLE squad - the fallen rise at full HP.\nNo free upgrade rank. The horde scales the same x1.20 hp, pace and heads."
+		return "Short rest - bind wounds and keep watch.\nHeals the company +25% max HP (clamped).\nOne member trains overnight: one free upgrade rank, picked on the level-up card.\nEven so, the horde scales x1.20 hp, pace and heads."
+	return "Long rest - sleep through the night.\nFull revive + full heal for the WHOLE squad - the fallen rise at full HP.\nNo free upgrade rank.\nThe horde scales the same x1.20 hp, pace and heads."
 func _on_rest_now() -> void:
 	# human-test pass-9 fix: the rest resolves once. The modal's Buttons keep answering
 	# picks after the card is hidden (their rects ignored hide()), so a stale click must
