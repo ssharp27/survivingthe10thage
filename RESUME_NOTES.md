@@ -2,26 +2,28 @@
 
 Session stopped on request. Resume here first — everything below the 2026-10-20 block is older history (keep as archive; M1_STATUS.md remains the single source of truth for flow/pitfalls/balance passes).
 
-## Where we are (2026-10-20 shutdown)
-- HEAD = **pass-10 commit (the one you are looking at)** on `main` — three pass-9 human-playtest bug reports fixed. Chain: pass 9 `1524c6e` > pass 8 `058f762` > resume notes `c96b1d8` > pass 7 `3e4dfa0` > older. Local-only, nothing ever pushed.
-- Pass 10 shipped (all three reports, plus the leak the reports exposed):
-  1. **Rescue staging** — the stranded PC lands PAST the camera edge (`SpawnFieldRecruit` walks a random bearing out to the visible rect's exit + `RECRUIT_MARGIN` 90 px, floor `RECRUIT_DIST` 300, 8 retries because `ClampToArena` can pull a candidate back into frame); escort goblins open `ESCORT_RING` 340 px wide of the PC (was 160).
-  2. **Crawl gate** — an escort goblin does not move until `Game.RecruitInView()` (PC inside the ~960x540 camera rect); creep factor 0.4 → `ESCORT_CRAWL` 0.22. So the beat no longer animates off-camera and reads as "they are coming for him".
-  3. **Join banner = SOFT pause** — `Game.GetWorldPause()` = `_pickerActive || _joinWaiting`; the 4 external gates (`Enemy`, `PartyMember`, `Boss`, `Director`) switched to it, `_Process` gained a freeze block after `UpdateHpStrips`, and the run-clock guard now excludes `_joinWaiting` too. Deliberately NOT a tree pause: the CLICK TO CONTINUE gate needs input frames.
-  4. **Hint leak** — the CLICK TO CONTINUE Label was a LOCAL inside `JoinRecruit`, so `ClearJoinBanner` never had a handle on it and it stayed painted over the HUD for the rest of the run (that stale prompt next to the SHORT REST GIFT picker is what read as a frozen game). Now a field `_joinHint`, hidden with the card.
-  5. **Campfire freeze/crash** — after `EndCampfire` hides the card, a hidden Control still receives `_input` and its rect still answers, so a stray click or ENTER re-ran `_on_commit_pressed` (`modal.show()` + `get_tree().paused = true` with nothing visible and nothing left to un-pause it). `Campfire.gd` now bails `if not visible` at the top of `_input`, and `_on_rest_now` bails `if not modal.visible` so a rest cannot resolve twice behind the camp. NOTE: the exact crash line never reached the log (buffer lost on crash); the hidden-card routing is the confirmed freeze mechanism, so if a human run still crashes on the short rest, say so and we hunt it with the runtime-error capture instead.
-- Gate evidence: `smokeCT18` TPK lv 4, `smokeCT19` VICTORY lv 6 (xp 88), `smokeCT20` TPK lv 4 — all `.err` 0 bytes. CT19 logged the drop 1119 px off camera, the camp-sweep join, the pilot join-banner clear, the SHORT-rest chain, BOSS and VICTORY.
-- **NEXT: one more human playtest round on pass 10.** Ask the player: does the off-camera rescue read the way they wanted (they must walk to it), does the escort now creep in slowly enough, does the join banner actually pause so they can look at the art, and is the short rest clean? Pilot smokes never walk to the rescue site, so escort-KILL joins are still only human-tested (the camp-sweep join is smoke-covered).
-- Balance hold: escort goblin HP (30 × horde) and base speed stay user-side; `ESCORT_RING` / `ESCORT_CRAWL` / `RECRUIT_MARGIN` are staging dials, re-take them on request.
+## Where we are (2026-10-20 shutdown — CURRENT)
+- HEAD = **pass-13 `af8ec61`** on `main` (local-only, nothing pushed). Full 2026-10-20 chain (old→new): pass 10 `894402f` > pass 11 `35c228b` > pass 12 `879f445` > pass 12b `73e8f20` > floor-pin `5629655` > arrow-key `c1b8077` > re-prioritization `7f68819` > campfire-layout-r1 `05f3754` > pass-12c `8153cd1` > **pass-13 `af8ec61`**.
+- **Pass-13 shipped AND verified = campfire data-truth fix** (the Mosiah "0 / 120 DOWN" lie on the camp card):
+  1. Root cause: C# `Set("party_data", ...)` **SILENTLY no-ops** on a typed `@export var party_data: Array[Dictionary]` (Godot.Collections.Array arrives as an untyped variant; typed setter rejects it with no error line anywhere). `_ready` saw `[]` and painted `_seed_demo()` placeholders — Baldrun 58/150, Mosiah 0/120 DOWN were DEMO data, never real stats. Fix: untyped `Array` export lands (pitfall in-file + M1_STATUS.md).
+  2. `_refresh_bars` fully re-populates each card via `_populate_card` (Game.cs re-Sets party_data on the SAME node after a cancel with no `_ready()` re-run → labels built once at build would linger stale); fill guard `inner >= 0` (bar_wrap size is 0 pre-layout). `_seed_demo()` kept only as the empty-data fallback.
+  3. Evidence: headless oracle print at refresh showed REAL C# rows (Baldrun 80/80 = true Main.tscn stats, no demo row). Gates CT57 (oracle) + CT58/59 plain pilot + CT60 (`M1_DEV_SKIP=camp`): all hit TPK/VICTORY lines + 0-byte `.err`, sequential. Logs at `C:\Users\Steve\AppData\Local\Temp\smokeCT{57..60}.out/.err`.
+- Run-summary DOWN at run end IS real data (Mosiah genuinely got eliminated in PLAY2 under boss-phase hordes) — user accepted, "not a big deal for M1".
+- Camp card is now data-truthful; its layout polish (alignment round 2) is the next camp item — see Next steps.
+- Pass 10 recap (earlier same day, human round 3 — details now fully absorbed into M1_STATUS.md passes 10-12c, that file is authoritative): rescue staging (`RECRUIT_MARGIN` 90 / `ESCORT_RING` 340 / `RECRUIT_DIST` 300), escort crawl gate (`RecruitInView`, `ESCORT_CRAWL` 0.22), join-banner SOFT pause (`GetWorldPause` = picker||join, not tree pause — CLICK gate needs input frames), hint-leak fix (`_joinHint` field), campfire freeze fix (hidden-card `_input` bail + `modal.visible` bail). Gate smokeCT18-20.
+- **Human playtest of pass 10 was never completed** — escort-KILL joins, off-camera rescue walk, banner art-look remain human-only paths (camp-sweep join is smoke-covered). Balance hold: escort goblin HP (30 × horde) and base speed stay user-side; staging dials re-take on request.
 
-## Queued vision slices (unchanged, from M1_STATUS.md)
-- art/8-bit slice H (artist report: enemy silhouettes, attack FX, atlas/palette, boss spectacle), M2 roster slice (3 PCs + join beats + evolutions), campfire/meta-map stub.
-- Optional cleanup: SDK artifacts (`sdk-bak-8.0.108`, zip); decide whether `RESUME_NOTES.md` / `.opencode/` get tracked (`RESUME_NOTES.md` is now tracked since this commit, `.opencode/` still untracked).
+## Next steps (2026-10-20 shutdown, in order)
+1. Camp alignment round 2 (user's 3rd screenshot, still open): member-card inner padding + taller cards so `READY`/`DOWN` row is not clipped; rest-card body line 3 grazes the chip line on the 170 px buttons (ShortBody/LongBody anchors 0.55..0.84, chips 0.87..0.98); cards flush to edges; check `Campfire.tscn` stack budget FIRST (cards were shrunk 168→138 to fit the 592 px inner frame) before growing heights.
+2. Await the USER's own 32-bit (32x32) art idea — the user owns the art concept and will explain it themselves; do NOT touch art before that. Then implement the art pass (assess/fix their Baldrun + Mosiah 32x32 models). Final M1 gate = art pass + meta-stub overlap fix.
+3. Declare M1 success; shutdown cleanup: refresh `M1_STATUS.md` if stale, SDK artifacts, `.opencode/` tracking decision.
+4. Standing (not started): 20-minute run curve cross-milestone workstream.
+5. Optional: one human playtest round covering the still-unverified paths (escort contact damage, STRANDED strip, 25% join-HP floor, picker gate for eliminated members, DPI-scaled frame, escort-KILL joins).
 
 ## Resume recipe (unchanged — details in M1_STATUS.md)
 - Build: `& 'C:\Users\Steve\dev-tools\dotnet\dotnet.exe' build survivingthe10thage.csproj --no-incremental -nologo` (no `-o`; OutputPath baked to `.godot\mono\temp\bin\Debug\`).
 - Smoke: `"C:\AI Coding\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe" --path C:\GitHub\survivingthe10thage --headless --quit-after 90000`, run via `cmd /c 'set M1_PILOT=1&& ... > file 2> file2'`, timeout 0, SEQUENTIALLY. Gate = VICTORY-or-TPK line + 0-byte `.err`. Pilot = verification only, never human play. `M1_REAPER=1` re-enables test bench.
-- Campfire.gd is TAB-indented — python byte-exact replaces with `repr()` verification are the only reliable edit path.
+- Campfire.gd is TAB-indented and pure ASCII (LF, no BOM) — the reliable edit path is PowerShell line-slice splices: `[System.IO.File]::ReadAllText` → `-split "\n"` → splice by line index → rejoin with LF → `[byte[]][char[]]` + `WriteAllBytes`, then verify with `Select-String` line dumps. NEVER put multi-line GDScript into the edit tool's oldString (generation corrupts tab-heavy GDScript payloads — happened twice on 2026-10-20, both aborts left the file untouched). PowerShell here is 5.1: `[System.IO.File]::` (not `[IO.Encoding]`), double quotes inside double quotes are `""` (not `\"`), no `&&`, `chr()` does not exist.
 - All 4.7 C#/GDScript API drifts catalogued in M1_STATUS.md (incl. pass-6 `Math`/`out` drifts).
 
 ---
@@ -113,7 +115,8 @@ P1 bugs: (1) boss pre-kill/softlock — no RegisterEnemy until ActivateBoss, par
 2. ◑ Re-run smoke (done: smokeR1/R2/R3) + a **no-pilot human-representative probe** — still owed: picker
    steal under real input, bosses unhittable pre-engage, cap binds, prints readable.
 3. Ask critic to re-score briefly (balance bar relaxed per user guidance — growth+challenge, ~20-min intent).
-4. Optional queue: ui-designer Qs (campfire timeout, dismiss target), artist Qs (leader, mini/boss identity), then artist asset production at its `res://` paths.
+4. Optional queue: ui-designer Qs (campfire timeout, dismiss target), artist Qs (leader, mini/boss identity),
+   then artist asset production at its `res://` paths.
 5. Commit + refresh M1_STATUS when verified.
 
 ## Facts worth re-checking at resume (why they matter)
