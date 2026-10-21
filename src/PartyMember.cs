@@ -69,6 +69,12 @@ public partial class PartyMember : Godot.Node2D
     Godot.ColorRect _body;
     Godot.Label _ds;
     float _flash = 0.0f;
+    // mini motion rig (user 2026-10-21): the body/art hangs on this pivot so the mini
+    // can shuffle without touching the node's logical position, hitbox, chips, labels
+    // or telegraph - and future art sprites reparent here unchanged
+    Godot.Node2D _rig;
+    float _rigT = 0.0f;
+    float _toppleDir = 1.0f;
 
     public override void _EnterTree()
     {
@@ -80,7 +86,11 @@ public partial class PartyMember : Godot.Node2D
         _body.Position = -_body.Size * 0.5f;
         _body.Color = memberIndex == 0 ? new Color(0.92f, 0.92f, 0.95f)
                                        : new Color(0.78f, 0.63f, 0.44f);
-        AddChild(_body);
+        _toppleDir = memberIndex % 2 == 0 ? 1.0f : -1.0f; // toppled minis fall opposite ways
+        _rig = new Godot.Node2D();
+        _rig.Name = "Rig";
+        AddChild(_rig);
+        _rig.AddChild(_body); // under the rig, NOT the root: see motion block below
         _ds = new Label();
         _ds.Position = new Vector2(-24.0f, -58.0f); // clears the 64x8 dash bar at y-42
         AddChild(_ds);
@@ -234,6 +244,30 @@ public partial class PartyMember : Godot.Node2D
         }
         else if (_ds != null)
             _ds.Modulate = dsColor;
+        // ---- tabletop mini motion (user 2026-10-21 "the party ARE minis"): a live,
+        // joined mini shuffles side-to-side with a lean and a set-down tap, exactly
+        // like fingers nudging a miniature; members run on OFFSET phases so the squad
+        // reads as individually nudged, not a marching band. DOWNED or eliminated =
+        // toppled mini (rim down, still). Not-yet-joined = stands upright waiting to
+        // be picked up. Front-facing art makes this whole language flip-free.
+        if (_rig != null)
+        {
+            bool liveMini = joined && !downed && !eliminated;
+            if (liveMini)
+            {
+                _rigT += delta;
+                float ph = _rigT * 5.6f + memberIndex * 0.9f;
+                float sway = (float)System.Math.Sin(ph) * 3.0f;
+                _rig.Position = new Vector2(sway, -(float)System.Math.Abs((float)System.Math.Sin(ph * 0.5)) * 1.2f);
+                _rig.Rotation = sway * 0.017f; // the lean trails the push
+            }
+            else
+            {
+                float top = downed || eliminated ? _toppleDir * (float)(System.Math.PI * 0.5) : 0.0f;
+                _rig.Position = new Vector2(0.0f, 0.0f);
+                _rig.Rotation += (top - _rig.Rotation) * (1.0f - (float)System.Math.Exp(-10.0 * delta));
+            }
+        }
         if (!joined || downed || eliminated)
             return; // a stranded recruit cannot swing: its weapon unlocks ON the join
         if (_flash > 0.0f)

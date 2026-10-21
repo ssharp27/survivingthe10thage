@@ -19,6 +19,10 @@ public partial class Boss : Combatant
     int _phase = 0;
     float _contactCd = 0.0f;
     Godot.ColorRect _body;
+    // bosses ARE minis (Enter-the-Gungeon spectacle): same table-slide family as the
+    // party, just bigger amplitude - art swap reparents _body's replacement here
+    Godot.Node2D _rig;
+    float _rigT = 0.0f;
 
     public override void _EnterTree()
     {
@@ -29,7 +33,10 @@ public partial class Boss : Combatant
         _body.Position = -_body.Size * 0.5f;
         _body.Color = kind == "mini" ? new Color(0.55f, 0.15f, 0.45f)
                                      : new Color(0.65f, 0.10f, 0.10f);
-        AddChild(_body);
+        _rig = new Godot.Node2D();
+        _rig.Name = "Rig";
+        AddChild(_rig);
+        _rig.AddChild(_body);
         // P1: NO RegisterEnemy here. An inactive boss must not be in the hittable
         // registry or weapons can pre-kill it (the old pre-killable mini softlocked
         // the run at 90 s). Game.ActivateBoss brings it in the moment its stage
@@ -52,6 +59,13 @@ public partial class Boss : Combatant
             return; // picker / join-banner soft pause: the boss holds its volley mid-phase
         float ratio = hp / maxHp;
         _phase = ratio > 0.66f ? 0 : (ratio > 0.33f ? 1 : 2);
+        // mini slide (user 2026-10-21): the boss is a big painted miniature being
+        // shoved across the table - lateral sway + lean, like the party, scaled up
+        _rigT += delta;
+        float ph = _rigT * 4.2f;
+        float slid = (float)System.Math.Sin(ph) * (kind == "mini" ? 3.0f : 4.5f);
+        _rig.Position = new Vector2(slid, 0.0f);
+        _rig.Rotation = slid * 0.012f;
 
         // body-check the NEAREST live member, not the Leader specifically: the boss
         // must punish whoever stands in its way (downed bodies handled below)

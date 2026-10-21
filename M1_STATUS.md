@@ -301,6 +301,25 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     linger stale); fill math guarded for `inner >= 0` (bar_wrap size is 0 before layout). _seed_demo
     kept only as the empty-data fallback. Gate: CT57 (oracle print showed REAL rows - Baldrun 80/80
     true stats, no demo) + CT58/59 plain pilot + CT60 M1_DEV_SKIP=camp, all TPK + 0-byte .err.
+  - **Pass-14 (2026-10-21, user art session: 32-bit minis idea + Baldrun/Mosiah AI art)**:
+    motion rig landed BEFORE the art - each entity gets a visual-only `Rig` Node2D the
+    body hangs on (hitbox/logic/chips/labels/telegraph stay on the root; future art
+    sprites reparent under the same rig unchanged). Three motion families per the user's
+    mini concept: PARTY = table slide (x sway 3 px + lean + set-down tap, phases offset
+    per memberIndex so nudges read individually) with a topple language: DOWNED/eliminated
+    = rim down (eased 90 deg lean, sway stopped), not-yet-joined = upright waiting to be
+    picked up - front-facing art makes the whole thing flip-free. ENEMIES = creature
+    walk-bob (vertical 1.4-2.2 px by kind, phase = instanceId%64 so the horde never
+    marches in lockstep) - deliberately NOT the slide: monsters walk, minis get shoved.
+    BOSSES = the party slide scaled (mini 3 px / final 4.5 px) - bosses ARE big minis.
+    All pauses keep rigs frozen (GetWorldPause early-return covers it). Art review notes
+    for the user's AI pieces (cleanup gate before art drops in): palettize ~24-32 colors
+    + bake out the 1px semi-transparent fringe, Mosiah hair/coat silhouette needs a tone
+    split, keep the shared round gold-rim base (reads as ground contact AND can gate
+    state via rim). "32-bit style" read as Diablo-era detail sprites, target 64-96 px
+    minis over a 16 px tile bg (the fidelity contrast IS the mini-on-table read).
+    Gate: CT61/CT62 plain pilot + CT63 camp-skip, all TPK + 0-byte .err (rig is visual -
+    feel needs human eyes, and the user is playing now).
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)

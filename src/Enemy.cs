@@ -22,11 +22,24 @@ public partial class Enemy : Combatant
     public Vector2 escortHold = new Vector2();
 
     Godot.ColorRect _body;
+    // mini-style motion rig (user 2026-10-21): enemies do NOT get the party's table
+    // slide (they are creatures, not minis) - they get a walk bob on this pivot so
+    // the theme contrasts; art/placeholder swap reparents here
+    Godot.Node2D _rig;
+    float _bobT = 0.0f;
+    float _bobPhase = 0.0f;
 
     // Visuals are built after spawn parameters land (Director sets kind/hp/speed post-new()),
     // so this runs on demand rather than in _EnterTree.
     public void InitVisuals()
     {
+        if (_rig == null)
+        {
+            _rig = new Godot.Node2D();
+            _rig.Name = "Rig";
+            AddChild(_rig);
+            _bobPhase = (GetInstanceId() % 64) * 0.37f; // the horde never bobs in lockstep
+        }
         if (kind == "reaper")
         {
             // TEST death-state reaper: big red diamond; touching it DOWNs a member
@@ -36,7 +49,7 @@ public partial class Enemy : Combatant
             _body.Position = -_body.Size * 0.5f;
             _body.Rotation = 0.785f;
             _body.Color = new Color(0.85f, 0.12f, 0.12f);
-            AddChild(_body);
+            _rig.AddChild(_body);
             return;
         }
         float w = kind == "wolf" ? 34.0f : (kind == "hobgoblin" ? 32.0f : 26.0f);
@@ -47,7 +60,7 @@ public partial class Enemy : Combatant
         _body.Color = kind == "wolf" ? new Color(0.55f, 0.58f, 0.62f)
                       : kind == "hobgoblin" ? new Color(0.13f, 0.26f, 0.12f)
                                             : new Color(0.30f, 0.48f, 0.23f);
-        AddChild(_body);
+        _rig.AddChild(_body);
     }
 
     public override void _Process(double d)
@@ -63,6 +76,15 @@ public partial class Enemy : Combatant
             return;
         if (g.GetWorldPause())
             return; // picker / join-banner soft pause: the horde holds still while the card is read
+        // creature walk bob (user 2026-10-21): enemies are creatures, not minis - vertical
+        // step bob instead of the party's table slide, phase per spawn so the horde
+        // never reads as one marching block; visuals only, never the hitbox
+        if (_rig != null)
+        {
+            _bobT += delta;
+            float amp = kind == "hobgoblin" ? 2.2f : kind == "wolf" ? 1.8f : 1.4f;
+            _rig.Position = new Vector2(0.0f, (float)System.Math.Sin(_bobT * 8.0f + _bobPhase) * amp);
+        }
         Vector2 p = GlobalPosition;
         if (kind == "reaper")
         {
