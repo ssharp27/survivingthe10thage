@@ -75,6 +75,11 @@ public partial class PartyMember : Godot.Node2D
     Godot.Node2D _rig;
     float _rigT = 0.0f;
     float _toppleDir = 1.0f;
+    // user 2026-10-21: a mini only shuffles while a finger is PUSHING it, so the rig
+    // measures the node's actual travel per frame - stopped party settles its last
+    // step instead of freezing mid-sway
+    Vector2 _lastMovePos = new Vector2();
+    float _moveSpeed = 0.0f;
 
     public override void _EnterTree()
     {
@@ -255,16 +260,36 @@ public partial class PartyMember : Godot.Node2D
             bool liveMini = joined && !downed && !eliminated;
             if (liveMini)
             {
-                _rigT += delta;
-                float ph = _rigT * 5.6f + memberIndex * 0.9f;
-                float sway = (float)System.Math.Sin(ph) * 3.0f;
-                _rig.Position = new Vector2(sway, -(float)System.Math.Abs((float)System.Math.Sin(ph * 0.5)) * 1.2f);
-                _rig.Rotation = sway * 0.017f; // the lean trails the push
+                // how far did this mini actually travel this frame? (post-fold coords,
+                // so wrap seams read as 0 not a teleport)
+                Vector2 gp = GlobalPosition;
+                float moved = gp.DistanceTo(_lastMovePos);
+                _lastMovePos = gp;
+                if (moved > 400.0f)
+                    moved = 0.0f; // wrap-fold frame, not motion
+                float inst = delta > 0.001f ? moved / delta : _moveSpeed;
+                _moveSpeed += (inst - _moveSpeed) * (1.0f - (float)System.Math.Exp(-8.0 * delta));
+                if (_moveSpeed > 30.0f) // being pushed across the table
+                {
+                    float ratio = _moveSpeed / 130.0f; // ~full party push speed
+                    ratio = ratio < 0.35f ? 0.35f : (ratio > 1.4f ? 1.4f : ratio);
+                    _rigT += delta * 7.2f * ratio; // user 2026-10-21: a touch faster than pass-14, scaled by push
+                    float ph = _rigT + memberIndex * 0.9f;
+                    float sway = (float)System.Math.Sin(ph) * 3.0f;
+                    _rig.Position = new Vector2(sway, -(float)System.Math.Abs((float)System.Math.Sin(ph * 0.5)) * 1.2f);
+                    _rig.Rotation = sway * 0.017f; // the lean trails the push
+                }
+                else
+                {
+                    // player stopped: glide the last sway back level - a set-down, not a jolt
+                    _rig.Position += -_rig.Position * (1.0f - (float)System.Math.Exp(-9.0 * delta));
+                    _rig.Rotation += -_rig.Rotation * (1.0f - (float)System.Math.Exp(-9.0 * delta));
+                }
             }
             else
             {
                 float top = downed || eliminated ? _toppleDir * (float)(System.Math.PI * 0.5) : 0.0f;
-                _rig.Position = new Vector2(0.0f, 0.0f);
+                _rig.Position += -_rig.Position * (1.0f - (float)System.Math.Exp(-9.0 * delta));
                 _rig.Rotation += (top - _rig.Rotation) * (1.0f - (float)System.Math.Exp(-10.0 * delta));
             }
         }

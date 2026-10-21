@@ -320,6 +320,16 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     minis over a 16 px tile bg (the fidelity contrast IS the mini-on-table read).
     Gate: CT61/CT62 plain pilot + CT63 camp-skip, all TPK + 0-byte .err (rig is visual -
     feel needs human eyes, and the user is playing now).
+  - **Pass-15 (2026-10-21, user feel round: "a little faster" + "stop when the player
+    stops, ending with the last bounce")**: party shuffle is now PUSH-GATED - the rig
+    measures the node's real travel per frame (post-fold, wrap seams read as 0) with an
+    exp-damped speed; above 30 px/s the mini shuffles and the tempo SCALES with the push
+    (7.2 rad/s base ~29% over pass-14, ratio clamped 0.35..1.4 of ~130 px/s full speed);
+    below it the sway GLIDES level (exp ease ~9/s) - a set-down, never a freeze mid-sway.
+    Side effect: the orbit ring's ~11 px/s idle drift sits under the gate, so the whole
+    squad stops shuffling when the Leader stops. Topple/stranded branches also ease
+    position now (no hard zero). Gate: CT64/CT65 plain pilot + CT66 camp-skip, all TPK +
+    0-byte .err (visual feel still human-eyes: knobs are 7.2f pace / 30f gate in PartyMember.cs).
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)
