@@ -106,13 +106,21 @@ public partial class PartyMember : Godot.Node2D
         _rig.Name = "Rig";
         AddChild(_rig);
         _rig.AddChild(_body); // under the rig, NOT the root: see motion block below
-        // painted mini (user 2026-10-21): Baldrun's cleaned art passed the audit (98x118,
-        // hard alpha, 50-colour palette). Sprite lives on the RIG so the shuffle AND the
-        // topple pivot at the base-rim centre, not the canvas centre - a toppled miniature
+        // painted minis (user 2026-10-21): cleaned art passed the audit - Baldrun 98x118
+        // (hard alpha, 50 opaque colours, dead-centred) and Mosiah 79x119 (0 soft-alpha px,
+        // 58 colours, cx_delta 0). Sprite lives on the RIG so the shuffle AND the topple
+        // pivot at the base-rim centre, not the canvas centre - a knocked-over miniature
         // falls around its own base. Hitbox, chips, labels, telegraphs untouched.
+        string miniPath = "";
+        float miniScale = 0.75f; // both canvases are ~118 tall -> ~88 px stage, under the 96 px boss
+        float miniRim = 7.0f;    // px from canvas bottom to the base-rim band's centre (audit read)
         if (displayName == "Baldrun")
+            miniPath = "res://art/baldrun.png";
+        else if (displayName == "Mosiah")
+            miniPath = "res://art/mosiah.png";
+        if (miniPath != "")
         {
-            Godot.Texture2D tex = GD.Load("res://art/baldrun.png") as Godot.Texture2D;
+            Godot.Texture2D tex = GD.Load(miniPath) as Godot.Texture2D;
             if (tex != null)
             {
                 _mini = new Godot.Sprite2D();
@@ -120,10 +128,10 @@ public partial class PartyMember : Godot.Node2D
                 // 4.7 has no C# TextureFilterMode enum: 0 = TEXTURE_FILTER_NEAREST straight
                 // into the native CanvasItem setter, so the painted edges stay hard
                 _mini.Set("texture_filter", 0);
-                float s = 0.75f; // 118 px canvas -> ~88 px stage: a hair under the 96 px final boss
-                _mini.Scale = new Vector2(s, s);
-                // rim centre pinned to the rig origin (rim band sits ~7 px shy of the canvas bottom)
-                _mini.Position = new Vector2(0.0f, -(tex.GetHeight() * 0.5f - 7.0f) * s);
+                _mini.Scale = new Vector2(miniScale, miniScale);
+                // rim centre pinned to the rig origin: the topple AND the dash plate
+                // (y+12 in Game.cs) anchor off this same contact point
+                _mini.Position = new Vector2(0.0f, -(tex.GetHeight() * 0.5f - miniRim) * miniScale);
                 _rig.AddChild(_mini);
                 _body.Size = new Vector2(0.0f, 0.0f); // art replaces the square outright
             }

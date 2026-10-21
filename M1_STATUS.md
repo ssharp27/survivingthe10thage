@@ -373,6 +373,22 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     base-rim centre; painted rim is ~73x12, so the circle covers the middle third of the
     base, not its full wingspan - widening it is a balance call (user owns those numbers).
     Gate: CT73/CT74 plain pilot + CT75 camp-skip, all TPK + 0-byte .err (lv4/lv6/lv4).
+  - **Pass-19 (2026-10-21, Mosiah art + knocked-over confirm)**: user dropped `art/mosiah.png`;
+    same import pipeline (headless `--import` pass made the `.import` sidecar, then the audit
+    ran through it). Audit verdict: 79x119, opaque bbox 78x117 at 1,1, 1px margins, cx_delta
+    0.0 (dead-centred), 58 opaque colours, 6443 covered px, 0 soft-alpha px - clean like
+    Baldrun. Wiring generalized the art block: displayName -> miniPath lookup (Baldrun,
+    Mosiah), per-piece knobs `miniScale 0.75` (both canvases ~118 tall -> ~88 stage px) and
+    `miniRim 7.0` px from canvas bottom to the base-rim centre; same nearest-filter + rim-
+    pinned-to-rig-origin anchor, so Mosiah topples and dash-plates off the same contact point.
+    Knocked-over language was already locked in pass-14/15: `downed || eliminated` tips the
+    RIG 90 deg around the base-rim pivot (~0.2s fall, alternate directions per member index);
+    with the minis now hanging on the rig they inherit it - a body being channel-revived
+    stays tipped until the revive completes, and the stranded recruit stays upright (locked).
+    Compile slips fixed in-flight: C# `String` not in scope here -> `string`; local `s`
+    collided with the telegraph spoke `s` in the same constructor -> `miniScale`/`miniRim`.
+    Gate: CT76/CT77 plain pilot + CT78 camp-skip, all TPK + 0-byte .err (lv5/lv4/lv4);
+    CT76's log shows Mosiah loaded clean (no loader error in the 0-byte .err).
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)
