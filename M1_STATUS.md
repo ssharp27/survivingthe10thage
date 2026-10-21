@@ -330,6 +330,27 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     squad stops shuffling when the Leader stops. Topple/stranded branches also ease
     position now (no hard zero). Gate: CT64/CT65 plain pilot + CT66 camp-skip, all TPK +
     0-byte .err (visual feel still human-eyes: knobs are 7.2f pace / 30f gate in PartyMember.cs).
+  - **Pass-16 (2026-10-21, art pass: real-PNG audit of Baldrun + rig wiring)**: user-cleaned
+    `art/baldrun.png` audited by a one-off headless `--script` tool (Godot 4.7 has no static
+    `Image.load`; use `ResourceLoader.load(path,"Texture2D")` + `get_image()` - NOT `get_data()`,
+    CompressedTexture2D doesn't carry it; import pass (`--headless --import`) must land BEFORE the
+    script can see the new PNG). Verdict: 98x118 canvas, opaque bbox 96x116 with a clean 1 px margin,
+    cx_delta -0.5 px (dead-centred), **0 soft-alpha px** of 8,263 covered (fringe bakeout = pass),
+    50 opaque colours (quantized, slightly over the 24-32 target - not a blocker). Wiring: `displayName
+    == "Baldrun"` loads the texture and hangs a Sprite2D on the **RIG** (not the root) at scale 0.75
+    (118 px canvas -> ~88 px stage, under the 96 px final boss), offset so the **base-rim centre sits
+    at the rig origin** (rim band ~7 px shy of canvas bottom) - the topple now pivots around the
+    miniature's own base, not its canvas centre. Nearest filtering pinned per-node: 4.7's C# bindings
+    have NO `TextureFilterMode` enum class, so `_mini.Set("texture_filter", 0)` (native setter + int
+    constant). `_mini` mirrors every `_body` state gate - hidden/camp visibility, hit-red flash,
+    invuln-green - and the placeholder square is zero-sized on art members (their Visible flag
+    re-arms every frame, so size 0 is the only reliable hide). Other members keep placeholder
+    squares until their art lands (Mosiah pending). Caveat: 0.75 is a non-integer texel scale under
+    NEAREST - if the user sees crawl/shimmer while walking, the fix is an offline clean resize to
+    ~88 px, not an engine filter. Gate: CT67/CT68 plain pilot + CT69 camp-skip, all TPK + 0-byte
+    .err (CT67 TPK lv4, CT68 TPK lv5, CT69 TPK lv4 with the camp rows + Baldrun-ELIMINATED line live).
+    Audit script `tools/artcheck.gd` kept on disk (untracked) - swap its res:// path line for the
+    Mosiah audit.
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)

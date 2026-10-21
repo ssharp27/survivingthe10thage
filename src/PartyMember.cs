@@ -80,6 +80,9 @@ public partial class PartyMember : Godot.Node2D
     // step instead of freezing mid-sway
     Vector2 _lastMovePos = new Vector2();
     float _moveSpeed = 0.0f;
+    // real painted mini (user 2026-10-21): hangs on the rig and replaces the placeholder
+    // square for PCs that have art; null until its texture load succeeds
+    Godot.Sprite2D _mini;
 
     public override void _EnterTree()
     {
@@ -96,6 +99,28 @@ public partial class PartyMember : Godot.Node2D
         _rig.Name = "Rig";
         AddChild(_rig);
         _rig.AddChild(_body); // under the rig, NOT the root: see motion block below
+        // painted mini (user 2026-10-21): Baldrun's cleaned art passed the audit (98x118,
+        // hard alpha, 50-colour palette). Sprite lives on the RIG so the shuffle AND the
+        // topple pivot at the base-rim centre, not the canvas centre - a toppled miniature
+        // falls around its own base. Hitbox, chips, labels, telegraphs untouched.
+        if (displayName == "Baldrun")
+        {
+            Godot.Texture2D tex = GD.Load("res://art/baldrun.png") as Godot.Texture2D;
+            if (tex != null)
+            {
+                _mini = new Godot.Sprite2D();
+                _mini.Texture = tex;
+                // 4.7 has no C# TextureFilterMode enum: 0 = TEXTURE_FILTER_NEAREST straight
+                // into the native CanvasItem setter, so the painted edges stay hard
+                _mini.Set("texture_filter", 0);
+                float s = 0.75f; // 118 px canvas -> ~88 px stage: a hair under the 96 px final boss
+                _mini.Scale = new Vector2(s, s);
+                // rim centre pinned to the rig origin (rim band sits ~7 px shy of the canvas bottom)
+                _mini.Position = new Vector2(0.0f, -(tex.GetHeight() * 0.5f - 7.0f) * s);
+                _rig.AddChild(_mini);
+                _body.Size = new Vector2(0.0f, 0.0f); // art replaces the square outright
+            }
+        }
         _ds = new Label();
         _ds.Position = new Vector2(-24.0f, -58.0f); // clears the 64x8 dash bar at y-42
         AddChild(_ds);
@@ -203,6 +228,8 @@ public partial class PartyMember : Godot.Node2D
             hidden = true;
         if (_body != null)
             _body.Visible = !hidden;
+        if (_mini != null)
+            _mini.Visible = !hidden; // same gate: campfire un-hides art and square alike
         if (_telePivot != null)
             _telePivot.Visible = !hidden;
         if (_ds != null)
@@ -301,9 +328,15 @@ public partial class PartyMember : Godot.Node2D
             // red tint, not a white multiply: Baldrun's near-white square barely
             // changed under a 3x white modulate
             _body.Modulate = new Color(1.0f, 0.35f, 0.35f);
+            if (_mini != null)
+                _mini.Modulate = new Color(1.0f, 0.35f, 0.35f);
         }
         else
+        {
             _body.Modulate = new Color(1.0f, 1.0f, 1.0f);
+            if (_mini != null)
+                _mini.Modulate = new Color(1.0f, 1.0f, 1.0f);
+        }
         cdTimer -= delta;
         if (dsHold > 0.0f)
         {
@@ -321,6 +354,8 @@ public partial class PartyMember : Godot.Node2D
         if (invuln > 0.0f)
         {
             _body.Modulate = new Color(0.8f, 1.0f, 0.85f); // pale green = post-revive shield
+            if (_mini != null)
+                _mini.Modulate = new Color(0.8f, 1.0f, 0.85f);
             if (_ds != null)
             {
                 // locked rule made visible: the player can see WHY a hit just bounced
