@@ -9,9 +9,10 @@ using Godot;
 public partial class Boss : Combatant
 {
     public bool active = false;
-    public float radius = 46.0f;
-    public float driftSpeed = 42.0f;
-    public float bulletDamage = 10.0f;
+    // the last four are scene-authored on BossMini/BossFinal: @export ships them in the PCK
+    [Export] public float radius = 46.0f;
+    [Export] public float driftSpeed = 42.0f;
+    [Export] public float bulletDamage = 10.0f;
 
     float _eventTimer = 3.0f;
     bool _telegraph = false;

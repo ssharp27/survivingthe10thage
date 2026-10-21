@@ -7,8 +7,10 @@ using Godot;
 public partial class Combatant : Godot.Node2D
 {
     public float hp = 10.0f;
-    public float maxHp = 10.0f;
-    public string kind = "goblin";
+    // @export so PackedScene overrides (Main.tscn's kind/maxHp on BossMini/BossFinal) ship
+    // in the PCK; plain-public overrides only apply inside the editor (see PartyMember.cs)
+    [Export] public float maxHp = 10.0f;
+    [Export] public string kind = "goblin";
     public float contactDamage = 5.0f;
     public float hurtFlash = 0.0f;
 

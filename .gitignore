@@ -15,5 +15,8 @@ bin/
 .DS_Store
 Thumbs.db
 
+# standalone demo builds (export output)
+build/
+
 # session / harness artifacts
 .claude/

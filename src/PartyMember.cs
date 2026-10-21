@@ -8,18 +8,22 @@ using Godot;
 /// </summary>
 public partial class PartyMember : Godot.Node2D
 {
-    public string displayName = "Member";
-    public string weaponName = "Maul";
-    public int memberIndex = 0;
-    public bool isLeader = false;
+    // [Export] IS REQUIRED, not cosmetic: the export packer only serializes [Export]-annotated
+    // C# properties into the PCK, so a plain-public scene override (Main.tscn's Baldrun/Mosiah
+    // blocks) silently vanishes in a standalone build (2026-10-21 demo bug: exported game ran
+    // with displayName="Member", isLeader=false, art lookup miss, boss HP defaults).
+    [Export] public string displayName = "Member";
+    [Export] public string weaponName = "Maul";
+    [Export] public int memberIndex = 0;
+    [Export] public bool isLeader = false;
 
-    public float maxHp = 60.0f;
-    public float baseSpeed = 185.0f;
+    [Export] public float maxHp = 60.0f;
+    [Export] public float baseSpeed = 185.0f;
 
-    public float weaponDamage = 10.0f;
-    public float cooldown = 1.15f;
-    public float range = 95.0f;
-    public float arcHalf = 1.05f; // half-arc radians: wide = maul, narrow = rapier
+    [Export] public float weaponDamage = 10.0f;
+    [Export] public float cooldown = 1.15f;
+    [Export] public float range = 95.0f;
+    [Export] public float arcHalf = 1.05f; // half-arc radians: wide = maul, narrow = rapier
 
     public float hp = 0.0f;
     public bool downed = false;
@@ -36,7 +40,7 @@ public partial class PartyMember : Godot.Node2D
     // "wider arc" rank track REMOVED per human test: Baldrun's upgrade pool went to
     // reach / damage / cooldown instead, so the maul fan stays a fixed ~150 deg arc.
     public int pierce = 0; // "deeper thrust": the rapier lane can skewer extra bodies
-    public string class_ = ""; // display class for the ui/ cards (empty = weapon fallback)
+    [Export] public string class_ = ""; // display class for the ui/ cards (empty = weapon fallback)
     public string pickHistory = ""; // tracks taken so far, rendered on the run-summary card
 
     // down/death-save state (driven by the Game root)
