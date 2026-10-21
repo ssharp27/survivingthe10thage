@@ -68,7 +68,14 @@ public partial class PartyMember : Godot.Node2D
 
     Godot.ColorRect _body;
     Godot.Label _ds;
-    float _flash = 0.0f;
+    float _flash = 0.0f; // RED lane: set ONLY when damage actually lands (NoteHitFlash)
+    float _atkFlash = 0.0f; // ghost-white swing pulse, kept off the harm lane
+    // Game.TakeHit calls this the frame damage lands, so the mini reads its harm
+    // flash from the one place that knows invuln/buffer rules already passed
+    public void NoteHitFlash()
+    {
+        _flash = 0.12f;
+    }
     // mini motion rig (user 2026-10-21): the body/art hangs on this pivot so the mini
     // can shuffle without touching the node's logical position, hitbox, chips, labels
     // or telegraph - and future art sprites reparent here unchanged
@@ -327,11 +334,22 @@ public partial class PartyMember : Godot.Node2D
         if (_flash > 0.0f)
         {
             _flash -= delta;
-            // red tint, not a white multiply: Baldrun's near-white square barely
-            // changed under a 3x white modulate
+            // RED = the body actually took damage (user 2026-10-21: harm owns the red
+            // lane; swings used to borrow it). Tint, not a white multiply: painted
+            // minis barely budge under >1 modulate
             _body.Modulate = new Color(1.0f, 0.35f, 0.35f);
             if (_mini != null)
                 _mini.Modulate = new Color(1.0f, 0.35f, 0.35f);
+        }
+        else if (_atkFlash > 0.0f)
+        {
+            _atkFlash -= delta;
+            // SWING = ghost-white commit pulse. Modulate only multiplies, so a bright
+            // white is impossible on painted art - semi-transparent IS the white read
+            if (_mini != null)
+                _mini.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.55f);
+            else
+                _body.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.6f); // placeholder squares ghost alike
         }
         else
         {
@@ -489,7 +507,7 @@ public partial class PartyMember : Godot.Node2D
                     ((Combatant)hit).TakeDamage(dmg);
             }
         }
-        _flash = 0.12f;
+        _atkFlash = 0.12f; // swing = ghost-white, never red (see flash block)
         _telePivot.Rotation = facing;
         _telePivot.Scale = new Vector2(rangeMul, rangeMul);
         // rebuild the spokes for the LIVE arc: ranks open the maul fan, and the

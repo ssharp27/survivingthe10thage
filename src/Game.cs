@@ -318,6 +318,7 @@ public partial class Game : Godot.Node2D
                 return;
             m.dsDamageBuffer = (float)DS_DAMAGE_FAIL_BUFFER;
             m.dsFails++;
+            m.NoteHitFlash(); // downed-body ran-into still reads as harm: red lane
             // locked rule made visible: damage on a downed body IS an extra failure
             GD.Print("[10thAge] damage on downed " + m.displayName + " = extra death-save fail "
                      + m.dsFails + "/" + DS_FAIL_LIMIT + " (buffered 2s)");
@@ -339,6 +340,7 @@ public partial class Game : Godot.Node2D
         if (_pilot)
             amount *= 0.15; // verification-only aid for headless runs; never set in normal play
         m.hp -= (float)amount;
+        m.NoteHitFlash(); // live HP loss = the red lane fires
         if (m.hp <= 0.0f)
         {
             // D fix: HP floors at 0 the moment a body falls, so overkill can neither

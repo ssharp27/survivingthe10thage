@@ -361,6 +361,18 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     their owner's rank for free (they are children); ties keep tree order; the sort reads
     the FOLDED positions the frame draws with, so wrap seams can't mis-sort. Gate: CT70/CT71
     plain pilot + CT72 camp-skip, all TPK + 0-byte .err (lv4/lv4/lv4).
+  - **Pass-18 (2026-10-21, user flash-lane split once art was in)**: the single `_flash`
+    timer fired on the SWING (line 492), so every Maul swipe painted Baldrun red - harm and
+    attack shared one lane. Split: RED = damage only, driven by `Game.TakeHit` calling
+    `m.NoteHitFlash()` on the two paths where harm is real (live HP loss + a downed-body
+    hit that registers a save-fail; invuln/engage/buffer early-returns skip it). SWING =
+    ghost-white commit pulse on a new `_atkFlash`: mini modulates (1,1,1,0.55) - Modulate
+    only multiplies, so "bright white" can't brighten painted art and semi-transparent IS
+    the white read; placeholder squares ghost at 0.6 alpha. Invuln-green lane unchanged.
+    Hitbox report to user: contact circle r=16 (`MEMBER_RADIUS`) is pinned exactly at the
+    base-rim centre; painted rim is ~73x12, so the circle covers the middle third of the
+    base, not its full wingspan - widening it is a balance call (user owns those numbers).
+    Gate: CT73/CT74 plain pilot + CT75 camp-skip, all TPK + 0-byte .err (lv4/lv6/lv4).
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)
