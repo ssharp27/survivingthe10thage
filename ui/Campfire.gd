@@ -101,9 +101,10 @@ func _make_card() -> Panel:
 	# past the 720 px screen and become unclickable (human-test rounds 1-2).
 	# WIDTH matters too (human bug 2026-10-20): GridContainer columns size to
 	# the CHILD MIN width - a 0 min width collapsed every card to a sliver at
-	# top-left and all its text painted over itself. 2 cols x 270 + 18 sep
-	# fits the 592 px inner frame.
-	card.custom_minimum_size = Vector2(270.0, 100.0)
+	# top-left and all its text painted over itself. 3 cols x 284 + 2x18 sep
+	# fits the 912 px inner width; 3 cols ALSO drop the grid to 2 rows, which
+	# is what makes the whole stack fit the 592 px inner height (pass-20).
+	card.custom_minimum_size = Vector2(284.0, 100.0)
 	card.add_theme_stylebox_override("panel", _stylebox_card())
 	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.name = "VBox"

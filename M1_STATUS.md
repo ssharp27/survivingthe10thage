@@ -389,6 +389,20 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     collided with the telegraph spoke `s` in the same constructor -> `miniScale`/`miniRim`.
     Gate: CT76/CT77 plain pilot + CT78 camp-skip, all TPK + 0-byte .err (lv5/lv4/lv4);
     CT76's log shows Mosiah loaded clean (no loader error in the 0-byte .err).
+  - **Pass-20 (2026-10-21, camp screen alignment - stack-budget fix)**: the vertical stack
+    overflowed the 592 px inner frame (fixed rows ~354 + 3-row grid min 320 + seps = ~674),
+    which is why the rest row and CONFIRM bar spilled past the 720 px screen and card rows
+    painted over each other. Fix is structural, not per-pixel: PartyGrid goes 3 columns
+    (2 rows for the 6 slots = 210 px min; 3x284 + 2x18 = 888 <= 912 inner width) - the ~50 px
+    of slack lands on the grid's stretch flag, growing every card to ~123 px so the READY/
+    DOWN state rows finally have room. Rest-button internals re-anchored: body 0.55..0.87
+    (54 px for 3 wrapped lines at 0.75 scale ~48 px, with a real gap), chip 0.90..0.99, so
+    body can no longer autowrap-overflow onto the chip line; button min stays 170. Card min
+    width 270 -> 284. Edits: tscn (columns, body/chip anchors+scale), gd (width + comments,
+    done via PowerShell regex replace after the edit tool degenerated on the .gd twice -
+    the file read back clean). Gate: CT79/CT80 plain pilot + CT81 camp-skip, all TPK +
+    0-byte .err (lv4/lv4/lv4); CT81's campfire lines prove the rebuilt card stack lays out
+    without a _ready abort.
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)
