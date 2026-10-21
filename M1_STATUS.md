@@ -351,6 +351,16 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     .err (CT67 TPK lv4, CT68 TPK lv5, CT69 TPK lv4 with the camp rows + Baldrun-ELIMINATED line live).
     Audit script `tools/artcheck.gd` kept on disk (untracked) - swap its res:// path line for the
     Mosiah audit.
+  - **Pass-17 (2026-10-21, user eyes on the wired Baldrun: dash bar through the art + flat
+    party draw order)**: two visual fixes. (a) The 64x8 dash-cooldown plate moved from y-42
+    (it cut across the bear's torso) to y+12 - the base-rim bottom sits ~y+5, so the gold
+    bar now reads as a charge plate the miniature stands ON, never through the art.
+    (b) PARTY Y-SORT: every frame ranks `_party` by ground Y and bakes rank into `ZIndex =
+    4+rank` (4..8 band stays over the horde) - a bodyguard crossing ABOVE Baldrun paints
+    UNDER him and vice versa, the classic tabletop overlap. Chips/labels/telegraphs ride
+    their owner's rank for free (they are children); ties keep tree order; the sort reads
+    the FOLDED positions the frame draws with, so wrap seams can't mis-sort. Gate: CT70/CT71
+    plain pilot + CT72 camp-skip, all TPK + 0-byte .err (lv4/lv4/lv4).
 
 
 ## Verified in-engine (smokeR1 + smokeR2 + smokeR3, 2026-10-19, M1_PILOT=1, `--quit-after 60000`)

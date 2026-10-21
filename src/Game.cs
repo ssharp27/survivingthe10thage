@@ -1390,11 +1390,14 @@ public partial class Game : Godot.Node2D
         // dash recharges. Human-test UX pass: 64x8 track at y-42, and once the dash IS
         // ready the fill flashes bright gold twice a second, so the 6 s recharge has an
         // actual "you may press SPACE now" cue instead of a static sliver.
+        // 2026-10-21 round 2: with the painted mini on, y-42 cut across the bear's torso
+        // - the bar moved BELOW the base (rim bottom sits ~y+5) so it reads as a charge
+        // plate the miniature stands on, never through the art.
         if (_dashBarPivot != null && _dashBarFill != null)
         {
             if (leader != null)
             {
-                _dashBarPivot.GlobalPosition = leader.GlobalPosition + new Vector2(0.0f, -42.0f);
+                _dashBarPivot.GlobalPosition = leader.GlobalPosition + new Vector2(0.0f, 12.0f);
                 double ready = _dashCdT <= 0.0 ? 1.0 : 1.0 - _dashCdT / DASH_CD;
                 if (ready < 0.0)
                     ready = 0.0;
@@ -1413,6 +1416,20 @@ public partial class Game : Godot.Node2D
             }
             else
                 _dashBarPivot.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+        }
+        // party Y-sort (user 2026-10-21): painted minis overlap on the table, so a
+        // bodyguard standing ABOVE the leader must paint UNDER him and vice versa.
+        // Rank members by ground Y and bake the rank into ZIndex (base 4..8 keeps the
+        // whole squad over the horde; chips/labels/telegraphs ride their parent's rank
+        // since they are children). Uses FOLDED positions - the same coords the frame
+        // draws - so wrap seams can't mis-sort.
+        foreach (PartyMember m in _party)
+        {
+            int rank = 0;
+            foreach (PartyMember o in _party)
+                if (o != m && o.GlobalPosition.Y < m.GlobalPosition.Y)
+                    rank += 1;
+            m.ZIndex = 4 + rank;
         }
 
         // death saves (locked rules): d20 every 4 s while downed - nat 20 revives

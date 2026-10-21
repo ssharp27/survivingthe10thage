@@ -122,7 +122,9 @@ public partial class PartyMember : Godot.Node2D
             }
         }
         _ds = new Label();
-        _ds.Position = new Vector2(-24.0f, -58.0f); // clears the 64x8 dash bar at y-42
+        _ds.Position = new Vector2(-24.0f, -58.0f); // above-head label lane (the dash bar
+                                                    // moved under the mini 2026-10-21, so this
+                                                    // lane no longer fights it)
         AddChild(_ds);
         // d20 death-save chip (DESIGN:12): paper face + ink number + state ring, parked
         // to the body's right so it never fights the ds label (y-58), the dash bar
