@@ -199,54 +199,54 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     .err 0 bytes; recruit drop + join lines both fired in the pilot log (join via the camp-sweep path since
     the pilot never walks to the rescue site).
  - **Human-play pass 10 (three pass-9 bug reports fixed, 2026-10-20)**: (1) STAGING - the beat must read as a
-    rescue the party rides toward, so the stranded PC lands PAST the camera edge (distance = the visible rect's
-    exit along the chosen bearing + RECRUIT_MARGIN 90 px, floored at RECRUIT_DIST 300; 8 bearing retries, because
-    ClampToArena can pull a candidate back into frame) and the escort goblins open ESCORT_RING 340 px wide of the
-    PC (was 160). (2) CRAWL GATE - an escort goblin does not move at all until Game.RecruitInView() says the PC is
-    inside the ~960x540 camera rect, and the creep factor dropped 0.4 -> ESCORT_CRAWL 0.22, so the goblins shamble
-    in over the screen instead of animating off-camera. (3) JOIN PAUSE - the banner is now a SOFT pause exactly like
-    the picker/camp screens: Game.GetWorldPause() = _pickerActive || _joinWaiting, the 4 external gates (Enemy,
-    PartyMember, Boss, Director) read it, a freeze block after UpdateHpStrips holds the sim, and `_joinWaiting` was
-    added to the run-clock guard. It is NOT a tree pause on purpose: the CLICK TO CONTINUE gate needs input frames.
-    (4) HINT LEAK - the CLICK TO CONTINUE Label was a LOCAL inside JoinRecruit, so ClearJoinBanner never had a
-    handle on it and the prompt stayed painted over the HUD for the rest of the run (in the pass-9 human run that
-    stale prompt next to the SHORT REST GIFT picker is exactly what read as a frozen game); it is a field `_joinHint`
-    now, hidden with the card. (5) CAMPFIRE FREEZE/CRASH - after EndCampfire hides the card a hidden Control still
-    receives _input and its rect still answers, so a stray click or ENTER re-ran _on_commit_pressed (modal.show() +
-    get_tree().paused = true with nothing visible on screen, and nothing left to un-pause it): Campfire.gd now bails
-    `if not visible` at the top of _input, and _on_rest_now bails `if not modal.visible` so a rest cannot resolve
-    twice behind the camp. Gate: smokeCT18 TPK lv 4 + smokeCT19 VICTORY lv 6 + smokeCT20 TPK lv 4, all .err 0 bytes;
-    CT19 logged the drop 1119 px off camera, the camp-sweep join, the pilot join-banner clear, the SHORT rest and
-    the BOSS/VICTORY line.
+	rescue the party rides toward, so the stranded PC lands PAST the camera edge (distance = the visible rect's
+	exit along the chosen bearing + RECRUIT_MARGIN 90 px, floored at RECRUIT_DIST 300; 8 bearing retries, because
+	ClampToArena can pull a candidate back into frame) and the escort goblins open ESCORT_RING 340 px wide of the
+	PC (was 160). (2) CRAWL GATE - an escort goblin does not move at all until Game.RecruitInView() says the PC is
+	inside the ~960x540 camera rect, and the creep factor dropped 0.4 -> ESCORT_CRAWL 0.22, so the goblins shamble
+	in over the screen instead of animating off-camera. (3) JOIN PAUSE - the banner is now a SOFT pause exactly like
+	the picker/camp screens: Game.GetWorldPause() = _pickerActive || _joinWaiting, the 4 external gates (Enemy,
+	PartyMember, Boss, Director) read it, a freeze block after UpdateHpStrips holds the sim, and `_joinWaiting` was
+	added to the run-clock guard. It is NOT a tree pause on purpose: the CLICK TO CONTINUE gate needs input frames.
+	(4) HINT LEAK - the CLICK TO CONTINUE Label was a LOCAL inside JoinRecruit, so ClearJoinBanner never had a
+	handle on it and the prompt stayed painted over the HUD for the rest of the run (in the pass-9 human run that
+	stale prompt next to the SHORT REST GIFT picker is exactly what read as a frozen game); it is a field `_joinHint`
+	now, hidden with the card. (5) CAMPFIRE FREEZE/CRASH - after EndCampfire hides the card a hidden Control still
+	receives _input and its rect still answers, so a stray click or ENTER re-ran _on_commit_pressed (modal.show() +
+	get_tree().paused = true with nothing visible on screen, and nothing left to un-pause it): Campfire.gd now bails
+	`if not visible` at the top of _input, and _on_rest_now bails `if not modal.visible` so a rest cannot resolve
+	twice behind the camp. Gate: smokeCT18 TPK lv 4 + smokeCT19 VICTORY lv 6 + smokeCT20 TPK lv 4, all .err 0 bytes;
+	CT19 logged the drop 1119 px off camera, the camp-sweep join, the pilot join-banner clear, the SHORT rest and
+	the BOSS/VICTORY line.
  - **Balance pass 11 + recruit-beat rework (user-approved, 2026-10-20 human-test)**: (1) Mosiah maxHp 50 -> 60
-    (Main.tscn, user ask). (2) PICKER QOL - eliminated-until-campfire bodies stop leaking onto level-up cards:
-    MemberJoinedAt -> MemberInPlay (joined && !eliminated), applied at all 3 picker call sites, so picks feed the
-    bodies that can still save the run; campfire revival re-opens their tracks automatically. (3) ESCORT HUNT -
-    escort goblins open ESCORT_RING 340 -> 520 px wide and crawl 0.22 -> 0.12 (both agent sanity-check numbers on
-    the user's "further/slower" ask), and they now CLOSE ON the PC instead of holding a decorative ring (escortHold
+	(Main.tscn, user ask). (2) PICKER QOL - eliminated-until-campfire bodies stop leaking onto level-up cards:
+	MemberJoinedAt -> MemberInPlay (joined && !eliminated), applied at all 3 picker call sites, so picks feed the
+	bodies that can still save the run; campfire revival re-opens their tracks automatically. (3) ESCORT HUNT -
+	escort goblins open ESCORT_RING 340 -> 520 px wide and crawl 0.22 -> 0.12 (both agent sanity-check numbers on
+	the user's "further/slower" ask), and they now CLOSE ON the PC instead of holding a decorative ring (escortHold
     = the PC, Enemy escort branch stops at 18 px, damages on contact within 30 px, contactDamage 2 on a 1 s cd).
-    (4) JOIN HP - EscortHitRecruit chips the stranded PC's hp (floored at RECRUIT_JOIN_FLOOR 0.25 of max, proposal
-    number), and JoinRecruit brings him in at whatever survived instead of full HP (supersedes the old "joins at
-    FULL HP" user rule). The horde still can never touch a stranded recruit; the escort can never run him down.
-    (5) HUD readout - while the beat is pending the HP strip goes live showing "Mosiah STRANDED 44/60" so the
-    join-HP cost is readable (agent addition on top of the user rule; vetoable). Smoke gate CT21/CT22 VICTORY lv 6
-    (join print shows the new 60/60hp) + CT23 TPK lv 6, all .err 0 bytes; escort contact damage and the STRANDED
-    strip are human-only paths (the pilot never walks to the rescue site, so it joins at full HP via the camp sweep).
+	(4) JOIN HP - EscortHitRecruit chips the stranded PC's hp (floored at RECRUIT_JOIN_FLOOR 0.25 of max, proposal
+	number), and JoinRecruit brings him in at whatever survived instead of full HP (supersedes the old "joins at
+	FULL HP" user rule). The horde still can never touch a stranded recruit; the escort can never run him down.
+	(5) HUD readout - while the beat is pending the HP strip goes live showing "Mosiah STRANDED 44/60" so the
+	join-HP cost is readable (agent addition on top of the user rule; vetoable). Smoke gate CT21/CT22 VICTORY lv 6
+	(join print shows the new 60/60hp) + CT23 TPK lv 6, all .err 0 bytes; escort contact damage and the STRANDED
+	strip are human-only paths (the pilot never walks to the rescue site, so it joins at full HP via the camp sweep).
  - **Wrap-world conversion (user fix, 2026-10-20 human-found bug)**: goblin escort staging collapsed completely
-    when a PC spawned near an arena edge (ClampToArena squashed the ring). The stage now has NO walls: ARENA_HW/HH
-    became the WRAP PERIOD (2400x1800 torus). ClampToArena -> WrapNearCamera (every entity folded into the half-period
-    box around the camera - 1200x900 vs the 960x540 screen, so seam folds sit outside frame and never pop) plus
-    WrapDelta for toroidal chase/contact math (Enemy normal/reaper/escort branches, Boss drift/aim/contact, downed-body
-    contacts). PartyMember._Process folds every body but the Leader (the Leader IS the camera anchor); gems fold in
-    UpdateGems; the floor rect rides the camera while the 60 patches fold (motion readout stays); bullets now despawn
-    camera-relative. Walls retired (BuildWall no longer called); HELP!/arrow track the recruit's FOLDED position;
+	when a PC spawned near an arena edge (ClampToArena squashed the ring). The stage now has NO walls: ARENA_HW/HH
+	became the WRAP PERIOD (2400x1800 torus). ClampToArena -> WrapNearCamera (every entity folded into the half-period
+	box around the camera - 1200x900 vs the 960x540 screen, so seam folds sit outside frame and never pop) plus
+	WrapDelta for toroidal chase/contact math (Enemy normal/reaper/escort branches, Boss drift/aim/contact, downed-body
+	contacts). PartyMember._Process folds every body but the Leader (the Leader IS the camera anchor); gems fold in
+	UpdateGems; the floor rect rides the camera while the 60 patches fold (motion readout stays); bullets now despawn
+	camera-relative. Walls retired (BuildWall no longer called); HELP!/arrow track the recruit's FOLDED position;
     SpawnFieldRecruit staging simplified (retry loop + clamp removed - staging cannot fail when there are no edges).
     "Absolute offscreen parking" is no longer a hiding spot in a looping world: Bosses start and die HIDDEN
     (_EnterTree + OnBossKilled Visible=false, ActivateBoss Visible=true), the dead TEST reaper hides itself too.
     Escort goblins that survive a camp-sweep join become ordinary horde goblins (no shuffling to a dead hold point;
-    escort branch now tracks the recruit's live position, not the spawn-time escortHold). Smoke gate CT31/CT32/CT33:
-    all VICTORY (lv 6/7/7), .err 0 bytes - recruit drop prints 1119px out cleanly. Caveat: wrap-awareness covers
-    chase/contact; enemy-to-enemy separation still uses raw coords (opposite-seam pairs under-count, greybox-tolerable).
+	escort branch now tracks the recruit's live position, not the spawn-time escortHold). Smoke gate CT31/CT32/CT33:
+	all VICTORY (lv 6/7/7), .err 0 bytes - recruit drop prints 1119px out cleanly. Caveat: wrap-awareness covers
+	chase/contact; enemy-to-enemy separation still uses raw coords (opposite-seam pairs under-count, greybox-tolerable).
  - **Pass 12b (2026-10-20, human-found wrap fallout)**: (1) the pinned floor covered ~1/4 of the frame on the user's
     fullscreen window - the 960x540 assumption was WRONG (DPI-scaled fullscreen with canvas_items stretch sees far more
     world). Frame + wrap period are now MEASURED, not hardcoded: a hidden full-rect anchor Control (_winProbe, anchors
@@ -304,16 +304,16 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
   - **Pass-14 (2026-10-21, user art session: 32-bit minis idea + Baldrun/Mosiah AI art)**:
     motion rig landed BEFORE the art - each entity gets a visual-only `Rig` Node2D the
     body hangs on (hitbox/logic/chips/labels/telegraph stay on the root; future art
-    sprites reparent under the same rig unchanged). Three motion families per the user's
-    mini concept: PARTY = table slide (x sway 3 px + lean + set-down tap, phases offset
-    per memberIndex so nudges read individually) with a topple language: DOWNED/eliminated
-    = rim down (eased 90 deg lean, sway stopped), not-yet-joined = upright waiting to be
-    picked up - front-facing art makes the whole thing flip-free. ENEMIES = creature
-    walk-bob (vertical 1.4-2.2 px by kind, phase = instanceId%64 so the horde never
-    marches in lockstep) - deliberately NOT the slide: monsters walk, minis get shoved.
-    BOSSES = the party slide scaled (mini 3 px / final 4.5 px) - bosses ARE big minis.
-    All pauses keep rigs frozen (GetWorldPause early-return covers it). Art review notes
-    for the user's AI pieces (cleanup gate before art drops in): palettize ~24-32 colors
+	sprites reparent under the same rig unchanged). Three motion families per the user's
+	mini concept: PARTY = table slide (x sway 3 px + lean + set-down tap, phases offset
+	per memberIndex so nudges read individually) with a topple language: DOWNED/eliminated
+	= rim down (eased 90 deg lean, sway stopped), not-yet-joined = upright waiting to be
+	picked up - front-facing art makes the whole thing flip-free. ENEMIES = creature
+	walk-bob (vertical 1.4-2.2 px by kind, phase = instanceId%64 so the horde never
+	marches in lockstep) - deliberately NOT the slide: monsters walk, minis get shoved.
+	BOSSES = the party slide scaled (mini 3 px / final 4.5 px) - bosses ARE big minis.
+	All pauses keep rigs frozen (GetWorldPause early-return covers it). Art review notes
+	for the user's AI pieces (cleanup gate before art drops in): palettize ~24-32 colors
     + bake out the 1px semi-transparent fringe, Mosiah hair/coat silhouette needs a tone
     split, keep the shared round gold-rim base (reads as ground contact AND can gate
     state via rim). "32-bit style" read as Diablo-era detail sprites, target 64-96 px
@@ -322,44 +322,44 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     feel needs human eyes, and the user is playing now).
   - **Pass-15 (2026-10-21, user feel round: "a little faster" + "stop when the player
     stops, ending with the last bounce")**: party shuffle is now PUSH-GATED - the rig
-    measures the node's real travel per frame (post-fold, wrap seams read as 0) with an
-    exp-damped speed; above 30 px/s the mini shuffles and the tempo SCALES with the push
-    (7.2 rad/s base ~29% over pass-14, ratio clamped 0.35..1.4 of ~130 px/s full speed);
-    below it the sway GLIDES level (exp ease ~9/s) - a set-down, never a freeze mid-sway.
-    Side effect: the orbit ring's ~11 px/s idle drift sits under the gate, so the whole
+	measures the node's real travel per frame (post-fold, wrap seams read as 0) with an
+	exp-damped speed; above 30 px/s the mini shuffles and the tempo SCALES with the push
+	(7.2 rad/s base ~29% over pass-14, ratio clamped 0.35..1.4 of ~130 px/s full speed);
+	below it the sway GLIDES level (exp ease ~9/s) - a set-down, never a freeze mid-sway.
+	Side effect: the orbit ring's ~11 px/s idle drift sits under the gate, so the whole
     squad stops shuffling when the Leader stops. Topple/stranded branches also ease
     position now (no hard zero). Gate: CT64/CT65 plain pilot + CT66 camp-skip, all TPK +
     0-byte .err (visual feel still human-eyes: knobs are 7.2f pace / 30f gate in PartyMember.cs).
   - **Pass-16 (2026-10-21, art pass: real-PNG audit of Baldrun + rig wiring)**: user-cleaned
     `art/baldrun.png` audited by a one-off headless `--script` tool (Godot 4.7 has no static
     `Image.load`; use `ResourceLoader.load(path,"Texture2D")` + `get_image()` - NOT `get_data()`,
-    CompressedTexture2D doesn't carry it; import pass (`--headless --import`) must land BEFORE the
-    script can see the new PNG). Verdict: 98x118 canvas, opaque bbox 96x116 with a clean 1 px margin,
-    cx_delta -0.5 px (dead-centred), **0 soft-alpha px** of 8,263 covered (fringe bakeout = pass),
-    50 opaque colours (quantized, slightly over the 24-32 target - not a blocker). Wiring: `displayName
-    == "Baldrun"` loads the texture and hangs a Sprite2D on the **RIG** (not the root) at scale 0.75
-    (118 px canvas -> ~88 px stage, under the 96 px final boss), offset so the **base-rim centre sits
-    at the rig origin** (rim band ~7 px shy of canvas bottom) - the topple now pivots around the
-    miniature's own base, not its canvas centre. Nearest filtering pinned per-node: 4.7's C# bindings
-    have NO `TextureFilterMode` enum class, so `_mini.Set("texture_filter", 0)` (native setter + int
-    constant). `_mini` mirrors every `_body` state gate - hidden/camp visibility, hit-red flash,
-    invuln-green - and the placeholder square is zero-sized on art members (their Visible flag
-    re-arms every frame, so size 0 is the only reliable hide). Other members keep placeholder
-    squares until their art lands (Mosiah pending). Caveat: 0.75 is a non-integer texel scale under
-    NEAREST - if the user sees crawl/shimmer while walking, the fix is an offline clean resize to
-    ~88 px, not an engine filter. Gate: CT67/CT68 plain pilot + CT69 camp-skip, all TPK + 0-byte
-    .err (CT67 TPK lv4, CT68 TPK lv5, CT69 TPK lv4 with the camp rows + Baldrun-ELIMINATED line live).
-    Audit script `tools/artcheck.gd` kept on disk (untracked) - swap its res:// path line for the
-    Mosiah audit.
+	CompressedTexture2D doesn't carry it; import pass (`--headless --import`) must land BEFORE the
+	script can see the new PNG). Verdict: 98x118 canvas, opaque bbox 96x116 with a clean 1 px margin,
+	cx_delta -0.5 px (dead-centred), **0 soft-alpha px** of 8,263 covered (fringe bakeout = pass),
+	50 opaque colours (quantized, slightly over the 24-32 target - not a blocker). Wiring: `displayName
+	== "Baldrun"` loads the texture and hangs a Sprite2D on the **RIG** (not the root) at scale 0.75
+	(118 px canvas -> ~88 px stage, under the 96 px final boss), offset so the **base-rim centre sits
+	at the rig origin** (rim band ~7 px shy of canvas bottom) - the topple now pivots around the
+	miniature's own base, not its canvas centre. Nearest filtering pinned per-node: 4.7's C# bindings
+	have NO `TextureFilterMode` enum class, so `_mini.Set("texture_filter", 0)` (native setter + int
+	constant). `_mini` mirrors every `_body` state gate - hidden/camp visibility, hit-red flash,
+	invuln-green - and the placeholder square is zero-sized on art members (their Visible flag
+	re-arms every frame, so size 0 is the only reliable hide). Other members keep placeholder
+	squares until their art lands (Mosiah pending). Caveat: 0.75 is a non-integer texel scale under
+	NEAREST - if the user sees crawl/shimmer while walking, the fix is an offline clean resize to
+	~88 px, not an engine filter. Gate: CT67/CT68 plain pilot + CT69 camp-skip, all TPK + 0-byte
+	.err (CT67 TPK lv4, CT68 TPK lv5, CT69 TPK lv4 with the camp rows + Baldrun-ELIMINATED line live).
+	Audit script `tools/artcheck.gd` kept on disk (untracked) - swap its res:// path line for the
+	Mosiah audit.
   - **Pass-17 (2026-10-21, user eyes on the wired Baldrun: dash bar through the art + flat
-    party draw order)**: two visual fixes. (a) The 64x8 dash-cooldown plate moved from y-42
-    (it cut across the bear's torso) to y+12 - the base-rim bottom sits ~y+5, so the gold
+	party draw order)**: two visual fixes. (a) The 64x8 dash-cooldown plate moved from y-42
+	(it cut across the bear's torso) to y+12 - the base-rim bottom sits ~y+5, so the gold
     bar now reads as a charge plate the miniature stands ON, never through the art.
     (b) PARTY Y-SORT: every frame ranks `_party` by ground Y and bakes rank into `ZIndex =
     4+rank` (4..8 band stays over the horde) - a bodyguard crossing ABOVE Baldrun paints
     UNDER him and vice versa, the classic tabletop overlap. Chips/labels/telegraphs ride
-    their owner's rank for free (they are children); ties keep tree order; the sort reads
-    the FOLDED positions the frame draws with, so wrap seams can't mis-sort. Gate: CT70/CT71
+	their owner's rank for free (they are children); ties keep tree order; the sort reads
+	the FOLDED positions the frame draws with, so wrap seams can't mis-sort. Gate: CT70/CT71
     plain pilot + CT72 camp-skip, all TPK + 0-byte .err (lv4/lv4/lv4).
   - **Pass-18 (2026-10-21, user flash-lane split once art was in)**: the single `_flash`
     timer fired on the SWING (line 492), so every Maul swipe painted Baldrun red - harm and
@@ -367,41 +367,41 @@ instrumentation P6) is **uncommitted** and verified by the smoke runs below.
     `m.NoteHitFlash()` on the two paths where harm is real (live HP loss + a downed-body
     hit that registers a save-fail; invuln/engage/buffer early-returns skip it). SWING =
     ghost-white commit pulse on a new `_atkFlash`: mini modulates (1,1,1,0.55) - Modulate
-    only multiplies, so "bright white" can't brighten painted art and semi-transparent IS
-    the white read; placeholder squares ghost at 0.6 alpha. Invuln-green lane unchanged.
-    Hitbox report to user: contact circle r=16 (`MEMBER_RADIUS`) is pinned exactly at the
-    base-rim centre; painted rim is ~73x12, so the circle covers the middle third of the
-    base, not its full wingspan - widening it is a balance call (user owns those numbers).
-    Gate: CT73/CT74 plain pilot + CT75 camp-skip, all TPK + 0-byte .err (lv4/lv6/lv4).
+	only multiplies, so "bright white" can't brighten painted art and semi-transparent IS
+	the white read; placeholder squares ghost at 0.6 alpha. Invuln-green lane unchanged.
+	Hitbox report to user: contact circle r=16 (`MEMBER_RADIUS`) is pinned exactly at the
+	base-rim centre; painted rim is ~73x12, so the circle covers the middle third of the
+	base, not its full wingspan - widening it is a balance call (user owns those numbers).
+	Gate: CT73/CT74 plain pilot + CT75 camp-skip, all TPK + 0-byte .err (lv4/lv6/lv4).
   - **Pass-19 (2026-10-21, Mosiah art + knocked-over confirm)**: user dropped `art/mosiah.png`;
-    same import pipeline (headless `--import` pass made the `.import` sidecar, then the audit
-    ran through it). Audit verdict: 79x119, opaque bbox 78x117 at 1,1, 1px margins, cx_delta
-    0.0 (dead-centred), 58 opaque colours, 6443 covered px, 0 soft-alpha px - clean like
-    Baldrun. Wiring generalized the art block: displayName -> miniPath lookup (Baldrun,
-    Mosiah), per-piece knobs `miniScale 0.75` (both canvases ~118 tall -> ~88 stage px) and
-    `miniRim 7.0` px from canvas bottom to the base-rim centre; same nearest-filter + rim-
-    pinned-to-rig-origin anchor, so Mosiah topples and dash-plates off the same contact point.
-    Knocked-over language was already locked in pass-14/15: `downed || eliminated` tips the
-    RIG 90 deg around the base-rim pivot (~0.2s fall, alternate directions per member index);
-    with the minis now hanging on the rig they inherit it - a body being channel-revived
-    stays tipped until the revive completes, and the stranded recruit stays upright (locked).
-    Compile slips fixed in-flight: C# `String` not in scope here -> `string`; local `s`
-    collided with the telegraph spoke `s` in the same constructor -> `miniScale`/`miniRim`.
-    Gate: CT76/CT77 plain pilot + CT78 camp-skip, all TPK + 0-byte .err (lv5/lv4/lv4);
-    CT76's log shows Mosiah loaded clean (no loader error in the 0-byte .err).
+	same import pipeline (headless `--import` pass made the `.import` sidecar, then the audit
+	ran through it). Audit verdict: 79x119, opaque bbox 78x117 at 1,1, 1px margins, cx_delta
+	0.0 (dead-centred), 58 opaque colours, 6443 covered px, 0 soft-alpha px - clean like
+	Baldrun. Wiring generalized the art block: displayName -> miniPath lookup (Baldrun,
+	Mosiah), per-piece knobs `miniScale 0.75` (both canvases ~118 tall -> ~88 stage px) and
+	`miniRim 7.0` px from canvas bottom to the base-rim centre; same nearest-filter + rim-
+	pinned-to-rig-origin anchor, so Mosiah topples and dash-plates off the same contact point.
+	Knocked-over language was already locked in pass-14/15: `downed || eliminated` tips the
+	RIG 90 deg around the base-rim pivot (~0.2s fall, alternate directions per member index);
+	with the minis now hanging on the rig they inherit it - a body being channel-revived
+	stays tipped until the revive completes, and the stranded recruit stays upright (locked).
+	Compile slips fixed in-flight: C# `String` not in scope here -> `string`; local `s`
+	collided with the telegraph spoke `s` in the same constructor -> `miniScale`/`miniRim`.
+	Gate: CT76/CT77 plain pilot + CT78 camp-skip, all TPK + 0-byte .err (lv5/lv4/lv4);
+	CT76's log shows Mosiah loaded clean (no loader error in the 0-byte .err).
   - **Pass-20 (2026-10-21, camp screen alignment - stack-budget fix)**: the vertical stack
     overflowed the 592 px inner frame (fixed rows ~354 + 3-row grid min 320 + seps = ~674),
     which is why the rest row and CONFIRM bar spilled past the 720 px screen and card rows
     painted over each other. Fix is structural, not per-pixel: PartyGrid goes 3 columns
     (2 rows for the 6 slots = 210 px min; 3x284 + 2x18 = 888 <= 912 inner width) - the ~50 px
-    of slack lands on the grid's stretch flag, growing every card to ~123 px so the READY/
-    DOWN state rows finally have room. Rest-button internals re-anchored: body 0.55..0.87
-    (54 px for 3 wrapped lines at 0.75 scale ~48 px, with a real gap), chip 0.90..0.99, so
-    body can no longer autowrap-overflow onto the chip line; button min stays 170. Card min
-    width 270 -> 284. Edits: tscn (columns, body/chip anchors+scale), gd (width + comments,
-    done via PowerShell regex replace after the edit tool degenerated on the .gd twice -
-    the file read back clean). Gate: CT79/CT80 plain pilot + CT81 camp-skip, all TPK +
-    0-byte .err (lv4/lv4/lv4); CT81's campfire lines prove the rebuilt card stack lays out
+	of slack lands on the grid's stretch flag, growing every card to ~123 px so the READY/
+	DOWN state rows finally have room. Rest-button internals re-anchored: body 0.55..0.87
+	(54 px for 3 wrapped lines at 0.75 scale ~48 px, with a real gap), chip 0.90..0.99, so
+	body can no longer autowrap-overflow onto the chip line; button min stays 170. Card min
+	width 270 -> 284. Edits: tscn (columns, body/chip anchors+scale), gd (width + comments,
+	done via PowerShell regex replace after the edit tool degenerated on the .gd twice -
+	the file read back clean). Gate: CT79/CT80 plain pilot + CT81 camp-skip, all TPK +
+	0-byte .err (lv4/lv4/lv4); CT81's campfire lines prove the rebuilt card stack lays out
     without a _ready abort.
 
 
@@ -616,3 +616,41 @@ the deferred Leader-down rule leaves no rescue channel — that is expected vari
 varies run to run). A run that ends in TPK legitimately has no VICTORY line — read the last log line to
 tell truncation apart from a real loss; rerun at 90000 frames only if the last line is a mid-stage status
 line.
+
+---
+
+## Pass 22 (2026-10-22) — demo-export root cause + picker stage-clock fix
+
+### Demo export: THE STALE EXPORT CACHE, not [Export]
+- Set-probe (sm23.out): `Object.Set("displayName","ProbeX")` STUCK at runtime => properties
+  addressable in the game build => the PACK side lost the assignments. Registration was fine.
+- Root cause: `.godot\exported\<path-id>\export-<hash>-Main.scn` is cached and invalidated ONLY
+  on **Main.tscn** changes. The [Export] fix lives in PartyMember.cs, so Main.tscn never changed
+  => every export after 10-21 17:54 re-shipped the same stale 1204-B entry (keys absent, only
+  node names Baldrun/Mosiah). DLL flavor / Compile Remove / annotation form were all red herrings.
+- FIX: `rmdir /s /q .godot\exported` (+ `.godot\mono\temp\{obj,bin}`) before exporting.
+  Regenerated entry = 1962 B WITH displayName/isLeader/weaponName/maxHp/arcHalf (x1 = interned
+  pool dedup) and Baldrun/Mosiah x2 (node name + value). Verified on disk before unzipping.
+- PITFALL: `.godot/exported` scene-bin cache does NOT see C# source changes. Wipe it before
+  any export whose PackedScene property semantics depend on C# annotations.
+- Headless export works when dotnet is PATH-prepended (`set PATH=C:\Users\Steve\dev-tools\dotnet;%PATH%`):
+  Godot's OWN C# build succeeds; preset maps to name "Game". Output: build\demo_v2.zip.
+
+### Picker stage-clock bug (human bug report 2026-10-22, user-directed => approved)
+- Symptom: park on the level-up pick card -> `_stageT` keeps ticking (HUD `t=` advances) while
+  the horde director holds the march (Director.cs early-return on world pause) -> at
+  `_stageT >= FIRST_HALF` the MINIBOSS transition fires in the switch => mini-boss spawns over an
+  empty arena. Join banner has the same exposure: its early-return sits AFTER the switch, so only
+  `_runT`-gated beats held during join, never the `_stageT` gate.
+- FIX (Game._Process): `_stageT += d` only when `!GetWorldPause()` — one increment site, so
+  picker AND join freeze stage beats; every reader (FIRST_HALF gate, Director density ramp,
+  camp timeout valve, HUD t=) follows by construction. Campfire state is unaffected (own state
+  machine, not a world pause). No balance numbers touched.
+
+### Pitfall: headless run with stale code tears down class registration
+- Editing .cs then running --headless with an older bin\ DLL => Godot defers the rebuild (no
+  rebuild popup headless) and starts with class registration gone: every Mono script prints
+  "Cannot instantiate C# script ... class could not be found" (sm26: 2-line stdout, 12 err rows).
+- FIX: dotnet-build first (writes .godot\mono\temp\bin\Debug) then `copy` that DLL over
+  bin\survivingthe10thage.dll so the assembly is NEWER than every source; the headless run then
+  loads it directly (sm27 green: Baldrun squad + TPK + 0-byte err).

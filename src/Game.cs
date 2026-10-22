@@ -9,34 +9,34 @@ using Godot;
 /// </summary>
 public partial class Game : Godot.Node2D
 {
-    // ---------- looping world / squad geometry ----------
-    // user bugfix 2026-10-20: goblin escort staging collapsed when a PC spawned near an
-    // arena edge. The stage has NO walls now: the world LOOPS (torus). The wrap period
-    // is NOT hardcoded: the fullscreen window (canvas_items stretch, aspect expand) can
-    // see far more world than the 1920x1080 base viewport at DPI-scaled sizes, and the
-    // frame is MEASURED per run (human bug 2026-10-20 part 2: the pinned floor covered
-    // only ~1/4 of the frame). period = 2x the measured half-extent + 480 px slack, so
-    // every entity's fold box strictly contains the frame and seam folds can never pop
+	// ---------- looping world / squad geometry ----------
+	// user bugfix 2026-10-20: goblin escort staging collapsed when a PC spawned near an
+	// arena edge. The stage has NO walls now: the world LOOPS (torus). The wrap period
+	// is NOT hardcoded: the fullscreen window (canvas_items stretch, aspect expand) can
+	// see far more world than the 1920x1080 base viewport at DPI-scaled sizes, and the
+	// frame is MEASURED per run (human bug 2026-10-20 part 2: the pinned floor covered
+	// only ~1/4 of the frame). period = 2x the measured half-extent + 480 px slack, so
+	// every entity's fold box strictly contains the frame and seam folds can never pop
     // in view, on any window.
     Vector2 _visHalf = new Vector2(960.0f, 540.0f); // overwritten by MeasureWindow()
     double _wrapW = 2400.0;
     double _wrapH = 1800.0;
     public readonly float MEMBER_RADIUS = 16.0f;
     public const double RING_RADIUS = 64.0; // bodyguard ring; sized so REVIVE_RANGE
-    // wraps a ring slot: a downed bodyguard is in arm's reach of the rescue
-    // ---------- player revive (leader stands still near a body) ----------
-    // 56 (was 30): widened so a bodyguard slot and the rescue share a spot
-    readonly double REVIVE_RANGE = 56.0;
-    readonly double REVIVE_CHANNEL = 3.0;
-    readonly double REVIVE_INVULN = 2.0; // post-revive immunity; the body is also
-    // shielded while the channel is actively progressing (reviveShield)
+	// wraps a ring slot: a downed bodyguard is in arm's reach of the rescue
+	// ---------- player revive (leader stands still near a body) ----------
+	// 56 (was 30): widened so a bodyguard slot and the rescue share a spot
+	readonly double REVIVE_RANGE = 56.0;
+	readonly double REVIVE_CHANNEL = 3.0;
+	readonly double REVIVE_INVULN = 2.0; // post-revive immunity; the body is also
+	// shielded while the channel is actively progressing (reviveShield)
 
-    // ---------- death saves (user-locked rules) ----------
-    // Downed allies roll a d20 every 4 s: nat 20 = revived at 25 % HP, 11-19 = a
-    // success, 3 successes = STABLE (rolls stop; a hit then slays the body
-    // outright unless the player revives it), 10 or below = a failure and 3
-    // failures = out until the next campfire. Damage on a downed (unstable) body
-    // is one failure, kept 2 s apart so a swarm can't insta-finish anyone.
+	// ---------- death saves (user-locked rules) ----------
+	// Downed allies roll a d20 every 4 s: nat 20 = revived at 25 % HP, 11-19 = a
+	// success, 3 successes = STABLE (rolls stop; a hit then slays the body
+	// outright unless the player revives it), 10 or below = a failure and 3
+	// failures = out until the next campfire. Damage on a downed (unstable) body
+	// is one failure, kept 2 s apart so a swarm can't insta-finish anyone.
     readonly double DS_INTERVAL = 4.0; // d20 roll cadence while downed
     readonly int DS_FAIL_ON = 10; // roll <= this fails
     readonly int DS_REVIVE_ON = 20; // nat 20 revives at 25 % HP
@@ -116,14 +116,14 @@ public partial class Game : Godot.Node2D
     static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f };
     static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0 };
     int[] _pickRank = new int[6];
-    int[] _optRoll = { -1, -1, -1 }; // this level-up's three offered options (slot -> option)
+	int[] _optRoll = { -1, -1, -1 }; // this level-up's three offered options (slot -> option)
 
-    // ---------- dash (SPACE; balance pass 4, user-approved) ----------
-    // Leader lunges 120 px (halved from 240 per user: "covers less ground") on a
-    // 6 s cooldown (up from 1.5 s per user); every live ring member lunges the
-    // SAME 120 px on its own 6 s cooldown - with the leader halved the impulses
-    // are symmetric, so the ring formation is preserved through the squad lunge.
-    // The cooldown gets a readout: a gold fill bar over Baldrun's head that
+	// ---------- dash (SPACE; balance pass 4, user-approved) ----------
+	// Leader lunges 120 px (halved from 240 per user: "covers less ground") on a
+	// 6 s cooldown (up from 1.5 s per user); every live ring member lunges the
+	// SAME 120 px on its own 6 s cooldown - with the leader halved the impulses
+	// are symmetric, so the ring formation is preserved through the squad lunge.
+	// The cooldown gets a readout: a gold fill bar over Baldrun's head that
     // grows back as the dash recharges.
     readonly double DASH_IMPULSE = 120.0; // px burst per dash (user halved it)
     readonly double DASH_CD = 6.0;        // seconds between dashes (user raised it)
@@ -131,189 +131,189 @@ public partial class Game : Godot.Node2D
     readonly double MEMBER_DASH_IMPULSE = 120.0; // px burst per ring member (now == leader)
     readonly double MEMBER_DASH_CD = 6.0;        // seconds between squad lunges
     double _memberDashCdT = 0.0;
-    Godot.Node2D _dashBarPivot = null;    // ride-along pivot over the leader's head
-    Godot.ColorRect _dashBarFill = null;  // the gold fill, re-sized every frame
-    double _dashPulse = 0.0;              // free-running clock behind the dash-ready flash
-    double _engageInvulnT = 0.0;          // 2 s party immunity window right after a boss engages
+	Godot.Node2D _dashBarPivot = null;    // ride-along pivot over the leader's head
+	Godot.ColorRect _dashBarFill = null;  // the gold fill, re-sized every frame
+	double _dashPulse = 0.0;              // free-running clock behind the dash-ready flash
+	double _engageInvulnT = 0.0;          // 2 s party immunity window right after a boss engages
 
-    // ---------- rest -> horde scaling (long rest costs the party its safety) ----------
-    // Director.cs reads this and densifies spawns; the long-rest risk chip on the
-    // Campfire screen is wired to exactly this.
-    double _hordeScale = 1.0;
+	// ---------- rest -> horde scaling (long rest costs the party its safety) ----------
+	// Director.cs reads this and densifies spawns; the long-rest risk chip on the
+	// Campfire screen is wired to exactly this.
+	double _hordeScale = 1.0;
 
-    // ---------- ui/ screens (Campfire.tscn + RunSummary.tscn, see ui/INTEGRATION.md) ----------
-    Godot.CanvasLayer _campfire;
-    Godot.CanvasLayer _summary;
-    bool _campfireWaiting = false;
-    string _campfireChoice = "";
-    // run summary retry: one ChangeSceneToFile per run, so a retry can never loop
-    bool _summaryRetried = false;
+	// ---------- ui/ screens (Campfire.tscn + RunSummary.tscn, see ui/INTEGRATION.md) ----------
+	Godot.CanvasLayer _campfire;
+	Godot.CanvasLayer _summary;
+	bool _campfireWaiting = false;
+	string _campfireChoice = "";
+	// run summary retry: one ChangeSceneToFile per run, so a retry can never loop
+	bool _summaryRetried = false;
 
-    // ---------- M1 verification pilot (headless smoke only) ----------
-    // Active only when the env var M1_PILOT is set. The leader then orbits while
-    // everyone is up, walks onto a downed body and stops there so the stand-still
-    // revive can channel. No gameplay values are touched.
-    bool _pilot = false;
-    // smoke helper mirroring the dev_camp key: M1_DEV_SKIP=camp makes a PILOT run
-    // skip to the campfire immediately, so CI runs actually load Campfire.tscn/.gd
-    // (layout edits would otherwise go unvalidated in TPK-heavy runs)
-    string _devSkip = "";
-    double _pilotTick = 0.0;
-    Godot.RandomNumberGenerator Rng;
+	// ---------- M1 verification pilot (headless smoke only) ----------
+	// Active only when the env var M1_PILOT is set. The leader then orbits while
+	// everyone is up, walks onto a downed body and stops there so the stand-still
+	// revive can channel. No gameplay values are touched.
+	bool _pilot = false;
+	// smoke helper mirroring the dev_camp key: M1_DEV_SKIP=camp makes a PILOT run
+	// skip to the campfire immediately, so CI runs actually load Campfire.tscn/.gd
+	// (layout edits would otherwise go unvalidated in TPK-heavy runs)
+	string _devSkip = "";
+	double _pilotTick = 0.0;
+	Godot.RandomNumberGenerator Rng;
 
-    enum StageState { PLAY1, MINIBOSS, CAMPFIRE, PLAY2, BOSS, DEAD, VICTORY };
-    StageState _state = StageState.PLAY1;
-    double _stageT = 0.0;
-    double _pickerWait = 0.0;
-    bool _pickerActive = false;
-    bool _summaryPrinted = false;
+	enum StageState { PLAY1, MINIBOSS, CAMPFIRE, PLAY2, BOSS, DEAD, VICTORY };
+	StageState _state = StageState.PLAY1;
+	double _stageT = 0.0;
+	double _pickerWait = 0.0;
+	bool _pickerActive = false;
+	bool _summaryPrinted = false;
 
-    Godot.Camera2D _camera;
-    Godot.Label _hud;
-    Godot.Label _pickerLabel;
-    // ---------- per-member HP strips (8-bit HUD grammar, replaces stacked text) ----------
-    // Human-test: the stacked "name: hp" lines ran past the window edge and were not
-    // scannable mid-horde. Each slot is a name label + a 110x7 bar + a state dot
-    // (sage standing / blood down / amber stable / grey OUT), gold marking the Leader.
-    Godot.CanvasLayer _hudLayer = null;
-    Godot.Collections.Array<Godot.Label> _hpName = new();
-    Godot.Collections.Array<Godot.ColorRect> _hpBg = new();
-    Godot.Collections.Array<Godot.ColorRect> _hpFill = new();
-    Godot.Collections.Array<Godot.ColorRect> _hpDot = new();
-    bool _hpStripsBuilt = false;
-    string _pickerCard = "LEVEL UP";      // what the picker is offering (level-up / camp gift)
-    double _pickerNoticeT = 0.0;          // "every rank capped - xp banked" notice countdown
-    Godot.Collections.Array<PartyMember> _party = new();
-    PartyMember _leader = null;
-    Godot.Collections.Array<Godot.Node2D> _gems = new();
-    Godot.Collections.Array<double> _gemVals = new();
-    // looping-world decor: the flat floor rect rides the camera (solid color, so pinning
-    // it is seam-invisible) while the scattered patches fold like every other entity,
-    // which keeps them scrolling AND looping as the motion readout
-    Godot.ColorRect _floorRect = null;
-    // hidden full-rect Control: after layout its Size IS the visible canvas rect
-    // (anchors 0,0-1,1 resolve against the root viewport) - the window measurement
-    Godot.Control _winProbe = null;
-    Godot.Collections.Array<Godot.ColorRect> _floorPatches = new();
-    Godot.Collections.Array<Godot.Node2D> _bullets = new();
-    Godot.Collections.Array<Vector2> _bulletVel = new();
-    Godot.Collections.Array<double> _bulletDmg = new();
-    Godot.Collections.Array<Godot.Node2D> _enemies = new();
-    Godot.Collections.Array<Boss> _bosses = new();
-    int _liveEnemies = 0;
-    double _ringAngle = 0.0;
-    // ---------- field-recruit state ----------
-    double _runT = 0.0;                 // run clock: PLAY1/MINIBOSS/PLAY2 only (camp and
-                                        // picker pauses do not burn stage beats)
-    bool _recruitBeatDone = false;      // the drop fires at most once per run
-    PartyMember _recruitPending = null; // stranded PC awaiting escort clear
-    int _escortLeft = 0;                // escort goblins still alive
-    Godot.Node2D _recruitArrow = null;  // arrow above the Leader, aimed at the PC
-    Godot.Label _helpLabel = null;      // HELP! floating over the stranded PC
-    bool _joinWaiting = false;          // join banner up, waiting for the click
-    Godot.Label _joinBanner = null;
-    Godot.ColorRect _joinBtn = null;
-    Godot.Label _joinHint = null;       // CLICK TO CONTINUE under the gold card: it is a
-                                        // field, not a local, so ClearJoinBanner can actually
-                                        // take it away (human fix: the stale hint kept
-                                        // telling the player to click a dead card)
+	Godot.Camera2D _camera;
+	Godot.Label _hud;
+	Godot.Label _pickerLabel;
+	// ---------- per-member HP strips (8-bit HUD grammar, replaces stacked text) ----------
+	// Human-test: the stacked "name: hp" lines ran past the window edge and were not
+	// scannable mid-horde. Each slot is a name label + a 110x7 bar + a state dot
+	// (sage standing / blood down / amber stable / grey OUT), gold marking the Leader.
+	Godot.CanvasLayer _hudLayer = null;
+	Godot.Collections.Array<Godot.Label> _hpName = new();
+	Godot.Collections.Array<Godot.ColorRect> _hpBg = new();
+	Godot.Collections.Array<Godot.ColorRect> _hpFill = new();
+	Godot.Collections.Array<Godot.ColorRect> _hpDot = new();
+	bool _hpStripsBuilt = false;
+	string _pickerCard = "LEVEL UP";      // what the picker is offering (level-up / camp gift)
+	double _pickerNoticeT = 0.0;          // "every rank capped - xp banked" notice countdown
+	Godot.Collections.Array<PartyMember> _party = new();
+	PartyMember _leader = null;
+	Godot.Collections.Array<Godot.Node2D> _gems = new();
+	Godot.Collections.Array<double> _gemVals = new();
+	// looping-world decor: the flat floor rect rides the camera (solid color, so pinning
+	// it is seam-invisible) while the scattered patches fold like every other entity,
+	// which keeps them scrolling AND looping as the motion readout
+	Godot.ColorRect _floorRect = null;
+	// hidden full-rect Control: after layout its Size IS the visible canvas rect
+	// (anchors 0,0-1,1 resolve against the root viewport) - the window measurement
+	Godot.Control _winProbe = null;
+	Godot.Collections.Array<Godot.ColorRect> _floorPatches = new();
+	Godot.Collections.Array<Godot.Node2D> _bullets = new();
+	Godot.Collections.Array<Vector2> _bulletVel = new();
+	Godot.Collections.Array<double> _bulletDmg = new();
+	Godot.Collections.Array<Godot.Node2D> _enemies = new();
+	Godot.Collections.Array<Boss> _bosses = new();
+	int _liveEnemies = 0;
+	double _ringAngle = 0.0;
+	// ---------- field-recruit state ----------
+	double _runT = 0.0;                 // run clock: PLAY1/MINIBOSS/PLAY2 only (camp and
+										// picker pauses do not burn stage beats)
+	bool _recruitBeatDone = false;      // the drop fires at most once per run
+	PartyMember _recruitPending = null; // stranded PC awaiting escort clear
+	int _escortLeft = 0;                // escort goblins still alive
+	Godot.Node2D _recruitArrow = null;  // arrow above the Leader, aimed at the PC
+	Godot.Label _helpLabel = null;      // HELP! floating over the stranded PC
+	bool _joinWaiting = false;          // join banner up, waiting for the click
+	Godot.Label _joinBanner = null;
+	Godot.ColorRect _joinBtn = null;
+	Godot.Label _joinHint = null;       // CLICK TO CONTINUE under the gold card: it is a
+										// field, not a local, so ClearJoinBanner can actually
+										// take it away (human fix: the stale hint kept
+										// telling the player to click a dead card)
 
-    // ---------- public surface used by the other scripts ----------
-    // the world LOOPS: instead of walls, every position is folded into the half-period
-    // box around the camera (Asteroids-style torus). The Leader is the anchor and must
-    // NOT be folded - folding it would pop the camera across a seam.
-    public Vector2 WrapNearCamera(Vector2 p)
-    {
-        Vector2 c = GetCameraCenter();
-        double pw = _wrapW;
-        double ph = _wrapH;
-        double dx = p.X - c.X;
-        double dy = p.Y - c.Y;
-        dx -= System.Math.Round(dx / pw) * pw;
-        dy -= System.Math.Round(dy / ph) * ph;
-        return new Vector2((float)(c.X + dx), (float)(c.Y + dy));
-    }
+	// ---------- public surface used by the other scripts ----------
+	// the world LOOPS: instead of walls, every position is folded into the half-period
+	// box around the camera (Asteroids-style torus). The Leader is the anchor and must
+	// NOT be folded - folding it would pop the camera across a seam.
+	public Vector2 WrapNearCamera(Vector2 p)
+	{
+		Vector2 c = GetCameraCenter();
+		double pw = _wrapW;
+		double ph = _wrapH;
+		double dx = p.X - c.X;
+		double dy = p.Y - c.Y;
+		dx -= System.Math.Round(dx / pw) * pw;
+		dy -= System.Math.Round(dy / ph) * ph;
+		return new Vector2((float)(c.X + dx), (float)(c.Y + dy));
+	}
 
-    // shortest step on the looping world: chase/move math must use this or an entity
-    // two steps from a seam tries the 2400 px way around instead of the 100 px hop
-    public Vector2 WrapDelta(Vector2 from, Vector2 to)
-    {
-        double dx = to.X - from.X;
-        double dy = to.Y - from.Y;
-        dx -= System.Math.Round(dx / _wrapW) * _wrapW;
-        dy -= System.Math.Round(dy / _wrapH) * _wrapH;
-        return new Vector2((float)dx, (float)dy);
-    }
+	// shortest step on the looping world: chase/move math must use this or an entity
+	// two steps from a seam tries the 2400 px way around instead of the 100 px hop
+	public Vector2 WrapDelta(Vector2 from, Vector2 to)
+	{
+		double dx = to.X - from.X;
+		double dy = to.Y - from.Y;
+		dx -= System.Math.Round(dx / _wrapW) * _wrapW;
+		dy -= System.Math.Round(dy / _wrapH) * _wrapH;
+		return new Vector2((float)dx, (float)dy);
+	}
 
-    public PartyMember GetLeader()
-    {
-        return _leader;
-    }
+	public PartyMember GetLeader()
+	{
+		return _leader;
+	}
 
-    public PartyMember NearestMember(Vector2 from)
-    {
-        PartyMember best = null;
-        double bestD = 1e18;
-        foreach (PartyMember m in _party)
-        {
-            if (!m.joined || m.downed || m.eliminated)
-                continue; // a stranded recruit is not squad yet: escorts do not chase it
-            double dd = m.GlobalPosition.DistanceSquaredTo(from);
-            if (dd < bestD)
-            {
-                bestD = dd;
-                best = m;
-            }
-        }
-        return best;
-    }
+	public PartyMember NearestMember(Vector2 from)
+	{
+		PartyMember best = null;
+		double bestD = 1e18;
+		foreach (PartyMember m in _party)
+		{
+			if (!m.joined || m.downed || m.eliminated)
+				continue; // a stranded recruit is not squad yet: escorts do not chase it
+			double dd = m.GlobalPosition.DistanceSquaredTo(from);
+			if (dd < bestD)
+			{
+				bestD = dd;
+				best = m;
+			}
+		}
+		return best;
+	}
 
-    // for contact/projectile damage: downed bodies are hit-able, just never chased
-    public PartyMember NearestMemberAny(Vector2 from)
-    {
-        PartyMember best = null;
-        double bestD = 1e18;
-        foreach (PartyMember m in _party)
-        {
-            if (!m.joined || m.eliminated)
-                continue;
-            double dd = m.GlobalPosition.DistanceSquaredTo(from);
-            if (dd < bestD)
-            {
-                bestD = dd;
-                best = m;
-            }
-        }
-        return best;
-    }
+	// for contact/projectile damage: downed bodies are hit-able, just never chased
+	public PartyMember NearestMemberAny(Vector2 from)
+	{
+		PartyMember best = null;
+		double bestD = 1e18;
+		foreach (PartyMember m in _party)
+		{
+			if (!m.joined || m.eliminated)
+				continue;
+			double dd = m.GlobalPosition.DistanceSquaredTo(from);
+			if (dd < bestD)
+			{
+				bestD = dd;
+				best = m;
+			}
+		}
+		return best;
+	}
 
-    public void TakeHit(PartyMember m, double amount)
-    {
-        // the horde can never touch a stranded recruit: only escort goblins chip him
-        // on contact (EscortHitRecruit), and that damage never runs the rescue down
-        // (user design 2026-10-20 pass 11: contact damage shapes the join HP)
-        if (m == null || !m.joined || m.eliminated)
-            return;
-        if (_engageInvulnT > 0.0)
-            return; // user-approved camp-safety gate: a boss engage opens on a 2 s
-                    // immunity window, so the arrival volley can never free-hit a party
-                    // that is still reacting (or parked at the camp beat)
-        if (m.invuln > 0.0f || m.reviveShield)
-            return; // post-revive shield, or the body is mid-rescue: immune
-        if (m.downed)
-        {
-            if (m.stable)
-            {
-                // stable bodies stopped rolling: the next hit just slays them
-                m.eliminated = true;
-                m.dsColor = CHIP_GREY;
-                m.SetDsText("OUT - next campfire");
-                GD.Print("[10thAge] " + m.displayName + " stable body SLAIN by damage - out until campfire");
-                CheckTpk();
-                return;
-            }
-            // downed bodies still get ran into / hit by volleys: each hit is one
-            // failed death save, buffered 2 s so a swarm can't insta-finish them
+	public void TakeHit(PartyMember m, double amount)
+	{
+		// the horde can never touch a stranded recruit: only escort goblins chip him
+		// on contact (EscortHitRecruit), and that damage never runs the rescue down
+		// (user design 2026-10-20 pass 11: contact damage shapes the join HP)
+		if (m == null || !m.joined || m.eliminated)
+			return;
+		if (_engageInvulnT > 0.0)
+			return; // user-approved camp-safety gate: a boss engage opens on a 2 s
+					// immunity window, so the arrival volley can never free-hit a party
+					// that is still reacting (or parked at the camp beat)
+		if (m.invuln > 0.0f || m.reviveShield)
+			return; // post-revive shield, or the body is mid-rescue: immune
+		if (m.downed)
+		{
+			if (m.stable)
+			{
+				// stable bodies stopped rolling: the next hit just slays them
+				m.eliminated = true;
+				m.dsColor = CHIP_GREY;
+				m.SetDsText("OUT - next campfire");
+				GD.Print("[10thAge] " + m.displayName + " stable body SLAIN by damage - out until campfire");
+				CheckTpk();
+				return;
+			}
+			// downed bodies still get ran into / hit by volleys: each hit is one
+			// failed death save, buffered 2 s so a swarm can't insta-finish them
             if (m.dsDamageBuffer > 0.0f)
                 return;
             m.dsDamageBuffer = (float)DS_DAMAGE_FAIL_BUFFER;
@@ -344,94 +344,94 @@ public partial class Game : Godot.Node2D
         if (m.hp <= 0.0f)
         {
             // D fix: HP floors at 0 the moment a body falls, so overkill can neither
-            // show a negative bar on the HUD strip nor poison the campfire's +25% heal
-            m.hp = 0.0f;
-            m.downed = true;
-            m.dsTimer = 0.0f;
-            m.dsFails = 0;
-            m.dsDamageBuffer = 0.0f;
-            m.SetDsText("DOWN");
-            m.dsColor = CHIP_BLOOD;
-            GD.Print("[10thAge] " + m.displayName + " DOWN at 0hp - d20 death saves start");
-            CheckTpk();
-        }
-    }
+			// show a negative bar on the HUD strip nor poison the campfire's +25% heal
+			m.hp = 0.0f;
+			m.downed = true;
+			m.dsTimer = 0.0f;
+			m.dsFails = 0;
+			m.dsDamageBuffer = 0.0f;
+			m.SetDsText("DOWN");
+			m.dsColor = CHIP_BLOOD;
+			GD.Print("[10thAge] " + m.displayName + " DOWN at 0hp - d20 death saves start");
+			CheckTpk();
+		}
+	}
 
-    public bool OnReaperDown(PartyMember m)
-    {
-        // TEST reaper (user death-state tester): whatever it touches goes DOWN and
-        // starts the d20 death-save cycle — this is the revival test bench. Returns
-        // true only when the down actually landed, so immunity lets it keep lurking.
-        if (m == null || !m.joined || m.eliminated || m.downed)
-            return false;
-        if (m.invuln > 0.0f || m.reviveShield)
-            return false;
-        m.hp = 0.0f;
-        m.downed = true;
-        m.stable = false;
-        m.dsTimer = 0.0f; // the first d20 rolls right away
-        m.dsFails = 0;
-        m.dsSucceeds = 0;
-        m.dsDamageBuffer = 0.0f;
-        m.SetDsText("DOWN");
-        m.dsColor = CHIP_BLOOD;
-        GD.Print("[10thAge] TEST reaper downed " + m.displayName + " - death saves start");
-        CheckTpk();
-        return true;
-    }
+	public bool OnReaperDown(PartyMember m)
+	{
+		// TEST reaper (user death-state tester): whatever it touches goes DOWN and
+		// starts the d20 death-save cycle — this is the revival test bench. Returns
+		// true only when the down actually landed, so immunity lets it keep lurking.
+		if (m == null || !m.joined || m.eliminated || m.downed)
+			return false;
+		if (m.invuln > 0.0f || m.reviveShield)
+			return false;
+		m.hp = 0.0f;
+		m.downed = true;
+		m.stable = false;
+		m.dsTimer = 0.0f; // the first d20 rolls right away
+		m.dsFails = 0;
+		m.dsSucceeds = 0;
+		m.dsDamageBuffer = 0.0f;
+		m.SetDsText("DOWN");
+		m.dsColor = CHIP_BLOOD;
+		GD.Print("[10thAge] TEST reaper downed " + m.displayName + " - death saves start");
+		CheckTpk();
+		return true;
+	}
 
-    // healBeat=false is the camp BEAT (mini-boss death): fallen lifted, bodies stand up,
-    // but the +25% heal waits on the rest choice so the campfire never double-heals.
-    public void ReviveAllAtCampfire(bool healBeat)
-    {
-        foreach (PartyMember m in _party)
-        {
-            if (!m.joined)
-                continue; // a PC not in the squad yet has nothing to lift at camp
-            if (m.eliminated)
-            {
-                // out since the last campfire: return at 25% HP
-                m.eliminated = false;
-                m.campReturned = true; // long rest must not full-heal these bodies
-                m.downed = false;
-                m.hp = m.maxHp * 0.25f;
-                m.stable = false;
-                m.dsFails = 0;
-                m.dsSucceeds = 0;
-                m.dsTimer = 0.0f;
-                m.dsDamageBuffer = 0.0f;
-                m.reviveProgress = 0.0f;
-                m.reviveShield = false;
-                // locked rule: EVERY revive path grants 2 s of post-revive invulnerability
-                m.invuln = (float)REVIVE_INVULN;
-                GD.Print("[10thAge] campfire revive: " + m.displayName + " returns at 25% hp + 2s invulnerable");
-                m.dsColor = CHIP_SAGE;
-                m.SetDsTemp("back at camp", 2.5);
-                continue;
-            }
-            if (m.downed)
-            {
-                // a body at camp: stands back up, rolls reset (and any legacy negative
-                // HP is floored before the +25% heal lands, so the gift is never spent
-                // on an overkill debt)
-                if (m.hp < 0.0f)
-                    m.hp = 0.0f;
-                m.downed = false;
-                m.stable = false;
-                m.dsFails = 0;
-                m.dsSucceeds = 0;
-                m.dsTimer = 0.0f;
-                m.dsDamageBuffer = 0.0f;
-                m.reviveProgress = 0.0f;
-                m.reviveShield = false;
-                m.invuln = (float)REVIVE_INVULN;
-                GD.Print("[10thAge] campfire stand-up: " + m.displayName + " + 2s invulnerable");
-                m.dsColor = CHIP_SAGE;
-                m.SetDsTemp("back at camp", 2.5);
-            }
-            if (healBeat)
-            {
-                // the campfire's locked +25% heal - applied once, by the rest choice
+	// healBeat=false is the camp BEAT (mini-boss death): fallen lifted, bodies stand up,
+	// but the +25% heal waits on the rest choice so the campfire never double-heals.
+	public void ReviveAllAtCampfire(bool healBeat)
+	{
+		foreach (PartyMember m in _party)
+		{
+			if (!m.joined)
+				continue; // a PC not in the squad yet has nothing to lift at camp
+			if (m.eliminated)
+			{
+				// out since the last campfire: return at 25% HP
+				m.eliminated = false;
+				m.campReturned = true; // long rest must not full-heal these bodies
+				m.downed = false;
+				m.hp = m.maxHp * 0.25f;
+				m.stable = false;
+				m.dsFails = 0;
+				m.dsSucceeds = 0;
+				m.dsTimer = 0.0f;
+				m.dsDamageBuffer = 0.0f;
+				m.reviveProgress = 0.0f;
+				m.reviveShield = false;
+				// locked rule: EVERY revive path grants 2 s of post-revive invulnerability
+				m.invuln = (float)REVIVE_INVULN;
+				GD.Print("[10thAge] campfire revive: " + m.displayName + " returns at 25% hp + 2s invulnerable");
+				m.dsColor = CHIP_SAGE;
+				m.SetDsTemp("back at camp", 2.5);
+				continue;
+			}
+			if (m.downed)
+			{
+				// a body at camp: stands back up, rolls reset (and any legacy negative
+				// HP is floored before the +25% heal lands, so the gift is never spent
+				// on an overkill debt)
+				if (m.hp < 0.0f)
+					m.hp = 0.0f;
+				m.downed = false;
+				m.stable = false;
+				m.dsFails = 0;
+				m.dsSucceeds = 0;
+				m.dsTimer = 0.0f;
+				m.dsDamageBuffer = 0.0f;
+				m.reviveProgress = 0.0f;
+				m.reviveShield = false;
+				m.invuln = (float)REVIVE_INVULN;
+				GD.Print("[10thAge] campfire stand-up: " + m.displayName + " + 2s invulnerable");
+				m.dsColor = CHIP_SAGE;
+				m.SetDsTemp("back at camp", 2.5);
+			}
+			if (healBeat)
+			{
+				// the campfire's locked +25% heal - applied once, by the rest choice
                 m.hp = m.hp + m.maxHp * 0.25f;
                 if (m.hp > m.maxHp)
                     m.hp = m.maxHp;
@@ -711,108 +711,108 @@ public partial class Game : Godot.Node2D
 
     // measures the REAL visible rect, so the wrap period (and staging distances)
     // always strictly contain the frame on any window size / DPI scale. The source
-    // is ground truth from the renderer's own layout pass: a hidden Control with
-    // full-rect anchors (0,0)-(1,1) resolves to exactly the visible canvas rect,
-    // and world<->canvas is 1:1 at zoom 1. Runs at run start AND every _Process
-    // frame: layout has not happened on the first frames, so the sanity guard
-    // rejects garbage and later frames correct it.
-    private void MeasureWindow()
-    {
-        if (_winProbe == null)
-        {
-            _winProbe = new Godot.Control();
-            // full-rect anchors: layout stretches this node to the visible canvas rect
-            _winProbe.SetAnchor(Godot.Side.Left, 0.0f);
-            _winProbe.SetAnchor(Godot.Side.Top, 0.0f);
-            _winProbe.SetAnchor(Godot.Side.Right, 1.0f);
-            _winProbe.SetAnchor(Godot.Side.Bottom, 1.0f);
-            _winProbe.Visible = false; // measurement only: never drawn
-            AddChild(_winProbe);
-        }
-        Godot.Vector2 vs = _winProbe.Size;
-        double hx = (double)vs.X * 0.5;
-        double hy = (double)vs.Y * 0.5;
-        if (hx < 64.0 || hy < 64.0)
-            return; // stale / garbage: keep the previous value
-        double w = hx * 2.0 + 480.0;
-        double h = hy * 2.0 + 480.0;
-        if (System.Math.Abs(w - _wrapW) < 2.0 && System.Math.Abs(h - _wrapH) < 2.0)
-            return; // same period, nothing to do
-        _visHalf = new Vector2((float)hx, (float)hy);
-        _wrapW = w;
-        _wrapH = h;
-        if (_floorRect != null)
-        {
-            _floorRect.Size = new Vector2((float)_wrapW, (float)_wrapH);
-            // no pivot trick: the headless oracle (pivot_test) proved pivot_offset is
-            // a NO-OP for translation - global_position setter just writes position.
-            // The pin below therefore pins TOP-LEFT = camera - size/2.
-        }
-        RescatterFloorPatches();
-        GD.Print("[10thAge] window measured: frame " + (int)(_visHalf.X * 2.0f) + "x" +
-                 (int)(_visHalf.Y * 2.0f) + " world px | wrap period " + (int)_wrapW + "x" + (int)_wrapH);
-    }
+	// is ground truth from the renderer's own layout pass: a hidden Control with
+	// full-rect anchors (0,0)-(1,1) resolves to exactly the visible canvas rect,
+	// and world<->canvas is 1:1 at zoom 1. Runs at run start AND every _Process
+	// frame: layout has not happened on the first frames, so the sanity guard
+	// rejects garbage and later frames correct it.
+	private void MeasureWindow()
+	{
+		if (_winProbe == null)
+		{
+			_winProbe = new Godot.Control();
+			// full-rect anchors: layout stretches this node to the visible canvas rect
+			_winProbe.SetAnchor(Godot.Side.Left, 0.0f);
+			_winProbe.SetAnchor(Godot.Side.Top, 0.0f);
+			_winProbe.SetAnchor(Godot.Side.Right, 1.0f);
+			_winProbe.SetAnchor(Godot.Side.Bottom, 1.0f);
+			_winProbe.Visible = false; // measurement only: never drawn
+			AddChild(_winProbe);
+		}
+		Godot.Vector2 vs = _winProbe.Size;
+		double hx = (double)vs.X * 0.5;
+		double hy = (double)vs.Y * 0.5;
+		if (hx < 64.0 || hy < 64.0)
+			return; // stale / garbage: keep the previous value
+		double w = hx * 2.0 + 480.0;
+		double h = hy * 2.0 + 480.0;
+		if (System.Math.Abs(w - _wrapW) < 2.0 && System.Math.Abs(h - _wrapH) < 2.0)
+			return; // same period, nothing to do
+		_visHalf = new Vector2((float)hx, (float)hy);
+		_wrapW = w;
+		_wrapH = h;
+		if (_floorRect != null)
+		{
+			_floorRect.Size = new Vector2((float)_wrapW, (float)_wrapH);
+			// no pivot trick: the headless oracle (pivot_test) proved pivot_offset is
+			// a NO-OP for translation - global_position setter just writes position.
+			// The pin below therefore pins TOP-LEFT = camera - size/2.
+		}
+		RescatterFloorPatches();
+		GD.Print("[10thAge] window measured: frame " + (int)(_visHalf.X * 2.0f) + "x" +
+				 (int)(_visHalf.Y * 2.0f) + " world px | wrap period " + (int)_wrapW + "x" + (int)_wrapH);
+	}
 
-    // re-scatter the motion-cue patches over the (possibly grown) wrap period
-    private void RescatterFloorPatches()
-    {
-        if (_floorRect == null || _floorPatches.Count == 0)
-            return; // Rng only exists once the patches do; safe guard for frame 1
-        Vector2 cen = GetCameraCenter();
-        foreach (Godot.ColorRect p in _floorPatches)
-            p.GlobalPosition = new Vector2(cen.X + (float)(Rng.Randf() * _wrapW - _wrapW * 0.5),
-                                           cen.Y + (float)(Rng.Randf() * _wrapH - _wrapH * 0.5));
-    }
+	// re-scatter the motion-cue patches over the (possibly grown) wrap period
+	private void RescatterFloorPatches()
+	{
+		if (_floorRect == null || _floorPatches.Count == 0)
+			return; // Rng only exists once the patches do; safe guard for frame 1
+		Vector2 cen = GetCameraCenter();
+		foreach (Godot.ColorRect p in _floorPatches)
+			p.GlobalPosition = new Vector2(cen.X + (float)(Rng.Randf() * _wrapW - _wrapW * 0.5),
+										   cen.Y + (float)(Rng.Randf() * _wrapH - _wrapH * 0.5));
+	}
 
-    // the escort must not shamble before the party can see the rescue (human fix: the
-    // beat read as an off-camera animation that started mid-walk)
-    public bool RecruitInView()
-    {
-        if (_recruitPending == null)
-            return false;
-        Vector2 cen = GetCameraCenter();
-        Vector2 half = GetVisibleHalfExtents();
-        Vector2 p = _recruitPending.GlobalPosition;
-        return System.Math.Abs(p.X - cen.X) <= half.X && System.Math.Abs(p.Y - cen.Y) <= half.Y;
-    }
+	// the escort must not shamble before the party can see the rescue (human fix: the
+	// beat read as an off-camera animation that started mid-walk)
+	public bool RecruitInView()
+	{
+		if (_recruitPending == null)
+			return false;
+		Vector2 cen = GetCameraCenter();
+		Vector2 half = GetVisibleHalfExtents();
+		Vector2 p = _recruitPending.GlobalPosition;
+		return System.Math.Abs(p.X - cen.X) <= half.X && System.Math.Abs(p.Y - cen.Y) <= half.Y;
+	}
 
-    public float GetEscortCrawl()
-    {
-        return (float)ESCORT_CRAWL;
-    }
+	public float GetEscortCrawl()
+	{
+		return (float)ESCORT_CRAWL;
+	}
 
-    public PartyMember GetRecruitPending()
-    {
-        return _recruitPending;
-    }
+	public PartyMember GetRecruitPending()
+	{
+		return _recruitPending;
+	}
 
-    // escort contact damage on the stranded PC (user pass 11): every goblin that walks
-    // onto him chips his HP, and JoinRecruit brings in whatever survived. floored -
-    // the escort pressures the rescue clock, it can never run the PC down outright
-    public void EscortHitRecruit(PartyMember m, double amount)
-    {
-        if (m == null || m.joined)
-            return;
-        // terminal runs (TPK/VICTORY screens) still tick the world; escort contact used
-        // to spam "chipped" forever behind the summary (CT50/51 log flood)
-        if (_state == StageState.DEAD || _state == StageState.VICTORY)
-            return;
-        float floor = m.maxHp * RECRUIT_JOIN_FLOOR;
-        float nh = m.hp - (float)amount;
-        if (nh < floor)
-            nh = floor;
-        m.hp = nh;
-        GD.Print("[10thAge] escort touch: " + m.displayName + " chipped to " +
-                 (int)m.hp + "/" + (int)m.maxHp + "hp");
-    }
+	// escort contact damage on the stranded PC (user pass 11): every goblin that walks
+	// onto him chips his HP, and JoinRecruit brings in whatever survived. floored -
+	// the escort pressures the rescue clock, it can never run the PC down outright
+	public void EscortHitRecruit(PartyMember m, double amount)
+	{
+		if (m == null || m.joined)
+			return;
+		// terminal runs (TPK/VICTORY screens) still tick the world; escort contact used
+		// to spam "chipped" forever behind the summary (CT50/51 log flood)
+		if (_state == StageState.DEAD || _state == StageState.VICTORY)
+			return;
+		float floor = m.maxHp * RECRUIT_JOIN_FLOOR;
+		float nh = m.hp - (float)amount;
+		if (nh < floor)
+			nh = floor;
+		m.hp = nh;
+		GD.Print("[10thAge] escort touch: " + m.displayName + " chipped to " +
+				 (int)m.hp + "/" + (int)m.maxHp + "hp");
+	}
 
-    public Vector2 GetCameraCenter()
-    {
-        return _camera != null ? _camera.GlobalPosition : (_leader != null ? _leader.GlobalPosition
-                                                                            : new Vector2(0, 0));
-    }
+	public Vector2 GetCameraCenter()
+	{
+		return _camera != null ? _camera.GlobalPosition : (_leader != null ? _leader.GlobalPosition
+																			: new Vector2(0, 0));
+	}
 
-    // long rest feeds this back to the director's pacing (rest = power vs horde scaling)
+	// long rest feeds this back to the director's pacing (rest = power vs horde scaling)
     public double GetHordeScale()
     {
         return _hordeScale;
@@ -896,45 +896,45 @@ public partial class Game : Godot.Node2D
         // is a no-op for translation, so centering must happen in the pin itself)
         floor.Color = new Color(0.10f, 0.16f, 0.10f, 1.0f);
         floor.ZIndex = -20; // the .tscn party/boss nodes predate this node in tree order;
-                            // without a negative z they'd be painted over by the floor
-        AddChild(floor);
-        _floorRect = floor; // rides the camera every frame: the looping world has no
-                            // edge, so the plain ground just keeps covering the frame
-        // scattered floor patches = motion reference. the camera keeps the leader centered,
-        // so a single-color floor made movement LOOK frozen even when input worked
-        Rng = new Godot.RandomNumberGenerator();
-        Rng.SetSeed(9001);
-        // patch DENSITY is kept constant to the measured period, so big windows keep the
-        // same motion cues per screen area
-        int patchCount = (int)(60.0 * _wrapW * _wrapH / (2400.0 * 1800.0));
-        if (patchCount > 400)
-            patchCount = 400;
-        for (int i = 0; i < patchCount; i++)
-        {
-            Godot.ColorRect p = new ColorRect();
-            float s = 6.0f + (float)Rng.Randf() * 10.0f;
-            p.Size = new Vector2(s, s);
-            p.GlobalPosition = new Vector2((float)Rng.Randf() * (float)_wrapW - (float)(_wrapW * 0.5),
-                                           (float)Rng.Randf() * (float)_wrapH - (float)(_wrapH * 0.5));
-            p.Color = new Color(0.13f, 0.20f, 0.13f, 1.0f);
-            p.ZIndex = -15;
-            AddChild(p);
-            _floorPatches.Add(p); // folded per frame like every other entity: the ground
-                                  // cover scrolls AND loops, so the wrap reads seamless
-        }
-        // walls are retired with the wrap (user fix 2026-10-20): there is no edge to
-        // bump into anymore, and a painted border would fight the invisible fold box
-        _camera = GetNode("Camera2D") as Godot.Camera2D;
-        Godot.CanvasLayer hudl = new CanvasLayer();
-        AddChild(hudl);
-        _hudLayer = hudl; // the HP strips parent to this once the party is known
-        _hud = new Label();
-        _hud.Position = new Vector2(24.0f, 24.0f);
-        hudl.AddChild(_hud);
-        _pickerLabel = new Label();
-        _pickerLabel.Position = new Vector2(24.0f, 274.0f); // clears the 6-row HP strip block
-        hudl.AddChild(_pickerLabel);
-        // dash-cooldown bar over the Leader's head: dark track + gold fill (resized
+							// without a negative z they'd be painted over by the floor
+		AddChild(floor);
+		_floorRect = floor; // rides the camera every frame: the looping world has no
+							// edge, so the plain ground just keeps covering the frame
+		// scattered floor patches = motion reference. the camera keeps the leader centered,
+		// so a single-color floor made movement LOOK frozen even when input worked
+		Rng = new Godot.RandomNumberGenerator();
+		Rng.SetSeed(9001);
+		// patch DENSITY is kept constant to the measured period, so big windows keep the
+		// same motion cues per screen area
+		int patchCount = (int)(60.0 * _wrapW * _wrapH / (2400.0 * 1800.0));
+		if (patchCount > 400)
+			patchCount = 400;
+		for (int i = 0; i < patchCount; i++)
+		{
+			Godot.ColorRect p = new ColorRect();
+			float s = 6.0f + (float)Rng.Randf() * 10.0f;
+			p.Size = new Vector2(s, s);
+			p.GlobalPosition = new Vector2((float)Rng.Randf() * (float)_wrapW - (float)(_wrapW * 0.5),
+										   (float)Rng.Randf() * (float)_wrapH - (float)(_wrapH * 0.5));
+			p.Color = new Color(0.13f, 0.20f, 0.13f, 1.0f);
+			p.ZIndex = -15;
+			AddChild(p);
+			_floorPatches.Add(p); // folded per frame like every other entity: the ground
+								  // cover scrolls AND loops, so the wrap reads seamless
+		}
+		// walls are retired with the wrap (user fix 2026-10-20): there is no edge to
+		// bump into anymore, and a painted border would fight the invisible fold box
+		_camera = GetNode("Camera2D") as Godot.Camera2D;
+		Godot.CanvasLayer hudl = new CanvasLayer();
+		AddChild(hudl);
+		_hudLayer = hudl; // the HP strips parent to this once the party is known
+		_hud = new Label();
+		_hud.Position = new Vector2(24.0f, 24.0f);
+		hudl.AddChild(_hud);
+		_pickerLabel = new Label();
+		_pickerLabel.Position = new Vector2(24.0f, 274.0f); // clears the 6-row HP strip block
+		hudl.AddChild(_pickerLabel);
+		// dash-cooldown bar over the Leader's head: dark track + gold fill (resized
         // every frame in _Process). Human-test UX pass: the old 44x5 sliver was
         // illegible and fought the death-save chip, so it is now a 64x8 track riding
         // at y-42 (chip label sits at y-58, the revive channel bar at y-30). ZIndex
@@ -989,7 +989,12 @@ public partial class Game : Godot.Node2D
     {
         float delta = (float)d;
         MeasureWindow(); // keep frame/period honest for any window size (DPI scaling)
-        _stageT += d;
+        // human bug 2026-10-22: the stage-beat clock must HOLD during read-the-card soft
+        // pauses (picker / join banner), same as _runT holds below. The mini-boss gate is
+        // _stageT >= FIRST_HALF, so a human parked on the pick card used to burn beats ->
+        // mini-boss engaged with the horde frozen: a boss spawning over an empty arena.
+        if (!GetWorldPause())
+            _stageT += d;
         _ringAngle += 0.22 * d; // orbit clock (user: "rotate a little faster" - was 0.15)
         _dashPulse += d;         // free-running clock for the dash-ready flash
         if (_engageInvulnT > 0.0)
@@ -1000,146 +1005,146 @@ public partial class Game : Godot.Node2D
         if (!_pickerActive && !_joinWaiting && (_state == StageState.PLAY1 || _state == StageState.MINIBOSS
                                || _state == StageState.PLAY2))
             _runT += d;
-        // the join banner's click gate is a HUMAN gate (no-timeout rule): pilot smokes
-        // clear it instantly so verification keeps advancing
-        if (_joinWaiting && _pilot)
-            ClearJoinBanner("pilot autopilot");
-        // P4: the reaper stays a spawn-once-at-10s TEST BENCH (locked behavior; no
-        // balance meaning), now OPT-IN via M1_REAPER=1. Its only changes here are where
-        // it drops in (outside the camera view, never on the party) and a slower lurk.
-        if (!_reaperSpawned && _stageT >= 10.0 && _state == StageState.PLAY1 && _reaperEnabled)
-        {
-            // TEST reaper: spawns ONCE 10 s into horde I, downs whoever it touches
-            // (death-save tester), attack-proof (hp stays huge), despawns after its
-            // first down
-            _reaperSpawned = true;
-            Enemy r = new Enemy();
-            r.kind = "reaper";
-            r.maxHp = 100000000.0f;
-            r.hp = r.maxHp;
-            r.speed = 48.0f;
-            r.contactDamage = 0.0f;
-            r.xpValue = 0.0f;
-            // spawn just OUTSIDE the camera view, never dropped on the party: the old
-            // ClampToArena(leader + 500,0) could land right on top of the squad
-            Vector2 cen = GetCameraCenter();
-            r.GlobalPosition = cen + new Vector2(820.0f, 140.0f);
-            RegisterEnemy(r);
-            AddChild(r);
-            GD.Print("[10thAge] TEST reaper live");
-        }
-        // DEV SKIP KEYS (human-test alignment probes, added 2026-10-20 on request; C#-side
-        // convenience like `retry`, no balance effect):
-        //   C: straight to the campfire beat - from PLAY1/PLAY2 engage the mini and instant-
-        //      slay it through the REAL kill scan (OnBossKilled: bullets swept, camp opens);
-        //      mid-MINIBOSS it just slays.   V: park runT at the final-boss gate (PLAY2).
-        //   J: park runT at the recruit-drop beat (PLAY1) so the escort beat fires next frame.
-        if (Input.IsActionJustPressed("dev_camp") || (_pilot && _devSkip == "camp"))
-        {
-            if (_state == StageState.PLAY1)
-            {
-                ActivateBoss("mini");
-                // OnBossKilled only routes MINIBOSS -> CAMPFIRE (user-locked flow), so
-                // stage through the real branch before slaying, or the kill dead-flags
-                // the boss in PLAY1 and the run just continues (learned in CT50/51)
-                _state = StageState.MINIBOSS;
-                _stageT = 0.0;
-                GD.Print("[10thAge] (dev) mini-boss stage engaged for the skip");
-            }
-            if (_state == StageState.PLAY1 || _state == StageState.MINIBOSS
-                    || _state == StageState.PLAY2)
-            {
-                foreach (Boss b in _bosses)
-                    if (b.kind == "mini" && b.hp > 0.0f)
-                    {
-                        b.hp = -1.0f; // next-frame kill scan runs the real OnBossKilled
-                        GD.Print("[10thAge] (dev) mini-boss instant-slain -> camp");
-                    }
-            }
-        }
-        if (Input.IsActionJustPressed("dev_boss") || (_pilot && _devSkip == "boss"))
-        {
-            if (_state == StageState.PLAY2)
-            {
-                _runT = BOSS_AT; // the PLAY2 gate engages on the real path next frame
-                GD.Print("[10thAge] (dev) runT parked at boss gate");
-            }
-        }
-        if (Input.IsActionJustPressed("dev_join") && _state == StageState.PLAY1
-                && !_recruitBeatDone)
-        {
-            _runT = RECRUIT_AT; // the PLAY1 drop fires on the real path next frame
-            GD.Print("[10thAge] (dev) runT parked at recruit drop");
-        }
-        switch (_state)
-        {
-            case StageState.PLAY1:
-                // field recruit drops 25 s into the run (user design 2026-10-20)
-                if (!_recruitBeatDone && _runT >= RECRUIT_AT)
-                {
-                    _recruitBeatDone = true;
-                    SpawnFieldRecruit();
-                }
-                if (_stageT >= FIRST_HALF)
-                {
-                    _state = StageState.MINIBOSS;
-                    _stageT = 0.0;
-                    ActivateBoss("mini");
-                    GD.Print("[10thAge] mini-boss engaged");
-                }
-                break;
-            case StageState.PLAY2:
-                // user pacing (2026-10-20): big boss gates 2m30s into the RUN (test value
-                // while we exercise recruitment + tier gates; will move with the 20-min plan)
-                if (_runT >= BOSS_AT)
-                {
-                    _state = StageState.BOSS;
-                    _stageT = 0.0;
-                    ActivateBoss("final");
-                    GD.Print("[10thAge] BOSS engaged");
-                }
-                break;
-            case StageState.CAMPFIRE:
-                // player-driven rest beat: the ui/Campfire screen emits rest_chosen and
-                // Game._OnCampfireChosen advances to PLAY2. user-locked (2026-10-19): a
-                // human campfire NEVER times out - it waits for a real choice forever.
-                // The timeout valve now only runs for the pilot autopilot (verification
-                // smokes) or when the campfire scene itself is missing (soft-lock guard).
-                if (!_campfireWaiting)
-                {
-                    _campfireWaiting = true;
-                    _stageT = 0.0;
-                    ShowCampfire();
-                }
-                else if ((_pilot || _campfire == null) && _stageT >= CAMPFIRE_WAIT_TIMEOUT)
-                {
-                    GD.Print("[10thAge] campfire: nobody chose a rest after " + (int)CAMPFIRE_WAIT_TIMEOUT
-                             + "s - defaulting to a short rest");
-                    EndCampfire("short");
-                }
-                break;
-            case StageState.DEAD:
-            case StageState.VICTORY:
-                // the run is over: the RunSummary card is up. R retries the stage (M1 has no
-                // journal/menu). ShowRunSummary un-pauses the tree, so this key gets input
-                // frames even though the card paused it; _RetryRun fires at most once per run.
-                if (Input.IsActionJustPressed("retry"))
-                    _RetryRun();
-                break;
-            default:
-                break;
-        }
-        if (_state == StageState.DEAD || _state == StageState.VICTORY)
-            return;
+		// the join banner's click gate is a HUMAN gate (no-timeout rule): pilot smokes
+		// clear it instantly so verification keeps advancing
+		if (_joinWaiting && _pilot)
+			ClearJoinBanner("pilot autopilot");
+		// P4: the reaper stays a spawn-once-at-10s TEST BENCH (locked behavior; no
+		// balance meaning), now OPT-IN via M1_REAPER=1. Its only changes here are where
+		// it drops in (outside the camera view, never on the party) and a slower lurk.
+		if (!_reaperSpawned && _stageT >= 10.0 && _state == StageState.PLAY1 && _reaperEnabled)
+		{
+			// TEST reaper: spawns ONCE 10 s into horde I, downs whoever it touches
+			// (death-save tester), attack-proof (hp stays huge), despawns after its
+			// first down
+			_reaperSpawned = true;
+			Enemy r = new Enemy();
+			r.kind = "reaper";
+			r.maxHp = 100000000.0f;
+			r.hp = r.maxHp;
+			r.speed = 48.0f;
+			r.contactDamage = 0.0f;
+			r.xpValue = 0.0f;
+			// spawn just OUTSIDE the camera view, never dropped on the party: the old
+			// ClampToArena(leader + 500,0) could land right on top of the squad
+			Vector2 cen = GetCameraCenter();
+			r.GlobalPosition = cen + new Vector2(820.0f, 140.0f);
+			RegisterEnemy(r);
+			AddChild(r);
+			GD.Print("[10thAge] TEST reaper live");
+		}
+		// DEV SKIP KEYS (human-test alignment probes, added 2026-10-20 on request; C#-side
+		// convenience like `retry`, no balance effect):
+		//   C: straight to the campfire beat - from PLAY1/PLAY2 engage the mini and instant-
+		//      slay it through the REAL kill scan (OnBossKilled: bullets swept, camp opens);
+		//      mid-MINIBOSS it just slays.   V: park runT at the final-boss gate (PLAY2).
+		//   J: park runT at the recruit-drop beat (PLAY1) so the escort beat fires next frame.
+		if (Input.IsActionJustPressed("dev_camp") || (_pilot && _devSkip == "camp"))
+		{
+			if (_state == StageState.PLAY1)
+			{
+				ActivateBoss("mini");
+				// OnBossKilled only routes MINIBOSS -> CAMPFIRE (user-locked flow), so
+				// stage through the real branch before slaying, or the kill dead-flags
+				// the boss in PLAY1 and the run just continues (learned in CT50/51)
+				_state = StageState.MINIBOSS;
+				_stageT = 0.0;
+				GD.Print("[10thAge] (dev) mini-boss stage engaged for the skip");
+			}
+			if (_state == StageState.PLAY1 || _state == StageState.MINIBOSS
+					|| _state == StageState.PLAY2)
+			{
+				foreach (Boss b in _bosses)
+					if (b.kind == "mini" && b.hp > 0.0f)
+					{
+						b.hp = -1.0f; // next-frame kill scan runs the real OnBossKilled
+						GD.Print("[10thAge] (dev) mini-boss instant-slain -> camp");
+					}
+			}
+		}
+		if (Input.IsActionJustPressed("dev_boss") || (_pilot && _devSkip == "boss"))
+		{
+			if (_state == StageState.PLAY2)
+			{
+				_runT = BOSS_AT; // the PLAY2 gate engages on the real path next frame
+				GD.Print("[10thAge] (dev) runT parked at boss gate");
+			}
+		}
+		if (Input.IsActionJustPressed("dev_join") && _state == StageState.PLAY1
+				&& !_recruitBeatDone)
+		{
+			_runT = RECRUIT_AT; // the PLAY1 drop fires on the real path next frame
+			GD.Print("[10thAge] (dev) runT parked at recruit drop");
+		}
+		switch (_state)
+		{
+			case StageState.PLAY1:
+				// field recruit drops 25 s into the run (user design 2026-10-20)
+				if (!_recruitBeatDone && _runT >= RECRUIT_AT)
+				{
+					_recruitBeatDone = true;
+					SpawnFieldRecruit();
+				}
+				if (_stageT >= FIRST_HALF)
+				{
+					_state = StageState.MINIBOSS;
+					_stageT = 0.0;
+					ActivateBoss("mini");
+					GD.Print("[10thAge] mini-boss engaged");
+				}
+				break;
+			case StageState.PLAY2:
+				// user pacing (2026-10-20): big boss gates 2m30s into the RUN (test value
+				// while we exercise recruitment + tier gates; will move with the 20-min plan)
+				if (_runT >= BOSS_AT)
+				{
+					_state = StageState.BOSS;
+					_stageT = 0.0;
+					ActivateBoss("final");
+					GD.Print("[10thAge] BOSS engaged");
+				}
+				break;
+			case StageState.CAMPFIRE:
+				// player-driven rest beat: the ui/Campfire screen emits rest_chosen and
+				// Game._OnCampfireChosen advances to PLAY2. user-locked (2026-10-19): a
+				// human campfire NEVER times out - it waits for a real choice forever.
+				// The timeout valve now only runs for the pilot autopilot (verification
+				// smokes) or when the campfire scene itself is missing (soft-lock guard).
+				if (!_campfireWaiting)
+				{
+					_campfireWaiting = true;
+					_stageT = 0.0;
+					ShowCampfire();
+				}
+				else if ((_pilot || _campfire == null) && _stageT >= CAMPFIRE_WAIT_TIMEOUT)
+				{
+					GD.Print("[10thAge] campfire: nobody chose a rest after " + (int)CAMPFIRE_WAIT_TIMEOUT
+							 + "s - defaulting to a short rest");
+					EndCampfire("short");
+				}
+				break;
+			case StageState.DEAD:
+			case StageState.VICTORY:
+				// the run is over: the RunSummary card is up. R retries the stage (M1 has no
+				// journal/menu). ShowRunSummary un-pauses the tree, so this key gets input
+				// frames even though the card paused it; _RetryRun fires at most once per run.
+				if (Input.IsActionJustPressed("retry"))
+					_RetryRun();
+				break;
+			default:
+				break;
+		}
+		if (_state == StageState.DEAD || _state == StageState.VICTORY)
+			return;
 
-        // the per-member readout is strips + state dots now (built once the party is
-        // known), so it refreshes on every path including the picker soft-pause
-        UpdateHpStrips(delta);
+		// the per-member readout is strips + state dots now (built once the party is
+		// known), so it refreshes on every path including the picker soft-pause
+		UpdateHpStrips(delta);
 
-        // ---------- join ceremony = soft pause (same read-the-card rule) ----------
-        // human fix 2026-10-20: the banner must pause the game like the level-up and camp
-        // screens so the player can actually look at the art. A tree pause would eat the
-        // CLICK TO CONTINUE gate, so this is the picker's soft pause: the world is drawn,
+		// ---------- join ceremony = soft pause (same read-the-card rule) ----------
+		// human fix 2026-10-20: the banner must pause the game like the level-up and camp
+		// screens so the player can actually look at the art. A tree pause would eat the
+		// CLICK TO CONTINUE gate, so this is the picker's soft pause: the world is drawn,
         // nobody acts, nothing takes damage, and the run clock that gates the recruit drop
         // and the bosses already holds still (same _stageT bookkeeping as the picker).
         if (_joinWaiting)
@@ -1324,8 +1329,8 @@ public partial class Game : Godot.Node2D
 
         // ---------- the bodyguard ring (human-test locked + "always attached" locked) ----------
         // Party members are ALWAYS attached to and orbiting the Leader unless they are
-        // downed or dead. Homing speed exceeds the Leader's walk speed (the old
-        // baseSpeed*0.9 cap maxed at 126 px/s - under Baldrun's 128 px/s stride, so
+		// downed or dead. Homing speed exceeds the Leader's walk speed (the old
+		// baseSpeed*0.9 cap maxed at 126 px/s - under Baldrun's 128 px/s stride, so
         // Mosiah permanently trailed), and a hard 120 px leash guarantees a stray push
         // can never leave a body lagging. The orbit feel stays: it rides the world-space
         // clock (_ringAngle), and auto-aim lives in PartyMember (the ring member bites
@@ -1377,143 +1382,143 @@ public partial class Game : Godot.Node2D
             _floorPatches[fp].GlobalPosition = WrapNearCamera(_floorPatches[fp].GlobalPosition);
         // recruit arrow: rides above the Leader and points at the stranded PC. Pure
         // guidance - the user asked for "an arrow pointing to their location (HELP!)".
-        // both the arrow and the HELP! label now track the RECRUIT'S FOLDED position,
-        // so when the beat wraps across a seam the guidance follows instead of hanging
-        // in the void at a stale absolute spot
-        if (_recruitPending != null && _recruitArrow != null)
-        {
-            if (_leader != null)
-                _recruitArrow.GlobalPosition = _leader.GlobalPosition;
-            _recruitArrow.LookAt(_recruitPending.GlobalPosition);
-            if (_helpLabel != null)
-                _helpLabel.GlobalPosition = _recruitPending.GlobalPosition + new Vector2(-26.0f, -62.0f);
-        }
-        // dash-cooldown readout over Baldrun: the gold fill grows back as the Leader's
+		// both the arrow and the HELP! label now track the RECRUIT'S FOLDED position,
+		// so when the beat wraps across a seam the guidance follows instead of hanging
+		// in the void at a stale absolute spot
+		if (_recruitPending != null && _recruitArrow != null)
+		{
+			if (_leader != null)
+				_recruitArrow.GlobalPosition = _leader.GlobalPosition;
+			_recruitArrow.LookAt(_recruitPending.GlobalPosition);
+			if (_helpLabel != null)
+				_helpLabel.GlobalPosition = _recruitPending.GlobalPosition + new Vector2(-26.0f, -62.0f);
+		}
+		// dash-cooldown readout over Baldrun: the gold fill grows back as the Leader's
         // dash recharges. Human-test UX pass: 64x8 track at y-42, and once the dash IS
         // ready the fill flashes bright gold twice a second, so the 6 s recharge has an
         // actual "you may press SPACE now" cue instead of a static sliver.
-        // 2026-10-21 round 2: with the painted mini on, y-42 cut across the bear's torso
-        // - the bar moved BELOW the base (rim bottom sits ~y+5) so it reads as a charge
-        // plate the miniature stands on, never through the art.
-        if (_dashBarPivot != null && _dashBarFill != null)
-        {
-            if (leader != null)
-            {
-                _dashBarPivot.GlobalPosition = leader.GlobalPosition + new Vector2(0.0f, 12.0f);
-                double ready = _dashCdT <= 0.0 ? 1.0 : 1.0 - _dashCdT / DASH_CD;
-                if (ready < 0.0)
-                    ready = 0.0;
-                if (ready > 1.0)
-                    ready = 1.0;
-                _dashBarFill.Size = new Vector2((float)(64.0 * ready), 8.0f);
-                bool charged = _dashCdT <= 0.0;
-                // 4.7 C# Math has no sin(): a sawtooth triangle 0->1->0 at 2 Hz does
-                // the ready-flash without any trig
-                float tw = (float)(_dashPulse * 4.0);
-                float cyc = tw - (int)tw;
-                float tri = cyc < 0.5f ? cyc * 2.0f : 2.0f - cyc * 2.0f;
-                float pulse = charged ? tri : 0.0f;
-                _dashBarFill.Color = new Color(0.83f + 0.12f * pulse, 0.64f + 0.14f * pulse,
-                                               0.24f + 0.11f * pulse, 1.0f);
-            }
-            else
-                _dashBarPivot.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
-        }
-        // party Y-sort (user 2026-10-21): painted minis overlap on the table, so a
-        // bodyguard standing ABOVE the leader must paint UNDER him and vice versa.
-        // Rank members by ground Y and bake the rank into ZIndex (base 4..8 keeps the
-        // whole squad over the horde; chips/labels/telegraphs ride their parent's rank
+		// 2026-10-21 round 2: with the painted mini on, y-42 cut across the bear's torso
+		// - the bar moved BELOW the base (rim bottom sits ~y+5) so it reads as a charge
+		// plate the miniature stands on, never through the art.
+		if (_dashBarPivot != null && _dashBarFill != null)
+		{
+			if (leader != null)
+			{
+				_dashBarPivot.GlobalPosition = leader.GlobalPosition + new Vector2(0.0f, 12.0f);
+				double ready = _dashCdT <= 0.0 ? 1.0 : 1.0 - _dashCdT / DASH_CD;
+				if (ready < 0.0)
+					ready = 0.0;
+				if (ready > 1.0)
+					ready = 1.0;
+				_dashBarFill.Size = new Vector2((float)(64.0 * ready), 8.0f);
+				bool charged = _dashCdT <= 0.0;
+				// 4.7 C# Math has no sin(): a sawtooth triangle 0->1->0 at 2 Hz does
+				// the ready-flash without any trig
+				float tw = (float)(_dashPulse * 4.0);
+				float cyc = tw - (int)tw;
+				float tri = cyc < 0.5f ? cyc * 2.0f : 2.0f - cyc * 2.0f;
+				float pulse = charged ? tri : 0.0f;
+				_dashBarFill.Color = new Color(0.83f + 0.12f * pulse, 0.64f + 0.14f * pulse,
+											   0.24f + 0.11f * pulse, 1.0f);
+			}
+			else
+				_dashBarPivot.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+		}
+		// party Y-sort (user 2026-10-21): painted minis overlap on the table, so a
+		// bodyguard standing ABOVE the leader must paint UNDER him and vice versa.
+		// Rank members by ground Y and bake the rank into ZIndex (base 4..8 keeps the
+		// whole squad over the horde; chips/labels/telegraphs ride their parent's rank
         // since they are children). Uses FOLDED positions - the same coords the frame
-        // draws - so wrap seams can't mis-sort.
-        foreach (PartyMember m in _party)
-        {
-            int rank = 0;
-            foreach (PartyMember o in _party)
-                if (o != m && o.GlobalPosition.Y < m.GlobalPosition.Y)
-                    rank += 1;
-            m.ZIndex = 4 + rank;
-        }
+		// draws - so wrap seams can't mis-sort.
+		foreach (PartyMember m in _party)
+		{
+			int rank = 0;
+			foreach (PartyMember o in _party)
+				if (o != m && o.GlobalPosition.Y < m.GlobalPosition.Y)
+					rank += 1;
+			m.ZIndex = 4 + rank;
+		}
 
-        // death saves (locked rules): d20 every 4 s while downed - nat 20 revives
-        // at 25 % HP, 11-19 is a success (3 successes = STABLE, rolls stop), 10 or
-        // below is a failure (3 = out until the campfire). Damage on a downed body
-        // is a buffered failure (TakeHit); damage on a STABLE body slays it (TakeHit).
-        // The player revives a body by walking the leader onto it and standing still.
-        foreach (PartyMember m in _party)
-        {
-            if (!m.joined || m.eliminated || !m.downed)
-                continue;
-            if (!m.stable)
-            {
-                m.dsTimer += (float)d;
-                if (m.dsTimer >= DS_INTERVAL)
-                {
-                    m.dsTimer = 0.0f;
-                    int roll = (int)(GD.Randi() % 20) + 1;
-                    m.dsLastRoll = roll; // the on-body d20 chip shows the die itself
-                    // P6 instrumentation: one line per d20 roll + outcome, so a headless
-                    // run can be verified by READING the dice, not the code.
-                    GD.Print("[10thAge] d20 " + m.displayName + " rolled " + roll +
-                             " (target " + DS_REVIVE_ON + " revive / " + DS_FAIL_ON + " or under fails)");
-                    if (roll == DS_REVIVE_ON)
-                    {
-                        GD.Print("[10thAge]   outcome: NAT 20 - " + m.displayName +
-                                 " self-revives at 25% hp, 2s invulnerable");
-                        m.downed = false;
-                        m.hp = m.maxHp * 0.25f;
-                        m.stable = false;
-                        m.dsFails = 0;
-                        m.dsSucceeds = 0;
-                        m.dsDamageBuffer = 0.0f;
-                        m.reviveShield = false;
-                        // locked rule: every revive grants 2 s of invulnerability
-                        m.invuln = (float)REVIVE_INVULN;
-                        GD.Print("[10thAge] revive(dice) " + m.displayName + " at 25% hp | invuln 2s granted");
-                        m.dsColor = CHIP_SAGE;
-                        m.SetDsTemp("NAT 20 - revived at 25%", 2.5);
-                        continue;
-                    }
-                    else if (roll <= DS_FAIL_ON)
-                    {
-                        m.dsFails++;
-                        if (m.dsFails >= DS_FAIL_LIMIT)
-                        {
-                            m.eliminated = true;
-                            m.dsColor = CHIP_GREY;
-                            m.SetDsText("OUT - next campfire");
-                            GD.Print("[10thAge] " + m.displayName + " ELIMINATED (3 failed saves) - returns at campfire");
-                            CheckTpk();
-                            continue;
-                        }
-                        m.dsColor = CHIP_BLOOD;
-                        m.SetDsText("d20 " + roll + " -> fail " + m.dsFails + "/" + DS_FAIL_LIMIT);
-                    }
-                    else
-                    {
-                        m.dsSucceeds++;
-                        if (m.dsSucceeds >= DS_STABLE_NEED)
-                        {
-                            m.stable = true;
-                            m.dsColor = CHIP_AMBER;
-                            m.SetDsText("STABLE - hits slay unless channeled");
-                            GD.Print("[10thAge] " + m.displayName + " STABLE - rolls stop; a hit now slays unless the party channels a rescue");
-                        }
-                        else
-                        {
-                            m.dsColor = CHIP_AMBER;
-                            m.SetDsText("d20 " + roll + " -> stable " + m.dsSucceeds + "/" + DS_STABLE_NEED);
-                        }
-                    }
-                }
-            }
-            // player revive channel: leader stands still next to the body. The body
-            // is immune while the channel is progressing (reviveShield) so a swarm
-            // can't screw the rescue out, plus 2 s of post-revive invulnerability.
+		// death saves (locked rules): d20 every 4 s while downed - nat 20 revives
+		// at 25 % HP, 11-19 is a success (3 successes = STABLE, rolls stop), 10 or
+		// below is a failure (3 = out until the campfire). Damage on a downed body
+		// is a buffered failure (TakeHit); damage on a STABLE body slays it (TakeHit).
+		// The player revives a body by walking the leader onto it and standing still.
+		foreach (PartyMember m in _party)
+		{
+			if (!m.joined || m.eliminated || !m.downed)
+				continue;
+			if (!m.stable)
+			{
+				m.dsTimer += (float)d;
+				if (m.dsTimer >= DS_INTERVAL)
+				{
+					m.dsTimer = 0.0f;
+					int roll = (int)(GD.Randi() % 20) + 1;
+					m.dsLastRoll = roll; // the on-body d20 chip shows the die itself
+					// P6 instrumentation: one line per d20 roll + outcome, so a headless
+					// run can be verified by READING the dice, not the code.
+					GD.Print("[10thAge] d20 " + m.displayName + " rolled " + roll +
+							 " (target " + DS_REVIVE_ON + " revive / " + DS_FAIL_ON + " or under fails)");
+					if (roll == DS_REVIVE_ON)
+					{
+						GD.Print("[10thAge]   outcome: NAT 20 - " + m.displayName +
+								 " self-revives at 25% hp, 2s invulnerable");
+						m.downed = false;
+						m.hp = m.maxHp * 0.25f;
+						m.stable = false;
+						m.dsFails = 0;
+						m.dsSucceeds = 0;
+						m.dsDamageBuffer = 0.0f;
+						m.reviveShield = false;
+						// locked rule: every revive grants 2 s of invulnerability
+						m.invuln = (float)REVIVE_INVULN;
+						GD.Print("[10thAge] revive(dice) " + m.displayName + " at 25% hp | invuln 2s granted");
+						m.dsColor = CHIP_SAGE;
+						m.SetDsTemp("NAT 20 - revived at 25%", 2.5);
+						continue;
+					}
+					else if (roll <= DS_FAIL_ON)
+					{
+						m.dsFails++;
+						if (m.dsFails >= DS_FAIL_LIMIT)
+						{
+							m.eliminated = true;
+							m.dsColor = CHIP_GREY;
+							m.SetDsText("OUT - next campfire");
+							GD.Print("[10thAge] " + m.displayName + " ELIMINATED (3 failed saves) - returns at campfire");
+							CheckTpk();
+							continue;
+						}
+						m.dsColor = CHIP_BLOOD;
+						m.SetDsText("d20 " + roll + " -> fail " + m.dsFails + "/" + DS_FAIL_LIMIT);
+					}
+					else
+					{
+						m.dsSucceeds++;
+						if (m.dsSucceeds >= DS_STABLE_NEED)
+						{
+							m.stable = true;
+							m.dsColor = CHIP_AMBER;
+							m.SetDsText("STABLE - hits slay unless channeled");
+							GD.Print("[10thAge] " + m.displayName + " STABLE - rolls stop; a hit now slays unless the party channels a rescue");
+						}
+						else
+						{
+							m.dsColor = CHIP_AMBER;
+							m.SetDsText("d20 " + roll + " -> stable " + m.dsSucceeds + "/" + DS_STABLE_NEED);
+						}
+					}
+				}
+			}
+			// player revive channel: leader stands still next to the body. The body
+			// is immune while the channel is progressing (reviveShield) so a swarm
+			// can't screw the rescue out, plus 2 s of post-revive invulnerability.
             bool channeling = leaderLive && !moved
                               && leader.GlobalPosition.DistanceTo(m.GlobalPosition) < REVIVE_RANGE;
             if (channeling && m.reviveProgress <= 0.0f)
-                GD.Print("[10thAge] channel START on " + m.displayName + "'s body - stand still "
-                         + (int)REVIVE_CHANNEL + "s; the body is immune while it runs");
+				GD.Print("[10thAge] channel START on " + m.displayName + "'s body - stand still "
+						 + (int)REVIVE_CHANNEL + "s; the body is immune while it runs");
             m.reviveShield = channeling;
             if (channeling)
             {
@@ -1529,10 +1534,10 @@ public partial class Game : Godot.Node2D
                     // locked rule: every revive grants 2 s of invulnerability
                     m.invuln = (float)REVIVE_INVULN;
                     m.hp = m.maxHp * 0.5f;
-                    GD.Print("[10thAge] channel COMPLETE: " + m.displayName +
-                             " revived at 50% hp | invuln 2s granted");
+					GD.Print("[10thAge] channel COMPLETE: " + m.displayName +
+							 " revived at 50% hp | invuln 2s granted");
                     m.dsColor = CHIP_SAGE;
-                    m.SetDsTemp("REVIVED - 50% hp", 2.0);
+					m.SetDsTemp("REVIVED - 50% hp", 2.0);
                 }
             }
             else if (m.reviveProgress > 0.0f)
@@ -1549,9 +1554,9 @@ public partial class Game : Godot.Node2D
             if (i >= _enemies.Count)
                 continue;
             Combatant c = (Combatant)_enemies[i];
-            if (c == null || c.kind == "dead")
+			if (c == null || c.kind == "dead")
             {
-                // self-despawn (TEST reaper) leaves kind "dead" without a decrement;
+				// self-despawn (TEST reaper) leaves kind "dead" without a decrement;
                 // the counted flag makes this cleanup safe for every exit path
                 if (c is Enemy)
                     ReleaseLiveCount((Enemy)c);
@@ -1562,7 +1567,7 @@ public partial class Game : Godot.Node2D
                 c.hurtFlash -= delta;
             if (c.hp > 0.0f)
                 continue;
-            if (c.kind == "mini" || c.kind == "final")
+			if (c.kind == "mini" || c.kind == "final")
                 OnBossKilled(c);
             else
             {
@@ -1574,10 +1579,10 @@ public partial class Game : Godot.Node2D
         UpdateGems(delta);
         UpdateBullets(delta);
         PickerTick(d);
-        _hud.Text = "Surviving the 10th Age - Tanurial Forest | Lv " + _level +
-                    " | xp " + (int)_xp + "/" + (int)_xpNext +
-                    " | " + StateName(_state) + " t=" + (int)_stageT + " | enemies " + _liveEnemies +
-                    (_recruitPending != null ? " | escort " + _escortLeft : "");
+		_hud.Text = "Surviving the 10th Age - Tanurial Forest | Lv " + _level +
+					" | xp " + (int)_xp + "/" + (int)_xpNext +
+					" | " + StateName(_state) + " t=" + (int)_stageT + " | enemies " + _liveEnemies +
+					(_recruitPending != null ? " | escort " + _escortLeft : "");
         // member HP/state is the strip block (UpdateHpStrips), not stacked label lines
         if (_pilot)
         {
@@ -1586,17 +1591,17 @@ public partial class Game : Godot.Node2D
             if (_pilotTick <= 0.0)
             {
                 _pilotTick = 15.0;
-                string hps = "";
+				string hps = "";
                 foreach (PartyMember mm in _party)
                 {
                     if (!mm.joined)
                         continue; // not squad yet: no phantom hp readout
-                    hps += (hps == "" ? "" : "  ") + mm.displayName +
-                           (mm.eliminated ? " OUT" : (mm.downed ? " down " + mm.dsFails + "/" + DS_FAIL_LIMIT : " " + (int)mm.hp + "hp"));
+					hps += (hps == "" ? "" : "  ") + mm.displayName +
+						   (mm.eliminated ? " OUT" : (mm.downed ? " down " + mm.dsFails + "/" + DS_FAIL_LIMIT : " " + (int)mm.hp + "hp"));
                 }
-                GD.Print("[10thAge] (pilot) " + StateName(_state) + " t=" + (int)_stageT +
-                         " | lv " + _level + " xp " + (int)_xpTotal + " | live enemies " + _liveEnemies +
-                         " | party: " + hps);
+				GD.Print("[10thAge] (pilot) " + StateName(_state) + " t=" + (int)_stageT +
+						 " | lv " + _level + " xp " + (int)_xpTotal + " | live enemies " + _liveEnemies +
+						 " | party: " + hps);
             }
         }
     }
@@ -1686,7 +1691,7 @@ public partial class Game : Godot.Node2D
             }
         }
         if (swept > 0)
-            GD.Print("[10thAge] camp safety: " + swept + " in-flight boss bullets swept before the card went up");
+			GD.Print("[10thAge] camp safety: " + swept + " in-flight boss bullets swept before the card went up");
     }
 
     private void PickerTick(double d)
@@ -1703,7 +1708,7 @@ public partial class Game : Godot.Node2D
             // reach/speed ranks stay reverted per user; damage-only stands.
             foreach (PartyMember m in _party)
                 m.weaponDamage += 0.5f;
-            GD.Print("[10thAge] level " + _level + " growth: all members +0.5 weapon dmg flat");
+			GD.Print("[10thAge] level " + _level + " growth: all members +0.5 weapon dmg flat");
             // human-test: fixed cards felt same-y every level - roll a smart-random
             // three instead (see RollOptions): one upgrade per member is guaranteed,
             // the third slot is fully wild
@@ -1711,23 +1716,23 @@ public partial class Game : Godot.Node2D
             {
                 _pickerActive = true;
                 _pickerWait = 0.0;
-                _pickerCard = "LEVEL UP";
+				_pickerCard = "LEVEL UP";
                 // human test: one long line ran past the window edge - stack the three
                 // picks so they always fit, and read them with NUMBER keys (A/S/D were
                 // the movement keys, so a walk tap could end the card unseen)
-                _pickerLabel.Text = _pickerCard + " - pick ONE (combat is frozen):\n" +
-                                    "[1] " + OptLabel(0) + "\n[2] " + OptLabel(1) + "\n[3] " + OptLabel(2);
-                GD.Print("[10thAge] level " + _level + " picker up: [1] " + OptLabel(0) + " | [2] " +
-                         OptLabel(1) + " | [3] " + OptLabel(2));
+				_pickerLabel.Text = _pickerCard + " - pick ONE (combat is frozen):\n" +
+									"[1] " + OptLabel(0) + "\n[2] " + OptLabel(1) + "\n[3] " + OptLabel(2);
+				GD.Print("[10thAge] level " + _level + " picker up: [1] " + OptLabel(0) + " | [2] " +
+						 OptLabel(1) + " | [3] " + OptLabel(2));
             }
             else
             {
                 // user-locked UX: a capped party must still say WHY no card appeared, or
                 // a level-up reads as a silent stat steal (the picker never opens here, so
                 // the no-timeout rule cannot soft-lock either)
-                GD.Print("[10thAge] level " + _level + ": every upgrade capped - no pick offered");
+				GD.Print("[10thAge] level " + _level + ": every upgrade capped - no pick offered");
                 _pickerNoticeT = 4.0;
-                _pickerLabel.Text = "EVERY RANK CAPPED - xp banked (evolutions are M2 content)";
+				_pickerLabel.Text = "EVERY RANK CAPPED - xp banked (evolutions are M2 content)";
             }
         }
         // the capped notice fades on its own timer; a live card owns the label instead
@@ -1735,7 +1740,7 @@ public partial class Game : Godot.Node2D
         {
             _pickerNoticeT -= d;
             if (_pickerNoticeT <= 0.0 && !_pickerActive)
-                _pickerLabel.Text = "";
+				_pickerLabel.Text = "";
         }
         if (!_pickerActive)
             return;
@@ -1745,11 +1750,11 @@ public partial class Game : Godot.Node2D
         // NUMBER keys avoid the movement clash entirely - still edge-read only, so a
         // fresh tap is a deliberate pick. Slots map through _optRoll (this card's roll).
         int choice = -1;
-        if (Input.IsActionJustPressed("pick_1"))
+		if (Input.IsActionJustPressed("pick_1"))
             choice = _optRoll[0];
-        else if (Input.IsActionJustPressed("pick_2"))
+		else if (Input.IsActionJustPressed("pick_2"))
             choice = _optRoll[1];
-        else if (Input.IsActionJustPressed("pick_3"))
+		else if (Input.IsActionJustPressed("pick_3"))
             choice = _optRoll[2];
         // user-locked (2026-10-19): the picker NEVER times out for human play - it waits
         // for a real 1/2/3 press forever. Only the pilot autopilot auto-confirms (2 s) so
@@ -1769,24 +1774,24 @@ public partial class Game : Godot.Node2D
             return;
         ApplyUpgrade(choice);
         _pickerActive = false;
-        _pickerLabel.Text = "";
+		_pickerLabel.Text = "";
     }
 
     private string OptLabel(int slot)
     {
         if (slot < 0 || slot >= _optRoll.Length)
-            return "-";
+			return "-";
         int i = _optRoll[slot];
         if (i < 0 || i >= OPT_LABEL.Length)
-            return "-";
+			return "-";
         PartyMember m = GetMemberByIndex(OPT_MEMBER[i]);
         if (m == null)
-            return "-";
+			return "-";
         // human-test UX: show WHERE a pick lands in the 3-rank track, so a player
         // reading the card knows one more rank is all the track has before M2's
         // evolution
-        return m.displayName + " " + m.weaponName + ": " + OPT_LABEL[i] +
-               " (" + (_pickRank[i] + 1) + "/" + PICK_RANK_CAP + ")";
+		return m.displayName + " " + m.weaponName + ": " + OPT_LABEL[i] +
+			   " (" + (_pickRank[i] + 1) + "/" + PICK_RANK_CAP + ")";
     }
 
     // ---------- per-member HP strips: name + 110x7 bar + state dot, 6 slots ----------
@@ -1844,26 +1849,26 @@ public partial class Game : Godot.Node2D
                 // bodyguard or a spoiler strip telling the player who is coming next.
                 // once the field beat lands the strip goes live (pass 11): the escort
                 // chips HP and the join brings in whatever survives, so it must read
-                n.Text = "";
+				n.Text = "";
                 f.Size = new Vector2(0.0f, 7.0f);
                 bg.Color = new Color(0.12f, 0.11f, 0.10f, 0.0f);
                 dot.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f);
                 continue;
             }
             PartyMember m = _party[i];
-            bool isOut = m.eliminated; // "out" is a reserved word in C# (the parameter modifier)
+			bool isOut = m.eliminated; // "out" is a reserved word in C# (the parameter modifier)
             bool down = m.downed && !isOut;
             float frac = m.maxHp > 0.0f ? m.hp / m.maxHp : 0.0f;
             if (frac < 0.0f)
                 frac = 0.0f; // HP floors at 0 (overkill never poisons the bar)
             if (frac > 1.0f)
                 frac = 1.0f;
-            string tag = (m.isLeader ? "* " : "") + m.displayName;
+			string tag = (m.isLeader ? "* " : "") + m.displayName;
             bool stranded = !m.joined; // field beat only: live strip tracks the join HP
-            n.Text = stranded ? tag + " STRANDED " + (int)m.hp + "/" + (int)m.maxHp
-                             : (isOut ? tag + " OUT (campfire)"
-                                    : (down ? tag + (m.stable ? " STABLE" : " DOWN")
-                                          : tag + " " + (int)m.hp + "/" + (int)m.maxHp));
+			n.Text = stranded ? tag + " STRANDED " + (int)m.hp + "/" + (int)m.maxHp
+							 : (isOut ? tag + " OUT (campfire)"
+									: (down ? tag + (m.stable ? " STABLE" : " DOWN")
+										  : tag + " " + (int)m.hp + "/" + (int)m.maxHp));
             f.Size = new Vector2(110.0f * frac, 7.0f);
             f.Color = m.isLeader ? new Color(0.83f, 0.64f, 0.24f, 1.0f)
                                  : new Color(0.62f, 0.52f, 0.38f, 1.0f);
@@ -1965,9 +1970,9 @@ public partial class Game : Godot.Node2D
         {
             // DESIGN: 3 ranks then an evolution = subclass choice. Stormcaller / Viperkiss
             // are M2 content, so a 4th rank stays capped and is logged, never silently eaten.
-            GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +
-                     " capped at rank " + PICK_RANK_CAP + "/" + PICK_RANK_CAP +
-                     " (evolution is M2)");
+			GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +
+					 " capped at rank " + PICK_RANK_CAP + "/" + PICK_RANK_CAP +
+					 " (evolution is M2)");
             return;
         }
         _pickRank[option]++;
@@ -1975,10 +1980,10 @@ public partial class Game : Godot.Node2D
         m.cdMul *= OPT_CD[option];
         m.rangeMul *= OPT_RANGE[option];
         m.pierce += OPT_PIERCE[option];
-        m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
-                         OPT_LABEL[option] + " x" + _pickRank[option];
-        GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +
-                 " rank " + _pickRank[option] + "/" + PICK_RANK_CAP);
+		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
+						 OPT_LABEL[option] + " x" + _pickRank[option];
+		GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +
+				 " rank " + _pickRank[option] + "/" + PICK_RANK_CAP);
     }
 
     // ---------- rest beat: the ui/Campfire screen owns the choice, Game owns the rules ----------
@@ -1986,26 +1991,26 @@ public partial class Game : Godot.Node2D
     {
         if (_campfire == null)
         {
-            Godot.PackedScene scn = GD.Load("res://ui/Campfire.tscn") as Godot.PackedScene;
+			Godot.PackedScene scn = GD.Load("res://ui/Campfire.tscn") as Godot.PackedScene;
             if (scn == null)
             {
-                GD.Print("[10thAge] WARNING: res://ui/Campfire.tscn missing - falling back to the "
-                         + (int)CAMPFIRE_WAIT_TIMEOUT + "s timeout rest");
+				GD.Print("[10thAge] WARNING: res://ui/Campfire.tscn missing - falling back to the "
+						 + (int)CAMPFIRE_WAIT_TIMEOUT + "s timeout rest");
                 return;
             }
             _campfire = scn.Instantiate() as Godot.CanvasLayer;
             // party_data must land BEFORE AddChild: the screen builds its cards in _ready()
-            _campfire.Set("party_data", CampfireCards());
-            _campfire.Set("stage_name", STAGE_NAME);
+			_campfire.Set("party_data", CampfireCards());
+			_campfire.Set("stage_name", STAGE_NAME);
             AddChild(_campfire);
-            // the instantiated scene root IS the "Campfire" node the signals live on
-            _campfire.Connect("rest_chosen", new Callable(this, "_OnCampfireChosen"));
-            _campfire.Connect("cancelled", new Callable(this, "_OnCampfireCancelled"));
+			// the instantiated scene root IS the "Campfire" node the signals live on
+			_campfire.Connect("rest_chosen", new Callable(this, "_OnCampfireChosen"));
+			_campfire.Connect("cancelled", new Callable(this, "_OnCampfireCancelled"));
         }
         else
-            _campfire.Set("party_data", CampfireCards()); // re-offer after a cancel
+			_campfire.Set("party_data", CampfireCards()); // re-offer after a cancel
         _campfire.Show();
-        GD.Print("[10thAge] campfire: the rest card is up - short/long is the party's call");
+		GD.Print("[10thAge] campfire: the rest card is up - short/long is the party's call");
     }
 
     private void EndCampfire(string restType)
@@ -2056,7 +2061,7 @@ public partial class Game : Godot.Node2D
                      + "scaling x" + (float)((int)(_hordeScale * 100.0)) / 100.0);
         }
         // user-approved camp benefit (2026-10-20): the campfire vacuums the map, like
-        // VS's magnet - every xp gem still lying around is reeled into the Leader's
+		// VS's magnet - every xp gem still lying around is reeled into the Leader's
         // pickup ring. The existing UpdateGems magnet (110 px / 380 px/s) flies and
         // collects them, so the xp math + despawn path are untouched and no gem is
         // silently skipped on rest.
@@ -2075,7 +2080,7 @@ public partial class Game : Godot.Node2D
                 reeled++;
             }
             GD.Print("[10thAge] camp vacuum: " + reeled + " xp gem(s) reeled to the "
-                     + "Leader's pickup ring");
+					 + "Leader's pickup ring");
         }
         foreach (PartyMember m in _party)
             m.campReturned = false;
@@ -2089,7 +2094,7 @@ public partial class Game : Godot.Node2D
     // can SEE the rescue, then shamble in and close ON the PC: contact chips his HP, and
     // the join brings in whatever survives (floored) - dawdling costs a maimed recruit.
     // Clearing all of them (or the campfire sweep) joins the PC with a rank-0 upgrade
-    // track (no catch-up gifts). The banner holds the "X JOINS THE BATTLE!" art slot.
+	// track (no catch-up gifts). The banner holds the "X JOINS THE BATTLE!" art slot.
     private void SpawnFieldRecruit()
     {
         PartyMember m = null;
@@ -2119,13 +2124,13 @@ public partial class Game : Godot.Node2D
         double ty = System.Math.Abs(dir.Y) > 0.001 ? half.Y / System.Math.Abs(dir.Y) : 1e30;
         double reach = System.Math.Max(RECRUIT_DIST, System.Math.Min(tx, ty) + RECRUIT_MARGIN);
         m.GlobalPosition = cen + dir * (float)reach;
-        GD.Print("[10thAge] field recruit: " + m.displayName + " stranded "
-                 + (int)m.GlobalPosition.DistanceTo(cen) + "px out, off camera | escort "
-                 + ESCORT_COUNT + " goblins hold still until the party is in sight of the rescue");
+		GD.Print("[10thAge] field recruit: " + m.displayName + " stranded "
+				 + (int)m.GlobalPosition.DistanceTo(cen) + "px out, off camera | escort "
+				 + ESCORT_COUNT + " goblins hold still until the party is in sight of the rescue");
         m.Visible = true;
         // HELP! floats over the stranded PC
         _helpLabel = new Godot.Label();
-        _helpLabel.Text = "HELP!";
+		_helpLabel.Text = "HELP!";
         _helpLabel.GlobalPosition = m.GlobalPosition + new Vector2(-26.0f, -62.0f);
         _helpLabel.ZIndex = 12;
         AddChild(_helpLabel);
@@ -2147,7 +2152,7 @@ public partial class Game : Godot.Node2D
         for (int i = 0; i < ESCORT_COUNT; i++)
         {
             Enemy e = new Enemy();
-            e.kind = "goblin";
+			e.kind = "goblin";
             e.maxHp = 30.0f * (float)GetHordeScale();
             e.hp = e.maxHp;
             e.speed = 90.0f;
@@ -2182,8 +2187,8 @@ public partial class Game : Godot.Node2D
             m.hp = m.maxHp * RECRUIT_JOIN_FLOOR;
         if (m.hp > m.maxHp)
             m.hp = m.maxHp;
-        GD.Print("[10thAge] join: " + m.displayName + " returns at " + (int)m.hp + "/" +
-                 (int)m.maxHp + "hp | rank 0 upgrades start at zero");
+		GD.Print("[10thAge] join: " + m.displayName + " returns at " + (int)m.hp + "/" +
+				 (int)m.maxHp + "hp | rank 0 upgrades start at zero");
         m.dsFails = 0;
         m.dsSucceeds = 0;
         m.dsDamageBuffer = 0.0f;
@@ -2201,13 +2206,13 @@ public partial class Game : Godot.Node2D
             if (_enemies[i] is Enemy en && en.escort)
                 en.escort = false;
         }
-        // join ceremony: the art slot ("X JOINS THE BATTLE!" posing with their weapon)
+		// join ceremony: the art slot ("X JOINS THE BATTLE!" posing with their weapon)
         // is a greybox banner + click gate for now. The human gate never times out
         // (same no-timer rule as the picker/campfire); the pilot clears it instantly.
         _joinWaiting = true;
         _joinBanner = new Godot.Label();
         _joinBanner.Position = new Vector2(430.0f, 300.0f);
-        _joinBanner.Text = m.displayName + " JOINS THE BATTLE! (art slot: weapon pose)";
+		_joinBanner.Text = m.displayName + " JOINS THE BATTLE! (art slot: weapon pose)";
         _joinBanner.ZIndex = 14;
         _hudLayer.AddChild(_joinBanner);
         _joinBtn = new Godot.ColorRect();
@@ -2217,15 +2222,15 @@ public partial class Game : Godot.Node2D
         _joinBtn.ZIndex = 14;
         _hudLayer.AddChild(_joinBtn);
         // the hint is a FIELD, not a local: ClearJoinBanner had no handle on a local, so
-        // "CLICK TO CONTINUE" stayed painted over the HUD for the rest of the run (human
+		// "CLICK TO CONTINUE" stayed painted over the HUD for the rest of the run (human
         // pass-9 report: a stale prompt next to a live picker read as a frozen game)
         _joinHint = new Godot.Label();
         _joinHint.Position = new Vector2(448.0f, 368.0f);
-        _joinHint.Text = "CLICK TO CONTINUE";
+		_joinHint.Text = "CLICK TO CONTINUE";
         _joinHint.ZIndex = 15;
         _hudLayer.AddChild(_joinHint);
-        GD.Print("[10thAge] RECRUIT JOINED: " + m.displayName + " at full hp, rank 0 | ring slot "
-                 + m.memberIndex + " opens - escort cleared");
+		GD.Print("[10thAge] RECRUIT JOINED: " + m.displayName + " at full hp, rank 0 | ring slot "
+				 + m.memberIndex + " opens - escort cleared");
     }
 
     private void ClearJoinBanner(string why)
@@ -2237,7 +2242,7 @@ public partial class Game : Godot.Node2D
             _joinBtn.Visible = false;
         if (_joinHint != null)
             _joinHint.Visible = false; // human fix: the prompt leaves with the card
-        GD.Print("[10thAge] join banner cleared (" + why + ") - the squad marches on");
+		GD.Print("[10thAge] join banner cleared (" + why + ") - the squad marches on");
     }
 
     // click gate for the join banner: MOUSE_BUTTON_LEFT == 1; presses only (releases are
@@ -2251,7 +2256,7 @@ public partial class Game : Godot.Node2D
         // MOUSE_BUTTON_LEFT == 1; presses only (a release is Pressed=false)
         if (ev is Godot.InputEventMouseButton mb && mb.ButtonIndex == Godot.MouseButton.Left
             && mb.Pressed)
-            ClearJoinBanner("click");
+			ClearJoinBanner("click");
     }
 
     private void _OnCampfireChosen(string restType)
@@ -2263,7 +2268,7 @@ public partial class Game : Godot.Node2D
     {
         // the player backed out of the embers: keep the beat, put the card back up
         _campfireWaiting = false;
-        GD.Print("[10thAge] campfire declined - the rest card comes back up");
+		GD.Print("[10thAge] campfire declined - the rest card comes back up");
     }
 
     // ---------- run end: the ui/RunSummary card is the retry loop (journal is M4) ----------
@@ -2273,7 +2278,7 @@ public partial class Game : Godot.Node2D
             return;
         _summaryPrinted = true;
         // GD.Print stays alongside the screen so a headless smoke run still logs the beat
-        GD.Print("[10thAge] " + s + " | level " + _level + " | xp total " + (int)_xpTotal);
+		GD.Print("[10thAge] " + s + " | level " + _level + " | xp total " + (int)_xpTotal);
         ShowRunSummary(s);
     }
 
@@ -2281,27 +2286,27 @@ public partial class Game : Godot.Node2D
     {
         if (_summary == null)
         {
-            Godot.PackedScene scn = GD.Load("res://ui/RunSummary.tscn") as Godot.PackedScene;
+			Godot.PackedScene scn = GD.Load("res://ui/RunSummary.tscn") as Godot.PackedScene;
             if (scn == null)
             {
-                GD.Print("[10thAge] WARNING: res://ui/RunSummary.tscn missing - summary stays print-only");
+				GD.Print("[10thAge] WARNING: res://ui/RunSummary.tscn missing - summary stays print-only");
                 return;
             }
             _summary = scn.Instantiate() as Godot.CanvasLayer;
-            _summary.Set("result", s.Contains("VICTORY") ? "victory" : "tpk");
-            _summary.Set("stage_name", STAGE_NAME);
-            _summary.Set("level", _level);
-            _summary.Set("xp_total", (int)_xpTotal);
-            _summary.Set("members", SummaryCards());
+			_summary.Set("result", s.Contains("VICTORY") ? "victory" : "tpk");
+			_summary.Set("stage_name", STAGE_NAME);
+			_summary.Set("level", _level);
+			_summary.Set("xp_total", (int)_xpTotal);
+			_summary.Set("members", SummaryCards());
             AddChild(_summary); // its _ready() pauses the tree and builds the rows
-            _summary.Connect("dismissed", new Callable(this, "_OnSummaryDismissed"));
+			_summary.Connect("dismissed", new Callable(this, "_OnSummaryDismissed"));
         }
         _summary.Show();
         // the card pauses the tree, but M1 un-pauses right away: DEAD/VICTORY already
         // freezes the sim through the stage early-return, and the retry key needs input
         // frames that a paused tree would never give us.
         GetTree().Paused = false;
-        GD.Print("[10thAge] run summary up - press R to retry the stage (journal/menu are M4)");
+		GD.Print("[10thAge] run summary up - press R to retry the stage (journal/menu are M4)");
     }
 
     private void _RetryRun()
@@ -2312,9 +2317,9 @@ public partial class Game : Godot.Node2D
             if (_summary != null)
                 _summary.Hide();
             GetTree().Paused = false;
-            GD.Print("[10thAge] retry: reloading res://Main.tscn");
+			GD.Print("[10thAge] retry: reloading res://Main.tscn");
             // the engine's own restart path: the main loop relaunches with this scene
-            GetTree().ChangeSceneToFile("res://Main.tscn");
+			GetTree().ChangeSceneToFile("res://Main.tscn");
         }
     }
 
@@ -2324,7 +2329,7 @@ public partial class Game : Godot.Node2D
         // the run stays over. Title screen / campaign journal routing is M4 content.
         if (_summary != null)
             _summary.Hide();
-        GD.Print("[10thAge] summary dismissed - the run stays over (press R to retry the stage)");
+		GD.Print("[10thAge] summary dismissed - the run stays over (press R to retry the stage)");
     }
 
     private Godot.Collections.Array CampfireCards()
@@ -2336,13 +2341,13 @@ public partial class Game : Godot.Node2D
                 continue; // the campfire only ever shows the squad; recruits appear once
                           // their field beat clears them in
             Godot.Collections.Dictionary card = new();
-            card["name"] = m.displayName;
-            card["klass"] = m.class_ == "" ? m.weaponName : m.class_;
-            card["weapon"] = m.weaponName;
-            card["hp"] = (int)m.hp;
-            card["max_hp"] = (int)m.maxHp;
-            card["state"] = m.eliminated ? "out" : (m.stable ? "stable" : (m.downed ? "down" : "up"));
-            card["leader"] = m.isLeader;
+			card["name"] = m.displayName;
+			card["klass"] = m.class_ == "" ? m.weaponName : m.class_;
+			card["weapon"] = m.weaponName;
+			card["hp"] = (int)m.hp;
+			card["max_hp"] = (int)m.maxHp;
+			card["state"] = m.eliminated ? "out" : (m.stable ? "stable" : (m.downed ? "down" : "up"));
+			card["leader"] = m.isLeader;
             rows.Add(card);
         }
         return rows;
@@ -2356,10 +2361,10 @@ public partial class Game : Godot.Node2D
             if (!m.joined)
                 continue; // never joined: not a party member to report on
             Godot.Collections.Dictionary card = new();
-            card["name"] = m.displayName;
-            card["state"] = m.eliminated ? "fallen"
-                            : (m.downed ? (m.stable ? "stable" : "downed") : "survived");
-            card["picks"] = m.pickHistory == "" ? "no picks yet" : m.pickHistory;
+			card["name"] = m.displayName;
+			card["state"] = m.eliminated ? "fallen"
+							: (m.downed ? (m.stable ? "stable" : "downed") : "survived");
+			card["picks"] = m.pickHistory == "" ? "no picks yet" : m.pickHistory;
             rows.Add(card);
         }
         return rows;
@@ -2378,20 +2383,21 @@ public partial class Game : Godot.Node2D
                 return;
         }
         _state = StageState.DEAD;
-        PrintSummary("TPK - the whole party is down");
+		PrintSummary("TPK - the whole party is down");
     }
+
 
     private static string StateName(StageState s)
     {
         switch (s)
         {
-            case StageState.PLAY1: return "horde I";
-            case StageState.MINIBOSS: return "MINI-BOSS";
-            case StageState.CAMPFIRE: return "CAMPFIRE";
-            case StageState.PLAY2: return "horde II";
-            case StageState.BOSS: return "BOSS";
-            case StageState.DEAD: return "dead";
-            default: return "cleared";
+			case StageState.PLAY1: return "horde I";
+			case StageState.MINIBOSS: return "MINI-BOSS";
+			case StageState.CAMPFIRE: return "CAMPFIRE";
+			case StageState.PLAY2: return "horde II";
+			case StageState.BOSS: return "BOSS";
+			case StageState.DEAD: return "dead";
+			default: return "cleared";
         }
     }
 }
