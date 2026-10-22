@@ -20,3 +20,4 @@ build/
 
 # session / harness artifacts
 .claude/
+.opencode/

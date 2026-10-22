@@ -1,4 +1,4 @@
-# M1 STATUS — 2026-10-18 pass, refreshed 2026-10-19 (full stage flow verified through VICTORY)
+# M1 STATUS — **SIGNED OFF 2026-10-22** (M1 greybox complete + standalone demo shipped; history below)
 
 M1 greybox of "Surviving the 10th Age" (Tanurial Forest) builds green, is **human-playable**,
 and the full campaign-battle loop is verified in-engine headless:
@@ -654,3 +654,21 @@ line.
 - FIX: dotnet-build first (writes .godot\mono\temp\bin\Debug) then `copy` that DLL over
   bin\survivingthe10thage.dll so the assembly is NEWER than every source; the headless run then
   loads it directly (sm27 green: Baldrun squad + TPK + 0-byte err).
+
+---
+
+## M1 SIGN-OFF (2026-10-22, user-approved)
+
+- **Human test of the final demo: PASSED** — user ran the shipped build ("seems to be happy and
+  running fine now") and directed both the picker stage-clock fix and this sign-off.
+- **Deliverable: `build\demo_final.zip`** (~74.4 MB, single zip — friend unzips and runs
+  `demo_final.exe`; `.pck` + `data_...` DLL folder ship inside). Verified end-to-end by headless
+  pilot `sm28`: `squad: Baldrun (Maul) + Mosiah (Rapier) | leader: Baldrun`, mini-boss engaged,
+  `TPK` terminal, 0-byte `.err`, zero forensic-probe residue.
+- Final code state: `e9a4bfb` (M1 systems, [Export] fix) + `7ef9503` pass 22 (picker/join stage-clock
+  hold, probe strip, export-cache root cause). Gate trail CT67–CT81 all green before sign-off.
+- **EXPORT PITFALL FOR M2+ REMINDER:** `.godot\exported` scene-bin cache only revalidates on
+  .tscn edits — wipe it before ANY export whose PackedScene property semantics depend on C# changes.
+- Deferred, non-blocking (carry into M2 backlog): human playtest checklist (dash feel, escort
+  contact chips, live HUD strip, 25% join-HP floor, picker gating, DPI frame, escort-kill joins),
+  camp alignment round-3 polish, 20-minute run-curve pass. M2 scope per DESIGN.md: roster growth.
