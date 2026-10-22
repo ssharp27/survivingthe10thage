@@ -24,6 +24,17 @@ public partial class PartyMember : Godot.Node2D
 	[Export] public float cooldown = 1.15f;
 	[Export] public float range = 95.0f;
 	[Export] public float arcHalf = 1.05f; // half-arc radians: wide = maul, narrow = rapier
+	// ---------- kit verbs ----------
+	// The kit is DATA on the member, not a new system: M1 shipped two melee verbs keyed on
+	// the fan width (arcHalf > 0.5 rad = cleaver fan with split damage, narrower = rapier
+	// lane with pierce). M2 adds a projectile verb (Asper's longbow): it fires the Game's
+	// PARTY-SIDE shot pool (SpawnShot), aims at the CLOSEST enemy in sight, and multishot
+	// fans extra bolts out of the same commit. The arc test alone cannot carry a third verb,
+	// so the kit name is the switch and arcHalf stays purely a melee property.
+	[Export] public string weaponKit = "melee"; // "melee" | "shot"
+	[Export] public float projSpeed = 340.0f;  // px/s a bug projectile travels
+	[Export] public float projLife = 2.2f;     // seconds a bolt may fly before it expires
+	public int shots = 1;                     // multishot rank lands here (1 = single bolt)
 
 	public float hp = 0.0f;
 	public bool downed = false;
@@ -404,7 +415,11 @@ public partial class PartyMember : Godot.Node2D
 		Godot.Collections.Array<Godot.Node2D> enemies = pg.GetEnemies();
 		// the live arc: ranks open the maul FAN, the rapier keeps its narrow lane
 		float arcEff = (float)System.Math.Min((double)arcHalf, System.Math.PI);
-		bool cleaver = arcHalf > 0.5f; // maul kit: arc cleave with split damage
+		// longbow kit: fires the Game's PARTY-SIDE shot pool (boss bullets live in the other
+		// pool, which only ever bites the party). Kit dispatch keys on weaponKit, NOT on
+		// arcHalf - arcHalf stays purely a melee property.
+		bool shotKit = weaponKit == "shot"; // longbow kit: fires the Game's party-side shot pool
+		bool cleaver = !shotKit && arcHalf > 0.5f; // maul kit: arc cleave with split damage
 		float reach = range * rangeMul;
 		Godot.Node2D best = null;
 		float bestD = 1e9f;
@@ -424,7 +439,9 @@ public partial class PartyMember : Godot.Node2D
 			// body faces, and the ~150 deg arc rides the swing (below), not the
 			// walk direction - so a Baldrun walking away from the horde still
 			// turns its cleave to the nearest threat instead of whiffing air.
-			if (isLeader && !cleaver && dd >= 40.0f &&
+			// a shooter Mosiah-aims too: the bow picks the nearest body in sight whatever way
+			// it faces, so the lane gate stays lane-only
+			if (isLeader && !cleaver && !shotKit && dd >= 40.0f &&
 				System.Math.Abs(angleDiff((float)System.Math.Atan2(v.Y, v.X), facing)) > arcEff)
 				continue;
 			bestD = dd;
@@ -440,7 +457,23 @@ public partial class PartyMember : Godot.Node2D
 						  // so the ~150 deg fan is centered on the swing toward the
 						  // closest body; only lane weapons respect walk facing
 		float dmg = weaponDamage * dmgMul;
-		if (cleaver)
+		if (shotKit)
+		{
+			// Longbow: the commit fires the Game's PARTY-SIDE shot pool at the closest body in
+			// sight. Damage is not split - every bolt that connects takes the full hit, and a
+			// miss simply expires (no pierce: the FAN is the multishot upgrade, pierce is the
+			// rapier's). Bolts fan tightly around the aim line so rank 1..3 reads as a wedge
+			// of chitin, not a stack of overlapping shots.
+			int bolts = shots < 1 ? 1 : (shots > 5 ? 5 : shots);
+			for (int s = 0; s < bolts; s++)
+			{
+				float off = (s - (bolts - 1) * 0.5f) * 0.16f; // rad of fan per extra bolt
+				float a2 = ang + off;
+				Vector2 dir = new Vector2((float)System.Math.Cos(a2), (float)System.Math.Sin(a2));
+				pg.SpawnShot(p + dir * 18.0f, dir * projSpeed, dmg, projLife);
+			}
+		}
+		else if (cleaver)
 		{
 			// Maul: ARC CLEAVE with SPLIT damage (human-test locked tradeoff): the
 			// fan is centered on the swing toward the closest body (auto-aim above);
@@ -519,18 +552,23 @@ public partial class PartyMember : Godot.Node2D
 					((Combatant)hit).TakeDamage(dmg);
 			}
 		}
-		_atkFlash = 0.12f; // swing = ghost-white, never red (see flash block)
-		_telePivot.Rotation = facing;
-		_telePivot.Scale = new Vector2(rangeMul, rangeMul);
-		// rebuild the spokes for the LIVE arc: ranks open the maul fan, and the
-		// rotations baked at load time only knew the base arcHalf
-		if (_teleParts != null && _teleParts.Length > 1 && arcHalf <= 3.0f)
+		_atkFlash = shotKit ? 0.08f : 0.12f; // a shooter flashes a shorter draw, never red
+		// the telegraph armature is a MELEE property: a bow shows its bolt in flight, not a
+		// fan of spokes on the ground (that would read as a swing that never happened)
+		if (!shotKit)
 		{
-			int nsp = _teleParts.Length;
-			for (int i = 0; i < nsp; i++)
-				_teleParts[i].Rotation = (float)(-arcEff + 2.0 * arcEff * i / (nsp - 1));
+			_telePivot.Rotation = facing;
+			_telePivot.Scale = new Vector2(rangeMul, rangeMul);
+			// rebuild the spokes for the LIVE arc: ranks open the maul fan, and the
+			// rotations baked at load time only knew the base arcHalf
+			if (_teleParts != null && _teleParts.Length > 1 && arcHalf <= 3.0f)
+			{
+				int nsp = _teleParts.Length;
+				for (int i = 0; i < nsp; i++)
+					_teleParts[i].Rotation = (float)(-arcEff + 2.0 * arcEff * i / (nsp - 1));
+			}
+			_teleHold = 0.18f;
 		}
-		_teleHold = 0.18f;
 	}
 
 	private static double angleDiff(double a, double b)

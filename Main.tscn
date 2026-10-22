@@ -40,14 +40,47 @@ range = 115.0
 arcHalf = 0.35
 class_ = "Bard"
 
+[node name="Asper" type="Node2D" parent="."]
+script = ExtResource("3_pm")
+displayName = "Asper"
+weaponName = "Longbow"
+memberIndex = 2
+maxHp = 60.0
+baseSpeed = 132.0
+weaponDamage = 10.0
+cooldown = 0.9
+range = 260.0
+weaponKit = "shot"
+projSpeed = 340.0
+projLife = 2.2
+class_ = "Arcane Archer"
+
 [node name="BossMini" type="Node2D" parent="."]
 script = ExtResource("4_boss")
-kind = "mini"
+kind = "mini1"
 maxHp = 300.0
 radius = 46.0
 driftSpeed = 42.0
 bulletDamage = 10.0
 position = Vector2(0.0, -500.0)
+
+[node name="BossMid" type="Node2D" parent="."]
+script = ExtResource("4_boss")
+kind = "boss1"
+maxHp = 520.0
+radius = 56.0
+driftSpeed = 46.0
+bulletDamage = 11.0
+position = Vector2(0.0, -620.0)
+
+[node name="BossMini2" type="Node2D" parent="."]
+script = ExtResource("4_boss")
+kind = "mini2"
+maxHp = 380.0
+radius = 46.0
+driftSpeed = 44.0
+bulletDamage = 10.0
+position = Vector2(0.0, -740.0)
 
 [node name="BossFinal" type="Node2D" parent="."]
 script = ExtResource("4_boss")
@@ -56,4 +89,4 @@ maxHp = 800.0
 radius = 60.0
 driftSpeed = 48.0
 bulletDamage = 12.0
-position = Vector2(0.0, -700.0)
+position = Vector2(0.0, -860.0)

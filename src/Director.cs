@@ -1,13 +1,13 @@
 using Godot;
 
 /// <summary>
-/// Horde director for M1: budget-curve spawning of goblins/wolves/hobgoblins around the
-/// leader, ramping within each half; paused during campfire and boss phases.
+/// Horde director: budget-curve spawning of the horde around the camera, ramping inside the
+/// CURRENT beat leg and gated by the horde tier the beat table set. One PLAY state covers
+/// horde AND boss marches now, so the march only holds during camp / death / victory.
 /// </summary>
 public partial class Director : Godot.Node2D
 {
-    // ---------- horde director for M1: budget-curve spawning of goblins/wolves/hobgoblins
-    // around the leader, ramping within each half; paused during campfire and boss phases ----------
+    // ---------- horde director: budget-curve spawning around the camera ----------
     float _spawnTimer = 4.0f;
     // VS-authentic on-screen cap: horde scale (long rest) multiplies this too, so a
     // long rest spawns MORE live bodies, not just faster ones (user rule)
@@ -23,12 +23,10 @@ public partial class Director : Godot.Node2D
             return;
         if (g.GetWorldPause())
             return; // picker / join-banner soft pause: the horde holds its march while a card is up
-        int st = g.GetStageState();
-        // user pacing (2026-10-20): the horde keeps spawning DURING the mini-boss and the
-        // big boss, but at a 50 % reduced rate (st 1/4 timer x2 below) - pressure without
-        // overwhelming. Only the camp pause and terminal states hold the march back.
-        if (st == 2 || st >= 5) // CAMPFIRE / DEAD / VICTORY
-            return;
+        // M1 read the stage as raw ints and hand-picked which states spawned; the beat
+        // table means there is one marching state, so ask the stage whether it marches.
+        if (!g.GetHordeActive())
+            return; // CAMPFIRE / DEAD / VICTORY hold the march back
         _spawnTimer -= (float)d;
         if (_spawnTimer > 0.0f)
             return;
@@ -36,18 +34,22 @@ public partial class Director : Godot.Node2D
         float scale = (float)g.GetHordeScale();
         if (g.GetLiveEnemies() >= (int)(MAX_LIVE * scale))
             return; // at cap: stop spawning, don't reset the timer either
+        // the density curve ramps inside the CURRENT beat leg (len = next beat - this one),
+        // so the schedule's pacing is data: move a beat's time and the ramp follows
         double t = g.GetStageT();
-        double half = st == 0 ? g.GetFirstHalf() : g.GetSecondHalf();
+        double half = g.GetStageLen();
         _spawnTimer = (float)System.Math.Max(0.35, 1.1 - 0.6 * (t / half));
-        if (st == 3)
-            _spawnTimer *= 0.67f; // post-mini-boss: the horde runs 50 % denser
-        else if (st == 0)
-            _spawnTimer *= 2.0f;  // user pacing (2026-10-20): half rate through the long
-                                  // pre-mini-boss window - pressure stays, the count does not
-        else if (st == 1 || st == 4)
-            _spawnTimer *= 2.0f;  // boss phases: horde runs at 50 % rate (user 2026-10-20)
+        float legFrac = (float)(half > 0.0 ? t / half : 0.0);
+        // leg-start easing: a fresh beat leg opens thin and thickens toward the NEXT beat.
+        // This is what M1's flat "half rate through the long pre-mini-boss window" did per
+        // half; the beat table makes legs 20-40 s, so the easing rides the leg instead of a
+        // hardcoded 90 s of stage.
+        _spawnTimer *= legFrac < 0.4f ? 2.0f - (legFrac / 0.4f) : 1.0f;
+        if (g.GetBossLive())
+            _spawnTimer *= 2.0f; // boss phases (any of the four): horde at 50 % rate, pressure
+                                  // without overwhelming (user pacing rule 2026-10-20)
         // the long rest's price lands here: horde scale densifies pacing AND beefs up
-        // whatever the next stage spawns (Game._hordeScale -> GetHordeScale)
+        // whatever the next leg spawns (Game._hordeScale -> GetHordeScale)
         _spawnTimer /= scale;
         Vector2 near = g.GetLeader() != null ? g.GetLeader().GlobalPosition : new Vector2(0, 0);
         Spawn(g, near, scale);
@@ -71,10 +73,13 @@ public partial class Director : Godot.Node2D
         if (g.GetLeader() != null && pos.DistanceTo(g.GetLeader().GlobalPosition) < 260.0f)
             return; // an arena clamp may have dragged the spawn into the party: skip, the
                     // timer already burned this roll
-        // user tier gate (2026-10-20): ONLY tier 1 (goblins) until TIER2_AT run-seconds,
-        // then tier 2 (wolves + hobgoblins) mixes in. Tier 3/4 hooks land with later stages
-        // - variety without handing a solo Leader a wolf pack at t=10s.
-        bool tier2 = g.GetRunT() >= g.GetTier2At();
+        // user tier gate: the horde runs whatever tier the beat table last advanced. Tier 1
+        // goblins | tier 2 wolves + hobgoblins | tiers 3 and 4 are NOT DESIGNED YET - the
+        // user will dictate those creatures, so until they land a tier-3/4 leg draws the
+        // tier-2 bodies with an elite HP bump and says so. Flagged placeholder, not invented
+        // content: nothing here pretends a creature nobody approved exists.
+        int tier = (int)g.GetHordeTier();
+        bool tier2 = tier >= 2;
         bool wolf = tier2 && (float)GD.Randf() < 0.30f;
         bool hob = false;
         if (!wolf)
@@ -92,7 +97,8 @@ public partial class Director : Godot.Node2D
         // user-approved balance round: goblin 30 / hobgoblin 60 / wolf 70 base HP,
         // still over a single hit on a packed cleave but a lone target dies in one
         // clean maul swing (30 dmg) - horde scale only bumps this on a long rest
-        e.maxHp = (wolf ? 70.0f : (hob ? 60.0f : 30.0f)) * hordeScale;
+        float tierBump = tier >= 4 ? 1.6f : (tier >= 3 ? 1.3f : 1.0f);
+        e.maxHp = (wolf ? 70.0f : (hob ? 60.0f : 30.0f)) * hordeScale * tierBump;
         e.hp = e.maxHp;
         e.speed = wolf ? 120.0f : (hob ? 100.0f : 90.0f);
         e.contactDamage = wolf ? 3.0f : (hob ? 3.0f : 2.0f);

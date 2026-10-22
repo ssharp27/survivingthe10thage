@@ -4,7 +4,11 @@ using Godot;
 /// Data-driven placeholder boss for the M1 timeline engine: three phases (100/66/33% HP),
 /// every event is telegraph -> attack -> recovery, composed of ring/fan/spokes primitives.
 /// Swap the pattern blocks for real encounter data later; the engine stays.
-/// kind is inherited from Combatant; the scene author sets "mini"/"final".
+/// kind is inherited from Combatant; the scene author sets the beat it belongs to:
+/// "mini1" / "boss1" / "mini2" / "final" (M2 beat loop). The kind is also what decides
+/// what a death MEANS (Game.OnBossKilled: mini -> camp | mid -> keep marching | final -> win),
+/// and the body's size / colour, so the loop is data in the scene, not four copies of a class.
+/// Legacy "mini" still reads as a mini so an older scene keeps working.
 /// </summary>
 public partial class Boss : Combatant
 {
@@ -25,15 +29,25 @@ public partial class Boss : Combatant
     Godot.Node2D _rig;
     float _rigT = 0.0f;
 
+    // the beat a boss node belongs to is carried in its kind, so the body reads the
+    // schedule: two minis (camp after either), one mid milestone, one stage end
+    private bool IsMiniKind()
+    {
+        return kind == "mini1" || kind == "mini2" || kind == "mini";
+    }
+
     public override void _EnterTree()
     {
         hp = maxHp;
         _body = new ColorRect();
-        float w = kind == "mini" ? 60.0f : 96.0f;
+        bool isMini = IsMiniKind();
+        // mid boss sits between the two sizes: bigger than a mini, not the stage's finale
+        float w = isMini ? 60.0f : (kind == "boss1" ? 80.0f : 96.0f);
         _body.Size = new Vector2(w, w);
         _body.Position = -_body.Size * 0.5f;
-        _body.Color = kind == "mini" ? new Color(0.55f, 0.15f, 0.45f)
-                                     : new Color(0.65f, 0.10f, 0.10f);
+        _body.Color = isMini ? new Color(0.55f, 0.15f, 0.45f)
+                             : kind == "boss1" ? new Color(0.62f, 0.34f, 0.10f)
+                                               : new Color(0.65f, 0.10f, 0.10f);
         _rig = new Godot.Node2D();
         _rig.Name = "Rig";
         AddChild(_rig);
@@ -64,7 +78,7 @@ public partial class Boss : Combatant
         // shoved across the table - lateral sway + lean, like the party, scaled up
         _rigT += delta;
         float ph = _rigT * 4.2f;
-        float slid = (float)System.Math.Sin(ph) * (kind == "mini" ? 3.0f : 4.5f);
+        float slid = (float)System.Math.Sin(ph) * (IsMiniKind() ? 3.0f : 4.5f);
         _rig.Position = new Vector2(slid, 0.0f);
         _rig.Rotation = slid * 0.012f;
 
