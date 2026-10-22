@@ -1286,6 +1286,10 @@ public partial class Game : Godot.Node2D
             if (_recruitPending != null)
                 _escortTimeout += d; // an abandoned cage still ends: the stage must keep moving
         }
+        // the stall rule needs a per-frame test: a stable-down party takes no more damage events,
+        // so the damage-site CheckTpk calls could never fire (that was the smokeM2w stall)
+        if (_state == StageState.PLAY)
+            CheckTpk();
 		// the join banner's click gate is a HUMAN gate (no-timeout rule): pilot smokes
 		// clear it instantly so verification keeps advancing
 		if (_joinWaiting && _pilot)
@@ -2905,15 +2909,24 @@ public partial class Game : Godot.Node2D
 
     private void CheckTpk()
     {
-        // TPK per the squad rules only when every member is ELIMINATED (3 failed
-        // saves). Downed members still roll death saves or wait for a campfire.
+        // TPK, two ways (user rule 2026-10-22 closes the stall): every JOINED member ELIMINATED (3
+        // failed saves), OR nobody can act at all - every joined member is OUT or DOWN-STABLE
+        // (death-save rolls stopped, so the dice cannot save the run either). The old test missed
+        // a stable-down body no enemy ever touches: with a live boss holding the next beat the
+        // stage could reach neither VICTORY nor TPK (first seen stalling 500+ s in smokeM2w).
+        // Reviving a downed leader from an ally is future work; until then an up body (or a body
+        // still rolling saves) is the only thing that keeps a run alive.
         foreach (PartyMember m in _party)
         {
             if (!m.joined)
                 continue; // a PC that never joined is not part of the party - it cannot
                           // hold off a TPK (or rescue a stranded one)
-            if (!m.eliminated)
-                return;
+            if (m.eliminated)
+                continue; // out until the next campfire: cannot act, cannot save
+            if (!m.downed)
+                return; // someone is up: they fight, and they can revive
+            if (!m.stable)
+                return; // still rolling death saves: the dice can keep the run going
         }
         _state = StageState.DEAD;
 		PrintSummary("TPK - the whole party is down");

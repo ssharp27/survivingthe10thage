@@ -153,6 +153,14 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 - **Dead-code cleanup** (behavior-neutral): the duplicated `if (_joinWaiting)` join-ceremony block was
   **pre-existing in M1's signed-off HEAD** (byte-identical, unreachable after the first `return`); the
   stale "advances to `PLAY2`" comment corrected to `PLAY`.
+- **Stall closed - CheckTpk two-way rule (user 2026-10-22)**: TPK fires when every joined member is
+  ELIMINATED (the old rule), **OR** when nobody can act at all — every joined member is OUT or **down-STABLE**
+  (rolls stopped, so the dice cannot save the run either; "the run is basically over without the leader").
+  Needs a **per-frame call** in `_Process` gated on `PLAY` (a motionless stable party takes no damage events,
+  so damage-site `CheckTpk` calls could never fire — that was the 500+ s `smokeM2w` stall; the `PLAY` gate
+  keeps it from overwriting a same-frame VICTORY). Guard order matters: **eliminated first** — eliminated
+  members keep `stable == false`, and a stability test ahead of the elimination test re-broke the classic
+  TPK (caught by the reaper smoke that ran to the frame cap with everyone OUT).
 
 ## Needs the user's word (blocking, not guessed)
 
@@ -161,15 +169,14 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
   creatures. The user must dictate the real ones.
 - **The 210 s beat's spelling**: the user wrote "tier-5 spawns" while 150 s is tier 3 — almost certainly a
   typo for **tier 4** (and the table is built that way), but confirm.
-- **Rank-4 evolution shape** (one-way vs two-way subclass choice) unanswered; none of the 3 new PCs has
-  a named evolution.
+- **Rank-4 evolution shape**: **parked** (user 2026-10-22: needs more thinking, not deciding yet) — none of
+  the new PCs has named evolutions, and nothing here should force the shape until it is dictated.
 - **Bolt-on-boss** is a decision I made to unblock the beat loop (bosses are enemies and the loop cannot
   advance past a live boss) — veto if the longbow should not trade with bosses.
-- **Soft-lock hole first observed in `smokeM2w`** (not Yu-caused — the 18-option OPT table just steered
-  pilot RNG into it): a **STABLE-down** body (death-save rolls stopped per the locked rule) + everyone
-  else OUT + a live boss holding the next beat = the stage can reach neither VICTORY nor TPK if no
-  enemy ever touches the prone body. Needs a rule from the user: stable-down bodies eventually die on
-  their own, or a stalled stage gets a valve (auto-elimination after N s / boss escalation).
+- **Party members reviving a downed leader** is **future work** (user 2026-10-22: "at some point" — it
+  helps when the leader is down but allies are up, and rescues nobody already out). Until it lands, an
+  up body (or one still rolling saves) is the only thing keeping a run alive. The TPK rule closing the
+  stall **landed this pass** — see "Landed this pass".
 
 ## M2 backlog / open items
 
@@ -256,6 +263,17 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   50 tier-2 gate → 70 mini1), party wiped during the mini1 march.
 - **Gate for the Yu build is green**: `smokeM2v` (camp) VICTORY, `smokeM2w2` (join) TPK, `smokeM2x` (plain)
   TPK, all `.err` 0 bytes; verb-bite evidence carried by the temp-delta `smokeM2ver`.
+- `smokeM2y` — reaper ON (`M1_REAPER=1`), the TPK-rule edit **pre-guard-fix**: everyone OUT yet **no terminal**
+  ran to the frame cap — direct evidence of the guard-order defect (stability test returned for eliminated
+  members). Superseded by `smokeM2y2`.
+- `smokeM2y2` — reaper ON with **temp rule print**: **TPK**, 0-byte `.err`, short trail. Baldrun stabilizes
+  (rolls 14, 15 → STABLE) and the line `(verif) TPK fired: stall rule (stable-down present)` lands **at the
+  stabilization moment** — the stall state itself ends the run, not a damage race. Print removed → not in
+  shipped code.
+- `smokeM2z` / `smokeM2z2` / `smokeM2z3` — camp / join / plain, **shipped build with the new rule**:
+  **VICTORY, TPK, TPK**, all `.err` 0 bytes; the plain trail walks 30→50→70 in table order and TPKs during
+  the mini1 march.
+- **Gate for the TPK-rule build is green**: `smokeM2z` VICTORY, `smokeM2z2`/`z3` TPK, all `.err` 0 bytes.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
@@ -289,3 +307,7 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
 - Dev-skip smokes are **unseeded-RNG trials**: a soft-lock branch (see the gate-trail note) can void one
   trail while the retry passes. Treat a no-terminal trail as VOID and retry, but record the stall if it is
   a rules hole the shipped game can reach.
+- A new terminal rule that is meant to **subsume** an old rule must still pass the old rule's own case
+  end-to-end: eliminated members keep `stable == false`, so testing "still rolling" before "eliminated"
+  silently re-opened the classic TPK. Symptom to trust: everyone `OUT` in every march strip yet no terminal
+  line until the frame cap.
