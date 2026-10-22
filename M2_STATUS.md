@@ -161,6 +161,19 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
   keeps it from overwriting a same-frame VICTORY). Guard order matters: **eliminated first** — eliminated
   members keep `stable == false`, and a stability test ahead of the elimination test re-broke the classic
   TPK (caught by the reaper smoke that ran to the frame cap with everyone OUT).
+- **HUD clock is the RUN clock, always (user 2026-10-22)**: all three display sites (plain HUD, picker
+  card, pilot strip) print `t=` from `GetRunTime()` (`_runT`) instead of `GetStageT()` - the leg clock
+  RESETS every beat row, and that reset made the first mini-boss read as "way too early" (human
+  complaint). `GetStageT()` survives only as the horde's density-ramp input (pacing DATA per leg,
+  never displayed). Beat times themselves were always honest run-seconds.
+- **Horde scales to party size (user rule, human playtest 2026-10-22)**: solo Baldrun was swamped by
+  a full-sized horde. `Director._Process` now multiplies BOTH volume dials by `partyScale =
+  GetPartyInPlay() / 2.0` (live cap AND cadence; normalized so M1's 2-PC pacing is 1.0 - solo 0.5x,
+  5 PCs 2.5x, applied after the leg ramp and easing, stacked with the rest scale). `GetPartyInPlay()`
+  (`Game.cs`) counts JOINED, not-eliminated members, floored at 1. Body HP deliberately keeps its
+  rest-only ×1.20 price - small squads face FEWER bodies, not fatter ones. Full session record in
+  **`docs/horde-party-scaling.md`** (shipped alongside - the verbatim block there matches the code
+  byte-for-byte, line numbers included).
 
 ## Needs the user's word (blocking, not guessed)
 
@@ -274,6 +287,15 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   **VICTORY, TPK, TPK**, all `.err` 0 bytes; the plain trail walks 30→50→70 in table order and TPKs during
   the mini1 march.
 - **Gate for the TPK-rule build is green**: `smokeM2z` VICTORY, `smokeM2z2`/`z3` TPK, all `.err` 0 bytes.
+- `smokeM2za` (plain), `smokeM2zb` (camp), `smokeM2zc` (join) — **horde-party-scaling + run-clock build**:
+  **TPK, VICTORY, VICTORY**, all `.err` 0 bytes. `za` carries the rule evidence twice over: every `t=` column
+  now climbs monotonically (mini1 honestly at beat 70 s, no per-leg reset), and the solo opening runs THIN
+  (`t=15`: 4 live vs 7 pre-change; solo mini phase 12 live at half-density) then thickens the moment Mosiah
+  joins (19→27→39→40 at the 2-PC cap) - density follows party size live. `zc` join-skip WON this roll
+  (unseeded-RNG trial: earlier `w` stalled, `w2` TPKed, `z2` TPKed, `zc` cleared - terminal reached every
+  time, which is what the stall rule guarantees).
+- **Gate for the party-scaling + run-clock build is green**: `smokeM2za` TPK, `smokeM2zb` VICTORY,
+  `smokeM2zc` VICTORY, all `.err` 0 bytes.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 

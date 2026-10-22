@@ -30,9 +30,16 @@ public partial class Director : Godot.Node2D
         _spawnTimer -= (float)d;
         if (_spawnTimer > 0.0f)
             return;
+        // user rule (human playtest 2026-10-22): the horde SCALES TO THE PARTY. A solo
+        // Baldrun opening runs a thin swarm and every ally who joins thickens it (VS-style:
+        // the survivors fund the horde). Normalized so M1's two-PC pacing is the 1.0 mark -
+        // solo runs half-density, a full 5-PC squad runs 2.5x. This scales SPAWN VOLUME
+        // (live cap AND cadence); body HP keeps its rest-only x1.20 price, so a small
+        // squad faces fewer bodies, not fatter ones.
+        float partyScale = (float)g.GetPartyInPlay() / 2.0f;
         // horde scale multiplies the cap too: a long-rest horde runs bigger AND denser
         float scale = (float)g.GetHordeScale();
-        if (g.GetLiveEnemies() >= (int)(MAX_LIVE * scale))
+        if (g.GetLiveEnemies() >= (int)(MAX_LIVE * scale * partyScale))
             return; // at cap: stop spawning, don't reset the timer either
         // the density curve ramps inside the CURRENT beat leg (len = next beat - this one),
         // so the schedule's pacing is data: move a beat's time and the ramp follows
@@ -49,8 +56,9 @@ public partial class Director : Godot.Node2D
             _spawnTimer *= 2.0f; // boss phases (any of the four): horde at 50 % rate, pressure
                                   // without overwhelming (user pacing rule 2026-10-20)
         // the long rest's price lands here: horde scale densifies pacing AND beefs up
-        // whatever the next leg spawns (Game._hordeScale -> GetHordeScale)
-        _spawnTimer /= scale;
+        // whatever the next leg spawns (Game._hordeScale -> GetHordeScale); the party
+        // factor densifies pacing alongside it (solo = timer x2, 5 PCs = x0.4)
+        _spawnTimer /= (scale * partyScale);
         Vector2 near = g.GetLeader() != null ? g.GetLeader().GlobalPosition : new Vector2(0, 0);
         Spawn(g, near, scale);
     }
