@@ -12,9 +12,9 @@ PASSED). Tree was clean at M1 sign-off when M2 opened.
 - **Meta-progression**: unlock characters, who can be recruited. The starting-party-size knob
   (1→2→3) is **deferred** per the user.
 
-Progress this pass: **4 of 5 roster PCs in play** — Baldrun + Mosiah (M1) + **Asper** + **Alvora**; only
-**Yu** is left dictated-but-unimplemented. The stage **beat loop** and the **5-slot picker** are in place, so
-the last PC drops straight into live beats once it lands.
+Progress this pass: **5 of 5 roster PCs in play** — Baldrun + Mosiah (M1) + **Asper** + **Alvora** + **Yu**.
+The stage **beat loop**, the **5-slot picker** and the escort-cage join path carry all five, and the
+roster is now complete (meta/unlocks and the party-size knob stay deferred).
 
 ## Stage beat loop — user-locked 2026-10-22
 
@@ -83,7 +83,10 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
   (the user dictated only damage and HP): ring 96 px, tick 1.15 s, baseSpeed 124 px/s — vetoable.
 - **Yu** — Tortle Occultist. Summons small creatures spawned near himself that run to an enemy and
   **explode for AoE damage**. Upgrades: damage, explosion AoE, summon rate, multiattack. Minion
-  damage 20 (not reduced by caught enemies), HP 70. **DICTATED, NOT IMPLEMENTED.**
+  damage 20 (not reduced by caught enemies), HP 70. **LANDED this pass** (`Main.tscn` `memberIndex = 4`,
+  `weaponKit = "summon"`, `class_ = "Occultist"`). Sanity defaults below are **assistant-designed**
+  (the user dictated only damage and HP): ritual sight 320 px, cooldown 1.6 s, familiar speed 84 px/s
+  (a hair under a goblin's 90), blast 56 px, fuse 6 s — vetoable.
 - Projectiles, rays, summons and AoEs are all in scope eventually.
 
 ## Landed this pass (uncommitted → committed this commit)
@@ -112,6 +115,17 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
   `Game.TakeHit` (the one place party damage lands: bullets, contact, boss volleys) with a **floor of 1
   per hit**, so armour can never turn a swarm into a free pass. Tracks are picker options **10–13**
   (`spirit brand` / `wider ring` / `quicker pulse` / `warding light`) on a new `OPT_ARMOUR` array.
+- **Yu's kit = `weaponKit = "summon"`** (the FOURTH verb): a commit spawns familiars **near Yu** in a
+  shallow fan into a **party-side summon pool** (`_summons` + parallel arrays in `Game.cs`, 64 pooled
+  slots — an **implementation bound, not a gameplay cap**: no cap per the user, "they won't last long").
+  Each familiar steers at the closest live body on the **short torus path** (`WrapDelta`) and **detonates
+  on contact OR when its 6 s fuse burns out** — the fuse IS the lifetime (user rule 2026-10-22), so no
+  familiar can be parked under a boss and saved for later. The blast reuses the cleric's no-split rule:
+  **FULL damage to every body in radius**. Familiars bite bosses exactly like bolts do
+  (`hitR = 16.0f + ((Boss)bestC).radius`) — the beat loop needs that bite to advance. Ranks reuse the
+  ordinary plumbing: picker options **14–17** (`occult flame` = `dmgMul`, `wider burst` = ONE `rangeMul`
+  rank widening BOTH ritual sight and blast radius, `quicker ritual` = `cdMul`, and `twin ritual` = the
+  multishot rank doubling as **multiattack**, one more familiar per commit).
 - **Ring seats are now a table** (`RING_SLOT = { 0, 3, 2, 4, 5, 1 }` keyed by `memberIndex`): the old
   math folded `memberIndex` 1 and 3 onto the same angle, so a fourth PC welded straight onto Mosiah.
   M1's hand-placement is kept verbatim (Mosiah seat 3, Asper seat 2), Alvora takes seat 4.
@@ -151,10 +165,16 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
   a named evolution.
 - **Bolt-on-boss** is a decision I made to unblock the beat loop (bosses are enemies and the loop cannot
   advance past a live boss) — veto if the longbow should not trade with bosses.
+- **Soft-lock hole first observed in `smokeM2w`** (not Yu-caused — the 18-option OPT table just steered
+  pilot RNG into it): a **STABLE-down** body (death-save rolls stopped per the locked rule) + everyone
+  else OUT + a live boss holding the next beat = the stage can reach neither VICTORY nor TPK if no
+  enemy ever touches the prone body. Needs a rule from the user: stable-down bodies eventually die on
+  their own, or a stalled stage gets a valve (auto-elimination after N s / boss escalation).
 
 ## M2 backlog / open items
 
-- Implement **Yu** on the spec above (the last roster slot). **Alvora landed this pass.**
+- **Roster complete at 5 PCs**: Yu landed this pass. What remains roster-wise is the **rank-4 evolution
+  shape** (below in "Needs the user's word") — none of the new PCs has a named evolution yet.
 - **M1 carry-over, not M2 scope unless the user pulls it**: deferred human-playtest checklist (dash
   feel, escort contact chips, live HUD strip, 25% join-HP floor, picker gating, DPI frame, escort-KILL
   joins), camp alignment round 3, 20-minute run-curve pass (see decision 2 — becomes load-bearing).
@@ -217,6 +237,25 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   **the print is not in the shipped code**, and `smokeM2r`/`s`/`t` are the trails for the shipped build.
 - **Gate for the Alvora build is green**: `smokeM2r` (camp) VICTORY, `smokeM2s`/`t` (join / plain) TPK,
   all three `.err` 0 bytes.
+- `smokeM2ver` — camp skip **with temp verification deltas** (ally IV beat 210→160 s, `ESCORT_GIVEUP`
+  55→6 s, temp blast print in `DetonateSummon`): **VICTORY**, 0-byte `.err`. The familiar verb **committed**:
+  27 blast lines, Yu joined (`RECRUIT JOINED: Yu ... ring slot 4 opens`), and the boss bite is direct —
+  `12 bodies, 1 of them boss` and `1 bodies, 1 of them boss` ×2 during the **FINAL BOSS** march. The picker
+  offered Yu tracks (`occult flame` / `wider burst` / `quicker ritual`, rank (1/3)). The deltas were
+  **added → run → reverted**; the print is not in the shipped code.
+- `smokeM2v` — camp skip, **Yu build, shipped values**: **VICTORY**, 0-byte `.err`. Roster line prints all
+  five; the 210 s ally IV row fires with 6 tier-4 escorts, Yu still stranded at VICTORY (the 55 s valve
+  loses the race there) — roster/loop evidence; the verb itself is gated by `smokeM2ver`.
+- `smokeM2w` — join skip, Yu build: **VOID — SOFT-LOCK**: mini1 march stalled at t=525 with Baldrun **STABLE**
+  down (rolls stopped per the locked rule), Mosiah OUT, mini1 frozen at 58 hp, beats held by the live boss,
+  TPK cannot fire (downed ≠ eliminated). Nothing Yu-related is involved — the 18-option OPT table shifted
+  pilot RNG into this branch. Recorded above in "Needs the user's word".
+- `smokeM2w2` — join-skip retry (fresh RNG): **TPK** terminal, 0-byte `.err` — clean wipe, all joined
+  members eliminated, no stall.
+- `smokeM2x` — plain pilot, Yu build: **TPK** terminal, 0-byte `.err`; beats fire in table order (30 ally →
+  50 tier-2 gate → 70 mini1), party wiped during the mini1 march.
+- **Gate for the Yu build is green**: `smokeM2v` (camp) VICTORY, `smokeM2w2` (join) TPK, `smokeM2x` (plain)
+  TPK, all `.err` 0 bytes; verb-bite evidence carried by the temp-delta `smokeM2ver`.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
@@ -239,3 +278,14 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
 - A verb whose damage route never touches a boss cannot advance the beat loop, and a smoke that VICTORYes
   does **not** by itself prove the new verb bit the boss. Print the interaction once (temporarily), gate on
   it, then remove the print - a VICTORY shared with the other trails is otherwise ambiguous.
+- PowerShell line-splices: `$all += , @(...)` **nests** an array, and `-join` then renders literal `System.Object[]`
+  **into the source file** — the intended lines are LOST and the file is corrupt. Append scalars individually,
+  never a nested array. And a `$ls = @()` slip before `-join` writes an **empty file**: recover via
+  `git checkout HEAD -- <file>` only if the file's uncommitted pass can be re-applied — check `git status`
+  and file size **before** any reflex restore, since a restore discards the whole uncommitted pass.
+- `(Get-Item f).Size` prints empty on a `FileInfo` in this shell; use `.Length` (and/or raw content length)
+  for the 0-byte `.err` gate. `-like '*System.Object[]*'` throws (`[]` is an invalid wildcard class) —
+  use `-match 'System\.Object'`.
+- Dev-skip smokes are **unseeded-RNG trials**: a soft-lock branch (see the gate-trail note) can void one
+  trail while the retry passes. Treat a no-terminal trail as VOID and retry, but record the stall if it is
+  a rules hole the shipped game can reach.

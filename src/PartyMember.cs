@@ -41,9 +41,16 @@ public partial class PartyMember : Godot.Node2D
 	// makes the ring an anti-swarm verb. Warding light is a FLAT incoming-damage reduction
 	// (-1/-2/-3 by rank, never below 1 damage per hit), applied in Game.TakeHit - the one place
 	// party damage lands.
-	[Export] public string weaponKit = "melee"; // "melee" | "shot" | "aura"
+	[Export] public string weaponKit = "melee"; // "melee" | "shot" | "aura" | "summon"
 	[Export] public float projSpeed = 340.0f;  // px/s a bug projectile travels
 	[Export] public float projLife = 2.2f;     // seconds a bolt may fly before it expires
+	// Yu's familiars (M2, user dictation 2026-10-22): the fuse is the summon's LIFETIME, and
+	// the familiar detonates on contact with prey OR when that fuse burns out - the fuse is
+	// what keeps a player from parking a pile of them under a boss and saving them for later.
+	// There is no summon cap (user): they never live long enough to stack up.
+	[Export] public float minionSpeed = 84.0f;  // px/s a familiar runs (a hair under a goblin's 90)
+	[Export] public float minionRadius = 56.0f; // px blast radius when it detonates (starts small)
+	[Export] public float minionFuse = 6.0f;    // seconds of fuse before it detonates by itself
 	public int shots = 1;                     // multishot rank lands here (1 = single bolt)
 
 	public float hp = 0.0f;
@@ -498,8 +505,16 @@ public partial class PartyMember : Godot.Node2D
 		// one. An empty ring burns nothing: the cooldown stays open, so a cleric standing over
 		// empty clearing never stalls its own beat. The radius rides reach and the pulse rides
 		// the weapon cooldown, so "wider ring" / "quicker pulse" reuse the rangeMul / cdMul ranks.
+		// M2's FOURTH verb is Yu's occult ritual: neither a bolt nor a ring but a small creature
+		// that runs at the closest prey and detonates for a blast NO body shares (user rule 2026-10-22:
+		// "the damage isn't reduced by number of enemies in the radius"). It lives in the Game's
+		// party-side summon pool and its fuse is its whole lifetime, so the ranks reuse the same
+		// plumbing every other member uses - cooldown = summon rate, damage = blast damage,
+		// reach = the ritual (it widens the sight AND the blast), shots = the multiattack rank.
 		bool auraKit = weaponKit == "aura"; // Spirit Guardians kit: ring pulsing around the caster
 		float reach = range * rangeMul;
+		// the fourth verb is keyed on the kit name like every other weapon
+		bool sumKit = weaponKit == "summon"; // Occultist ritual: fuse-driven familiars run at prey
 		if (auraKit)
 		{
 			// the ring is a full-body sweep, so the lane/fan target search below is skipped
@@ -521,6 +536,52 @@ public partial class PartyMember : Godot.Node2D
 			_atkFlash = 0.08f; // same commit pulse the longbow uses, never the red harm lane
 			_auraPulse = 0.22f; // the ring flares so the tick reads without a HUD
 			return;
+		}
+		// ---------- Yu's occult ritual: run the familiar pool, never a node per familiar ----------
+		// The ritual is neither a bolt nor a ring, so it does its OWN prey scan: it sends a
+		// creature after something well outside arm's reach, which the shared lane/fan search
+		// below (gated by reach) is not for. Prey is the NEAREST living body, whatever way Yu
+		// faces - like the bow and the maul, only a lane weapon respects walk facing.
+		if (sumKit)
+		{
+			Godot.Node2D prey = null;
+			float preyD = 1e9f;
+			for (int i = 0; i < enemies.Count; i++)
+			{
+				Godot.Node2D n = enemies[i];
+				Combatant nc = (Combatant)n;
+				if (nc == null || nc.kind == "dead")
+					continue;
+				Vector2 dv = pg.WrapDelta(p, n.GlobalPosition);
+				float dd = dv.Length();
+				if (dd >= preyD)
+					continue;
+				preyD = dd;
+				prey = n;
+			}
+			if (prey == null || preyD > reach)
+				return; // nothing in sight: the ritual stays ready, an empty clearing never stalls a beat
+			cdTimer = cooldown * cdMul;
+			_atkFlash = 0.08f; // same commit pulse the longbow uses, never the red harm lane
+			// multiattack rank: one more familiar per rank, spread in a shallow fan so a
+			// triple summon never spawns three bodies in one spot. They are spawned NEAR Yu
+			// (user dictation 2026-10-22), not on the prey it chased.
+			int familiars = shots < 1 ? 1 : (shots > 5 ? 5 : shots);
+			// ONE reach rank widens BOTH the ritual's sight AND its blast, so "wider burst"
+			// rides rangeMul like every other reach track. Blast damage is NOT split by whatever
+			// stands in it (user rule 2026-10-22) - that no-split lives in the pool, see DetonateSummon.
+			float blast = minionRadius * rangeMul;
+			// chase on the SHORT torus path: an absolute delta would take the 2400 px way round a seam
+			Vector2 aim = pg.WrapDelta(p, prey.GlobalPosition);
+			aim = aim.Length() > 0.01f ? aim.Normalized() : new Vector2(1.0f, 0.0f);
+			for (int s = 0; s < familiars; s++)
+			{
+				float off = (s - (familiars - 1) * 0.5f) * 0.42f; // rad of spread per extra familiar
+				float ca = (float)System.Math.Cos(off); // rotate the aim: Godot C# Vector2 has no .rotated()
+				float sa = (float)System.Math.Sin(off);
+				Vector2 dir = new Vector2(aim.X * ca - aim.Y * sa, aim.X * sa + aim.Y * ca);
+				pg.SpawnSummon(p + dir * 26.0f, weaponDamage * dmgMul, minionFuse, blast, minionSpeed);
+			}
 		}
 		Godot.Node2D best = null;
 		float bestD = 1e9f;

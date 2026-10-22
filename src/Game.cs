@@ -145,16 +145,18 @@ public partial class Game : Godot.Node2D
                                            "heavier arrows (longbow damage)", "quicker draw (longbow cooldown)",
                                            "farther shot (longbow reach)", "multishot (fan of shots)",
                                            "spirit brand (guardian damage)", "wider ring (guardian reach)",
-                                           "quicker pulse (guardian rate)", "warding light (armour)" };
-    static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3 };
-    static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f };
-    static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.18f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f };
-    static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f };
-    static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0 }; // multishot rank: one more bolt in the fan
+                                           "quicker pulse (guardian rate)", "warding light (armour)",
+                                           "occult flame (blast damage)", "wider burst (blast reach)",
+                                           "quicker ritual (summon rate)", "twin ritual (one more familiar)" };
+    static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4 };
+    static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f };
+    static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.18f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f };
+    static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f };
+    static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
     // warding light (Alvora): FLAT incoming-damage reduction per rank. A hit is never softened
     // below 1 (Game.TakeHit), so armour cannot turn a swarm into a free pass.
-    static readonly int[] OPT_ARMOUR = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 };
+    static readonly int[] OPT_ARMOUR = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0 };
     int[] _pickRank = new int[OPT_LABEL.Length];
     int[] _optRoll = new int[PICK_SLOTS]; // this card's offered options (slot -> option, -1 = empty slot)
 
@@ -253,6 +255,23 @@ public partial class Game : Godot.Node2D
 		Godot.Collections.Array<Vector2> _shotVel = new();
 		Godot.Collections.Array<double> _shotDmg = new();
 		Godot.Collections.Array<double> _shotLife = new();
+		// ---------- party-side summon pool (M2: Yu's occult familiars) ----------
+		// A familiar is NOT a projectile and NOT a Combatant: it runs at the closest prey and
+		// DETONATES - either on contact, or when its fuse burns out (user rule 2026-10-22: "the
+		// minions will last 6 seconds before detonating to keep the player from stacking them
+		// up for a boss"), so there is nothing to cap and nothing to keep forever. Same pooled
+		// discipline as the shot pool: fixed slots, no allocation per familiar. The 64 slots are
+		// an implementation bound, not a gameplay cap - a 1.6s ritual with a 6s fuse and the
+		// rank-3 multiattack still running keeps roughly 15 in flight, nowhere near the bound.
+		// Blast radius and speed are per slot because both ride the member's ranks, which move
+		// between one commit and the next.
+		Godot.Collections.Array<Godot.Node2D> _summons = new();
+		Godot.Collections.Array<Vector2> _summonVel = new();   // last heading, re-steered every frame
+		Godot.Collections.Array<double> _summonDmg = new();
+		Godot.Collections.Array<double> _summonLife = new();   // the fuse (seconds left)
+		Godot.Collections.Array<double> _summonR = new();      // blast radius, px
+		Godot.Collections.Array<float> _summonSpd = new();     // px/s this familiar runs
+		Godot.Collections.Array<bool> _summonBurst = new();    // slot is mid detonation flare
 	Godot.Collections.Array<Godot.Node2D> _enemies = new();
 	Godot.Collections.Array<Boss> _bosses = new();
 	int _liveEnemies = 0;
@@ -1217,6 +1236,29 @@ public partial class Game : Godot.Node2D
             _shotDmg.Add(0.0);
             _shotLife.Add(0.0);
         }
+        // Yu's familiars: pooled like the bolts and the gems, so a rank-3 multiattack ritual
+        // never allocates a node mid-horde. Shell-first so the creature reads as a body; the
+        // detonation re-sizes this SAME rect to the blast it actually made (see DetonateSummon),
+        // which is why SpawnSummon has to put the shell back before every reuse.
+        for (int i = 0; i < 64; i++)
+        {
+            Godot.Node2D s = new Node2D();
+            Godot.ColorRect cr = new ColorRect();
+            cr.Size = new Vector2(14.0f, 14.0f);
+            cr.Position = new Vector2(-7.0f, -7.0f);
+            cr.Color = new Color(0.26f, 0.2f, 0.34f, 1.0f); // occult violet shell
+            cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+            s.AddChild(cr);
+            s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+            AddChild(s);
+            _summons.Add(s);
+            _summonVel.Add(new Vector2(0, 0));
+            _summonDmg.Add(0.0);
+            _summonLife.Add(0.0);
+            _summonR.Add(0.0);
+            _summonSpd.Add(0.0f);
+            _summonBurst.Add(false);
+        }
     }
 
     public override void _Process(double d)
@@ -1817,6 +1859,7 @@ public partial class Game : Godot.Node2D
         UpdateGems(delta);
         UpdateBullets(delta);
         UpdateShots(delta); // the party's own projectiles: mirror pool, opposite faction
+        UpdateSummons(delta); // Yu's familiars: run at prey, detonate on contact OR on the fuse
         PickerTick(d);
 		_hud.Text = "Surviving the 10th Age - Tanurial Forest | Lv " + _level +
 					" | xp " + (int)_xp + "/" + (int)_xpNext +
@@ -1982,6 +2025,136 @@ public partial class Game : Godot.Node2D
             ((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
             return;
         }
+    }
+
+    // ---------- Yu's familiars: run -> detonate, damage through the shared kill scan ----------
+    public void SpawnSummon(Vector2 pos, double dmg, double fuse, double radius, float speed)
+    {
+        for (int i = 0; i < _summons.Count; i++)
+        {
+            Godot.Node2D s = _summons[i];
+            if (s.GlobalPosition.X >= -8000.0f)
+                continue; // occupied slot
+            s.GlobalPosition = pos;
+            _summonVel[i] = new Vector2(0, 0);
+            _summonDmg[i] = dmg;
+            _summonLife[i] = fuse;
+            _summonR[i] = radius;
+            _summonSpd[i] = speed;
+            _summonBurst[i] = false;
+            // put the shell back: the slot may have been left mid-blast by DetonateSummon
+            Godot.ColorRect cr = (Godot.ColorRect)s.GetChild(0);
+            cr.Size = new Vector2(14.0f, 14.0f);
+            cr.Position = new Vector2(-7.0f, -7.0f);
+            cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+            return;
+        }
+    }
+
+    private void UpdateSummons(float delta)
+    {
+        for (int i = 0; i < _summons.Count; i++)
+        {
+            Godot.Node2D s = _summons[i];
+            if (s.GlobalPosition.X < -8000.0f)
+                continue; // free slot
+            if (_summonBurst[i])
+            {
+                // mid flare: the bite already went off, so this slot only fades and frees itself
+                _summonLife[i] -= delta;
+                if (_summonLife[i] <= 0.0)
+                    DespawnSummon(i);
+                continue;
+            }
+            _summonLife[i] -= delta;
+            Vector2 p = s.GlobalPosition;
+            // the last second of the fuse runs hot so a dying familiar reads without a HUD
+            if (_summonLife[i] < 1.0)
+            {
+                float f = (float)(1.0 - _summonLife[i]);
+                if (f < 0.0f)
+                    f = 0.0f;
+                ((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f + f * 0.9f, 1.0f, 1.0f, 1.0f);
+            }
+            if (_summonLife[i] <= 0.0)
+            {
+                // fuse out: it detonates wherever it stands, so a familiar can never be parked
+                // under a boss and saved for later (user rule 2026-10-22)
+                DetonateSummon(i);
+                continue;
+            }
+            // steer at the closest living body on the SHORT torus path: the world loops, so
+            // absolute deltas would have the familiar take 2400 px around a seam
+            Godot.Node2D best = null;
+            Combatant bestC = null;
+            float bestD = 1e9f;
+            for (int e = 0; e < _enemies.Count; e++)
+            {
+                Godot.Node2D n = _enemies[e];
+                Combatant nc = (Combatant)n;
+                if (nc == null || nc.kind == "dead")
+                    continue;
+                Vector2 dv = WrapDelta(p, n.GlobalPosition);
+                float dd = dv.Length();
+                if (dd >= bestD)
+                    continue;
+                bestD = dd;
+                best = n;
+                bestC = nc;
+            }
+            if (best != null)
+            {
+                // a familiar bites a boss exactly like a bolt does: the beat loop cannot advance
+                // while a live boss owns the arena. The hit test rides the authored silhouette.
+                float hitR = bestC is Boss ? 16.0f + ((Boss)bestC).radius : 20.0f;
+                if (bestD <= hitR)
+                {
+                    DetonateSummon(i); // it ran into a body: the fuse goes off ON contact
+                    continue;
+                }
+                _summonVel[i] = WrapDelta(p, best.GlobalPosition).Normalized() * _summonSpd[i];
+            }
+            // familiars wrap like every other entity instead of dying offscreen; the fuse is
+            // what bounds their lifetime, so nothing here can orbit the torus forever
+            s.GlobalPosition = WrapNearCamera(p + _summonVel[i] * delta);
+        }
+    }
+
+    private void DetonateSummon(int i)
+    {
+        Godot.Node2D s = _summons[i];
+        Vector2 p = s.GlobalPosition;
+        double dmg = _summonDmg[i];
+        double r = _summonR[i];
+        for (int e = 0; e < _enemies.Count; e++)
+        {
+            Godot.Node2D n = _enemies[e];
+            Combatant nc = (Combatant)n;
+            if (nc == null || nc.kind == "dead")
+                continue;
+            // the blast is a full-body sweep like the cleric's ring: damage is NOT split among
+            // whatever stands in it (user rule 2026-10-22), which is what makes a familiar
+            // worth spending on a packed horde instead of leaking damage on a lone body.
+            if (WrapDelta(p, n.GlobalPosition).Length() > r)
+                continue;
+            nc.TakeDamage(dmg);
+        }
+        // the slot BECOMES the blast for a beat: the shell grows to the radius it actually bit
+        // and fades, so the AoE reads without a HUD. Pure nodes - the C# _draw hook is dead in 4.7.
+        _summonBurst[i] = true;
+        _summonLife[i] = 0.16;
+        Godot.ColorRect cr = (Godot.ColorRect)s.GetChild(0);
+        cr.Size = new Vector2((float)r * 2.0f, (float)r * 2.0f);
+        cr.Position = new Vector2((float)-r, (float)-r);
+        cr.Modulate = new Color(1.5f, 0.9f, 1.3f, 0.55f);
+    }
+
+    private void DespawnSummon(int i)
+    {
+        Godot.Node2D s = _summons[i];
+        s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+        ((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+        _summonBurst[i] = false;
     }
 
     private void DespawnBullet(int i)

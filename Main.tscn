@@ -68,6 +68,22 @@ range = 96.0
 weaponKit = "aura"
 class_ = "Twilight Cleric"
 
+[node name="Yu" type="Node2D" parent="."]
+script = ExtResource("3_pm")
+displayName = "Yu"
+weaponName = "Familiars"
+memberIndex = 4
+maxHp = 70.0
+baseSpeed = 124.0
+weaponDamage = 20.0
+cooldown = 1.6
+range = 320.0
+weaponKit = "summon"
+minionSpeed = 84.0
+minionRadius = 56.0
+minionFuse = 6.0
+class_ = "Occultist"
+
 [node name="BossMini" type="Node2D" parent="."]
 script = ExtResource("4_boss")
 kind = "mini1"
