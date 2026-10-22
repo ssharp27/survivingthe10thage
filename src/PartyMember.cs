@@ -4,7 +4,9 @@ using Godot;
 /// One party member: HP, auto-attack driven by signature-weapon parameters, and the
 /// down/death-save/revive state fields (the state machine itself lives in Game).
 /// Baldrun = wide ~150 deg arc cleave (damage split among everything in the fan);
-/// Mosiah = narrow fast rapier (single target + pierce, hits one body at a time).
+/// Mosiah = narrow fast rapier (single target + pierce, hits one body at a time);
+/// Asper = longbow (party-side shot pool, multishot fan); Alvora = Spirit Guardians
+/// (a ring that pulses around the caster: FULL damage to every body inside, not split).
 /// </summary>
 public partial class PartyMember : Godot.Node2D
 {
@@ -30,8 +32,16 @@ public partial class PartyMember : Godot.Node2D
 	// lane with pierce). M2 adds a projectile verb (Asper's longbow): it fires the Game's
 	// PARTY-SIDE shot pool (SpawnShot), aims at the CLOSEST enemy in sight, and multishot
 	// fans extra bolts out of the same commit. The arc test alone cannot carry a third verb,
-	// so the kit name is the switch and arcHalf stays purely a melee property.
-	[Export] public string weaponKit = "melee"; // "melee" | "shot"
+	// so the kit name is the switch and arcHalf stays purely a melee property. M2 adds a THIRD
+	// verb for the cleric (Alvora's Spirit Guardians): a persistent ring of spirits around the
+	// caster that pulses on the weapon cooldown. Radius rides the reach stat and the pulse rides
+	// the cooldown, so both of its ranks reuse the same rangeMul / cdMul plumbing as every other
+	// reach and speed track; the damage is NOT split by count (user rule 2026-10-22) - every body
+	// inside takes the full hit, which is the exact opposite of the maul's cleave split and what
+	// makes the ring an anti-swarm verb. Warding light is a FLAT incoming-damage reduction
+	// (-1/-2/-3 by rank, never below 1 damage per hit), applied in Game.TakeHit - the one place
+	// party damage lands.
+	[Export] public string weaponKit = "melee"; // "melee" | "shot" | "aura"
 	[Export] public float projSpeed = 340.0f;  // px/s a bug projectile travels
 	[Export] public float projLife = 2.2f;     // seconds a bolt may fly before it expires
 	public int shots = 1;                     // multishot rank lands here (1 = single bolt)
@@ -43,6 +53,11 @@ public partial class PartyMember : Godot.Node2D
 	Godot.Node2D _telePivot; // telegraph armature (pure nodes: C# _draw is dead in 4.7)
 	Godot.ColorRect[] _teleParts;
 	float _teleHold = 0.0f; // telegraph visibility timer, set on each swing
+	// Spirit Guardians armature: motes orbiting under ONE pivot, so a single Scale change carries
+	// the "wider ring" rank (pure nodes again: the C# _draw hook is dead in 4.7)
+	Godot.Node2D _auraPivot = null;
+	Godot.ColorRect[] _auraParts;
+	float _auraPulse = 0.0f; // seconds of ring flare left from the last pulse
 	public float facing = 0.0f;
 	public float dmgMul = 1.0f;
 	public float cdMul = 1.0f;
@@ -51,6 +66,9 @@ public partial class PartyMember : Godot.Node2D
 	// "wider arc" rank track REMOVED per human test: Baldrun's upgrade pool went to
 	// reach / damage / cooldown instead, so the maul fan stays a fixed ~150 deg arc.
 	public int pierce = 0; // "deeper thrust": the rapier lane can skewer extra bodies
+	// warding light ranks: FLAT incoming damage reduction, applied in Game.TakeHit with a floor
+	// of 1 per hit (never a percentage, never a free pass)
+	public int armour = 0;
 	[Export] public string class_ = ""; // display class for the ui/ cards (empty = weapon fallback)
 	public string pickHistory = ""; // tracks taken so far, rendered on the run-summary card
 
@@ -216,6 +234,28 @@ public partial class PartyMember : Godot.Node2D
 			_telePivot.AddChild(s);
 			_teleParts[i] = s;
 		}
+		// Spirit Guardians ring (Alvora): six motes orbiting at the ring radius under one pivot.
+		// Built for EVERY member and hidden by the visibility gate below unless this member IS
+		// the aura kit, so the art pass never has to special-case which member owns which armature.
+		// The pivot's live Scale carries the "wider ring" rank, so the motes are authored at the
+		// base radius only.
+		_auraPivot = new Godot.Node2D();
+		_auraPivot.Name = "Guardians";
+		AddChild(_auraPivot);
+		_auraPivot.Visible = false;
+		_auraParts = new Godot.ColorRect[6];
+		for (int i = 0; i < 6; i++)
+		{
+			Godot.ColorRect s = new Godot.ColorRect();
+			s.Size = new Vector2(9.0f, 9.0f);
+			float a = (float)(System.Math.PI * 2.0 * i / 6.0);
+			s.Position = new Vector2((float)System.Math.Cos(a) * range, (float)System.Math.Sin(a) * range);
+			// twilight violet: the guardians read as spirits, not another weapon flash
+			s.Color = new Color(0.72f, 0.55f, 0.95f, 0.5f);
+			s.ZIndex = 4; // under the body (5) so a mote never hides the mini
+			_auraPivot.AddChild(s);
+			_auraParts[i] = s;
+		}
 	}
 
 	public void SetDsText(string s)
@@ -262,10 +302,18 @@ public partial class PartyMember : Godot.Node2D
 			_body.Visible = !hidden;
 		if (_mini != null)
 			_mini.Visible = !hidden; // same gate: campfire un-hides art and square alike
+		// the telegraph armature is a MELEE property: a bow shows its bolt in flight and the
+		// cleric shows orbiting guardians, so neither carries a fan of ground spokes. (The commit
+		// site already gated the swing; this is the IDLE frame, where the spokes would otherwise
+		// sit at their authored alpha forever on a member that never swings.)
 		if (_telePivot != null)
-			_telePivot.Visible = !hidden;
+			_telePivot.Visible = !hidden && weaponKit == "melee";
 		if (_ds != null)
 			_ds.Visible = !hidden;
+		// the guardians ring belongs to a LIVE, joined cleric only: a stranded recruit stands
+		// waiting without an aura, and a downed body has no spirits
+		if (_auraPivot != null)
+			_auraPivot.Visible = !hidden && joined && !downed && weaponKit == "aura";
 		// ---- downed-body readout: the d20 chip + the STAND STILL channel bar ----
 		bool downChip = downed && !eliminated;
 		float chanTotal = reviveChannelTotal > 0.0f ? reviveChannelTotal : 3.0f;
@@ -354,6 +402,28 @@ public partial class PartyMember : Godot.Node2D
 		}
 		if (!joined || downed || eliminated)
 			return; // a stranded recruit cannot swing: its weapon unlocks ON the join
+		// ---- Spirit Guardians ring: orbit + pulse flare ----
+		// A slow constant orbit so the ring reads as HIS aura at a glance; the flare is what makes
+		// a PULSE readable without a HUD. One pivot, so one Scale carries the "wider ring" rank.
+		if (weaponKit == "aura" && _auraPivot != null)
+		{
+			_auraPivot.Scale = new Vector2(rangeMul, rangeMul);
+			_auraPivot.Rotation += (float)(1.1 * delta);
+			if (_auraPulse > 0.0f)
+			{
+				_auraPulse -= delta;
+				// flare decays over the pulse window, so the ring brightens then settles
+				_auraPulse = _auraPulse < 0.0f ? 0.0f : _auraPulse;
+				float f = _auraPulse / 0.22f;
+				foreach (Godot.ColorRect s in _auraParts)
+					s.Modulate = new Color(1.0f + f * 0.7f, 1.0f, 1.0f + f * 0.4f);
+			}
+			else
+			{
+				foreach (Godot.ColorRect s in _auraParts)
+					s.Modulate = new Color(1.0f, 1.0f, 1.0f);
+			}
+		}
 		if (_flash > 0.0f)
 		{
 			_flash -= delta;
@@ -420,7 +490,38 @@ public partial class PartyMember : Godot.Node2D
 		// arcHalf - arcHalf stays purely a melee property.
 		bool shotKit = weaponKit == "shot"; // longbow kit: fires the Game's party-side shot pool
 		bool cleaver = !shotKit && arcHalf > 0.5f; // maul kit: arc cleave with split damage
+		// Spirit Guardians kit: a ring that pulses around the caster. Damage is NOT split by
+		// count (user rule 2026-10-22) - every body inside takes the FULL hit, the exact
+		// opposite of the maul's cleave split, and what makes the cleric an anti-swarm verb.
+		// Bosses live in the SAME array (RegisterEnemy takes them; they only skip the horde cap),
+		// so the ring can trade with a live boss, which is what lets the beat loop advance past
+		// one. An empty ring burns nothing: the cooldown stays open, so a cleric standing over
+		// empty clearing never stalls its own beat. The radius rides reach and the pulse rides
+		// the weapon cooldown, so "wider ring" / "quicker pulse" reuse the rangeMul / cdMul ranks.
+		bool auraKit = weaponKit == "aura"; // Spirit Guardians kit: ring pulsing around the caster
 		float reach = range * rangeMul;
+		if (auraKit)
+		{
+			// the ring is a full-body sweep, so the lane/fan target search below is skipped
+			int struck = 0;
+			for (int i = 0; i < enemies.Count; i++)
+			{
+				Godot.Node2D n = enemies[i];
+				Combatant nc = (Combatant)n;
+				if (nc == null || nc.kind == "dead")
+					continue;
+				if ((n.GlobalPosition - p).Length() > reach)
+					continue;
+				nc.TakeDamage(weaponDamage * dmgMul); // FULL hit, not dmg / struck
+				struck++;
+			}
+			if (struck <= 0)
+				return; // nothing in the ring: the next pulse stays ready
+			cdTimer = cooldown * cdMul;
+			_atkFlash = 0.08f; // same commit pulse the longbow uses, never the red harm lane
+			_auraPulse = 0.22f; // the ring flares so the tick reads without a HUD
+			return;
+		}
 		Godot.Node2D best = null;
 		float bestD = 1e9f;
 		for (int i = 0; i < enemies.Count; i++)

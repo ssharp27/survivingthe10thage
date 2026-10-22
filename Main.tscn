@@ -55,6 +55,19 @@ projSpeed = 340.0
 projLife = 2.2
 class_ = "Arcane Archer"
 
+[node name="Alvora" type="Node2D" parent="."]
+script = ExtResource("3_pm")
+displayName = "Alvora"
+weaponName = "Guardians"
+memberIndex = 3
+maxHp = 80.0
+baseSpeed = 124.0
+weaponDamage = 10.0
+cooldown = 1.15
+range = 96.0
+weaponKit = "aura"
+class_ = "Twilight Cleric"
+
 [node name="BossMini" type="Node2D" parent="."]
 script = ExtResource("4_boss")
 kind = "mini1"

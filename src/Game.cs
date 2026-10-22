@@ -24,6 +24,13 @@ public partial class Game : Godot.Node2D
     public readonly float MEMBER_RADIUS = 16.0f;
     public const double RING_RADIUS = 64.0; // bodyguard ring; sized so REVIVE_RANGE
 	// wraps a ring slot: a downed bodyguard is in arm's reach of the rescue
+	// ---------- ring seats (one distinct angle per roster seat) ----------
+	// Seats are keyed by memberIndex so a recruit always returns to the same place at the
+	// table. M1's hand-placement is kept verbatim (Asper seat 2, Mosiah seat 3), so the
+	// existing squad reads IDENTICALLY; what changed is that seats are now a table instead
+	// of math that folded index 1 onto the same seat as index 3 - a fourth PC used to
+	// weld straight onto Mosiah. Distinct seats hold up to the 5-PC roster.
+	static readonly int[] RING_SLOT = { 0, 3, 2, 4, 5, 1 }; // [memberIndex] -> seat number
 	// ---------- player revive (leader stands still near a body) ----------
 	// 56 (was 30): widened so a bodyguard slot and the rescue share a spot
 	readonly double REVIVE_RANGE = 56.0;
@@ -136,13 +143,18 @@ public partial class Game : Godot.Node2D
                                            "swifter swings (cooldown)", "quicker thrusts (cooldown)",
                                            "deeper thrust (reach + pierce)", "sharper points (damage)",
                                            "heavier arrows (longbow damage)", "quicker draw (longbow cooldown)",
-                                           "farther shot (longbow reach)", "multishot (fan of shots)" };
-    static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2 };
-    static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f };
-    static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.18f, 1.0f };
-    static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f };
-    static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0 };
-    static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 }; // multishot rank: one more bolt in the fan
+                                           "farther shot (longbow reach)", "multishot (fan of shots)",
+                                           "spirit brand (guardian damage)", "wider ring (guardian reach)",
+                                           "quicker pulse (guardian rate)", "warding light (armour)" };
+    static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3 };
+    static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f };
+    static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.18f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f };
+    static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f };
+    static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0 }; // multishot rank: one more bolt in the fan
+    // warding light (Alvora): FLAT incoming-damage reduction per rank. A hit is never softened
+    // below 1 (Game.TakeHit), so armour cannot turn a swarm into a free pass.
+    static readonly int[] OPT_ARMOUR = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 };
     int[] _pickRank = new int[OPT_LABEL.Length];
     int[] _optRoll = new int[PICK_SLOTS]; // this card's offered options (slot -> option, -1 = empty slot)
 
@@ -388,6 +400,15 @@ public partial class Game : Godot.Node2D
         }
         if (_pilot)
             amount *= 0.15; // verification-only aid for headless runs; never set in normal play
+        if (m.armour > 0)
+        {
+            // warding light (Alvora rank track): a FLAT reduction, not a percentage - the user's
+            // rule is -1/-2/-3 by rank. The floor of 1 is what keeps armour from turning a
+            // swarm into a free pass: a hit always bites for something.
+            amount -= m.armour;
+            if (amount < 1.0)
+                amount = 1.0;
+        }
         m.hp -= (float)amount;
         m.NoteHitFlash(); // live HP loss = the red lane fires
         if (m.hp <= 0.0f)
@@ -1561,9 +1582,9 @@ public partial class Game : Godot.Node2D
                     continue; // fallen bodies stay where they fell (locked); a stranded
                               // recruit stands where it fell IN, welded to its own spot
                 int k = m.memberIndex;
-                if (k < 2)
-                    k = 2 + (k % 4);
-                double slot = k * System.Math.PI * 0.4;
+                if (k < 0 || k >= RING_SLOT.Length)
+                    k = 1 + (k % (RING_SLOT.Length - 1)); // roster past the table: give it a seat
+                double slot = RING_SLOT[k] * System.Math.PI * 0.4;
                 Vector2 aim = new Vector2((float)System.Math.Cos(_ringAngle + slot),
                                           (float)System.Math.Sin(_ringAngle + slot));
                 Vector2 target = anchor + aim * (float)RING_RADIUS;
@@ -2308,6 +2329,7 @@ public partial class Game : Godot.Node2D
         m.rangeMul *= OPT_RANGE[option];
         m.pierce += OPT_PIERCE[option];
         m.shots += OPT_SHOTS[option]; // multishot: one more bolt in the fan per rank
+        m.armour += OPT_ARMOUR[option]; // warding light: flat incoming damage -1 per rank
 		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
 						 OPT_LABEL[option] + " x" + _pickRank[option];
 		GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +

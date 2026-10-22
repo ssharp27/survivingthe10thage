@@ -1,4 +1,4 @@
-# M2 STATUS — **IN PROGRESS** (opened 2026-10-22; Asper + the beat loop landed this pass)
+# M2 STATUS — **IN PROGRESS** (opened 2026-10-22; Asper, the beat loop + Alvora landed this pass)
 
 M2 = the campaign roster. Scope, locked decisions, and gate trail live here; `M1_STATUS.md` stays the
 authoritative M1 record (passes 1–22, signed off at `f0ca883` + `demo_final.zip` shipped, human test
@@ -12,9 +12,9 @@ PASSED). Tree was clean at M1 sign-off when M2 opened.
 - **Meta-progression**: unlock characters, who can be recruited. The starting-party-size knob
   (1→2→3) is **deferred** per the user.
 
-Progress this pass: **1 of 5→3 roster PCs playable is not the claim** — Baldrun + Mosiah (M1) + **Asper**
-= 3 in play; **Alvora** and **Yu** are dictated but not implemented. The stage **beat loop** and the
-**5-slot picker** are in place, so the two missing PCs drop straight into live beats once they land.
+Progress this pass: **4 of 5 roster PCs in play** — Baldrun + Mosiah (M1) + **Asper** + **Alvora**; only
+**Yu** is left dictated-but-unimplemented. The stage **beat loop** and the **5-slot picker** are in place, so
+the last PC drops straight into live beats once it lands.
 
 ## Stage beat loop — user-locked 2026-10-22
 
@@ -78,7 +78,9 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
   `class_ = "Arcane Archer"`, no `arcHalf`).
 - **Alvora** — Owlin twilight cleric. **Spirit Guardians** = persistent AoE around himself, **10
   damage to every enemy inside, NOT split by count**. Upgrades: damage, AoE size, tick rate,
-  armour (flat −1/−2/−3, floor 1). Damage 10, HP 80. **DICTATED, NOT IMPLEMENTED.**
+  armour (flat −1/−2/−3, floor 1). Damage 10, HP 80. **LANDED this pass** (`Main.tscn` `memberIndex = 3`,
+  `weaponKit = "aura"`, `class_ = "Twilight Cleric"`). Sanity defaults below are **assistant-designed**
+  (the user dictated only damage and HP): ring 96 px, tick 1.15 s, baseSpeed 124 px/s — vetoable.
 - **Yu** — Tortle Occultist. Summons small creatures spawned near himself that run to an enemy and
   **explode for AoE damage**. Upgrades: damage, explosion AoE, summon rate, multiattack. Minion
   damage 20 (not reduced by caught enemies), HP 70. **DICTATED, NOT IMPLEMENTED.**
@@ -92,6 +94,27 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
   (`_shots`, `Game.cs`:233/1181/1894, mirroring the boss-owned `_bullets`), multishot fans extra
   bolts off the same commit (`PartyMember.cs`:470, ±0.16 rad/bolt). Telegraph armature is gated
   `if (!shotKit)` — a bow shows its bolt in flight, not a fan of ground spokes.
+- **Alvora's kit = `weaponKit = "aura"`** (the THIRD verb, so kit dispatch now has three arms): the
+  commit path in `PartyMember.cs` runs a ring sweep **before** the melee/fan target search, and every
+  body inside `range * rangeMul` takes the **FULL** `weaponDamage * dmgMul` — **no split by count**, the
+  exact opposite of the maul's cleave rule, which is what makes the cleric the anti-swarm verb. An
+  **empty ring burns nothing**: it returns without setting `cdTimer`, so a cleric standing over empty
+  clearing never stalls its own beat; a live commit sets `cdTimer = cooldown * cdMul`. That is what makes
+  "wider ring" the same `rangeMul` plumbing as every other reach track and "quicker pulse" the same
+  `cdMul` plumbing as every other speed track. Bosses live in the same `GetEnemies()` array (`RegisterEnemy`
+  takes them, they only skip the horde cap) and `Boss.cs:13` is `class Boss : Combatant`, so the ring
+  **can** trade with a live boss — without which the beat loop could never advance past one.
+  Visuals are node-only as everywhere else in 4.7: 6 motes orbiting under one `Guardians` pivot (Scale
+  carries the ring rank) with a flare on each pulse. The **telegraph armature is now hidden for any
+  non-melee kit** — the idle visibility site only tested `!hidden`, so Asper's 260 px spoke fan and
+  Alvora's ring both inherited a melee fan that no swing ever explained.
+- **Warding light = `public int armour`** ranks, a **FLAT** incoming-damage reduction applied in
+  `Game.TakeHit` (the one place party damage lands: bullets, contact, boss volleys) with a **floor of 1
+  per hit**, so armour can never turn a swarm into a free pass. Tracks are picker options **10–13**
+  (`spirit brand` / `wider ring` / `quicker pulse` / `warding light`) on a new `OPT_ARMOUR` array.
+- **Ring seats are now a table** (`RING_SLOT = { 0, 3, 2, 4, 5, 1 }` keyed by `memberIndex`): the old
+  math folded `memberIndex` 1 and 3 onto the same angle, so a fourth PC welded straight onto Mosiah.
+  M1's hand-placement is kept verbatim (Mosiah seat 3, Asper seat 2), Alvora takes seat 4.
 - **Bolts hit bosses** (this was the dead-weight defect this session found): the old shot test skipped
   `nc is Boss`, so the longbow did nothing in every fight, and the beat loop cannot advance while a
   live boss owns the arena. Hit radius now rides the silhouette:
@@ -131,7 +154,7 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 
 ## M2 backlog / open items
 
-- Implement **Alvora** and **Yu** on the specs above (blocking the last 2 roster slots).
+- Implement **Yu** on the spec above (the last roster slot). **Alvora landed this pass.**
 - **M1 carry-over, not M2 scope unless the user pulls it**: deferred human-playtest checklist (dash
   feel, escort contact chips, live HUD strip, 25% join-HP floor, picker gating, DPI frame, escort-KILL
   joins), camp alignment round 3, 20-minute run-curve pass (see decision 2 — becomes load-bearing).
@@ -175,6 +198,26 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   TPK, all three `.err` 0 bytes. A TPK is a pass here — the pilot autopilot is not a competent player, and
   M1's pilot TPKed too; the VICTORY proof is the camp-skip trail that walks the whole loop.
 
+- `smokeM2r` - **camp skip, Alvora build**: **VICTORY**, 0-byte `.err`. The roster line prints all four
+  PCs (`Baldrun (Maul) + Mosiah (Rapier) + Asper (Longbow) + Alvora (Guardians)`); Alvora is delivered on
+  the 150 s ally-III row (`stranded 1051 px out` + **6 tier-3 escorts** → `join: Alvora returns at
+  80/80hp`), and the 210 s ally-IV row logs the honest **`ally 4 skipped - no such PC waiting in the
+  roster yet`** (Yu is still only dictated). The camp card offered `Alvora Guardians: warding light
+  (armour) (1/3)`, which is the new `OPT_ARMOUR` track being live in the picker, not just present in
+  source.
+- `smokeM2s` - join skip, Alvora build: **TPK** terminal, 0-byte `.err` — same shape as `smokeM2p`
+  (stopped inside the `mini1` fight with the boss-live hold respected; `mini1` 66hp → 58hp while only
+  Baldrun + Mosiah were live).
+- `smokeM2t` - plain pilot, Alvora build: **TPK** terminal, 0-byte `.err` (party wiped during `mini1` at
+  level 6, `live enemies 37`).
+- `smokeM2u` - camp skip run **with a temporary boss-strike print added to the aura branch** (added → run
+  → removed → rebuilt): 7 pulse lines, all inside the `final` march, each `N bodies, 1 of them boss`
+  (the last `2 bodies`), and the final boss closed at **70 hp** on VICTORY. This is the direct proof that
+  the guardian ring bites a live **boss**, which is the verb the beat loop needs to advance at all —
+  **the print is not in the shipped code**, and `smokeM2r`/`s`/`t` are the trails for the shipped build.
+- **Gate for the Alvora build is green**: `smokeM2r` (camp) VICTORY, `smokeM2s`/`t` (join / plain) TPK,
+  all three `.err` 0 bytes.
+
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
 - `8.0f` vs `8.0`: Godot C# will not implicitly narrow a double literal to `float` in a ternary arm —
@@ -186,3 +229,13 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   needs `hp > 0` for targeting, but the scheduler needs `active` alone. Same array, two different questions.
 - A dev skip that reaches every boss node unconditionally is a **smoke lie**: gate it on the arena's actual
   owner, or park on the beat and let the real path engage.
+- **A new roster PC is not just a scene node.** The follow-ring math (`memberIndex` → angle) folded seats
+  1 and 3 onto the same angle, so a 4th PC welded onto Mosiah and every ring/AoE read from that body became
+  ambiguous. Seat **tables** beat arithmetic when the seat count is small and hand-placed.
+- Kit-visibility gates must be written at the **idle** site, not only at the commit site: the telegraph
+  pivot was hidden only by `!hidden`, so a non-melee kit inherited a permanent fan of ground spokes at its
+  authored alpha (Asper's 260 px fan, Alvora's ring). A commit-site `if (!shotKit)` does not cover frames
+  where nothing committed.
+- A verb whose damage route never touches a boss cannot advance the beat loop, and a smoke that VICTORYes
+  does **not** by itself prove the new verb bit the boss. Print the interaction once (temporarily), gate on
+  it, then remove the print - a VICTORY shared with the other trails is otherwise ambiguous.
