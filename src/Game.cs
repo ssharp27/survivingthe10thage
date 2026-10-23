@@ -81,9 +81,10 @@ public partial class Game : Godot.Node2D
 	// boss beats name the Boss node they engage, so a beat is data and the scene owns the
 	// body (four of them now, parked hidden until their beat fires)
 	readonly string[] BEAT_BOSS = { "", "", "mini1", "", "boss1", "", "mini2", "", "final", "" };
-	// ally beats land in roster memberIndex order: the first ally beat recruits member 1,
-	// the second recruits member 2, and so on. A beat whose PC is not in the roster yet
-	// is skipped with a log line, so the loop stays honest while the roster grows.
+	// ally beats recruit whatever the per-run JOIN LOTTERY drew for that slot (user 2026-10-23:
+	// runs are dynamic). The lottery is built at boot from the stage-weighted table below,
+	// drawn without replacement and excluding the run's own leader. A -1 slot (pool
+	// exhausted) is a logged no-op, so the loop stays honest while the roster grows.
 	int _allyBeatIdx = 0;                 // which ally beat has fired (0 = none)
 	int _nextBeat = 0;                    // next row of the beat table to fire
 	// the density curve ramps inside the CURRENT beat leg: len = next beat - last beat
@@ -109,8 +110,23 @@ public partial class Game : Godot.Node2D
 	// escort bodies run on the tier that is live when the beat fires (user rule: later
 	// beats are guarded by harder enemies), and they scale like the horde does
 	double _hordeTier = 1.0;              // 1 goblins | 2 wolves+hobgoblins | 3/4 M2 gates
-	// stage name shown on the ui/ cards; hardcoded until the meta-map exists (M3)
+	// stage name/number shown on the ui/ cards AND the HUD (user 2026-10-23: Tanurial Forest
+	// is "stage 1" / "level 1" - many more stages are planned, so every display site reads
+	// the pair instead of a baked string)
 	private const string STAGE_NAME = "Tanurial Forest";
+	private const int STAGE_NUMBER = 1;
+	// ---------- roster join lottery (user 2026-10-23: dynamic runs) ----------
+	// WHICH roster PCs can be recruited this run and in WHICH order: one weighted,
+	// without-replacement draw per ally beat, taken at boot. The run's own leader never
+	// rolls onto its own pool (it CAN show up on runs where it is not the leader).
+	// Row = STAGE_NUMBER - 1; columns are memberIndex order
+	// (0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu). Weight 0 = cannot appear
+	// on that stage. Stage 1 per the user: Baldrun + Mosiah more likely than the rest.
+	// Sanity numbers - the user will add rows/weights per future stage.
+	// the new-style initializer: Godot's C# build trips CS0623 on nested old-style braces
+	private static readonly int[][] JOIN_W = { new int[] { 3, 3, 1, 1, 1 } };   // row 0 = stage 1: Baldrun + Mosiah heavy
+	private int[] _joinOrder = new int[0]; // ally slot k -> memberIndex drawn for it
+	private Godot.RandomNumberGenerator _joinRng; // UNSEEDED on purpose: a fresh process re-rolls
 	// CAMPFIRE_LEN is gone: the campfire beat is player-driven (the ui/ Campfire
 	// screen emits rest_chosen). This is only the safety valve so an idle/AFK
 	// player (or a headless smoke run) still advances after this much waiting.
@@ -131,19 +147,18 @@ public partial class Game : Godot.Node2D
 	// unused in human play, kept as the tuning knob in case the pilot gate ever needs it)
 	readonly double PICKER_AUTO_TIMEOUT = 6.0;
 
-	// ---------- level-up picker: one open track per member IN PLAY, 3 ranks then cap ----------
+	// ---------- level-up picker: one open track per member IN PLAY + 1 WILD, 3 ranks then cap ----------
 	// Human-test: a fixed 3-option card felt the same every level - roll variety instead.
-	// M1 shipped two members + one wild slot. M2's roster grows, so the CARD grows with it:
-	// one option per member actually in the squad (keys 1..5), no wild slot. The locked
-	// picker-fairness call - at five PCs a fixed three stops covering the squad and a player
-	// can watch one weapon never come up, so the wild-slot seed order dies out and each slot
-	// is tied to a member instead. A member whose every track is capped simply drops its
-	// slot, so the card never shows a pick that cannot be taken.
+	// user RE-LOCK (2026-10-23): the card shows one still-open track per member in play
+	// PLUS one fully-wild slot (a random open track from ANY member, never a repeat) -
+	// M1's wildcard is back by user request. With five PCs that's up to six keys.
+	// A member whose every track is capped simply drops its slot, so the card never
+	// shows a pick that cannot be taken.
 	// Offense only - never HP, speed or healing (those live in campfires and revives); the
 	// kit-native ranks (pierce, multishot) ride the same cap. Ranks cap at 3 per DESIGN; the
 	// 4th rank would be the evolution (Stormcaller / Viperkiss), still stubbed for M2.
 	const int PICK_RANK_CAP = 3;
-	const int PICK_SLOTS = 5;   // keys pick_1..pick_5: the card never exceeds the roster
+	const int PICK_SLOTS = 6;   // keys pick_1..pick_6: five members + one wild slot
 	static readonly string[] OPT_LABEL = { "longer reach (maul)", "heavier blows (maul damage)",
 										   "swifter swings (cooldown)", "quicker thrusts (cooldown)",
 										   "deeper thrust (reach + pierce)", "sharper points (damage)",
@@ -855,14 +870,15 @@ public partial class Game : Godot.Node2D
 				_hordeTier = BEAT_TIER[_nextBeat];
 			if (kind == 0)
 			{
-				// ally beats recruit in roster memberIndex order, so beat N wants member N.
-				// A PC the roster does not have yet is a logged no-op: the loop stays honest
-				// while the roster grows one character at a time.
+				// the per-run join lottery drew this slot's PC at boot (user 2026-10-23:
+				// dynamic runs). wantIdx -1 means the weighted pool ran dry: logged no-op.
+				// _allyBeatIdx counts from 1 (0 = none fired), so the lottery slot is idx-1
 				_allyBeatIdx++;
+				int wantIdx = (_allyBeatIdx - 1) < _joinOrder.Length ? _joinOrder[_allyBeatIdx - 1] : -1;
 				PartyMember pc = null;
 				foreach (PartyMember pm in _party)
 				{
-					if (pm.memberIndex == _allyBeatIdx && !pm.joined)
+					if (pm.memberIndex == wantIdx && !pm.joined)
 					{
 						pc = pm;
 						break;
@@ -889,7 +905,7 @@ public partial class Game : Godot.Node2D
 				// holds the row back, it only lands once `final` is truly slain, so "cleared"
 				// stays honest even if the boss was still alive at the wrap time.
 				_state = StageState.VICTORY;
-				PrintSummary("VICTORY — Tanurial Forest cleared");
+				PrintSummary("VICTORY — " + STAGE_NAME + " (stage " + STAGE_NUMBER + ") cleared");
 			}
 			else
 			{
@@ -1152,6 +1168,9 @@ public partial class Game : Godot.Node2D
 			roster += (roster == "" ? "" : " + ") + pm2.displayName + " (" + pm2.weaponName + ")";
 		GD.Print("[10thAge] squad: " + roster + " | leader: " +
 				 (_leader != null ? _leader.displayName : "none"));
+		// the join lottery rolls at boot so the pilot / escort paths never have to re-decide
+		// which PC a beat owns (the print keeps the smoke trails honest about who lands when)
+		BuildJoinLottery();
 		_pilot = OS.GetEnvironment("M1_PILOT") != null && OS.GetEnvironment("M1_PILOT") != "";
 		_devSkip = OS.GetEnvironment("M1_DEV_SKIP") == null ? "" : OS.GetEnvironment("M1_DEV_SKIP");
 		// the reaper is a pure death/revive TEST BENCH (no balance meaning): human play
@@ -1906,7 +1925,8 @@ public partial class Game : Godot.Node2D
 		UpdateShots(delta); // the party's own projectiles: mirror pool, opposite faction
 		UpdateSummons(delta); // Yu's familiars: run at prey, detonate on contact OR on the fuse
 		PickerTick(d);
-		_hud.Text = "Surviving the 10th Age - Tanurial Forest | Lv " + _level +
+		_hud.Text = "Surviving the 10th Age - " + STAGE_NAME + " (stage " + STAGE_NUMBER +
+					") | Lv " + _level +
 					" | xp " + (int)_xp + "/" + (int)_xpNext +
 					" | " + StateName(_state) + " t=" + (int)GetRunTime() + " | enemies " + _liveEnemies +
 					(_recruitPending != null ? " | escort " + _escortLeft : "");
@@ -2286,9 +2306,9 @@ public partial class Game : Godot.Node2D
 		// NUMBER keys avoid the movement clash entirely - still edge-read only, so a
 		// fresh tap is a deliberate pick. Slots map through _optRoll (this card's roll).
 		int choice = -1;
-		// card-shaped key scan: the number of keys the card can show is the squad size,
-		// so scan the slots rather than three hand-written branches (pick_1..pick_5 exist
-		// in the input map; an empty slot is not rendered, so a press there is a no-op)
+		// card-shaped key scan: the number of keys the card can show is the squad size
+		// (+1 wild), so scan the slots rather than three hand-written branches (pick_1..pick_6
+		// exist in the input map; an empty slot is not rendered, so a press there is a no-op)
 		for (int s = 0; s < PICK_SLOTS; s++)
 		{
 			if (!Input.IsActionJustPressed("pick_" + (s + 1)))
@@ -2433,14 +2453,81 @@ public partial class Game : Godot.Node2D
 		}
 	}
 
+	// ---------- join lottery draw (user 2026-10-23: dynamic runs) ----------
+	// Builds the run's recruit order ONCE at boot: one weighted pick per ally-beat row,
+	// without replacement, from the roster minus the run's own leader. Higher weight =
+	// shows up on more runs; weight 0 = cannot appear this stage; a dry pool leaves the
+	// remaining slots -1 (logged no-op at the beat). _joinRng is unseeded on purpose so
+	// every smoke / every human run re-rolls.
+	private void BuildJoinLottery()
+	{
+		int row = STAGE_NUMBER - 1;
+		if (row < 0)
+			row = 0;
+		if (row >= JOIN_W.Length)
+			row = JOIN_W.Length - 1;
+		int slots = 0;
+		for (int i = 0; i < BEAT_KIND.Length; i++)
+			if (BEAT_KIND[i] == 0.0)
+				slots++;
+		_joinOrder = new int[slots];
+		for (int i = 0; i < slots; i++)
+			_joinOrder[i] = -1;
+		_joinRng = new Godot.RandomNumberGenerator(); // unseeded on purpose
+		int[] pool = new int[_party.Count];
+		int poolCount = 0;
+		foreach (PartyMember pm in _party)
+		{
+			// the leader obviously can't recruit itself (user rule); the table itself stays
+			// leader-agnostic so any PC can show up when another one leads the run
+			if (!pm.isLeader && pm.memberIndex < JOIN_W[row].Length)
+				{ pool[poolCount++] = pm.memberIndex; }
+		}
+		for (int s = 0; s < slots && poolCount > 0; s++)
+		{
+			int total = 0;
+			for (int i = 0; i < poolCount; i++)
+				{ total += JOIN_W[row][pool[i]]; }
+			{ if (total <= 0) break; } // everyone left cannot appear this stage
+			{ double roll = _joinRng.Randf() * (double)total;
+			 double acc = 0.0;
+			 int chosen = -1;
+			 for (int i = 0; i < poolCount; i++)
+			 {
+				 acc += (double)JOIN_W[row][pool[i]];
+				 if (roll < acc)
+				 { chosen = i; break; }
+			 }
+			{ if (chosen < 0) chosen = poolCount - 1; } // FP edge: take the last candidate
+			 _joinOrder[s] = pool[chosen];
+			 // pull the winner so no PC recruits twice in one run
+			 for (int i = chosen; i < poolCount - 1; i++)
+				 pool[i] = pool[i + 1];
+			 poolCount--;
+			}
+		}
+		string names = "";
+		for (int s = 0; s < slots; s++)
+		{
+			if (_joinOrder[s] < 0)
+				continue;
+			PartyMember pm2 = GetMemberByIndex(_joinOrder[s]);
+			names += (names == "" ? "" : " > ") + (pm2 != null ? pm2.displayName : "?");
+		}
+		GD.Print("[10thAge] join lottery (stage " + STAGE_NUMBER + "): " +
+				 (names == "" ? "no recruits - the leader owns the whole roster" : names));
+	}
+
 	// ---------- smart-random level-up roll (human-test: variety, not same-y cards) ----------
 	// The CARD grows with the squad: one slot per member actually in play, in roster order,
-	// each slot drawing that member's still-open tracks. M1 shipped two members plus one
-	// fully wild slot; the M2 roster grows, so the wild slot goes away (the locked fairness
-	// call: at five PCs a fixed three stops covering the squad and a player can watch one
-	// weapon never come up). A member whose whole pool is capped just drops its slot, so the
-	// card never shows a pick that cannot be taken. If NOTHING is open the picker stays
-	// closed and the level-up banks the xp instead.
+	// each slot drawing that member's still-open tracks - THEN one fully-wild slot from
+	// everything still open (user re-lock 2026-10-23: per-member options + 1 wildcard,
+	// M1's wild slot back on demand). No option appears twice on one card. A member whose
+	// whole pool is capped just drops its slot, so the card never shows a pick that cannot
+	// be taken. If NOTHING is open the picker stays closed and the level-up banks the xp.
+	// memberIndex order: 0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu
+	// (row 0 of JOIN_W above carries their stage-1 recruit weights; this card only sees
+	// members already IN play).
 	private bool RollOptions()
 	{
 		for (int s = 0; s < PICK_SLOTS; s++)
@@ -2487,6 +2574,18 @@ public partial class Game : Godot.Node2D
 			_optRoll[slot] = pick;
 			open[pick] = false; // a track never appears twice on one card (slots are distinct
 								 // members now, so this only guards a hand-edited table)
+		}
+		// user re-lock (2026-10-23): +1 WILD slot - a random still-open track from ANY
+		// member. The per-member slots already flipped open[pick]=false, so the
+		// leftovers are exactly the wild pool; if the roster filled every key, the
+		// wild drops out rather than pushing a 7th key onto the input map.
+		{
+		 int[] wild = new int[OPT_LABEL.Length];
+		 int wc = 0;
+		 for (int o = 0; o < OPT_LABEL.Length; o++)
+			{ if (open[o]) wild[wc++] = o; }
+		 if (wc > 0 && liveCount < PICK_SLOTS)
+			 _optRoll[liveCount] = wild[(int)(Rng.Randf() * (float)wc) % wc];
 		}
 		for (int s = 0; s < PICK_SLOTS; s++)
 			if (_optRoll[s] >= 0)

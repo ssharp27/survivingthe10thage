@@ -1,4 +1,4 @@
-# M2 STATUS — **IN PROGRESS** (opened 2026-10-22; Asper, the beat loop + Alvora landed this pass)
+# M2 STATUS - **IN PROGRESS** (opened 2026-10-22; join lottery + stage label + picker re-wild landed this pass)
 
 M2 = the campaign roster. Scope, locked decisions, and gate trail live here; `M1_STATUS.md` stays the
 authoritative M1 record (passes 1–22, signed off at `f0ca883` + `demo_final.zip` shipped, human test
@@ -24,14 +24,14 @@ levels between fights before every gate:
 
 | run s | row | what fires |
 | --- | --- | --- |
-| 30  | ally I        | Mosiah joins (escort cage) |
+| 30  | ally I        | **lottery draw 1** joins (escort cage) |
 | 60  | tier-2 gate   | horde tier 2 |
 | 120 | mini-boss I   | `mini1` — its kill opens the camp |
-| 150 | ally II       | Asper joins + **6 tier-2 escorts** |
+| 150 | ally II       | **lottery draw 2** joins + **6 tier-2 escorts** |
 | 180 | boss I        | `boss1` (mid boss) — its kill keeps the horde marching |
-| 210 | ally III      | + tier-3 escorts ("we can define them now") |
+| 210 | ally III      | **lottery draw 3** joins + tier-3 escorts ("we can define them now") |
 | 240 | mini-boss II  | `mini2` — its kill opens the camp |
-| 270 | ally IV       | + tier-4 spawns — **spelling to confirm** (user wrote "tier-5") |
+| 270 | ally IV       | **lottery draw 4** joins + tier-4 spawns — **spelling to confirm** (user wrote "tier-5") |
 | 360 | final boss    | `final` — its kill ALSO keeps the horde marching (no instant VICTORY) |
 | 420 | WRAP-UP       | kind 5: run clock lands on it with a clear arena → **VICTORY** |
 
@@ -92,6 +92,22 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 
 ## Landed this pass (uncommitted → committed this commit)
 
+- **Join lottery (user 2026-10-23: dynamic runs)**: which PCs show up as recruits and in which
+  order is now random per run. `Game.cs` gained a stage-weighted table `JOIN_W` (row =
+  `STAGE_NUMBER - 1`, columns memberIndex order; stage 1 = Baldrun 3 / Mosiah 3 / Asper 1 /
+  Alvora 1 / Yu 1 — **sanity numbers, user will add rows per future stage**). `BuildJoinLottery()`
+  draws once at boot (weighted, **without replacement**, leader excluded via `isLeader` — the
+  table itself is leader-agnostic so any PC can show up on runs where another one leads).
+  `JOIN_W` is a NEW-dimension initializer — old-style nested braces trip CS0623 in Godot's C#
+  build. `_joinRng` is deliberately **unseeded**: every smoke / human run re-rolls (the trail
+  prints `join lottery (stage 1): X > Y > Z > W` at boot so gates stay honest). A dry pool
+  leaves the slot `-1` = logged no-op. Ally beats now look up `_joinOrder[_allyBeatIdx]`.
+- **Stage label (user 2026-10-23)**: `STAGE_NUMBER = 1` beside `STAGE_NAME`; HUD and the
+  VICTORY summary print `Tanurial Forest (stage 1)` — future levels just bump the constant.
+- **Picker re-wilded (user 2026-10-23: was showing one upgrade per character only)**: card is
+  back to M1's shape — **one still-open track per member in play PLUS one fully-wild slot**
+  (random open track from ANY member, never a repeat on the card). `PICK_SLOTS = 6` (keys
+  `pick_1..pick_6`; the `pick_6` keycode 54 was added to `project.godot`'s input map).
 - **Asper's kit**: `[Export] weaponKit` ("melee" | "shot") dispatch in `PartyMember.cs` replaces the
   `arcHalf > 0.5f` two-branch verb switch; `arcHalf` is now **purely a melee property**. Shot branch
   aims at the closest body in sight (bosses included), spawns into a **party-owned shot pool**
@@ -342,8 +358,27 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
 - `smokeM2zk` (plain, 120 k frames) — **Alvora art wiring build**: **VICTORY** level 24 / xp 1244, 0-byte
   `.err`. Alvora joins at the 210 s row (its `GD.Load` runs at join time), ring-slot-3 opens, and the
   run stays error-free to the wrap, so the new sidecar + 4th lookup branch are live.
+- `smokeM2zo` (plain, 120 k frames) — **join-lottery + stage label + picker re-wild build**: **VICTORY**
+  level 24 / xp 1247, 0-byte `.err`. Boot prints `join lottery (stage 1): Yu > Mosiah > Alvora > Asper`
+  and the four ally beats recruit EXACTLY that order (30s Yu / 150s Mosiah / 210s Alvora / 270s Asper)
+  — the earlier off-by-one is gone, no ally row skips, and the VICTORY line reads "Tanurial Forest
+  (stage 1) cleared". Picker cards now show per-member slots + the wild (six-key ceiling live).
+- `smokeM2zp` (camp skip) — **VICTORY** level 16 / xp 581, 0-byte `.err`; its boot lottery
+  re-rolled to `Yu > Mosiah > Asper > Alvora` (different from `zo` — the unseeded `_joinRng`
+  re-rolls per run, as designed).
+- **Gate for the join-lottery + stage-label + picker re-wild build is green**: `smokeM2zo` (plain)
+  VICTORY + `smokeM2zp` (camp) VICTORY + `smokeM2zq` (join skip) VICTORY, all `.err` 0 bytes.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
+
+- **Join-lottery index base**: `_allyBeatIdx` counts from **1** (0 = none fired), but `_joinOrder`
+  is a 0-based draw order — looking up `_joinOrder[_allyBeatIdx]` silently skipped the FIRST drawn
+  PC and left the last ally row "no such PC waiting". The smoke trail caught it (boot print said
+  `Mosiah > Asper > ...` but beat 30 s recruited Asper); always cross-check the boot lottery line
+  against the per-beat `ally N (name)` lines.
+- **Old-style nested array initializers trip Godot's C# build** (CS0623: "Array initializers can
+  only be used in a variable or field initializer"): `int[][] X = { { 1, 2 }, };` fails even as a
+  field; write `new int[][] { new int[] { 1, 2 } }`.
 
 - `8.0f` vs `8.0`: Godot C# will not implicitly narrow a double literal to `float` in a ternary arm —
   `float hitR = cond ? 8.0f + r : 20.0f;` must be `8.0f`.
