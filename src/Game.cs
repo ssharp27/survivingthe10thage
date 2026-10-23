@@ -58,18 +58,17 @@ public partial class Game : Godot.Node2D
 	readonly Color CHIP_SAGE = new Color(0.60f, 0.84f, 0.60f, 1.0f);
 	readonly Color CHIP_GREY = new Color(0.70f, 0.70f, 0.70f, 1.0f);
 
-	// ---------- stage beat loop (M2 schedule, user re-locked 2026-10-23) ----------
+	// ---------- stage beat loop (M2 schedule, user re-locked 2026-10-23 again) ----------
 	// The stage is a BEAT TABLE on the run clock, not a fixed state chain. Times are
 	// RUN seconds, so a picker / join / camp pause never burns a beat (pass-22 rule).
-	//   30s ally I | 60s tier-2 gate | 90s mini-boss I | 120s ally II | 150s boss I
-	//   180s ally III | 210s mini-boss II | 240s ally IV | 300s final boss | 400s WRAP-UP
-	// The user stretched every gate to ease the 120 s wall they wiped at, and asked for the
-	// run to KEEP ROLLING to 400 s after the final boss - a sandbox window to test the full
-	// roster and horde scaling at strength. So `final`'s kill no longer ends the run (see
-	// OnBossKilled); the 10th row is what raises VICTORY.
+	//   30s ally I | 60s tier-2 gate | 120s mini-boss I | 150s ally II | 180s boss I
+	//   210s ally III | 240s mini-boss II | 270s ally IV | 360s final boss | 420s WRAP-UP
+	// Second re-lock same day: the human playtest still wiped too often, so the user stretched
+	// the early legs again (mini I 90 -> 120, boss I 150 -> 180, mini II 210 -> 240, final
+	// 300 -> 360, wrap 400 -> 420) to give the party more scaling runway before each fight.
 	// This is the gameplay loop "until times and scaling are changed around" (user rule),
 	// so every number here is data the user can move without touching the sequencer.
-	readonly double[] BEAT_T = { 30.0, 60.0, 90.0, 120.0, 150.0, 180.0, 210.0, 240.0, 300.0, 400.0 };
+	readonly double[] BEAT_T = { 30.0, 60.0, 120.0, 150.0, 180.0, 210.0, 240.0, 270.0, 360.0, 420.0 };
 	// 0 = ally join beat, 1 = horde tier gate, 2 = mini-boss (its kill opens the camp),
 	// 3 = mid boss (its kill just lets the horde keep marching), 4 = final boss (its kill
 	// ALSO keeps the horde marching - the run rolls on), 5 = WRAP-UP (run clock lands on it
@@ -89,51 +88,51 @@ public partial class Game : Godot.Node2D
 	int _nextBeat = 0;                    // next row of the beat table to fire
 	// the density curve ramps inside the CURRENT beat leg: len = next beat - last beat
 	// (replaces M1's FIRST_HALF / SECOND_HALF halves, which the beat table subsumes)
-    // ---------- field recruit (user-approved 2026-10-20) ----------
-    // RECRUIT_AT / TIER2_AT / BOSS_AT are gone: the beat table above owns every stage gate.
-    // A not-yet-party PC drops into the world with HELP! and an arrow from the Leader; ESCORT_COUNT
-    // escorts of the CURRENT horde tier slowly close in. Clearing them all joins the PC at
-    // whatever HP he survived (floored - see JoinRecruit). The join banner carries the
-    // "X JOINS THE BATTLE!" art slot and waits for a click (human gate, no timeout).
-    const int ESCORT_COUNT = 6;
-    // human-playtest fix (2026-10-20): the beat must read as a rescue the party rides
-    // toward, not a pop-in next to the Leader - the stranded PC lands PAST the camera
-    // edge, the escort goblins open wide of the PC, and they shamble in.
-    readonly double RECRUIT_DIST = 300.0; // floor distance from the camera (see SpawnFieldRecruit)
-    const double RECRUIT_MARGIN = 90.0;   // px past the visible rect the stranded PC lands at
-    // human pass 11 (2026-10-20): even wider and even slower - the beat should read as a
-    // hunt - and escort goblins now CLOSE ON the PC and chip him on contact, so dawdling
-    // on the rescue trades away the HP he joins with (floored, see JoinRecruit)
-    readonly double ESCORT_RING = 520.0;  // escort bodies start this wide of the stranded PC
-    readonly double ESCORT_CRAWL = 0.12;  // creep factor on escort speed: pressure, not a chase
-    const float RECRUIT_JOIN_FLOOR = 0.25f; // floored fraction of max HP the PC joins at
-    // escort bodies run on the tier that is live when the beat fires (user rule: later
-    // beats are guarded by harder enemies), and they scale like the horde does
-    double _hordeTier = 1.0;              // 1 goblins | 2 wolves+hobgoblins | 3/4 M2 gates
-    // stage name shown on the ui/ cards; hardcoded until the meta-map exists (M3)
-    private const string STAGE_NAME = "Tanurial Forest";
-    // CAMPFIRE_LEN is gone: the campfire beat is player-driven (the ui/ Campfire
-    // screen emits rest_chosen). This is only the safety valve so an idle/AFK
-    // player (or a headless smoke run) still advances after this much waiting.
-    readonly double CAMPFIRE_WAIT_TIMEOUT = 25.0;
+	// ---------- field recruit (user-approved 2026-10-20) ----------
+	// RECRUIT_AT / TIER2_AT / BOSS_AT are gone: the beat table above owns every stage gate.
+	// A not-yet-party PC drops into the world with HELP! and an arrow from the Leader; ESCORT_COUNT
+	// escorts of the CURRENT horde tier slowly close in. Clearing them all joins the PC at
+	// whatever HP he survived (floored - see JoinRecruit). The join banner carries the
+	// "X JOINS THE BATTLE!" art slot and waits for a click (human gate, no timeout).
+	const int ESCORT_COUNT = 6;
+	// human-playtest fix (2026-10-20): the beat must read as a rescue the party rides
+	// toward, not a pop-in next to the Leader - the stranded PC lands PAST the camera
+	// edge, the escort goblins open wide of the PC, and they shamble in.
+	readonly double RECRUIT_DIST = 300.0; // floor distance from the camera (see SpawnFieldRecruit)
+	const double RECRUIT_MARGIN = 90.0;   // px past the visible rect the stranded PC lands at
+	// human pass 11 (2026-10-20): even wider and even slower - the beat should read as a
+	// hunt - and escort goblins now CLOSE ON the PC and chip him on contact, so dawdling
+	// on the rescue trades away the HP he joins with (floored, see JoinRecruit)
+	readonly double ESCORT_RING = 520.0;  // escort bodies start this wide of the stranded PC
+	readonly double ESCORT_CRAWL = 0.12;  // creep factor on escort speed: pressure, not a chase
+	const float RECRUIT_JOIN_FLOOR = 0.25f; // floored fraction of max HP the PC joins at
+	// escort bodies run on the tier that is live when the beat fires (user rule: later
+	// beats are guarded by harder enemies), and they scale like the horde does
+	double _hordeTier = 1.0;              // 1 goblins | 2 wolves+hobgoblins | 3/4 M2 gates
+	// stage name shown on the ui/ cards; hardcoded until the meta-map exists (M3)
+	private const string STAGE_NAME = "Tanurial Forest";
+	// CAMPFIRE_LEN is gone: the campfire beat is player-driven (the ui/ Campfire
+	// screen emits rest_chosen). This is only the safety valve so an idle/AFK
+	// player (or a headless smoke run) still advances after this much waiting.
+	readonly double CAMPFIRE_WAIT_TIMEOUT = 25.0;
 
-    // ---------- death-state tester (user ask) ----------
-    // A big red instant-kill circle spawns 10 s into the run: attack-proof, it
-    // kills the first body it touches and despawns right after. Test tool only.
-    bool _reaperSpawned = false;
-    bool _reaperEnabled = false; // TEST BENCH default OFF; M1_REAPER=1 re-enables it
+	// ---------- death-state tester (user ask) ----------
+	// A big red instant-kill circle spawns 10 s into the run: attack-proof, it
+	// kills the first body it touches and despawns right after. Test tool only.
+	bool _reaperSpawned = false;
+	bool _reaperEnabled = false; // TEST BENCH default OFF; M1_REAPER=1 re-enables it
 
-    // ---------- xp / level ----------
-    double _xp = 0.0;
-    double _xpTotal = 0.0;
-    int _level = 1;
-    double _xpNext = 6.0;
-    // (human pickers never time out now - user-locked; this constant is intentionally
-    // unused in human play, kept as the tuning knob in case the pilot gate ever needs it)
-    readonly double PICKER_AUTO_TIMEOUT = 6.0;
+	// ---------- xp / level ----------
+	double _xp = 0.0;
+	double _xpTotal = 0.0;
+	int _level = 1;
+	double _xpNext = 6.0;
+	// (human pickers never time out now - user-locked; this constant is intentionally
+	// unused in human play, kept as the tuning knob in case the pilot gate ever needs it)
+	readonly double PICKER_AUTO_TIMEOUT = 6.0;
 
-    // ---------- level-up picker: one open track per member IN PLAY, 3 ranks then cap ----------
-    // Human-test: a fixed 3-option card felt the same every level - roll variety instead.
+	// ---------- level-up picker: one open track per member IN PLAY, 3 ranks then cap ----------
+	// Human-test: a fixed 3-option card felt the same every level - roll variety instead.
 	// M1 shipped two members + one wild slot. M2's roster grows, so the CARD grows with it:
 	// one option per member actually in the squad (keys 1..5), no wild slot. The locked
 	// picker-fairness call - at five PCs a fixed three stops covering the squad and a player
@@ -428,17 +427,17 @@ public partial class Game : Godot.Node2D
 		if (m.armour > 0)
 		{
 			// warding light (Alvora rank track): a FLAT reduction, not a percentage - the user's
-            // rule is -1/-2/-3 by rank. The floor of 1 is what keeps armour from turning a
-            // swarm into a free pass: a hit always bites for something.
-            amount -= m.armour;
-            if (amount < 1.0)
-                amount = 1.0;
-        }
-        m.hp -= (float)amount;
-        m.NoteHitFlash(); // live HP loss = the red lane fires
-        if (m.hp <= 0.0f)
-        {
-            // D fix: HP floors at 0 the moment a body falls, so overkill can neither
+			// rule is -1/-2/-3 by rank. The floor of 1 is what keeps armour from turning a
+			// swarm into a free pass: a hit always bites for something.
+			amount -= m.armour;
+			if (amount < 1.0)
+				amount = 1.0;
+		}
+		m.hp -= (float)amount;
+		m.NoteHitFlash(); // live HP loss = the red lane fires
+		if (m.hp <= 0.0f)
+		{
+			// D fix: HP floors at 0 the moment a body falls, so overkill can neither
 			// show a negative bar on the HUD strip nor poison the campfire's +25% heal
 			m.hp = 0.0f;
 			m.downed = true;
@@ -527,87 +526,87 @@ public partial class Game : Godot.Node2D
 			if (healBeat)
 			{
 				// the campfire's locked +25% heal - applied once, by the rest choice
-                m.hp = m.hp + m.maxHp * 0.25f;
-                if (m.hp > m.maxHp)
-                    m.hp = m.maxHp;
-            }
-        }
-    }
+				m.hp = m.hp + m.maxHp * 0.25f;
+				if (m.hp > m.maxHp)
+					m.hp = m.maxHp;
+			}
+		}
+	}
 
-    public void AddXp(double value)
-    {
-        _xp += value;
-        _xpTotal += value;
-    }
+	public void AddXp(double value)
+	{
+		_xp += value;
+		_xpTotal += value;
+	}
 
-    public void OnEnemyKilled(Combatant c)
-    {
-        if (c is Boss) // four boss nodes now (mini1 / boss1 / mini2 / final): the class,
-                       // not a kind string, decides a death is a BOSS death
-        {
-            OnBossKilled(c);
-            return;
-        }
-        // field recruit: escort goblins dying IS the rescue meter (user design 2026-10-20)
-        if (((Enemy)c).escort && _recruitPending != null && _escortLeft > 0)
-        {
-            _escortLeft--;
-            GD.Print("[10thAge] escort down: " + _escortLeft + "/" + ESCORT_COUNT +
-                     " left to rescue " + _recruitPending.displayName);
-            if (_escortLeft <= 0)
-                JoinRecruit();
-        }
-        SpawnGem(c.GlobalPosition, ((Enemy)c).xpValue);
-        c.kind = "dead";
-        ReleaseLiveCount((Enemy)c); // ownership-flagged: never double-decrements
-        c.QueueFree();
-    }
+	public void OnEnemyKilled(Combatant c)
+	{
+		if (c is Boss) // four boss nodes now (mini1 / boss1 / mini2 / final): the class,
+					   // not a kind string, decides a death is a BOSS death
+		{
+			OnBossKilled(c);
+			return;
+		}
+		// field recruit: escort goblins dying IS the rescue meter (user design 2026-10-20)
+		if (((Enemy)c).escort && _recruitPending != null && _escortLeft > 0)
+		{
+			_escortLeft--;
+			GD.Print("[10thAge] escort down: " + _escortLeft + "/" + ESCORT_COUNT +
+					 " left to rescue " + _recruitPending.displayName);
+			if (_escortLeft <= 0)
+				JoinRecruit();
+		}
+		SpawnGem(c.GlobalPosition, ((Enemy)c).xpValue);
+		c.kind = "dead";
+		ReleaseLiveCount((Enemy)c); // ownership-flagged: never double-decrements
+		c.QueueFree();
+	}
 
-    public void OnBossKilled(Combatant b)
-    {
-        string kb = b.kind; // capture before we overwrite it below
-        // slain bosses must despawn visually but NOT QueueFree: _bosses and the
-        // scene still reference them. kind "dead" drops the registry entry in the
-        // kill scan (so nothing targets it again); the body parks offscreen AND goes
-        // hidden - in a wrapping world "offscreen" absolute coords no longer exist,
-        // a long-enough walk loops right back to them
-        b.kind = "dead";
-        ((Boss)b).active = false;
-        b.Visible = false;
-        b.GlobalPosition = new Vector2(0.0f, -10000.0f);
-        // the boss a beat engaged decides what its death MEANS. With one PLAY state covering
-        // every fight, the route cannot come from the stage state any more: it comes from the
-        // kind the scene authored (mini -> camp | mid boss -> the horde keeps marching |
-        // final -> VICTORY).
-        if (kb == "mini1" || kb == "mini2")
-        {
-            _state = StageState.CAMPFIRE;
-            _campWaitT = 0.0;
-            ClearEnemies();
-            // user-approved camp-safety gate: the camp beat is a read-the-card moment,
-            // so every in-flight boss bullet is swept before the grimoire goes up - a
-            // player absorbing the rest choice cannot be shot mid-decision.
-            ClearBullets();
-            ReviveAllAtCampfire(false);
-            GD.Print("[10thAge] mini-boss slain — camp: the fallen return at 25% hp; the "
-                     + "rest choice decides healing");
-        }
-        else if (kb == "boss1")
-        {
-            // user beat loop (2026-10-22): the mid boss is a milestone fight, not the end of
-            // the stage. Its death leaves the horde marching on toward the next beat, and
-            // deliberately does NOT sweep the arena or open a camp (campfires sit after
-            // mini-bosses only).
-            _campWaitT = 0.0;
-            GD.Print("[10thAge] mid boss slain - the stage keeps marching");
-        }
-        else if (kb == "final")
-        {
-            // user rule (2026-10-23): killing the final boss no longer ends the run. The
-            // stage runs on to the 400 s WRAP-UP beat - the user's sandbox window to test
+	public void OnBossKilled(Combatant b)
+	{
+		string kb = b.kind; // capture before we overwrite it below
+		// slain bosses must despawn visually but NOT QueueFree: _bosses and the
+		// scene still reference them. kind "dead" drops the registry entry in the
+		// kill scan (so nothing targets it again); the body parks offscreen AND goes
+		// hidden - in a wrapping world "offscreen" absolute coords no longer exist,
+		// a long-enough walk loops right back to them
+		b.kind = "dead";
+		((Boss)b).active = false;
+		b.Visible = false;
+		b.GlobalPosition = new Vector2(0.0f, -10000.0f);
+		// the boss a beat engaged decides what its death MEANS. With one PLAY state covering
+		// every fight, the route cannot come from the stage state any more: it comes from the
+		// kind the scene authored (mini -> camp | mid boss -> the horde keeps marching |
+		// final -> VICTORY).
+		if (kb == "mini1" || kb == "mini2")
+		{
+			_state = StageState.CAMPFIRE;
+			_campWaitT = 0.0;
+			ClearEnemies();
+			// user-approved camp-safety gate: the camp beat is a read-the-card moment,
+			// so every in-flight boss bullet is swept before the grimoire goes up - a
+			// player absorbing the rest choice cannot be shot mid-decision.
+			ClearBullets();
+			ReviveAllAtCampfire(false);
+			GD.Print("[10thAge] mini-boss slain — camp: the fallen return at 25% hp; the "
+					 + "rest choice decides healing");
+		}
+		else if (kb == "boss1")
+		{
+			// user beat loop (2026-10-22): the mid boss is a milestone fight, not the end of
+			// the stage. Its death leaves the horde marching on toward the next beat, and
+			// deliberately does NOT sweep the arena or open a camp (campfires sit after
+			// mini-bosses only).
+			_campWaitT = 0.0;
+			GD.Print("[10thAge] mid boss slain - the stage keeps marching");
+		}
+		else if (kb == "final")
+		{
+			// user rule (2026-10-23): killing the final boss no longer ends the run. The
+			// stage runs on to the WRAP-UP beat (420 s on the current lock) - the user's sandbox window to test
             // the full roster and horde scaling at strength. The body is already despawned
             // above; the horde keeps marching like it does after the mid boss.
-            GD.Print("[10thAge] final boss slain - the run keeps rolling to the 400s wrap-up beat");
+            GD.Print("[10thAge] final boss slain - the run keeps rolling to the wrap-up beat");
         }
     }
 
@@ -885,17 +884,17 @@ public partial class Game : Godot.Node2D
 			else if (kind == 5)
 			{
 				// user rule (2026-10-23): after the final boss the run keeps rolling to a
-				// WRAP-UP beat (400 s) so the full roster and the fully scaled horde can be
+				// WRAP-UP beat (420 s on the current lock - data, keep it in the table) so the full roster and the fully scaled horde can be
 				// tested at strength. This row is what raises VICTORY - and because BossPending
 				// holds the row back, it only lands once `final` is truly slain, so "cleared"
-				// stays honest even if the boss was still alive at 400 s.
+				// stays honest even if the boss was still alive at the wrap time.
 				_state = StageState.VICTORY;
 				PrintSummary("VICTORY — Tanurial Forest cleared");
 			}
 			else
 			{
 				// 2 = mini (kill -> camp) | 3 = mid boss (kill -> keep marching) | 4 = final
-				// (kill -> keep marching too; the 400 s wrap-up row ends the run)
+				// (kill -> keep marching too; the wrap-up row ends the run)
 				_bossBeat = _nextBeat;
 				ActivateBoss(BEAT_BOSS[_nextBeat]);
 				GD.Print("[10thAge] beat " + (int)BEAT_T[_beatIdx] + "s: " + BEAT_BOSS[_nextBeat]
