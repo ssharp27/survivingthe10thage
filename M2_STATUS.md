@@ -92,6 +92,14 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 
 ## Landed this pass (uncommitted → committed this commit)
 
+- **Alvora verb swap (user 2026-10-23)**: warding light (flat −1/−2/−3 incoming armour) is **gone**,
+  replaced by **guiding light** — her ring pulse also MARKS every body it catches: +10%/rank damage
+  taken **from every source** for a 4 s window. Mark lives on the shared `Combatant` surface
+  (`vulnMul`/`vulnT`, `Vulnerable()`, `TickVuln()` decay called from `Enemy._Process` and
+  `Boss._Process`), so melee bolts rings and future verbs get the setup for free; stronger mark
+  overwrites, window only refreshes (ranks never multiply). `Game.TakeHit` lost its armour block
+  — the squad now has **zero flat mitigation**, the deliberate cost of the swap. Picker label +
+  `OPT_VULN` table renamed; property `armour` -> `guidingLight` on the member.
 - **Join lottery (user 2026-10-23: dynamic runs)**: which PCs show up as recruits and in which
   order is now random per run. `Game.cs` gained a stage-weighted table `JOIN_W` (row =
   `STAGE_NUMBER - 1`, columns memberIndex order; stage 1 = Baldrun 3 / Mosiah 3 / Asper 1 /
@@ -368,6 +376,17 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   re-rolls per run, as designed).
 - **Gate for the join-lottery + stage-label + picker re-wild build is green**: `smokeM2zo` (plain)
   VICTORY + `smokeM2zp` (camp) VICTORY + `smokeM2zq` (join skip) VICTORY, all `.err` 0 bytes.
+- `smokeM2zr` (plain) / `smokeM2zs` (camp) / `smokeM2zt` (join) — **guiding-light verb swap**: all
+  **VICTORY**, 0-byte `.err`; picker cards render "guiding light (ring vulnerability)" (the pilot
+  never ranks the Alvora slot, so those trails alone never exercise the mark).
+- `smokeM2zu` (join skip) — **temp-verification run**: boot handed Alvora two guiding-light ranks
+  and Combatant printed marks + amplified hits: **527 `guiding mark` applications** and **726
+  amplified hits at x1.2 including on the `final` boss** (11.5→13.8, 21.5→25.8, 16.5→19.8) — the
+  mark bites OTHER sources, not just the ring. VICTORY lv8, 0-byte `.err`.
+- **Gate for the guiding-light build is green** (temp lines removed, rebuild): `smokeM2zv` (plain)
+  VICTORY lv24 / xp 1243 + `smokeM2zw` (camp) VICTORY + `smokeM2zx` (join) VICTORY, all `.err` 0,
+  **0 VERIFY lines in the shipped binary**, and the plain trail's lottery `Asper > Yu > Mosiah >
+  Alvora` matches its four ally beats one-for-one.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 

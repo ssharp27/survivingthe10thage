@@ -165,7 +165,7 @@ public partial class Game : Godot.Node2D
 										   "heavier arrows (longbow damage)", "quicker draw (longbow cooldown)",
 										   "farther shot (longbow reach)", "multishot (fan of shots)",
 										   "spirit brand (guardian damage)", "wider ring (guardian reach)",
-										   "quicker pulse (guardian rate)", "warding light (armour)",
+										   "quicker pulse (guardian rate)", "guiding light (ring vulnerability)",
 										   "occult flame (blast damage)", "wider burst (blast reach)",
 										   "quicker ritual (summon rate)", "twin ritual (one more familiar)" };
 	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4 };
@@ -174,9 +174,11 @@ public partial class Game : Godot.Node2D
 	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f };
 	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
-	// warding light (Alvora): FLAT incoming-damage reduction per rank. A hit is never softened
-	// below 1 (Game.TakeHit), so armour cannot turn a swarm into a free pass.
-	static readonly int[] OPT_ARMOUR = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0 };
+	// guiding light (Alvora): the ring MARKS caught bodies for +10%/rank incoming damage
+	// from EVERY source, a window on the body that decays on its own (Combatant.TickVuln).
+	// The user swapped the old flat-armour defence for this offense (2026-10-23): the squad
+	// keeps no mitigation, but the cleric's ring becomes the party's damage setup.
+	static readonly int[] OPT_VULN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0 };
 	int[] _pickRank = new int[OPT_LABEL.Length];
 	int[] _optRoll = new int[PICK_SLOTS]; // this card's offered options (slot -> option, -1 = empty slot)
 
@@ -439,15 +441,8 @@ public partial class Game : Godot.Node2D
 		}
 		if (_pilot)
 			amount *= 0.15; // verification-only aid for headless runs; never set in normal play
-		if (m.armour > 0)
-		{
-			// warding light (Alvora rank track): a FLAT reduction, not a percentage - the user's
-			// rule is -1/-2/-3 by rank. The floor of 1 is what keeps armour from turning a
-			// swarm into a free pass: a hit always bites for something.
-			amount -= m.armour;
-			if (amount < 1.0)
-				amount = 1.0;
-		}
+		// no flat mitigation left: the warding-light armour the user traded away (2026-10-23)
+		// was the last armour path, so every hit bites for its full amount now
 		m.hp -= (float)amount;
 		m.NoteHitFlash(); // live HP loss = the red lane fires
 		if (m.hp <= 0.0f)
@@ -2646,7 +2641,7 @@ public partial class Game : Godot.Node2D
 		m.rangeMul *= OPT_RANGE[option];
 		m.pierce += OPT_PIERCE[option];
 		m.shots += OPT_SHOTS[option]; // multishot: one more bolt in the fan per rank
-		m.armour += OPT_ARMOUR[option]; // warding light: flat incoming damage -1 per rank
+		{ m.guidingLight += 0.10 * OPT_VULN[option]; } // guiding light: marked bodies +10%/rank incoming
 		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
 						 OPT_LABEL[option] + " x" + _pickRank[option];
 		GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +

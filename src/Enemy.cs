@@ -66,6 +66,7 @@ public partial class Enemy : Combatant
     public override void _Process(double d)
     {
         float delta = (float)d;
+        TickVuln((double)delta); // guiding-light window decays on every body, even off-screen
         if (_body == null)
             InitVisuals();
         if (kind == "dead")

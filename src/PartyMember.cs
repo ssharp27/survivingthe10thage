@@ -41,9 +41,9 @@ public partial class PartyMember : Godot.Node2D
 	// the cooldown, so both of its ranks reuse the same rangeMul / cdMul plumbing as every other
 	// reach and speed track; the damage is NOT split by count (user rule 2026-10-22) - every body
 	// inside takes the full hit. The maul's fan dropped its split too (user 2026-10-23), so both
-	// heavy AoE verbs now bite crowds at full strength. Warding light is a FLAT incoming-damage reduction
-	// (-1/-2/-3 by rank, never below 1 damage per hit), applied in Game.TakeHit - the one place
-	// party damage lands.
+	// heavy AoE verbs now bite crowds at full strength. Warding light is GONE (user 2026-10-23
+	// swapped it for offense): the cleric's fourth track is guiding light, a VULNERABILITY
+	// mark - ring-caught bodies take +10%/rank damage from every source for a window.
 	[Export] public string weaponKit = "melee"; // "melee" | "shot" | "aura" | "summon"
 	[Export] public float projSpeed = 340.0f;  // px/s a bug projectile travels
 	[Export] public float projLife = 2.2f;     // seconds a bolt may fly before it expires
@@ -76,9 +76,10 @@ public partial class PartyMember : Godot.Node2D
 	// "wider arc" rank track REMOVED per human test: Baldrun's upgrade pool went to
 	// reach / damage / cooldown instead, so the maul fan stays a fixed ~150 deg arc.
 	public int pierce = 0; // "deeper thrust": the rapier lane can skewer extra bodies
-	// warding light ranks: FLAT incoming damage reduction, applied in Game.TakeHit with a floor
-	// of 1 per hit (never a percentage, never a free pass)
-	public int armour = 0;
+	// guiding light ranks: VULNERABILITY per rank (+0.10/rank). Stored on the member, spent
+	// by the aura commit via Combatant.Vulnerable - the ring is the only applier, every
+	// damage source reads the mark. (The old flat-armour property is gone per user swap.)
+	public double guidingLight = 0.0;
 	[Export] public string class_ = ""; // display class for the ui/ cards (empty = weapon fallback)
 	public string pickHistory = ""; // tracks taken so far, rendered on the run-summary card
 
@@ -539,6 +540,10 @@ public partial class PartyMember : Godot.Node2D
 				if ((n.GlobalPosition - p).Length() > reach)
 					continue;
 				nc.TakeDamage(weaponDamage * dmgMul); // FULL hit, not dmg / struck
+				// guiding light: the pulse also MARKS what it caught (rank 0 = no mark),
+				// so the whole party bites marked bodies harder until the window decays
+				if (guidingLight > 0.0)
+					nc.Vulnerable(guidingLight, 4.0);
 				struck++;
 			}
 			if (struck <= 0)

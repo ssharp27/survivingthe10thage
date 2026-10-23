@@ -67,6 +67,7 @@ public partial class Boss : Combatant
         if (!active || hp <= 0.0f)
             return;
         float delta = (float)d;
+        TickVuln((double)delta); // a marching boss decays its mark; dormant bosses hold still
         Game g = GetParent() as Game;
         if (g == null)
             return;
