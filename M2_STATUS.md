@@ -191,6 +191,10 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
   80x119, opaque bbox 78x117 at 1,1 (1px margins), `cx_delta` -0.5, 0 soft-alpha px, 61 opaque colours.
   Wired into the `displayName -> miniPath` lookup in `PartyMember._EnterTree`; `miniScale 0.75` and
   `miniRim 7.0` carry over unchanged (same ~118-119 canvas class as the other two).
+- **Alvora sprite (user 2026-10-23, `art/alvora.png`)**: same art pipeline - headless `--import` made
+  the sidecar, `tools/artcheck.gd` audit **passed**: 94x119, opaque bbox 92x117 at 1,1 (1px margins),
+  `cx_delta` -0.5, 0 soft-alpha px, 61 opaque colours. Wired as the 4th `displayName` branch; scale/rim
+  carry over (all four canvases are the ~118-119 class).
 
 ## Needs the user's word (blocking, not guessed)
 
@@ -335,6 +339,9 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
 - `smokeM2zj` (plain, 120 k frames) — **Asper art wiring build**: **VICTORY** level 24 / xp 1222, 0-byte
   `.err`. Asper's `GD.Load` of `res://art/asper.png` runs at join time (150 s row) and the run stays
   error-free end to end, so the sidecar import + audit wiring are live in the shipped binary.
+- `smokeM2zk` (plain, 120 k frames) — **Alvora art wiring build**: **VICTORY** level 24 / xp 1244, 0-byte
+  `.err`. Alvora joins at the 210 s row (its `GD.Load` runs at join time), ring-slot-3 opens, and the
+  run stays error-free to the wrap, so the new sidecar + 4th lookup branch are live.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
