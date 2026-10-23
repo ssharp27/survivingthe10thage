@@ -3,7 +3,9 @@ using Godot;
 /// <summary>
 /// One party member: HP, auto-attack driven by signature-weapon parameters, and the
 /// down/death-save/revive state fields (the state machine itself lives in Game).
-/// Baldrun = wide ~150 deg arc cleave (damage split among everything in the fan);
+/// Baldrun = wide ~150 deg arc cleave (FULL damage to every body in the fan - the
+/// split was dropped user 2026-10-23, the maul was weaker than every other verb once
+/// a few bodies crowded the group);
 /// Mosiah = narrow fast rapier (single target + pierce, hits one body at a time);
 /// Asper = longbow (party-side shot pool, multishot fan); Alvora = Spirit Guardians
 /// (a ring that pulses around the caster: FULL damage to every body inside, not split).
@@ -28,7 +30,8 @@ public partial class PartyMember : Godot.Node2D
 	[Export] public float arcHalf = 1.05f; // half-arc radians: wide = maul, narrow = rapier
 	// ---------- kit verbs ----------
 	// The kit is DATA on the member, not a new system: M1 shipped two melee verbs keyed on
-	// the fan width (arcHalf > 0.5 rad = cleaver fan with split damage, narrower = rapier
+	// the fan width (arcHalf > 0.5 rad = cleaver fan, and since the user 2026-10-23
+	// rebalance its fan takes FULL damage per body, no split; narrower = rapier
 	// lane with pierce). M2 adds a projectile verb (Asper's longbow): it fires the Game's
 	// PARTY-SIDE shot pool (SpawnShot), aims at the CLOSEST enemy in sight, and multishot
 	// fans extra bolts out of the same commit. The arc test alone cannot carry a third verb,
@@ -37,8 +40,8 @@ public partial class PartyMember : Godot.Node2D
 	// caster that pulses on the weapon cooldown. Radius rides the reach stat and the pulse rides
 	// the cooldown, so both of its ranks reuse the same rangeMul / cdMul plumbing as every other
 	// reach and speed track; the damage is NOT split by count (user rule 2026-10-22) - every body
-	// inside takes the full hit, which is the exact opposite of the maul's cleave split and what
-	// makes the ring an anti-swarm verb. Warding light is a FLAT incoming-damage reduction
+	// inside takes the full hit. The maul's fan dropped its split too (user 2026-10-23), so both
+	// heavy AoE verbs now bite crowds at full strength. Warding light is a FLAT incoming-damage reduction
 	// (-1/-2/-3 by rank, never below 1 damage per hit), applied in Game.TakeHit - the one place
 	// party damage lands.
 	[Export] public string weaponKit = "melee"; // "melee" | "shot" | "aura" | "summon"
@@ -223,7 +226,7 @@ public partial class PartyMember : Godot.Node2D
 		_telePivot = new Godot.Node2D();
 		_telePivot.Name = "Telegraph";
 		AddChild(_telePivot);
-		bool maul = arcHalf > 0.5f; // maul kit: arc cleave, split damage
+		bool maul = arcHalf > 0.5f; // maul kit: arc cleave, full damage per body (user 2026-10-23)
 		bool circle = arcHalf > 3.0f; // only a deliberate 360 deg kit gets a dial
 		int spokes = circle ? 12 : (maul ? 3 : 1);
 		float w = circle ? 4.0f : (maul ? 5.0f : 7.0f);
@@ -496,7 +499,7 @@ public partial class PartyMember : Godot.Node2D
 		// pool, which only ever bites the party). Kit dispatch keys on weaponKit, NOT on
 		// arcHalf - arcHalf stays purely a melee property.
 		bool shotKit = weaponKit == "shot"; // longbow kit: fires the Game's party-side shot pool
-		bool cleaver = !shotKit && arcHalf > 0.5f; // maul kit: arc cleave with split damage
+		bool cleaver = !shotKit && arcHalf > 0.5f; // maul kit: arc cleave, full damage per body (user 2026-10-23)
 		// Spirit Guardians kit: a ring that pulses around the caster. Damage is NOT split by
 		// count (user rule 2026-10-22) - every body inside takes the FULL hit, the exact
 		// opposite of the maul's cleave split, and what makes the cleric an anti-swarm verb.
@@ -637,11 +640,11 @@ public partial class PartyMember : Godot.Node2D
 		}
 		else if (cleaver)
 		{
-			// Maul: ARC CLEAVE with SPLIT damage (human-test locked tradeoff): the
-			// fan is centered on the swing toward the closest body (auto-aim above);
-			// everything inside it is hit, but the swing's force divides among them -
-			// a lone target eats the full blow, a packed horde only gets chipped
-			int hits = 0;
+			// Maul: ARC CLEAVE, FULL damage to every body in the fan (user 2026-10-23:
+			// the split made the maul weaker than every other verb once a few bodies
+			// crowded the group - the fan now reads as a reaper, and the damage stat
+			// dropped 30 -> 20 to buy the honesty back). The fan is still centered on
+			// the swing toward the closest body (auto-aim above).
 			for (int i = 0; i < enemies.Count; i++)
 			{
 				Godot.Node2D n = enemies[i];
@@ -651,19 +654,7 @@ public partial class PartyMember : Godot.Node2D
 				Vector2 e = n.GlobalPosition - p;
 				if (e.Length() <= reach &&
 					System.Math.Abs(angleDiff((float)System.Math.Atan2(e.Y, e.X), facing)) <= arcEff)
-					hits++;
-			}
-			float each = dmg / (float)(hits > 0 ? hits : 1);
-			for (int i = 0; i < enemies.Count; i++)
-			{
-				Godot.Node2D n = enemies[i];
-				Combatant nc = (Combatant)n;
-				if (nc == null || nc.kind == "dead")
-					continue;
-				Vector2 e = n.GlobalPosition - p;
-				if (e.Length() <= reach &&
-					System.Math.Abs(angleDiff((float)System.Math.Atan2(e.Y, e.X), facing)) <= arcEff)
-					nc.TakeDamage(each);
+					nc.TakeDamage(dmg);
 			}
 		}
 		else

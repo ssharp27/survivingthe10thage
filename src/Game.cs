@@ -58,24 +58,30 @@ public partial class Game : Godot.Node2D
 	readonly Color CHIP_SAGE = new Color(0.60f, 0.84f, 0.60f, 1.0f);
 	readonly Color CHIP_GREY = new Color(0.70f, 0.70f, 0.70f, 1.0f);
 
-	// ---------- stage beat loop (M2 schedule, user-locked 2026-10-22) ----------
-	// The stage is a BEAT TABLE on the run clock, not a fixed five-state chain. Times are
+	// ---------- stage beat loop (M2 schedule, user re-locked 2026-10-23) ----------
+	// The stage is a BEAT TABLE on the run clock, not a fixed state chain. Times are
 	// RUN seconds, so a picker / join / camp pause never burns a beat (pass-22 rule).
-	//   30s ally I | 50s tier-2 gate | 70s mini-boss I | 90s ally II | 120s boss I
-	//   150s ally III (tier-3 escorts) | 180s mini-boss II | 210s ally IV | 230s final boss
+	//   30s ally I | 60s tier-2 gate | 90s mini-boss I | 120s ally II | 150s boss I
+	//   180s ally III | 210s mini-boss II | 240s ally IV | 300s final boss | 400s WRAP-UP
+	// The user stretched every gate to ease the 120 s wall they wiped at, and asked for the
+	// run to KEEP ROLLING to 400 s after the final boss - a sandbox window to test the full
+	// roster and horde scaling at strength. So `final`'s kill no longer ends the run (see
+	// OnBossKilled); the 10th row is what raises VICTORY.
 	// This is the gameplay loop "until times and scaling are changed around" (user rule),
 	// so every number here is data the user can move without touching the sequencer.
-	readonly double[] BEAT_T = { 30.0, 50.0, 70.0, 90.0, 120.0, 150.0, 180.0, 210.0, 230.0 };
+	readonly double[] BEAT_T = { 30.0, 60.0, 90.0, 120.0, 150.0, 180.0, 210.0, 240.0, 300.0, 400.0 };
 	// 0 = ally join beat, 1 = horde tier gate, 2 = mini-boss (its kill opens the camp),
-	// 3 = mid boss (its kill just lets the horde keep marching), 4 = final boss (VICTORY)
-	readonly int[] BEAT_KIND = { 0, 1, 2, 0, 3, 0, 2, 0, 4 };
+	// 3 = mid boss (its kill just lets the horde keep marching), 4 = final boss (its kill
+	// ALSO keeps the horde marching - the run rolls on), 5 = WRAP-UP (run clock lands on it
+	// with a clear arena -> VICTORY; a live `final` holds the row back until it is resolved)
+	readonly int[] BEAT_KIND = { 0, 1, 2, 0, 3, 0, 2, 0, 4, 5 };
 	// the horde tier the stage runs at once that beat lands (0 = leave the tier alone).
 	// Ally III / IV bring the tier-3 / tier-4 escorts the user asked for, so their beats
 	// also advance the horde.
-	readonly int[] BEAT_TIER = { 0, 2, 0, 0, 0, 3, 0, 4, 0 };
+	readonly int[] BEAT_TIER = { 0, 2, 0, 0, 0, 3, 0, 4, 0, 0 };
 	// boss beats name the Boss node they engage, so a beat is data and the scene owns the
 	// body (four of them now, parked hidden until their beat fires)
-	readonly string[] BEAT_BOSS = { "", "", "mini1", "", "boss1", "", "mini2", "", "final" };
+	readonly string[] BEAT_BOSS = { "", "", "mini1", "", "boss1", "", "mini2", "", "final", "" };
 	// ally beats land in roster memberIndex order: the first ally beat recruits member 1,
 	// the second recruits member 2, and so on. A beat whose PC is not in the roster yet
 	// is skipped with a log line, so the loop stays honest while the roster grows.
@@ -597,8 +603,11 @@ public partial class Game : Godot.Node2D
         }
         else if (kb == "final")
         {
-            _state = StageState.VICTORY;
-            PrintSummary("VICTORY — Tanurial Forest cleared");
+            // user rule (2026-10-23): killing the final boss no longer ends the run. The
+            // stage runs on to the 400 s WRAP-UP beat - the user's sandbox window to test
+            // the full roster and horde scaling at strength. The body is already despawned
+            // above; the horde keeps marching like it does after the mid boss.
+            GD.Print("[10thAge] final boss slain - the run keeps rolling to the 400s wrap-up beat");
         }
     }
 
@@ -873,9 +882,20 @@ public partial class Game : Godot.Node2D
 			else if (kind == 1)
 				GD.Print("[10thAge] beat " + (int)BEAT_T[_beatIdx] + "s: horde tier "
 						 + (int)_hordeTier + " gate");
+			else if (kind == 5)
+			{
+				// user rule (2026-10-23): after the final boss the run keeps rolling to a
+				// WRAP-UP beat (400 s) so the full roster and the fully scaled horde can be
+				// tested at strength. This row is what raises VICTORY - and because BossPending
+				// holds the row back, it only lands once `final` is truly slain, so "cleared"
+				// stays honest even if the boss was still alive at 400 s.
+				_state = StageState.VICTORY;
+				PrintSummary("VICTORY — Tanurial Forest cleared");
+			}
 			else
 			{
 				// 2 = mini (kill -> camp) | 3 = mid boss (kill -> keep marching) | 4 = final
+				// (kill -> keep marching too; the 400 s wrap-up row ends the run)
 				_bossBeat = _nextBeat;
 				ActivateBoss(BEAT_BOSS[_nextBeat]);
 				GD.Print("[10thAge] beat " + (int)BEAT_T[_beatIdx] + "s: " + BEAT_BOSS[_nextBeat]
@@ -916,6 +936,7 @@ public partial class Game : Godot.Node2D
             case 2: return "MINI-BOSS";
             case 3: return "BOSS";
             case 4: return "FINAL BOSS";
+            case 5: return "WRAP-UP";
             default: return "horde";
         }
     }

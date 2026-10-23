@@ -16,23 +16,25 @@ Progress this pass: **5 of 5 roster PCs in play** — Baldrun + Mosiah (M1) + **
 The stage **beat loop**, the **5-slot picker** and the escort-cage join path carry all five, and the
 roster is now complete (meta/unlocks and the party-size knob stay deferred).
 
-## Stage beat loop — user-locked 2026-10-22
+## Stage beat loop — user RE-LOCKED 2026-10-23 (stretches the 2026-10-22 lock)
 
-The user locked this schedule ("Our gameplay beat/loop for now until times and scaling are changed
-around"), so it is **data on the run clock**, not a state chain: `Game.cs`:61–71 `BEAT_T` /
-`BEAT_KIND` / `BEAT_TIER` / `BEAT_BOSS`, 9 rows.
+The user stretched every gate to ease the 120 s wall they wiped at, and asked for the run to
+**keep rolling to 400 s after the final boss** (a sandbox window to test characters and scaling).
+Still **data on the run clock**, `Game.cs` `BEAT_T` / `BEAT_KIND` / `BEAT_TIER` / `BEAT_BOSS`,
+now **10 rows**:
 
 | run s | row | what fires |
 | --- | --- | --- |
 | 30  | ally I        | Mosiah joins (escort cage) |
-| 50  | tier-2 gate   | horde tier 2 |
-| 70  | mini-boss I   | `mini1` — its kill opens the camp |
-| 90  | ally II       | Asper joins + **6 tier-2 escorts** |
-| 120 | first boss    | `boss1` (mid boss) — its kill keeps the horde marching |
-| 150 | ally III      | + tier-3 escorts ("we can define them now") |
-| 180 | mini-boss II  | `mini2` — its kill opens the camp |
-| 210 | ally IV       | + tier-4 spawns — **spelling to confirm** (user wrote "tier-5") |
-| 230 | final boss    | `final` → VICTORY |
+| 60  | tier-2 gate   | horde tier 2 |
+| 90  | mini-boss I   | `mini1` — its kill opens the camp |
+| 120 | ally II       | Asper joins + **6 tier-2 escorts** |
+| 150 | boss I        | `boss1` (mid boss) — its kill keeps the horde marching |
+| 180 | ally III      | + tier-3 escorts ("we can define them now") |
+| 210 | mini-boss II  | `mini2` — its kill opens the camp |
+| 240 | ally IV       | + tier-4 spawns — **spelling to confirm** (user wrote "tier-5") |
+| 300 | final boss    | `final` — its kill ALSO keeps the horde marching (no instant VICTORY) |
+| 400 | WRAP-UP       | kind 5: run clock lands on it with a clear arena → **VICTORY** |
 
 Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 - Times are **run seconds**, so a picker / join / camp pause never burns a beat (pass-22 rule).
@@ -174,6 +176,16 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
   rest-only ×1.20 price - small squads face FEWER bodies, not fatter ones. Full session record in
   **`docs/horde-party-scaling.md`** (shipped alongside - the verbatim block there matches the code
   byte-for-byte, line numbers included).
+- **Beat loop re-locked + sandbox window (user 2026-10-23)**: every gate stretched (30/60/90/120/150/180/210/240/300) because
+  the human playtest wiped at the old 120 s mid boss with only two PCs. The **400 s WRAP-UP row
+  (kind 5)** is now what raises VICTORY: `final`'s kill no longer ends the run (`OnBossKilled` final
+  branch keeps the horde marching), and the wrap-up row is held back by `BossPending()` until the
+  arena is clear, so "cleared" only prints once `final` is truly slain and the party gets a full
+  100 s tier-4 sandbox at 5-PC strength.
+- **Baldrun maul no longer splits (user 2026-10-23)**: damage stat 30 → **20** (`Main.tscn`) and the
+  cleaver branch in `PartyMember._Commit` applies **FULL damage to every body in the fan** - the old
+  `dmg / hits` made the maul weaker than every other verb once a few bodies crowded the group. The
+  fan (auto-aim centered on the closest body) is unchanged.
 
 ## Needs the user's word (blocking, not guessed)
 
@@ -296,6 +308,15 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   time, which is what the stall rule guarantees).
 - **Gate for the party-scaling + run-clock build is green**: `smokeM2za` TPK, `smokeM2zb` VICTORY,
   `smokeM2zc` VICTORY, all `.err` 0 bytes.
+- `smokeM2zd2` (plain, 90 k frames), `smokeM2ze` (camp skip), `smokeM2zf` (join skip) — **beat re-lock + wrap-up + Baldrun de-split build**:
+  **VICTORY, VICTORY, VICTORY**, all `.err` 0 bytes. The schedule prints fire on the NEW rows in every
+  trail (30/60/90/107-camp/…/210/240/300), the new `final`-kill line "the run keeps rolling to the
+  400s wrap-up beat" appears in all three, and VICTORY lands at the 400 s WRAP-UP row with the
+  sandbox proven live (final slain ~325-355 s, horde marching tier-4 at 2.5× party density, live
+  36→55 bodies, through 385 s). Note the 60 k-frame cap is now SHORT of the stage (plain run
+  expired ~330 s without a terminal in `zd`) — the sandbox window needs 90 k frames.
+- **Gate for the beat re-lock + wrap-up + Baldrun de-split build is green**: `smokeM2zd2` VICTORY,
+  `smokeM2ze` VICTORY, `smokeM2zf` VICTORY, all `.err` 0 bytes.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
