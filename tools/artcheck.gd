@@ -3,7 +3,7 @@ extends SceneTree
 # audit: palette + soft alpha + bbox for a mini PNG
 
 func _init():
-	var tex = ResourceLoader.load("res://art/mosiah.png", "Texture2D")
+	var tex = ResourceLoader.load("res://art/asper.png", "Texture2D")
 	if tex == null:
 		print("[10thArt] LOAD FAILED")
 		quit(1)

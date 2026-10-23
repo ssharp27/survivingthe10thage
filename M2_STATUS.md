@@ -186,6 +186,11 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
   cleaver branch in `PartyMember._Commit` applies **FULL damage to every body in the fan** - the old
   `dmg / hits` made the maul weaker than every other verb once a few bodies crowded the group. The
   fan (auto-aim centered on the closest body) is unchanged.
+- **Asper sprite (user 2026-10-23, `art/asper.png`)**: run through the same art pipeline as Baldrun/
+  Mosiah - headless `--import` pass made the `.import` sidecar, then `tools/artcheck.gd` audit **passed**:
+  80x119, opaque bbox 78x117 at 1,1 (1px margins), `cx_delta` -0.5, 0 soft-alpha px, 61 opaque colours.
+  Wired into the `displayName -> miniPath` lookup in `PartyMember._EnterTree`; `miniScale 0.75` and
+  `miniRim 7.0` carry over unchanged (same ~118-119 canvas class as the other two).
 
 ## Needs the user's word (blocking, not guessed)
 
@@ -327,6 +332,9 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   `.err`, and the kill line now reads "the run keeps rolling to the wrap-up beat" with no baked time.
 - **Gate for the second beat re-lock build is green**: `smokeM2zg2` (shipped) VICTORY + `smokeM2zh`
   (camp) VICTORY + `smokeM2zi` (join) VICTORY, all `.err` 0 bytes.
+- `smokeM2zj` (plain, 120 k frames) — **Asper art wiring build**: **VICTORY** level 24 / xp 1222, 0-byte
+  `.err`. Asper's `GD.Load` of `res://art/asper.png` runs at join time (150 s row) and the run stays
+  error-free end to end, so the sidecar import + audit wiring are live in the shipped binary.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 

@@ -151,16 +151,20 @@ public partial class PartyMember : Godot.Node2D
 		_rig.AddChild(_body); // under the rig, NOT the root: see motion block below
 		// painted minis (user 2026-10-21): cleaned art passed the audit - Baldrun 98x118
 		// (hard alpha, 50 opaque colours, dead-centred) and Mosiah 79x119 (0 soft-alpha px,
-		// 58 colours, cx_delta 0). Sprite lives on the RIG so the shuffle AND the topple
+		// 58 colours, cx_delta 0) and Asper 80x119 (0 soft-alpha px, 61 colours, cx_delta -0.5,
+		// 1px margins, rim read 7px like Mosiah). Sprite lives on the RIG so the shuffle AND the topple
 		// pivot at the base-rim centre, not the canvas centre - a knocked-over miniature
 		// falls around its own base. Hitbox, chips, labels, telegraphs untouched.
 		string miniPath = "";
-		float miniScale = 0.75f; // both canvases are ~118 tall -> ~88 px stage, under the 96 px boss
+		float miniScale = 0.75f; // all three canvases ~118-119 tall -> ~88 px stage, under the 96 px boss
 		float miniRim = 7.0f;    // px from canvas bottom to the base-rim band's centre (audit read)
 		if (displayName == "Baldrun")
 			miniPath = "res://art/baldrun.png";
 		else if (displayName == "Mosiah")
 			miniPath = "res://art/mosiah.png";
+		else if (displayName == "Asper")
+			// 152-163 region: name -> art lookup (Asper art audit-passed, rim/scale carry over)
+			miniPath = "res://art/asper.png";
 		if (miniPath != "")
 		{
 			Godot.Texture2D tex = GD.Load(miniPath) as Godot.Texture2D;
