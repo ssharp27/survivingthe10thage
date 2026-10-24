@@ -16,7 +16,8 @@ gets to invent another name for armour again.
 - `src/Game.cs` — boot dump loop (~line 1213, after `Rng.SetSeed(9001)`), the TakeHit
   defence tags (ARMOUR/EVASION ~line 407), magnet `COLLECTION_RANGE`, gem `XP_PCT`,
   upgrade-card OPT commits writing tag slots
-- `src/Combatant.cs` — body-side `vulnMul` pair for the VULNERABILITY tag (untouched)
+- `src/Combatant.cs` — body-side `vulnMul` pair for the VULNERABILITY tag, plus the
+  `slowMul` pair the draging maul spends (see grant chains below)
 
 ## The registry (index: tag / category / kind / base)
 
@@ -60,6 +61,20 @@ After `Rng.SetSeed(9001)` Game.cs prints one line per tag:
 Sixteen rows, dormant included — a missing row means the registry broke, and the
 gate should fail. The loop prints only; it consumes no RNG, so boot trails stay
 cross-gate aligned.
+
+## Upgrade-card grant chains (the 2026-10-24 cards)
+
+- Baldrun **draging maul** — deliberately NOT a tag slot. Kit field
+  `PartyMember.maulSlow` (+0.25/rank, cap 0.75 falls out of `PICK_RANK_CAP`, no
+  clamp) spent by the maul cleave at `nc.Slowed(maulSlow, 2.5)`; the slow is a
+  BODY status: `Combatant.slowMul/slowT` + `Slowed()`/`TickSlow()` mirror the
+  guiding-light vulnerability pair exactly (stronger mark wins, window refresh
+  only). `Enemy.cs` reads the pair at its three movement sites as
+  `spd = speed * (1 - slowMul)` while `slowT > 0`; boss immunity is enforced
+  at the applier hook (`!(nc is Boss)`), never inside `Slowed()`.
+- Mosiah **deadly aim** — pure data: `OPT_CRIT` +0.08/rank straight into tag 3
+  (`crit chance`, points kind). `RollDamage` already rolls the slot, so the
+  card is 5% → 13/21/29% by rank with zero new code paths.
 
 ## Deliberately parked (this pass)
 

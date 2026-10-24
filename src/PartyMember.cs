@@ -84,6 +84,12 @@ public partial class PartyMember : Godot.Node2D
 	// by the aura commit via Combatant.Vulnerable - the ring is the only applier, every
 	// damage source reads the mark. (The old flat-armour property is gone per user swap.)
 	public double guidingLight = 0.0;
+	// draging maul ranks (Baldrun 4th card, user 2026-10-24): +0.25/rank drag strength, cap
+	// 0.75 by PICK_RANK_CAP (no clamp needed). The maul cleave spends it via Combatant.Slowed
+	// - only applier, bosses immune at the hook. Kit field like pierce/guidingLight, not a
+	// tag slot: the slow is a BODY status (slowMul/slowT on the body), not a party stat.
+	// deadly aim needs no field: its card writes the CRIT_CHANCE slot of the stat store.
+	public double maulSlow = 0.0; // drag strength per rank: rank 3 = a quarter speed, no clamp
 	[Export] public string class_ = ""; // display class for the ui/ cards (empty = weapon fallback)
 	public string pickHistory = ""; // tracks taken so far, rendered on the run-summary card
 
@@ -735,7 +741,13 @@ public partial class PartyMember : Godot.Node2D
 				Vector2 e = n.GlobalPosition - p;
 				if (e.Length() <= reach &&
 					System.Math.Abs(angleDiff((float)System.Math.Atan2(e.Y, e.X), facing)) <= arcEff)
-					nc.TakeDamage(dmg * Strikes()); // MULTISTRIKE: the whole swing repeats
+					{
+						nc.TakeDamage(dmg * Strikes()); // MULTISTRIKE: the whole swing repeats
+						// draging maul: rank-gated drag on caught bodies (2.5 s window, refresh-not-stack);
+						// bosses immune at the applier, so only the horde gets the tax. See Combatant.Slowed.
+						if (maulSlow > 0.0 && !(nc is Boss))
+							nc.Slowed(maulSlow, 2.5);
+					}
 			}
 		}
 		else

@@ -167,18 +167,28 @@ public partial class Game : Godot.Node2D
 										   "spirit brand (guardian damage)", "wider ring (guardian reach)",
 										   "quicker pulse (guardian rate)", "guiding light (ring vulnerability)",
 										   "occult flame (blast damage)", "wider burst (blast reach)",
-										   "quicker ritual (summon rate)", "twin ritual (one more familiar)" };
-	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4 };
-	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f };
-	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.18f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f };
-	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f };
-	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
+										   "quicker ritual (summon rate)", "twin ritual (one more familiar)", "draging maul (slow on hit)",
+										   "deadly aim (crit chance)" };
+	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1 };
+	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f };
+	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.18f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f };
+	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
 	// guiding light (Alvora): the ring MARKS caught bodies for +10%/rank incoming damage
 	// from EVERY source, a window on the body that decays on its own (Combatant.TickVuln).
 	// The user swapped the old flat-armour defence for this offense (2026-10-23): the squad
 	// keeps no mitigation, but the cleric's ring becomes the party's damage setup.
-	static readonly int[] OPT_VULN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0 };
+	static readonly int[] OPT_VULN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 };
+	// draging maul (Baldrun 4th card, user 2026-10-24): connected maul hits drag caught bodies to
+	// (1 - 0.25/rank) speed for a 2.5 s window (Combatant.slowMul/slowT, refresh-not-stack); only
+	// horde movement reads it and the cleave hook never marks Bosses. deadly aim (Mosiah 4th card):
+	// +8%/rank CRIT_CHANCE points on the every-PC 5% seed - RollDamage already rolls that slot,
+	// so the crit card is pure table data. Rows 18/19 of the 20-wide tables; caps bound both:
+	// drag <= 0.75 at rank 3, crit <= 0.05 + 3 x 0.08 = 0.29.
+	// OPT_SLOW = drag strength/rank (Baldrun row 18); OPT_CRIT = crit points/rank (Mosiah row 19).
+	static readonly double[] OPT_SLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0 };
+	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08 };
 	int[] _pickRank = new int[OPT_LABEL.Length];
 	int[] _optRoll = new int[PICK_SLOTS]; // this card's offered options (slot -> option, -1 = empty slot)
 
@@ -2437,7 +2447,7 @@ public partial class Game : Godot.Node2D
 			Godot.ColorRect bg = _hpBg[i];
 			Godot.ColorRect f = _hpFill[i];
 			Godot.ColorRect dot = _hpDot[i];
-			if (i >= _party.Count || (!_party[i].joined && _recruitPending != _party[i]))
+ (i >= _party.Count || (!_party[i].joined && _recruitPending != _party[i]))
 			{
 				// unused slot / not-yet-arrived PC: fully invisible, never a phantom
 				// bodyguard or a spoiler strip telling the player who is coming next.
@@ -2449,7 +2459,7 @@ public partial class Game : Godot.Node2D
 				dot.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f);
 				continue;
 			}
-			PartyMember m = _party[i];
+ m = _party[i];
 			bool isOut = m.eliminated; // "out" is a reserved word in C# (the parameter modifier)
 			bool down = m.downed && !isOut;
 			float frac = m.EffMaxHp() > 0.0 ? (float)(m.hp / m.EffMaxHp()) : 0.0f;
@@ -2667,6 +2677,8 @@ public partial class Game : Godot.Node2D
 		m.pierce += OPT_PIERCE[option];
 		m.stat[StatTags.MULTISTRIKE] += OPT_SHOTS[option]; // multistrike: one more bolt / familiar per rank
 		{ m.guidingLight += 0.10 * OPT_VULN[option]; } // guiding light: marked bodies +10%/rank incoming
+		{ m.maulSlow += OPT_SLOW[option]; } // draging maul: drag strength per rank onto the kit field
+		{ m.stat[StatTags.CRIT_CHANCE] += OPT_CRIT[option]; } // deadly aim: crit points on the tag store
 		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
 						 OPT_LABEL[option] + " x" + _pickRank[option];
 		GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +

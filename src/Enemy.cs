@@ -67,6 +67,8 @@ public partial class Enemy : Combatant
     {
         float delta = (float)d;
         TickVuln((double)delta); // guiding-light window decays on every body, even off-screen
+        TickSlow((double)delta); // draging-maul window decays on every body, like guiding light
+        float spd = speed * (slowT > 0.0 ? 1.0f - (float)slowMul : 1.0f); // draging maul: a dragged body shambles
         if (_body == null)
             InitVisuals();
         if (kind == "dead")
@@ -96,7 +98,7 @@ public partial class Enemy : Combatant
             PartyMember prey = g.NearestMember(p);
             if (prey != null)
                 GlobalPosition = g.WrapNearCamera(GlobalPosition +
-                                             g.WrapDelta(GlobalPosition, prey.GlobalPosition).Normalized() * speed * delta);
+                                             g.WrapDelta(GlobalPosition, prey.GlobalPosition).Normalized() * spd * delta);
             PartyMember touch = g.NearestMemberAny(GlobalPosition);
             if (touch != null && g.WrapDelta(GlobalPosition, touch.GlobalPosition).Length() < 36.0f + g.MEMBER_RADIUS
                 && g.OnReaperDown(touch))
@@ -129,7 +131,7 @@ public partial class Enemy : Combatant
                 float hl = hold.Length();
                 if (hl > 18.0f)
                     GlobalPosition = g.WrapNearCamera(GlobalPosition +
-                                   hold.Normalized() * speed * g.GetEscortCrawl() * delta);
+                                   hold.Normalized() * spd * g.GetEscortCrawl() * delta);
                 _contactCd -= delta;
                 if (hl < 30.0f && _contactCd <= 0.0f)
                 {
@@ -150,7 +152,7 @@ public partial class Enemy : Combatant
                 float dist = to.Length();
                 float wobble = kind == "goblin" ? (float)System.Math.Sin(p.X * 0.05 + p.Y * 0.03) * 26.0f : 0.0f;
                 Vector2 dir = (to + new Vector2(wobble * 0.4f, wobble)).Normalized();
-                GlobalPosition += dir * speed * delta;
+                GlobalPosition += dir * spd * delta; // draging maul: a dragged body shambles
                 GlobalPosition = g.WrapNearCamera(GlobalPosition); // fold instead of walls
                 if (dist < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
                 {

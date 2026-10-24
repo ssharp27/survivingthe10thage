@@ -39,6 +39,31 @@ public partial class Combatant : Godot.Node2D
         }
     }
 
+    // draging maul (Baldrun 4th card, user 2026-10-24): the maul cleave taxes caught bodies -
+    // body speed -% for a window. A BODY status, not a tag: it lives on the shared surface
+    // so every verb could apply it, and only the maul applier enforces boss immunity. Stronger
+    // mark wins, window refresh only - mirrors guiding light exactly, per user pick (slow
+    // beats stun). Enemy.cs reads the pair at its three movement sites.
+    public double slowMul = 0.0;
+    public double slowT = 0.0;
+
+    public void Slowed(double mul, double duration)
+    {
+        if (mul > slowMul)
+            slowMul = mul;
+        if (duration > slowT)
+            slowT = duration; // refresh only: two overlapping marks never stack
+    }
+
+    public void TickSlow(double delta)
+    {
+        if (slowT > 0.0)
+        {
+            slowT -= delta;
+            if (slowT <= 0.0)
+                slowMul = 0.0; // the mark decays with the window
+        }
+    }
     public void Hurt()
     {
         hurtFlash = 0.12f;

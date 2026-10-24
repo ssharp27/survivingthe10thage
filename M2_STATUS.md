@@ -418,6 +418,12 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   dodge lines) + camp VICTORY lv16 / xp 576 (45 dodges) + join-skip VICTORY lv9 / xp 190 (37 dodges),
   all `.err` 0 bytes, 0 VERIFY. The dodge rolls now consume the run Rng too, so the horde stream shifted
   again - wins unchanged, levels drift by one as expected.
+- `smokeM2zx1` (camp skip), `smokeM2zx2` (join skip), `smokeM2zx3` (plain) — **draging-maul +
+  deadly-aim upgrade-card build**: **VICTORY, VICTORY, VICTORY**, 0-byte `.err`, 16 `stat tag`
+  rows each. The picker now offers Baldrun's `draging maul` (kit field + body slow via
+  `Combatant.Slowed`, bosses immune at the applier) and Mosiah's `deadly aim` (+8%/rank
+  CRIT_CHANCE, pure data). Crit rolls already consumed the run RNG from the stat-tag pass, so
+  the horde stream shifted; the slow itself adds no draws.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
