@@ -424,6 +424,14 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   `Combatant.Slowed`, bosses immune at the applier) and Mosiah's `deadly aim` (+8%/rank
   CRIT_CHANCE, pure data). Crit rolls already consumed the run RNG from the stat-tag pass, so
   the horde stream shifted; the slow itself adds no draws.
+- `smokeM2zx4` (camp skip), `smokeM2zx5` (join skip), `smokeM2zx6` (plain) — **HUD join-order strip
+  build**: **VICTORY, VICTORY, VICTORY**, 0-byte `.err`, 16 `stat tag` rows each. Bug fix (user 2026-10-24):
+  strips drew fixed roster rows, so a Yu-first recruit painted the bottom row with a three-row gap
+  above. Now strip slot i paints the i-th PC to ARRIVE via `_hpOrder` (leader + the boot-drawn
+  lottery sequence, built once in `BuildJoinLottery`); the STRANDED preview rides the next strip
+  because `_recruitPending` is always that strip's drawn member; dry-pool trailing slots stay
+  invisible. Storage stays roster order (`memberIndex` = ring slot, picker cards unchanged) -
+  display-only change, no RNG consumed, so beat trails keep the cards-build shape.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 

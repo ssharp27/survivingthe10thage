@@ -126,6 +126,7 @@ public partial class Game : Godot.Node2D
 	// the new-style initializer: Godot's C# build trips CS0623 on nested old-style braces
 	private static readonly int[][] JOIN_W = { new int[] { 3, 3, 1, 1, 1 } };   // row 0 = stage 1: Baldrun + Mosiah heavy
 	private int[] _joinOrder = new int[0]; // ally slot k -> memberIndex drawn for it
+	private Godot.Collections.Array<int> _hpOrder = new(); // HUD strip slot -> memberIndex: the join order (see BuildJoinLottery)
 	private Godot.RandomNumberGenerator _joinRng; // UNSEEDED on purpose: a fresh process re-rolls
 	// CAMPFIRE_LEN is gone: the campfire beat is player-driven (the ui/ Campfire
 	// screen emits rest_chosen). This is only the safety valve so an idle/AFK
@@ -2447,7 +2448,11 @@ public partial class Game : Godot.Node2D
 			Godot.ColorRect bg = _hpBg[i];
 			Godot.ColorRect f = _hpFill[i];
 			Godot.ColorRect dot = _hpDot[i];
- (i >= _party.Count || (!_party[i].joined && _recruitPending != _party[i]))
+			// strip slot i shows the i-th PC to ARRIVE, not the i-th roster entry
+			// (join-order map built in BuildJoinLottery; the STRANDED preview rides the
+			// next strip, which is exactly the slot the current recruit drew)
+			PartyMember m = (i < _hpOrder.Count) ? GetMemberByIndex(_hpOrder[i]) : null;
+			if (m == null || (!m.joined && _recruitPending != m))
 			{
 				// unused slot / not-yet-arrived PC: fully invisible, never a phantom
 				// bodyguard or a spoiler strip telling the player who is coming next.
@@ -2459,7 +2464,6 @@ public partial class Game : Godot.Node2D
 				dot.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f);
 				continue;
 			}
- m = _party[i];
 			bool isOut = m.eliminated; // "out" is a reserved word in C# (the parameter modifier)
 			bool down = m.downed && !isOut;
 			float frac = m.EffMaxHp() > 0.0 ? (float)(m.hp / m.EffMaxHp()) : 0.0f;
@@ -2546,6 +2550,23 @@ public partial class Game : Godot.Node2D
 		}
 		GD.Print("[10thAge] join lottery (stage " + STAGE_NUMBER + "): " +
 				 (names == "" ? "no recruits - the leader owns the whole roster" : names));
+		// HUD strip order = JOIN order (user 2026-10-24): the leader owns the top strip and
+		// each recruit appends the next one, so a Yu-first draw no longer paints Yu on its
+		// fixed roster row with an empty gap above. Storage keeps roster order (memberIndex
+		// is the ring slot); only the HUD strips read this map, built once because the
+		// lottery already fixes the whole order at boot.
+		_hpOrder = new Godot.Collections.Array<int>();
+		foreach (PartyMember pm in _party)
+		{
+			if (pm.isLeader)
+				_hpOrder.Add(pm.memberIndex); // the leader arrives at boot: strip 0
+		}
+		for (int s = 0; s < _joinOrder.Length; s++)
+		{
+			if (_joinOrder[s] < 0)
+				{ continue; } // dry pool: nobody fills that strip (trailing slots stay invisible)
+			_hpOrder.Add(_joinOrder[s]);
+		}
 	}
 
 	// ---------- smart-random level-up roll (human-test: variety, not same-y cards) ----------
