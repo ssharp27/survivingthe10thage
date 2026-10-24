@@ -459,6 +459,16 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   fall, not the rise). Evidence: `smokeM2zxv` ran once with a TEMP buffer print showing countdowns up
   to "4s left" (the fail-buffer alone caps at 2.0), then reverted before the trio. No RNG consumed by
   the lane itself.
+- `smokeM2zx13` (camp skip), `smokeM2zx14` (join skip), `smokeM2zx15` (plain) — **per-member XP
+  suction build**: **VICTORY lv16/xp580, VICTORY lv9/xp191, VICTORY lv24/xp1250**, 0-byte `.err`,
+  16 `stat tag` rows each. QOL add (user 2026-10-24): XP gems are no longer leader-only — every
+  living PC owns its own `COLLECTION_RANGE` magnet bubble (nearest member wins on overlap so a gem
+  rides ONE stream, no splitting), and pickup pays THAT member's own `XP_PCT` bonus. Downed/eliminated
+  bodies and the stranded unjoined recruit own no bubble. The campfire beat's vacuum still reels
+  gems to the leader UNCHANGED (a beat effect, separate lane). Evidence is directional rather than
+  print-shown: XP totals rise against the grace trio (580/191/1250 vs 536/149/1233; the join-skip
+  trail jumps from lv8 to lv9) because stragglers now vacuum their side of the arena, and all
+  three trails keep VICTORY with clean `.err`. No RNG consumed by the suction itself.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 

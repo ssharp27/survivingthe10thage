@@ -1994,10 +1994,14 @@ public partial class Game : Godot.Node2D
 		}
 	}
 
+	// QOL (user 2026-10-24): XP suction became PER-MEMBER - every living PC owns
+	// its own COLLECT_RANGE bubble, so stragglers vacuum their side of the arena
+	// and the leader no longer has to run over each pile (he is IN _party, so
+	// his own bubble survives the scan below)
+	// the campfire vacuum (camp beat) still reels gems to the leader UNCHANGED
+	// (party suction on the field vs camp vacuum on the beat are separate lanes)
 	private void UpdateGems(float delta)
 	{
-		PartyMember leader = _leader;
-		bool leaderLive = leader != null && !leader.downed && !leader.eliminated;
 		for (int i = 0; i < _gems.Count; i++)
 		{
 			Godot.Node2D gem = _gems[i];
@@ -2006,19 +2010,33 @@ public partial class Game : Godot.Node2D
 			// gems sit where bodies died: fold them like everything else, so a player
 			// who wanders off loops back to them instead of losing them off-world
 			gem.GlobalPosition = WrapNearCamera(gem.GlobalPosition);
-			if (leaderLive)
+			// nearest living member whose bubble holds this gem: on overlap the
+			// CLOSEST PC owns the magnet so a gem rides one stream, and pickup
+			// pays that member's own XP_PCT tag (party max 5, gems few: cheap)
+			PartyMember puller = null;
+			Vector2 to = Vector2.Zero;
+			float dist = 1e30f;
+			foreach (PartyMember mm in _party)
 			{
-				Vector2 to = leader.GlobalPosition - gem.GlobalPosition;
-				float dist = to.Length();
-				if (dist < 110.0f * (float)leader.stat[StatTags.COLLECTION_RANGE])
+				if (!mm.joined || mm.downed || mm.eliminated)
+					continue; // downed/eliminated bodies + stranded recruits: no bubble
+				Vector2 mt = mm.GlobalPosition - gem.GlobalPosition;
+				float md = mt.Length();
+				if (md < 110.0f * (float)mm.stat[StatTags.COLLECTION_RANGE] && md < dist)
 				{
-					gem.GlobalPosition += to.Normalized() * 380.0f * delta;
-					if (dist < 14.0f)
-					{
-						AddXp(_gemVals[i] * (1.0 + leader.stat[StatTags.XP_PCT])); // XP_PCT tag: gems worth more at pickup
-						DespawnGem(i);
-						continue;
-					}
+					puller = mm;
+					dist = md;
+					to = mt;
+				}
+			}
+			if (puller != null)
+			{
+				gem.GlobalPosition += to.Normalized() * 380.0f * delta;
+				if (dist < 14.0f)
+				{
+					AddXp(_gemVals[i] * (1.0 + puller.stat[StatTags.XP_PCT])); // XP_PCT tag: gems worth more at pickup
+					DespawnGem(i);
+					continue;
 				}
 			}
 		}
