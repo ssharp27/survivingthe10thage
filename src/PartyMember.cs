@@ -38,7 +38,7 @@ public partial class PartyMember : Godot.Node2D
 	// so the kit name is the switch and arcHalf stays purely a melee property. M2 adds a THIRD
 	// verb for the cleric (Alvora's Spirit Guardians): a persistent ring of spirits around the
 	// caster that pulses on the weapon cooldown. Radius rides the reach stat and the pulse rides
-	// the cooldown, so both of its ranks reuse the same rangeMul / cdMul plumbing as every other
+	// the cooldown, so both of its ranks reuse the AREA and ATTACK_SPEED tags like every other
 	// reach and speed track; the damage is NOT split by count (user rule 2026-10-22) - every body
 	// inside takes the full hit. The maul's fan dropped its split too (user 2026-10-23), so both
 	// heavy AoE verbs now bite crowds at full strength. Warding light is GONE (user 2026-10-23
@@ -54,7 +54,7 @@ public partial class PartyMember : Godot.Node2D
 	[Export] public float minionSpeed = 84.0f;  // px/s a familiar runs (a hair under a goblin's 90)
 	[Export] public float minionRadius = 56.0f; // px blast radius when it detonates (starts small)
 	[Export] public float minionFuse = 6.0f;    // seconds of fuse before it detonates by itself
-	public int shots = 1;                     // multishot rank lands here (1 = single bolt)
+	// multistrike now lives in the stat store (StatTags.MULTISTRIKE); Strikes() reads it
 
 	public float hp = 0.0f;
 	public bool downed = false;
@@ -69,10 +69,14 @@ public partial class PartyMember : Godot.Node2D
 	Godot.ColorRect[] _auraParts;
 	float _auraPulse = 0.0f; // seconds of ring flare left from the last pulse
 	public float facing = 0.0f;
-	public float dmgMul = 1.0f;
-	public float cdMul = 1.0f;
-	public float rangeMul = 1.0f;
-	public float speedMul = 1.0f;
+	// canonical stat store: one slot per StatTags tag, seeded from StatTags.BASE in _EnterTree
+	/**
+	 * Per-tag stat values (index = StatTags.* constants; see StatTags.cs). Upgrades write
+	 * these slots; everything combat-side reads them via the Eff* helpers, Strikes() and
+	 * RollDamage below. This is the single canonical home for every permanent stat.
+	 */
+	public double[] stat = new double[StatTags.N];
+
 	// "wider arc" rank track REMOVED per human test: Baldrun's upgrade pool went to
 	// reach / damage / cooldown instead, so the maul fan stays a fixed ~150 deg arc.
 	public int pierce = 0; // "deeper thrust": the rapier lane can skewer extra bodies
@@ -139,7 +143,7 @@ public partial class PartyMember : Godot.Node2D
 	{
 		AddToGroup("party");
 		ZIndex = 5; // members (and their _draw telegraphs) paint above enemy squares
-		hp = maxHp;
+		SeedStatStore(); hp = (float)EffMaxHp(); // HEALTH tag is additive points on the authored base
 		_body = new ColorRect();
 		_body.Size = new Vector2(30.0f, 30.0f);
 		_body.Position = -_body.Size * 0.5f;
@@ -289,6 +293,59 @@ public partial class PartyMember : Godot.Node2D
 		dsHold = (float)hold;
 	}
 
+	// ---------- canonical stat accessors (StatTags registry) ----------
+	/** Seed the stat store from the registry BASE (once, in _EnterTree). */
+	public void SeedStatStore()
+	{
+		for (int i = 0; i < StatTags.N; i += 1)
+			stat[i] = StatTags.BASE[i];
+	}
+	/** Authored weaponDamage scaled by the ATTACK_DAMAGE tag. */
+	public double EffDamage() { return weaponDamage * stat[StatTags.ATTACK_DAMAGE]; }
+	/** Authored cooldown divided by the ATTACK_SPEED tag (higher = faster attacks). */
+	public double EffCooldown()
+	{
+		double spd = stat[StatTags.ATTACK_SPEED];
+		if (spd < 0.05)
+			spd = 0.05; // clamp: stacked speed cards can't drive the timer to zero
+		return cooldown / spd;
+	}
+	/** Authored reach scaled by the AREA tag. */
+	public double EffRange() { return range * stat[StatTags.AREA]; }
+	/** Authored maxHp plus the additive HEALTH tag (points). */
+	public double EffMaxHp() { return maxHp + stat[StatTags.HEALTH]; }
+	/** Authored baseSpeed scaled by the MOVEMENT_SPEED tag. */
+	public double EffMove() { return baseSpeed * stat[StatTags.MOVEMENT_SPEED]; }
+	/** Whole repeats of the current attack (MULTISTRIKE tag, kind COUNT). */
+	public int Strikes()
+	{
+		int n = (int)stat[StatTags.MULTISTRIKE];
+		if (n < 1)
+			n = 1;
+		if (n > 5)
+			n = 5; // same 1..5 ceiling the shot fan always used
+		return n;
+	}
+	/**
+	 * Party-side damage surface: rolls CRIT_CHANCE on the run RNG (all allies crit,
+	 * enemies never do), pays CRIT_DAMAGE on a hit, drips LIFESTEAL back into the
+	 * body, and returns the number to hand TakeDamage. This deliberately lives on
+	 * the party side, NOT inside Combatant.TakeDamage which the horde shares.
+	 */
+	public double RollDamage(Godot.Node2D host, double amount)
+	{
+		if (host is Game g && g.Rng != null && g.Rng.Randf() < stat[StatTags.CRIT_CHANCE])
+			amount *= stat[StatTags.CRIT_DAMAGE];
+		double steal = amount * stat[StatTags.LIFESTEAL];
+		if (steal > 0.0)
+		{
+			hp += (float)steal;
+			double cap = EffMaxHp();
+			if (hp > cap)
+				hp = (float)cap;
+		}
+		return amount > 0.5 ? amount : 0.5; // same 0.5 floor the old commits kept
+	}
 	public override void _Process(double d)
 	{
 		Game pg0 = GetParent() as Game;
@@ -306,6 +363,17 @@ public partial class PartyMember : Godot.Node2D
 			dsDamageBuffer -= delta; // ticks even while downed: the 2 s fail-buffer
 		if (invuln > 0.0f)
 			invuln -= delta; // post-revive immunity window, ticks always
+		// hp regen (REGEN tag): points per second, never while downed or unjoined
+		if (!downed && joined && stat[StatTags.REGEN] > 0.0)
+		{
+			double regenCap = EffMaxHp();
+			if (hp < regenCap)
+			{
+				hp += (float)(stat[StatTags.REGEN] * delta);
+				if (hp > regenCap)
+					hp = (float)regenCap;
+			}
+		}
 		// eliminated = out until the next campfire: the body, telegraph and ds label
 		// go hidden; writing visibility every frame is what un-hides a member when
 		// the campfire lifts them back up
@@ -426,7 +494,7 @@ public partial class PartyMember : Godot.Node2D
 		// a PULSE readable without a HUD. One pivot, so one Scale carries the "wider ring" rank.
 		if (weaponKit == "aura" && _auraPivot != null)
 		{
-			_auraPivot.Scale = new Vector2(rangeMul, rangeMul);
+			_auraPivot.Scale = new Vector2((float)stat[StatTags.AREA], (float)stat[StatTags.AREA]);
 			_auraPivot.Rotation += (float)(1.1 * delta);
 			if (_auraPulse > 0.0f)
 			{
@@ -516,15 +584,15 @@ public partial class PartyMember : Godot.Node2D
 		// so the ring can trade with a live boss, which is what lets the beat loop advance past
 		// one. An empty ring burns nothing: the cooldown stays open, so a cleric standing over
 		// empty clearing never stalls its own beat. The radius rides reach and the pulse rides
-		// the weapon cooldown, so "wider ring" / "quicker pulse" reuse the rangeMul / cdMul ranks.
+		// the weapon cooldown, so "wider ring" / "quicker pulse" reuse the AREA and ATTACK_SPEED tags.
 		// M2's FOURTH verb is Yu's occult ritual: neither a bolt nor a ring but a small creature
 		// that runs at the closest prey and detonates for a blast NO body shares (user rule 2026-10-22:
 		// "the damage isn't reduced by number of enemies in the radius"). It lives in the Game's
 		// party-side summon pool and its fuse is its whole lifetime, so the ranks reuse the same
 		// plumbing every other member uses - cooldown = summon rate, damage = blast damage,
-		// reach = the ritual (it widens the sight AND the blast), shots = the multiattack rank.
+		// reach = the ritual (it widens the sight AND the blast), the MULTISTRIKE tag = multiattack rank.
 		bool auraKit = weaponKit == "aura"; // Spirit Guardians kit: ring pulsing around the caster
-		float reach = range * rangeMul;
+		float reach = (float)EffRange();
 		// the fourth verb is keyed on the kit name like every other weapon
 		bool sumKit = weaponKit == "summon"; // Occultist ritual: fuse-driven familiars run at prey
 		if (auraKit)
@@ -539,7 +607,7 @@ public partial class PartyMember : Godot.Node2D
 					continue;
 				if ((n.GlobalPosition - p).Length() > reach)
 					continue;
-				nc.TakeDamage(weaponDamage * dmgMul); // FULL hit, not dmg / struck
+				nc.TakeDamage(RollDamage(pg, weaponDamage) * Strikes()); // FULL hit, not dmg / struck
 				// guiding light: the pulse also MARKS what it caught (rank 0 = no mark),
 				// so the whole party bites marked bodies harder until the window decays
 				if (guidingLight > 0.0)
@@ -548,7 +616,7 @@ public partial class PartyMember : Godot.Node2D
 			}
 			if (struck <= 0)
 				return; // nothing in the ring: the next pulse stays ready
-			cdTimer = cooldown * cdMul;
+			cdTimer = (float)EffCooldown();
 			_atkFlash = 0.08f; // same commit pulse the longbow uses, never the red harm lane
 			_auraPulse = 0.22f; // the ring flares so the tick reads without a HUD
 			return;
@@ -577,16 +645,16 @@ public partial class PartyMember : Godot.Node2D
 			}
 			if (prey == null || preyD > reach)
 				return; // nothing in sight: the ritual stays ready, an empty clearing never stalls a beat
-			cdTimer = cooldown * cdMul;
+			cdTimer = (float)EffCooldown();
 			_atkFlash = 0.08f; // same commit pulse the longbow uses, never the red harm lane
 			// multiattack rank: one more familiar per rank, spread in a shallow fan so a
 			// triple summon never spawns three bodies in one spot. They are spawned NEAR Yu
 			// (user dictation 2026-10-22), not on the prey it chased.
-			int familiars = shots < 1 ? 1 : (shots > 5 ? 5 : shots);
+			int familiars = Strikes(); // MULTISTRIKE tag repeats the whole summon volley
 			// ONE reach rank widens BOTH the ritual's sight AND its blast, so "wider burst"
-			// rides rangeMul like every other reach track. Blast damage is NOT split by whatever
+			// rides the AREA tag like every other reach track. Blast damage is NOT split by whatever
 			// stands in it (user rule 2026-10-22) - that no-split lives in the pool, see DetonateSummon.
-			float blast = minionRadius * rangeMul;
+			float blast = (float)(minionRadius * stat[StatTags.AREA]);
 			// chase on the SHORT torus path: an absolute delta would take the 2400 px way round a seam
 			Vector2 aim = pg.WrapDelta(p, prey.GlobalPosition);
 			aim = aim.Length() > 0.01f ? aim.Normalized() : new Vector2(1.0f, 0.0f);
@@ -596,7 +664,7 @@ public partial class PartyMember : Godot.Node2D
 				float ca = (float)System.Math.Cos(off); // rotate the aim: Godot C# Vector2 has no .rotated()
 				float sa = (float)System.Math.Sin(off);
 				Vector2 dir = new Vector2(aim.X * ca - aim.Y * sa, aim.X * sa + aim.Y * ca);
-				pg.SpawnSummon(p + dir * 26.0f, weaponDamage * dmgMul, minionFuse, blast, minionSpeed);
+				pg.SpawnSummon(p + dir * 26.0f, (float)RollDamage(pg, weaponDamage), minionFuse, blast, minionSpeed);
 			}
 		}
 		Godot.Node2D best = null;
@@ -627,14 +695,14 @@ public partial class PartyMember : Godot.Node2D
 		}
 		if (best == null || bestD > reach)
 			return;
-		cdTimer = cooldown * cdMul;
+		cdTimer = (float)EffCooldown();
 		Vector2 to = best.GlobalPosition - p;
 		float ang = (float)System.Math.Atan2(to.Y, to.X);
 		if (!isLeader || cleaver)
 			facing = ang; // auto-aim: the cleave swings at its prey (Mosiah-style),
 						  // so the ~150 deg fan is centered on the swing toward the
 						  // closest body; only lane weapons respect walk facing
-		float dmg = weaponDamage * dmgMul;
+		float dmg = (float)RollDamage(pg, weaponDamage);
 		if (shotKit)
 		{
 			// Longbow: the commit fires the Game's PARTY-SIDE shot pool at the closest body in
@@ -642,7 +710,7 @@ public partial class PartyMember : Godot.Node2D
 			// miss simply expires (no pierce: the FAN is the multishot upgrade, pierce is the
 			// rapier's). Bolts fan tightly around the aim line so rank 1..3 reads as a wedge
 			// of chitin, not a stack of overlapping shots.
-			int bolts = shots < 1 ? 1 : (shots > 5 ? 5 : shots);
+			int bolts = Strikes(); // MULTISTRIKE tag fans one more bolt per rank
 			for (int s = 0; s < bolts; s++)
 			{
 				float off = (s - (bolts - 1) * 0.5f) * 0.16f; // rad of fan per extra bolt
@@ -667,7 +735,7 @@ public partial class PartyMember : Godot.Node2D
 				Vector2 e = n.GlobalPosition - p;
 				if (e.Length() <= reach &&
 					System.Math.Abs(angleDiff((float)System.Math.Atan2(e.Y, e.X), facing)) <= arcEff)
-					nc.TakeDamage(dmg);
+					nc.TakeDamage(dmg * Strikes()); // MULTISTRIKE: the whole swing repeats
 			}
 		}
 		else
@@ -700,7 +768,7 @@ public partial class PartyMember : Godot.Node2D
 						continue;
 					Vector2 e = c.GlobalPosition - p;
 					float dd = e.Length();
-					if (dd <= range * rangeMul && dd < nd &&
+					if (dd <= (float)EffRange() && dd < nd &&
 						System.Math.Abs(angleDiff((float)System.Math.Atan2(e.Y, e.X), facing)) <= laneHalf)
 					{
 						nd = dd;
@@ -715,7 +783,7 @@ public partial class PartyMember : Godot.Node2D
 			{
 				// pierce widens the lane but the rays past the last body stay empty
 				if (hit != null)
-					((Combatant)hit).TakeDamage(dmg);
+					((Combatant)hit).TakeDamage(dmg * Strikes()); // MULTISTRIKE: the rapier re-thrusts
 			}
 		}
 		_atkFlash = shotKit ? 0.08f : 0.12f; // a shooter flashes a shorter draw, never red
@@ -724,7 +792,7 @@ public partial class PartyMember : Godot.Node2D
 		if (!shotKit)
 		{
 			_telePivot.Rotation = facing;
-			_telePivot.Scale = new Vector2(rangeMul, rangeMul);
+			_telePivot.Scale = new Vector2((float)stat[StatTags.AREA], (float)stat[StatTags.AREA]);
 			// rebuild the spokes for the LIVE arc: ranks open the maul fan, and the
 			// rotations baked at load time only knew the base arcHalf
 			if (_teleParts != null && _teleParts.Length > 1 && arcHalf <= 3.0f)

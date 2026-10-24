@@ -223,7 +223,7 @@ public partial class Game : Godot.Node2D
 	// (layout edits would otherwise go unvalidated in TPK-heavy runs)
 	string _devSkip = "";
 	double _pilotTick = 0.0;
-	Godot.RandomNumberGenerator Rng;
+	public Godot.RandomNumberGenerator Rng; // public: PartyMember.RollDamage rolls crits on the run stream
 
 	enum StageState { PLAY, CAMPFIRE, DEAD, VICTORY }; // beat table owns the stage flow now
 	StageState _state = StageState.PLAY;
@@ -402,6 +402,20 @@ public partial class Game : Godot.Node2D
 					// that is still reacting (or parked at the camp beat)
 		if (m.invuln > 0.0f || m.reviveShield)
 			return; // post-revive shield, or the body is mid-rescue: immune
+		// defence tags (ARMOUR/EVASION): evasion rolls first for a full dodge,
+		// then armour subtracts flat - never below 1 damage (user floor 2026-10-24)
+		if (Rng != null && m.stat[StatTags.EVASION] > 0.0 && Rng.Randf() < m.stat[StatTags.EVASION])
+		{
+			m.NoteHitFlash(); // a dodge reads on the ghost-white lane, never the harm lane
+			GD.Print("[10thAge] " + m.displayName + " EVASION dodge - the hit glances off");
+			return;
+		}
+		if (m.stat[StatTags.ARMOUR] > 0.0)
+		{
+			amount -= m.stat[StatTags.ARMOUR];
+			if (amount < 1.0)
+				amount = 1.0; // flat reduction with a never-below-1 floor
+		}
 		if (m.downed)
 		{
 			if (m.stable)
@@ -464,7 +478,7 @@ public partial class Game : Godot.Node2D
 	public bool OnReaperDown(PartyMember m)
 	{
 		// TEST reaper (user death-state tester): whatever it touches goes DOWN and
-		// starts the d20 death-save cycle — this is the revival test bench. Returns
+		// starts the d20 death-save cycle ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â this is the revival test bench. Returns
 		// true only when the down actually landed, so immunity lets it keep lurking.
 		if (m == null || !m.joined || m.eliminated || m.downed)
 			return false;
@@ -498,7 +512,7 @@ public partial class Game : Godot.Node2D
 				m.eliminated = false;
 				m.campReturned = true; // long rest must not full-heal these bodies
 				m.downed = false;
-				m.hp = m.maxHp * 0.25f;
+				m.hp = (float)(m.EffMaxHp() * 0.25);
 				m.stable = false;
 				m.dsFails = 0;
 				m.dsSucceeds = 0;
@@ -536,9 +550,9 @@ public partial class Game : Godot.Node2D
 			if (healBeat)
 			{
 				// the campfire's locked +25% heal - applied once, by the rest choice
-				m.hp = m.hp + m.maxHp * 0.25f;
-				if (m.hp > m.maxHp)
-					m.hp = m.maxHp;
+				m.hp = m.hp + (float)(m.EffMaxHp() * 0.25);
+				if (m.hp > m.EffMaxHp())
+					m.hp = (float)m.EffMaxHp();
 			}
 		}
 	}
@@ -598,7 +612,7 @@ public partial class Game : Godot.Node2D
 			// player absorbing the rest choice cannot be shot mid-decision.
 			ClearBullets();
 			ReviveAllAtCampfire(false);
-			GD.Print("[10thAge] mini-boss slain — camp: the fallen return at 25% hp; the "
+			GD.Print("[10thAge] mini-boss slain ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â camp: the fallen return at 25% hp; the "
 					 + "rest choice decides healing");
 		}
 		else if (kb == "boss1")
@@ -900,7 +914,7 @@ public partial class Game : Godot.Node2D
 				// holds the row back, it only lands once `final` is truly slain, so "cleared"
 				// stays honest even if the boss was still alive at the wrap time.
 				_state = StageState.VICTORY;
-				PrintSummary("VICTORY — " + STAGE_NAME + " (stage " + STAGE_NUMBER + ") cleared");
+				PrintSummary("VICTORY ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â " + STAGE_NAME + " (stage " + STAGE_NUMBER + ") cleared");
 			}
 			else
 			{
@@ -1084,13 +1098,13 @@ public partial class Game : Godot.Node2D
 		// to spam "chipped" forever behind the summary (CT50/51 log flood)
 		if (_state == StageState.DEAD || _state == StageState.VICTORY)
 			return;
-		float floor = m.maxHp * RECRUIT_JOIN_FLOOR;
+		float floor = (float)(m.EffMaxHp() * RECRUIT_JOIN_FLOOR);
 		float nh = m.hp - (float)amount;
 		if (nh < floor)
 			nh = floor;
 		m.hp = nh;
 		GD.Print("[10thAge] escort touch: " + m.displayName + " chipped to " +
-				 (int)m.hp + "/" + (int)m.maxHp + "hp");
+				 (int)m.hp + "/" + (int)m.EffMaxHp() + "hp");
 	}
 
 	public Vector2 GetCameraCenter()
@@ -1194,6 +1208,17 @@ public partial class Game : Godot.Node2D
 		// so a single-color floor made movement LOOK frozen even when input worked
 		Rng = new Godot.RandomNumberGenerator();
 		Rng.SetSeed(9001);
+		// stat registry boot dump: every tag row prints (dormant rows included) so smoke
+		// trails and future meta screens share one canonical vocabulary from StatTags.cs
+		// kind 0 = multiplier, 1 = points, 2 = count - see StatTags.cs KIND
+		for (int tag = 0; tag < StatTags.N; tag += 1)
+			GD.Print("[10thAge] stat tag " + StatTags.NAMES[tag] + " [" +
+			 StatTags.CATEGORY[tag] + " kind " + StatTags.KIND[tag] +
+			 " base " + StatTags.BASE[tag] + "]");
+
+		// party-side tags all live in PartyMember.stat[] at these indices; the
+		// body-side vulnerability tag pairs with Combatant.vulnMul (the ring's mark)
+
 		// patch DENSITY is kept constant to the measured period, so big windows keep the
 		// same motion cues per screen area
 		int patchCount = (int)(60.0 * _wrapW * _wrapH / (2400.0 * 1800.0));
@@ -1623,7 +1648,7 @@ public partial class Game : Godot.Node2D
 		if (moved)
 		{
 			dir = dir.Normalized();
-			leader.GlobalPosition = leader.GlobalPosition + dir * leader.baseSpeed * leader.speedMul * delta;
+			leader.GlobalPosition = leader.GlobalPosition + dir * (float)leader.EffMove() * delta;
 			if (faceTo.X != 0.0f || faceTo.Y != 0.0f)
 				leader.facing = (float)System.Math.Atan2(faceTo.Y, faceTo.X);
 			else
@@ -1659,7 +1684,7 @@ public partial class Game : Godot.Node2D
 					best = b;
 				}
 			}
-			if (best != null && bestD <= leader.range * leader.rangeMul * 1.5f)
+			if (best != null && bestD <= (float)leader.EffRange() * 1.5f)
 			{
 				Vector2 v = best.GlobalPosition - leader.GlobalPosition;
 				leader.facing = (float)System.Math.Atan2(v.Y, v.X);
@@ -1676,7 +1701,7 @@ public partial class Game : Godot.Node2D
 		// its prey), so the rapier still lands while circling.
 		{
 			Vector2 anchor = leader != null ? leader.GlobalPosition : new Vector2(0, 0);
-			float leadSpeed = leader != null ? leader.baseSpeed * leader.speedMul : 128.0f;
+			float leadSpeed = leader != null ? (float)leader.EffMove() : 128.0f;
 			foreach (PartyMember m in _party)
 			{
 				if (!m.joined || m.isLeader || m.downed || m.eliminated)
@@ -1696,7 +1721,7 @@ public partial class Game : Godot.Node2D
 				// attachment-first follow (user-locked): homing far above walk
 				// speed so a gap never persists - the member behaves as welded
 				// to the slot, never as a chaser
-				float home = (float)System.Math.Max((double)m.baseSpeed * (double)m.speedMul * 1.5,
+				float home = (float)System.Math.Max(m.EffMove() * 1.5,
 													(double)leadSpeed + 80.0);
 				double step = (double)home * (double)delta;
 				Vector2 move = step >= gap ? to : to * (float)(step / gap);
@@ -1804,7 +1829,7 @@ public partial class Game : Godot.Node2D
 						GD.Print("[10thAge]   outcome: NAT 20 - " + m.displayName +
 								 " self-revives at 25% hp, 2s invulnerable");
 						m.downed = false;
-						m.hp = m.maxHp * 0.25f;
+						m.hp = (float)(m.EffMaxHp() * 0.25);
 						m.stable = false;
 						m.dsFails = 0;
 						m.dsSucceeds = 0;
@@ -1872,7 +1897,7 @@ public partial class Game : Godot.Node2D
 					m.reviveShield = false;
 					// locked rule: every revive grants 2 s of invulnerability
 					m.invuln = (float)REVIVE_INVULN;
-					m.hp = m.maxHp * 0.5f;
+					m.hp = (float)(m.EffMaxHp() * 0.5);
 					GD.Print("[10thAge] channel COMPLETE: " + m.displayName +
 							 " revived at 50% hp | invuln 2s granted");
 					m.dsColor = CHIP_SAGE;
@@ -1965,12 +1990,12 @@ public partial class Game : Godot.Node2D
 			{
 				Vector2 to = leader.GlobalPosition - gem.GlobalPosition;
 				float dist = to.Length();
-				if (dist < 110.0f)
+				if (dist < 110.0f * (float)leader.stat[StatTags.COLLECTION_RANGE])
 				{
 					gem.GlobalPosition += to.Normalized() * 380.0f * delta;
 					if (dist < 14.0f)
 					{
-						AddXp(_gemVals[i]);
+						AddXp(_gemVals[i] * (1.0 + leader.stat[StatTags.XP_PCT])); // XP_PCT tag: gems worth more at pickup
 						DespawnGem(i);
 						continue;
 					}
@@ -2427,17 +2452,17 @@ public partial class Game : Godot.Node2D
 			PartyMember m = _party[i];
 			bool isOut = m.eliminated; // "out" is a reserved word in C# (the parameter modifier)
 			bool down = m.downed && !isOut;
-			float frac = m.maxHp > 0.0f ? m.hp / m.maxHp : 0.0f;
+			float frac = m.EffMaxHp() > 0.0 ? (float)(m.hp / m.EffMaxHp()) : 0.0f;
 			if (frac < 0.0f)
 				frac = 0.0f; // HP floors at 0 (overkill never poisons the bar)
 			if (frac > 1.0f)
 				frac = 1.0f;
 			string tag = (m.isLeader ? "* " : "") + m.displayName;
 			bool stranded = !m.joined; // field beat only: live strip tracks the join HP
-			n.Text = stranded ? tag + " STRANDED " + (int)m.hp + "/" + (int)m.maxHp
+			n.Text = stranded ? tag + " STRANDED " + (int)m.hp + "/" + (int)m.EffMaxHp()
 							 : (isOut ? tag + " OUT (campfire)"
 									: (down ? tag + (m.stable ? " STABLE" : " DOWN")
-										  : tag + " " + (int)m.hp + "/" + (int)m.maxHp));
+										  : tag + " " + (int)m.hp + "/" + (int)m.EffMaxHp()));
 			f.Size = new Vector2(110.0f * frac, 7.0f);
 			f.Color = m.isLeader ? new Color(0.83f, 0.64f, 0.24f, 1.0f)
 								 : new Color(0.62f, 0.52f, 0.38f, 1.0f);
@@ -2636,11 +2661,11 @@ public partial class Game : Godot.Node2D
 			return;
 		}
 		_pickRank[option]++;
-		m.dmgMul *= OPT_DMG[option];
-		m.cdMul *= OPT_CD[option];
-		m.rangeMul *= OPT_RANGE[option];
+		m.stat[StatTags.ATTACK_DAMAGE] *= OPT_DMG[option];
+		m.stat[StatTags.ATTACK_SPEED] /= OPT_CD[option]; // cd x0.86 == speed /0.86; no-op when 1.0
+		m.stat[StatTags.AREA] *= OPT_RANGE[option];
 		m.pierce += OPT_PIERCE[option];
-		m.shots += OPT_SHOTS[option]; // multishot: one more bolt in the fan per rank
+		m.stat[StatTags.MULTISTRIKE] += OPT_SHOTS[option]; // multistrike: one more bolt / familiar per rank
 		{ m.guidingLight += 0.10 * OPT_VULN[option]; } // guiding light: marked bodies +10%/rank incoming
 		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
 						 OPT_LABEL[option] + " x" + _pickRank[option];
@@ -2688,7 +2713,7 @@ public partial class Game : Godot.Node2D
 			// hp too (the campReturned guard is gone). NO free upgrade rank anymore. The
 			// x1.20 horde-scaling price stays.
 			foreach (PartyMember m in _party)
-				m.hp = m.maxHp;
+				m.hp = (float)m.EffMaxHp();
 			_hordeScale *= 1.20;
 			GD.Print("[10thAge] LONG rest: whole squad revived to full hp, no free rank, horde "
 					 + "scaling x" + (float)((int)(_hordeScale * 100.0)) / 100.0);
@@ -2855,12 +2880,12 @@ public partial class Game : Godot.Node2D
 		m.joined = true;
 		// user rule (pass 11): the PC joins at the HP the player PRESERVED - escort
 		// contact ate into him on the beat - floored so no rescue ever lands a corpse
-		if (m.hp < m.maxHp * RECRUIT_JOIN_FLOOR)
-			m.hp = m.maxHp * RECRUIT_JOIN_FLOOR;
-		if (m.hp > m.maxHp)
-			m.hp = m.maxHp;
+		if (m.hp < m.EffMaxHp() * RECRUIT_JOIN_FLOOR)
+			m.hp = (float)(m.EffMaxHp() * RECRUIT_JOIN_FLOOR);
+		if (m.hp > m.EffMaxHp())
+			m.hp = (float)m.EffMaxHp();
 		GD.Print("[10thAge] join: " + m.displayName + " returns at " + (int)m.hp + "/" +
-				 (int)m.maxHp + "hp | rank 0 upgrades start at zero");
+				 (int)m.EffMaxHp() + "hp | rank 0 upgrades start at zero");
 		m.dsFails = 0;
 		m.dsSucceeds = 0;
 		m.dsDamageBuffer = 0.0f;
@@ -3017,7 +3042,7 @@ public partial class Game : Godot.Node2D
 			card["klass"] = m.class_ == "" ? m.weaponName : m.class_;
 			card["weapon"] = m.weaponName;
 			card["hp"] = (int)m.hp;
-			card["max_hp"] = (int)m.maxHp;
+			card["max_hp"] = (int)m.EffMaxHp();
 			card["state"] = m.eliminated ? "out" : (m.stable ? "stable" : (m.downed ? "down" : "up"));
 			card["leader"] = m.isLeader;
 			rows.Add(card);

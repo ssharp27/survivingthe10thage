@@ -92,6 +92,22 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 
 ## Landed this pass (uncommitted → committed this commit)
 
+- **Stat-tag registry + tag-backed stat store (user 2026-10-24 stat plan)**: `src/StatTags.cs`
+  (NEW, data-only) owns the **one canonical vocabulary**: 16 tags, indices 0..15 (the user plan plus
+  the accepted 16th, `vulnerability`), each with `BASE` seed, `CATEGORY` (offense x7 / defense x4 /
+  utility x4 / modifier x1) and `KIND` (0 = multiplier, 1 = points, 2 = count). `PartyMember.cs`
+  now keeps the **single store** `stat = new double[StatTags.N]` seeded via `SeedStatStore()`
+  before `hp = (float)EffMaxHp()`; the old per-stat fields `dmgMul/cdMul/rangeMul/speedMul` and
+  `int shots` are GONE - every reader goes through `EffDamage/EffCooldown/EffRange/EffMaxHp/EffMove/
+  Strikes()` and `RollDamage` (crit rolls on the run Rng: ALL party crits at 5% base for x1.5,
+  horde never does; lifesteal feeds the body back capped at `EffMaxHp()`; REGEN ticks in `_Process`
+  while standing and joined). `Game.TakeHit` grew the defence tags: EVASION full-dodge roll BEFORE
+  the armour flat-minus, never-below-1 floor (user 2026-10-24). OPT commits now write TAG SLOTS
+  (`ATTACK_DAMAGE` x, `ATTACK_SPEED` /cd - the cooldown lives INSIDE the speed tag, `AREA` x,
+  `MULTISTRIKE` +); magnet x `COLLECTION_RANGE`, gems x `XP_PCT`; `Game.Rng` went public so
+  `RollDamage` rolls on the run stream. HORDE side (Enemy/Boss) keeps its own numbers: tags are
+  party-side only, plus the body-side vulnerability pair (`Combatant.vulnMul`). Docs: `docs/stat-tags.md`;
+  the boot dump (16 `stat tag ...` rows after `Rng.SetSeed(9001)`) is the contract the trail greps.
 - **Alvora verb swap (user 2026-10-23)**: warding light (flat −1/−2/−3 incoming armour) is **gone**,
   replaced by **guiding light** — her ring pulse also MARKS every body it catches: +10%/rank damage
   taken **from every source** for a 4 s window. Mark lives on the shared `Combatant` surface
@@ -387,6 +403,12 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   VICTORY lv24 / xp 1243 + `smokeM2zw` (camp) VICTORY + `smokeM2zx` (join) VICTORY, all `.err` 0,
   **0 VERIFY lines in the shipped binary**, and the plain trail's lottery `Asper > Yu > Mosiah >
   Alvora` matches its four ally beats one-for-one.
+- **Gate for the stat-tag store build is green**: `smokeM2zy` (plain) VICTORY lv24 / xp 1272 +
+  `smokeM2zz` (camp) VICTORY lv16 / xp 593 + `smokeM2zy2` (join) VICTORY lv9 / xp 191, all `.err` 0
+  bytes, **16 `stat tag` rows each** (the new registry audit), 0 VERIFY. Shape note: every party hit
+  now consumes one `Rng` draw (5% base crit), so the horde stream shifted - all three trails show
+  post-wrap elimination lines (the horde cleans near-dead bodies after the win), win line itself
+  unchanged and present before the frame cap.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
@@ -433,3 +455,4 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   end-to-end: eliminated members keep `stable == false`, so testing "still rolling" before "eliminated"
   silently re-opened the classic TPK. Symptom to trust: everyone `OUT` in every march strip yet no terminal
   line until the frame cap.
+
