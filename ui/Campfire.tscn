@@ -89,7 +89,7 @@ color = Color(0.78, 0.66, 0.42, 0.7)
 
 [node name="PartyGrid" type="GridContainer" parent="Frame/Contents"]
 mouse_passable = false
-columns = 3
+columns = 1
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants = {"h_separation": 18, "v_separation": 14}

@@ -432,6 +432,20 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   because `_recruitPending` is always that strip's drawn member; dry-pool trailing slots stay
   invisible. Storage stays roster order (`memberIndex` = ring slot, picker cards unchanged) -
   display-only change, no RNG consumed, so beat trails keep the cards-build shape.
+- `smokeM2zx7` (camp skip), `smokeM2zx8` (join skip), `smokeM2zx9` (plain) — **camp-menu roster
+  build**: **VICTORY, VICTORY, VICTORY**, 0-byte `.err`, 16 `stat tag` rows each. Bug fix #2 (user
+  2026-10-24): the camp menu only showed the first 2 characters — `CampfireCards()` sent joined
+  members ONLY, so early camps painted leader + first recruit and the 3-col x 2-row mini-card grid
+  had nowhere for the rest. The camp now lists the WHOLE roster top-to-bottom in join order on the
+  same `_hpOrder` map the HUD strips use: an unrecruited PC reads "not recruited yet" (dimmed, grey
+  accent), and every row carries its upgrade picks (`pickHistory`, same source the run summary
+  reports) plus the current weapon — the user's ask. `ui/Campfire.tscn` `PartyGrid` went 3 cols ->
+  1 col; `ui/Campfire.gd` mini-cards (284x100 VBox stack) became 880x32 single-row strips
+  (Accent/Name/LeaderTag/BarWrap/HPText/State/Weapon/Picks) so 5 rows x 32 px + 4 x 14 sep = 216 px
+  keeps the old vertical budget inside the 592 px inner frame (rest row + commit button keep
+  clickable rects — human-test rounds 1-2 rule). Data side gained a `CampCard()` helper ("away"
+  state + "picks" key); `SummaryCards()` keeps its joined-only filter ON PURPOSE (run report = who
+  fought, camp = whole roster). No RNG consumed — display-only, trails unchanged.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 

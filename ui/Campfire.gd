@@ -84,7 +84,7 @@ func _build() -> void:
 	for c in _cards:
 		c.queue_free()
 	_cards.clear()
-	var slots: int = 6
+	var slots: int = 5 # 2026-10-24: the camp lists the full 5-PC roster
 	for i in range(slots):
 		var card: Panel = _make_card()
 		grid.add_child(card)
@@ -96,72 +96,37 @@ func _build() -> void:
 func _make_card() -> Panel:
 	var card: Panel = Panel.new()
 	card.name = "MemberCard"
-# 138 (was 168): the full stack (header + roster + grid + rest row +
-	# confirm bar) must fit the 592 px inner frame or lower controls spill
-	# past the 720 px screen and become unclickable (human-test rounds 1-2).
-	# WIDTH matters too (human bug 2026-10-20): GridContainer columns size to
-	# the CHILD MIN width - a 0 min width collapsed every card to a sliver at
-	# top-left and all its text painted over itself. 3 cols x 284 + 2x18 sep
-	# fits the 912 px inner width; 3 cols ALSO drop the grid to 2 rows, which
-	# is what makes the whole stack fit the 592 px inner height (pass-20).
-	card.custom_minimum_size = Vector2(284.0, 100.0)
+	# 2026-10-24: one strip per PC now - 5 rows x 32 px + 4 x 14 sep = 216 px, so the whole
+	# roster still fits the 592 px inner frame (the old grid was 3 cols x 2 rows x 100 px).
+	# 880 px fills the 912 px inner width; a real min WIDTH is still mandatory or the
+	# 2026-10-20 human bug bites: a 0 min width collapsed the GridContainer columns to a
+	# sliver and every label painted over the next card. ONE HBox row, BarWrap stays fixed.
+	card.custom_minimum_size = Vector2(880.0, 32.0)
 	card.add_theme_stylebox_override("panel", _stylebox_card())
-	var vbox: VBoxContainer = VBoxContainer.new()
-	vbox.name = "VBox"
-	vbox.anchor_left = 0.0
-	vbox.anchor_top = 0.0
-	vbox.anchor_right = 1.0
-	vbox.anchor_bottom = 1.0
-	vbox.size_flags_horizontal = 3
-	vbox.add_theme_constant_override("separation", 6)
-	card.add_child(vbox)
-	# name row
-	var name_row: HBoxContainer = HBoxContainer.new()
-	name_row.name = "NameRow"
-	name_row.anchor_left = 0.0
-	name_row.anchor_top = 0.0
-	name_row.anchor_right = 1.0
-	name_row.size_flags_horizontal = 3
-	name_row.add_theme_constant_override("separation", 10)
+	var row: HBoxContainer = HBoxContainer.new()
+	row.name = "Row"
+	row.anchor_left = 0.0
+	row.anchor_top = 0.0
+	row.anchor_right = 1.0
+	row.anchor_bottom = 1.0
+	row.size_flags_horizontal = 3
+	row.add_theme_constant_override("separation", 10)
+	card.add_child(row)
+	var accent: ColorRect = ColorRect.new()
+	accent.name = "Accent"
+	accent.custom_minimum_size = Vector2(4.0, 22.0)
+	accent.size_flags_vertical = 3
 	var name_l: Label = Label.new()
 	name_l.name = "Name"
 	name_l.add_theme_color_override("font_color", INK)
-	# human bug 2026-10-20: expand flag made the NAME take the whole 270 px
-	# row, pushing LeaderTag past the card edge (it painted over the next card)
-	#name_l.size_flags_horizontal = 3
 	var leader_l: Label = Label.new()
 	leader_l.name = "LeaderTag"
 	leader_l.text = "LEADER"
 	leader_l.add_theme_color_override("font_color", GOLD)
 	leader_l.scale = Vector2(0.75, 0.75)
 	leader_l.visible = false
-	name_row.add_child(name_l)
-	name_row.add_child(leader_l)
-	vbox.add_child(name_row)
-	var weapon_l: Label = Label.new()
-	weapon_l.name = "Weapon"
-	weapon_l.add_theme_color_override("font_color", MUTED)
-	weapon_l.scale = Vector2(0.85, 0.85)
-	weapon_l.size_flags_horizontal = 3
-	vbox.add_child(weapon_l)
-	# hp row
-	var hp_row: HBoxContainer = HBoxContainer.new()
-	hp_row.name = "HPRow"
-	hp_row.anchor_left = 0.0
-	hp_row.anchor_top = 0.0
-	hp_row.anchor_right = 1.0
-	hp_row.size_flags_horizontal = 3
-	hp_row.add_theme_constant_override("separation", 10)
 	var bar_wrap: Control = Control.new()
 	bar_wrap.name = "BarWrap"
-	bar_wrap.anchor_left = 0.0
-	bar_wrap.anchor_top = 0.0
-	bar_wrap.anchor_right = 1.0
-	bar_wrap.anchor_bottom = 1.0
-	# human bug 2026-10-20: expand flag let BarWrap eat the whole HPRow,
-	# pushing the "xx/yy hp" label out of the card and over the neighbour.
-	# Fixed 150 px bar; the hp text label keeps the rest of the row.
-	#bar_wrap.size_flags_horizontal = 3
 	bar_wrap.custom_minimum_size = Vector2(150.0, 16.0)
 	var bar_bg: ColorRect = ColorRect.new()
 	bar_bg.name = "BarBg"
@@ -181,32 +146,27 @@ func _make_card() -> Panel:
 	fill.color = GOLD
 	bar_bg.add_child(fill)
 	bar_wrap.add_child(bar_bg)
-	hp_row.add_child(bar_wrap)
 	var hp_l: Label = Label.new()
 	hp_l.name = "HPText"
-	hp_l.add_theme_color_override("font_color", MUTED)
-	hp_l.scale = Vector2(0.9, 0.9)
-	hp_row.add_child(hp_l)
-	vbox.add_child(hp_row)
-	# state row
-	var state_row: HBoxContainer = HBoxContainer.new()
-	state_row.name = "StateRow"
-	state_row.anchor_left = 0.0
-	state_row.anchor_top = 0.0
-	state_row.anchor_right = 1.0
-	state_row.size_flags_horizontal = 3
-	state_row.add_theme_constant_override("separation", 10)
-	var accent: ColorRect = ColorRect.new()
-	accent.name = "Accent"
-	accent.custom_minimum_size = Vector2(4.0, 26.0)
-	accent.size_flags_vertical = 3
+	hp_l.add_theme_color_override("font_color", INK)
 	var state_l: Label = Label.new()
 	state_l.name = "State"
-	state_l.add_theme_color_override("font_color", INK)
-	state_l.scale = Vector2(0.9, 0.9)
-	state_row.add_child(accent)
-	state_row.add_child(state_l)
-	vbox.add_child(state_row)
+	state_l.add_theme_color_override("font_color", BLOOD)
+	var weapon_l: Label = Label.new()
+	weapon_l.name = "Weapon"
+	weapon_l.add_theme_color_override("font_color", INK)
+	var picks_l: Label = Label.new()
+	picks_l.name = "Picks"
+	picks_l.add_theme_color_override("font_color", MUTED)
+	picks_l.scale = Vector2(0.8, 0.8)
+	row.add_child(accent)
+	row.add_child(name_l)
+	row.add_child(leader_l)
+	row.add_child(bar_wrap)
+	row.add_child(hp_l)
+	row.add_child(state_l)
+	row.add_child(weapon_l)
+	row.add_child(picks_l)
 	return card
 func _stylebox_card() -> StyleBoxFlat:
 	var sb: StyleBoxFlat = StyleBoxFlat.new()
@@ -252,18 +212,17 @@ func _stylebox_modal() -> StyleBoxFlat:
 	sb.shadow_color = Color(0, 0, 0, 0.35)
 	return sb
 func _populate_card(card: Panel, data: Dictionary) -> void:
-	var vbox: VBoxContainer = card.get_node("VBox") as VBoxContainer
-	var name_l: Label = vbox.get_node("NameRow/Name") as Label
-	var leader_l: Label = vbox.get_node("NameRow/LeaderTag") as Label
-	var weapon_l: Label = vbox.get_node("Weapon") as Label
-	var hp_row: HBoxContainer = vbox.get_node("HPRow") as HBoxContainer
-	var bar_wrap: Control = hp_row.get_node("BarWrap") as Control
+	var row: HBoxContainer = card.get_node("Row") as HBoxContainer
+	var name_l: Label = row.get_node("Name") as Label
+	var leader_l: Label = row.get_node("LeaderTag") as Label
+	var bar_wrap: Control = row.get_node("BarWrap") as Control
 	var bar_bg: ColorRect = bar_wrap.get_node("BarBg") as ColorRect
 	var fill: ColorRect = bar_bg.get_node("Fill") as ColorRect
-	var hp_l: Label = hp_row.get_node("HPText") as Label
-	var state_row: HBoxContainer = vbox.get_node("StateRow") as HBoxContainer
-	var accent: ColorRect = state_row.get_node("Accent") as ColorRect
-	var state_l: Label = state_row.get_node("State") as Label
+	var hp_l: Label = row.get_node("HPText") as Label
+	var state_l: Label = row.get_node("State") as Label
+	var weapon_l: Label = row.get_node("Weapon") as Label
+	var picks_l: Label = row.get_node("Picks") as Label
+	var accent: ColorRect = row.get_node("Accent") as ColorRect
 	var hp: float = float(data.get("hp", 0))
 	var max_hp: float = float(data.get("max_hp", 0))
 	var pct: float = 0.0
@@ -288,6 +247,7 @@ func _populate_card(card: Panel, data: Dictionary) -> void:
 	name_l.text = str(data.get("name", "Member"))
 	leader_l.visible = bool(data.get("leader", false))
 	weapon_l.text = "%s - %s" % [str(data.get("klass", "")), str(data.get("weapon", ""))]
+	picks_l.text = str(data.get("picks", "no picks yet"))
 	match state:
 		"up":
 			state_l.text = "READY"
@@ -301,17 +261,24 @@ func _populate_card(card: Panel, data: Dictionary) -> void:
 		"out":
 			state_l.text = "OUT - back at campfire"
 			accent.color = GREY
+		"away":
+			state_l.text = "not recruited yet"
+			accent.color = GREY
 		_:
 			state_l.text = "-"
 			accent.color = GREY
-	card.modulate = Color(1, 1, 1, 0.55) if state == "out" else Color(1, 1, 1, 1)
+	# 2026-10-24: away (never recruited) reads dimmer than an out-at-camp body
+	card.modulate = Color(1, 1, 1, 0.55) if state == "out" else (Color(1, 1, 1, 0.45) if state == "away" else Color(1, 1, 1, 1))
 func _populate_empty(card: Panel) -> void:
-	var vbox: VBoxContainer = card.get_node("VBox") as VBoxContainer
-	(vbox.get_node("NameRow/Name") as Label).text = "-"
-	(vbox.get_node("Weapon") as Label).text = "empty slot"
-	(vbox.get_node("HPRow/HPText") as Label).text = "- / - hp"
-	(vbox.get_node("StateRow/State") as Label).text = "-"
-	(vbox.get_node("StateRow/Accent") as ColorRect).color = GREY
+	var row: HBoxContainer = card.get_node("Row") as HBoxContainer
+	(row.get_node("Name") as Label).text = "-"
+	(row.get_node("HPText") as Label).text = "- / - hp"
+	(row.get_node("State") as Label).text = "-"
+	(row.get_node("Weapon") as Label).text = "empty slot"
+	(row.get_node("Picks") as Label).text = ""
+	(row.get_node("Accent") as ColorRect).color = GREY
+	(row.get_node("BarWrap/BarBg/Fill") as ColorRect).size = Vector2(0.0, 12.0)
+	(row.get_node("LeaderTag") as Label).visible = false
 	card.modulate = Color(1, 1, 1, 0.45)
 func _select(idx: int) -> void:
 	_selection = idx

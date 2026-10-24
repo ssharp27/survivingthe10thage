@@ -3062,25 +3062,55 @@ public partial class Game : Godot.Node2D
 		GD.Print("[10thAge] summary dismissed - the run stays over (press R to retry the stage)");
 	}
 
+	// user bug 2026-10-24: joined-only rows showed just the leader + first recruit, so the camp
+	// listed 2 of 5 PCs. The camp menu now lists the WHOLE roster, top-to-bottom in HUD join
+	// order (_hpOrder); an unrecruited PC reads "away", and "picks" is the upgrade line.
+	// _hpOrder (leader first, then join order) is the same map the HUD strips use.
 	private Godot.Collections.Array CampfireCards()
 	{
 		Godot.Collections.Array rows = new();
+		if (_hpOrder.Count > 0)
+		{
+			// dry-pool safety: a roster entry the join lottery never placed is tail-appended.
+			for (int i = 0; i < _hpOrder.Count; i++)
+			{
+				PartyMember m = GetMemberByIndex(_hpOrder[i]);
+				if (m != null)
+					rows.Add(CampCard(m));
+			}
+			foreach (PartyMember m in _party)
+			{
+				bool shown = false;
+				for (int i = 0; i < _hpOrder.Count; i++)
+				{
+					if (_hpOrder[i] == m.memberIndex)
+						shown = true;
+				}
+				if (!shown)
+					rows.Add(CampCard(m));
+			}
+			return rows;
+		}
+		// boot fallback: _hpOrder stays empty until BuildJoinLottery runs.
 		foreach (PartyMember m in _party)
 		{
-			if (!m.joined)
-				continue; // the campfire only ever shows the squad; recruits appear once
-						  // their field beat clears them in
-			Godot.Collections.Dictionary card = new();
-			card["name"] = m.displayName;
-			card["klass"] = m.class_ == "" ? m.weaponName : m.class_;
-			card["weapon"] = m.weaponName;
-			card["hp"] = (int)m.hp;
-			card["max_hp"] = (int)m.EffMaxHp();
-			card["state"] = m.eliminated ? "out" : (m.stable ? "stable" : (m.downed ? "down" : "up"));
-			card["leader"] = m.isLeader;
-			rows.Add(card);
+			rows.Add(CampCard(m));
 		}
 		return rows;
+	}
+
+	private Godot.Collections.Dictionary CampCard(PartyMember m)
+	{
+		Godot.Collections.Dictionary card = new();
+		card["name"] = m.displayName;
+		card["klass"] = m.class_ == "" ? m.weaponName : m.class_;
+		card["weapon"] = m.weaponName;
+		card["hp"] = (int)m.hp;
+		card["max_hp"] = (int)m.EffMaxHp();
+		card["state"] = !m.joined ? "away" : (m.eliminated ? "out" : (m.stable ? "stable" : (m.downed ? "down" : "up")));
+		card["leader"] = m.isLeader;
+		card["picks"] = m.pickHistory == "" ? "no picks yet" : m.pickHistory;
+		return card;
 	}
 
 	private Godot.Collections.Array SummaryCards()
