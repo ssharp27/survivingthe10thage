@@ -50,6 +50,11 @@ public partial class Game : Godot.Node2D
 	readonly int DS_FAIL_LIMIT = 3;
 	readonly int DS_STABLE_NEED = 3; // successes before the rolls stop
 	readonly double DS_DAMAGE_FAIL_BUFFER = 2.0;
+	// down grace (user 2026-10-24): the 4 s right after a body falls, enemy hits can
+	// never consume a death-save fail - a PC downed inside a swarm gets breathing
+	// room. Rides the dsDamageBuffer lane (set to THIS at the down sites), fully
+	// silent: no chip text, no flash, no HUD (user asked for no display at all)
+	readonly double DS_DOWN_GRACE = 4.0;
 	// grimoire chip palette for the ON-BODY death-save readout (the die lives on the
 	// body, not in the log): failed saves run blood, successes/stable run amber,
 	// every revive/at-camp beat runs sage, eliminated bodies run grey.
@@ -478,7 +483,10 @@ public partial class Game : Godot.Node2D
 			m.downed = true;
 			m.dsTimer = 0.0f;
 			m.dsFails = 0;
-			m.dsDamageBuffer = 0.0f;
+			// down grace (user 2026-10-24): the fall ARMS the 4 s window on the same
+			// lane the fail-buffer uses, so every enemy hit inside it just returns -
+			// no fail, no chip text, no extra flash (silent, as the user asked)
+			m.dsDamageBuffer = (float)DS_DOWN_GRACE;
 			m.SetDsText("DOWN");
 			m.dsColor = CHIP_BLOOD;
 			GD.Print("[10thAge] " + m.displayName + " DOWN at 0hp - d20 death saves start");
@@ -501,7 +509,8 @@ public partial class Game : Godot.Node2D
 		m.dsTimer = 0.0f; // the first d20 rolls right away
 		m.dsFails = 0;
 		m.dsSucceeds = 0;
-		m.dsDamageBuffer = 0.0f;
+		// the TEST reaper gets the same 4 s grace, so the revival bench behaves live
+		m.dsDamageBuffer = (float)DS_DOWN_GRACE;
 		m.SetDsText("DOWN");
 		m.dsColor = CHIP_BLOOD;
 		GD.Print("[10thAge] TEST reaper downed " + m.displayName + " - death saves start");

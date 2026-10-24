@@ -446,6 +446,19 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   clickable rects — human-test rounds 1-2 rule). Data side gained a `CampCard()` helper ("away"
   state + "picks" key); `SummaryCards()` keeps its joined-only filter ON PURPOSE (run report = who
   fought, camp = whole roster). No RNG consumed — display-only, trails unchanged.
+- `smokeM2zx10` (camp skip), `smokeM2zx11` (join skip), `smokeM2zx12` (plain) — **down-grace build**:
+  **VICTORY lv15/xp536, VICTORY lv8/xp149, VICTORY lv24/xp1233**, 0-byte `.err`, 16 `stat tag` rows
+  each. QOL add (user 2026-10-24): a fresh DOWN now opens a 4 s window where enemy hits can never
+  consume a death-save fail - swarm mercy for a body downed mid-rush. Rides the EXISTING silent lane:
+  both down sites (TakeHit hp<=0, OnReaperDown) arm `dsDamageBuffer` to the new `DS_DOWN_GRACE` = 4.0
+  instead of zeroing it, so hits inside the window just return - no fail, no chip text, no extra flash,
+  no HUD (user asked for no display at all; downed bodies never lose HP, so window hits are inert).
+  Grace == `DS_INTERVAL` so the window covers exactly down -> first d20 roll; time-based saves roll as
+  normal, only damage-caused fails are shielded, and the 2 s between-fail buffer (`DS_DAMAGE_FAIL_BUFFER`)
+  keeps re-arming each post-window fail; join/campfire/revive sites stay zeroed (grace belongs to the
+  fall, not the rise). Evidence: `smokeM2zxv` ran once with a TEMP buffer print showing countdowns up
+  to "4s left" (the fail-buffer alone caps at 2.0), then reverted before the trio. No RNG consumed by
+  the lane itself.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
