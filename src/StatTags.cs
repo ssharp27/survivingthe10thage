@@ -35,9 +35,9 @@ public class StatTags
 	public static readonly int N = 16;
 
 	// seed table: multipliers at 1.0, counts at 1 strike, dormant stats at zero;
-	// everyone crits at 5% for x1.5 (user 2026-10-24)
+	// everyone crits at 5% for x1.5 and dodges at 5% (user 2026-10-24)
 	public static readonly double[] BASE = new double[] { 1, 1, 1, 0.05, 1.5, 1, 0, 0,
-														  0, 0, 0, 0, 0, 1, 1, 0 };
+														  0, 0.05, 0, 0, 0, 1, 1, 0 };
 
 	// CATEGORY for meta screens: offense x7, defense x4, utility x4, modifier x1
 	// (vulnerability is the body-side debuff Combatant already carries)

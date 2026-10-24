@@ -30,7 +30,7 @@ gets to invent another name for armour again.
 6  lifesteal          offense  points      0
 7  health             defense  points      0       (additive on the authored maxHp)
 8  armour             defense  points      0       (flat minus, never below 1)
-9  evasion            defense  points      0       (full dodge roll, before armour)
+9  evasion            defense  points      0.05    (full dodge roll, before armour)
 10 hp regen           defense  points      0       (pts/sec, while standing and joined)
 11 xp %               utility  points      0       (gem pickup: xp * (1 + stat))
 12 gold %             utility  points      0       (DORMANT: no gold economy yet)

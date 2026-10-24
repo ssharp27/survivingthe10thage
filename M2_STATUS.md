@@ -92,6 +92,10 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 
 ## Landed this pass (uncommitted → committed this commit)
 
+- **Baseline 5% evasion for every PC (user follow-up 2026-10-24)**: one seed-table move in `StatTags.cs`,
+  `BASE[EVASION]` 0 -> 0.05; the TakeHit dodge roll was already gated on `stat > 0`, so all five roster
+  members dodge from run start with no other code touched. Docs registry table re-aligned; per-PC evasion
+  grants would write the SAME tag slot later.
 - **Stat-tag registry + tag-backed stat store (user 2026-10-24 stat plan)**: `src/StatTags.cs`
   (NEW, data-only) owns the **one canonical vocabulary**: 16 tags, indices 0..15 (the user plan plus
   the accepted 16th, `vulnerability`), each with `BASE` seed, `CATEGORY` (offense x7 / defense x4 /
@@ -409,6 +413,11 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   now consumes one `Rng` draw (5% base crit), so the horde stream shifted - all three trails show
   post-wrap elimination lines (the horde cleans near-dead bodies after the win), win line itself
   unchanged and present before the frame cap.
+- `smokeM2zw1` (plain), `smokeM2zw2` (camp skip), `smokeM2zw3` (join skip) - **baseline-evasion build**:
+  all 16 `stat tag` rows print with `evasion [defense kind 1 base 0.05]`; plain VICTORY lv24 / xp 1245 (50
+  dodge lines) + camp VICTORY lv16 / xp 576 (45 dodges) + join-skip VICTORY lv9 / xp 190 (37 dodges),
+  all `.err` 0 bytes, 0 VERIFY. The dodge rolls now consume the run Rng too, so the horde stream shifted
+  again - wins unchanged, levels drift by one as expected.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
