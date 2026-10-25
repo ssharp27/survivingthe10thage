@@ -1,8 +1,37 @@
-# RESUME NOTES — Surviving the 10th Age — end of 2026-10-21 session (CURRENT)
+# RESUME NOTES — Surviving the 10th Age — end of 2026-10-25 session (CURRENT)
 
-Session stopped on request, **M1 declared SUCCESS by the user (2026-10-21)**. Start with M1_STATUS.md (authoritative, passes 1–20) and this block. Everything below the 2026-10-21 block is older history (archive only).
+Session stopped on request (user 2026-10-25). Start with **M2_STATUS.md** (the authoritative M2 trail + pitfalls) and this block. The 2026-10-21 block and everything below is archive history.
 
-## Where we are (2026-10-21 shutdown — CURRENT)
+## Where we are (2026-10-25 shutdown — CURRENT)
+- HEAD = **ultimate button `33c1283`** on `main`, **pushed to origin** (github.com/ssharp27/survivingthe10thage), tree clean.
+- M2 feature trail (all committed+pushed, one user-driven feature at a time, smoke-gated): stat-tag registry `bd4367a` > evasion `8aea93b` > cards `509d48b` > HUD-order `96f44af` > camp-roster `cc7d31e` > down-grace `09de67b` > XP-suction `754bfc8` > leader bonuses `45387d2` > **ultimates `33c1283`** (R key, 120 s tag-gated cooldown; Baldrun "Giant's Might" the only lane so far; 10 s duration is the assistant pick, documented on the trail; other four PCs' ults deferred).
+- Beat loop lock (user 2026-10-23, do not re-litigate): 30 ally I | 60 tier-2 gate | 120 mini-boss I | 150 ally II | 180 boss I | 210 ally III | 240 mini-boss II | 270 ally IV | 360 final boss | 420 VICTORY; roster 5/5 one-PC-at-a-time; picker = one track/member + 1 wild `pick_1..pick_6`.
+- Gate contract NOW: VICTORY + **17** `stat tag` audit rows (registry grew 16→17 with tag 16 `ultimate cooldown`, utility multiplier — gate = `ULT_CD_BASE 120 s / stat` inside PartyMember, reserved for future meta progression) + 0-byte `.err` (measure via `.Length`). Smokes strictly SEQUENTIAL, background; never two Godot processes on the project dir.
+- Latest gates (smokeM4 trio): zx19 (Baldrun leads) VICTORY lv15/xp527, 2 `(ult) Giant's Might` fires ~t=120/~t=300, readout `ult 1/2`, cd `120→15` ticking to tail; zx20 (`M1_LEADER=Asper`) VICTORY lv15/xp533 (`ult 0 cd 0` inert, insect lane intact); zx21 (`M1_LEADER=Yu`) VICTORY lv15/xp548 (spirit lane intact). All camp-skip, 17 rows, err 0.
+- Human-only paths still owed (pilot cannot reach): pressing R / dash / picker keys in a real run, campfire UI interaction, and the Giant's Might ×2 visual actually looking right.
+- Parked/unanswered: assistant proposed evidence runs for the **Mosiah pierce + Alvora regen** leader lanes (`M1_LEADER=Mosiah`/`Alvora`) — the leader-bonus trio covered chain/insects/spirits only; user never answered, so it stays parked.
+- Helper scripts live in `C:\Users\Steve\AppData\Local\Temp\opencode` (untracked): `smokeM4.ps1` = latest trio + evidence grep, `verify10.py` = latest BOM-aware verifier (17-row filter `(ult)`/`lb chain`/`leader seat`), `commitmsg2.txt` = last commit-message style ref, `spliceD.py`/`splicePM2.py` = applied ult splices (pattern reuse).
+
+## Next steps (2026-10-25 shutdown, in order)
+1. Await the user's next feature / bug-fix request — features are user-driven, ONE at a time, with the established smoke gate.
+2. Only if the user re-approves: pierce/regen leader-lane evidence runs (clone `smokeM4.ps1` with `M1_LEADER=Mosiah`/`Alvora`, verify `(ult)`-style counters + 17 rows).
+3. Natural follow-ons (user gates, do not start unasked): other four PCs' ultimates, meta progression spending tag 16, drawn lightning VFX, insect/sprite art.
+
+## Splice + tooling discipline (proven, unchanged — details in M2_STATUS.md)
+- **PartyMember.cs raw writes corrupt** (re-serialize ~12 interleaved copies): ONLY the git-splice route — python builds the full new content in a TEMP file → `git hash-object -w <tmp>` → `git update-index --cacheinfo "100644,<hash>,src/PartyMember.cs"` (no bare `--force`, ambiguous on this git) → `git checkout-index -f -- src/PartyMember.cs`. Game.cs python splices (`sub()` asserting `count == 1`) are safe direct writes.
+- Build: `cmd /c 'set PATH=C:\Users\Steve\dev-tools\dotnet;%PATH%&& dotnet build survivingthe10thage.csproj --no-incremental -nologo'` — expect ONLY 3 pre-existing GodotMcpPlugin CS0618 warnings.
+- Smoke exe: `"C:\AI Coding\Godot_v4.7.2-stable_mono_win64\Godot_v4.7.2-stable_mono_win64_console.exe" --path C:\GitHub\survivingthe10thage --headless --quit-after 120000`; env `M1_PILOT=1`, `M1_DEV_SKIP=camp|join`, bench valve `M1_LEADER=<name>` (flips the seat BEFORE `BuildJoinLottery()`); run a ps1 via `powershell -NoProfile -Command "Get-Content '<ps1>' -Raw | Invoke-Expression"`, background. PS `>` redirect is UTF-16 — verifiers must BOM-detect (utf-16-le else utf-8).
+- PS 5.1: no `&&` (use `;`), `$` eaten at write positions (patch via python `chr(36)`), `git commit -m` breaks on quotes → `-F` file.
+- Godot C# bindings are PascalCase (`Vector2.Normalized()`, `Scale`); `GetInstanceId()` returns **ulong** — `(long)` casts on both sides vs `Array<long>`.
+- RNG discipline: seeded `Rng` (9001) drives combat rolls — ult/leader features shift downstream streams WITHOUT the feature consuming a roll (magnitudes change kill timing); `_joinRng` and death saves are unseeded (`GD.Randi()`) so run-to-run lv/xp drift is legitimate; join-order drift explains cross-trail lv/xp differences (zx21 15/548 vs its zx18 twin 16/552 is that variance, not a bug).
+
+---
+
+# Older history below — end of 2026-10-21 session (archive)
+
+Session stopped on request, **M1 declared SUCCESS by the user (2026-10-21)**. Start with M1_STATUS.md (authoritative, passes 1–20) and that block. Everything below the 2026-10-21 block is older history (archive only).
+
+## Where we are (2026-10-21 shutdown — archive)
 - HEAD = **pass-20 `ea1f10c`** on `main`, **pushed to origin** — all 68 commits now live at `https://github.com/ssharp27/survivingthe10thage`.
 - **M1 = SUCCESS**: full stage loop verified through VICTORY/TPK gates, squad model + death saves + campfire + join beat all shipped, and the art pass landed for BOTH party PCs (ahead of schedule — the art gate the old doc called for is done).
 - 2026-10-21 chain (old→new): pass-14/15 motion language (party table-slide + topple, push-gated shuffle; enemies walk-bob) > pass-16 art audit + Baldrun wiring `d8e348f` > pass-17 dash-plate drop (`y+12`) + party Y-sort (band `4+rank`) `1648490` > pass-18 flash-lane split `0bfc042` > pass-19 Mosiah wiring `14d14fa` > pass-20 camp alignment `ea1f10c`.
