@@ -31,25 +31,31 @@ public class StatTags
 	public static readonly int GOLD_PCT = 12;
 	public static readonly int COLLECTION_RANGE = 13;
 	public static readonly int MOVEMENT_SPEED = 14;
+	// ultimate tag grew the registry 16 -> 17 (user 2026-10-25 ult button): the gate
+	// is 120 s / stat so meta progression can shorten it (same cd-inside convention
+	// as ATTACK_SPEED)
+	// Baldrun's Giant's Might gate: cd = ULT_CD_BASE (120 s, PartyMember) / stat
 	public static readonly int VULNERABILITY = 15;
-	public static readonly int N = 16;
+	public static readonly int ULT = 16;
+	public static readonly int N = 17;
 
 	// seed table: multipliers at 1.0, counts at 1 strike, dormant stats at zero;
 	// everyone crits at 5% for x1.5 and dodges at 5% (user 2026-10-24)
 	public static readonly double[] BASE = new double[] { 1, 1, 1, 0.05, 1.5, 1, 0, 0,
-														  0, 0.05, 0, 0, 0, 1, 1, 0 };
+														  0, 0.05, 0, 0, 0, 1, 1, 0, 1 };
 
-	// CATEGORY for meta screens: offense x7, defense x4, utility x4, modifier x1
+	// CATEGORY for meta screens: offense x7, defense x4, utility x5, modifier x1
 	// (vulnerability is the body-side debuff Combatant already carries)
 	public static readonly string[] CATEGORY = new string[] { "offense", "offense", "offense",
 															  "offense", "offense", "offense", "offense",
 															  "defense", "defense", "defense", "defense",
 															  "utility", "utility", "utility", "utility",
-															  "modifier" };
+															  "modifier",
+															  "utility" };
 
 	// KIND: 0 = multiplier, 1 = points, 2 = count (how grants combine on the seed)
 	public static readonly int[] KIND = new int[] { 0, 0, 0, 1, 0, 2, 1, 1, 1, 1,
-													1, 1, 1, 0, 0, 1 };
+													1, 1, 1, 0, 0, 1, 0 };
 
 	// NAMES are display strings for meta screens / future card tables
 	// (the registry owns the wording, not any card array)
@@ -58,7 +64,8 @@ public class StatTags
 														  "multistrike", "lifesteal", "health",
 														  "armour", "evasion", "hp regen",
 														  "xp %", "gold %", "collection range",
-														  "movement speed", "vulnerability" };
+														  "movement speed", "vulnerability",
+															"ultimate cooldown" };
 		// xp % and gold % rows print even while dormant so future meta work can find them
 		// dormant rows print too: meta progression must see the whole board, not
 		// only the stats that currently have values

@@ -60,6 +60,19 @@ public partial class PartyMember : Godot.Node2D
 	public bool downed = false;
 	public bool eliminated = false;
 	float cdTimer = 0.0f;
+	// ultimate (R, user 2026-10-25): ultT = seconds of Giant's Might left; ultCdT
+	// = seconds until the ult is ready again (gate = ULT_CD_BASE / StatTags.ULT so
+	// meta progression can shorten it). _grown guards the root scale restore so
+	// expiry shrinks exactly once. The 10 s duration is the assistant pick (user
+	// named no window) - documented on the trail.
+	public double ultT = 0.0;
+	public double ultCdT = 0.0;
+	bool _grown = false;
+	readonly double ULT_CD_BASE = 120.0; // user: 120 s gate, tag-driven
+	readonly double ULT_LASTS = 10.0; // pick, documented on the trail
+	readonly double ULT_DMG = 1.5; // +50% damage while grown (RollDamage choke)
+	readonly double ULT_SIZE = 2.0; // root scale x2: art and tele/aura pivots inherit
+	readonly double ULT_RANGE = 2.0; // reach / hit radius x2 (EffRange)
 	Godot.Node2D _telePivot; // telegraph armature (pure nodes: C# _draw is dead in 4.7)
 	Godot.ColorRect[] _teleParts;
 	float _teleHold = 0.0f; // telegraph visibility timer, set on each swing
@@ -300,6 +313,36 @@ public partial class PartyMember : Godot.Node2D
 	}
 
 	// ---------- canonical stat accessors (StatTags registry) ----------
+	// ---------- ultimate button (R, user 2026-10-25) ----------
+	public int ultKey()
+	{
+		if (displayName == "Baldrun")
+			return 1; // Giant's Might
+		return 0; // other PCs: no ultimate authored yet (future lanes land here)
+	}
+	public bool TryUltimate()
+	{
+		if (ultCdT > 0.0)
+		{
+			GD.Print("[10thAge] (ult) " + displayName + " still cooling: " +
+				(int)System.Math.Ceiling(ultCdT) + " s");
+			return false; // press on cooldown is a no-op, gate not wasted
+		}
+		if (ultKey() == 1)
+		{
+			ultCdT = ULT_CD_BASE / stat[StatTags.ULT];
+			ultT = ULT_LASTS;
+			_grown = true;
+			Scale = new Vector2((float)ULT_SIZE, (float)ULT_SIZE);
+			GD.Print("[10thAge] (ult) Giant's Might: " + displayName +
+				" doubles size and reach (damage x1.5) for " + (int)ULT_LASTS +
+				" s, gate " + (int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
+			return true;
+		}
+		GD.Print("[10thAge] (ult) " + displayName + " has no ultimate yet");
+		return false;
+	}
+
 	/** Seed the stat store from the registry BASE (once, in _EnterTree). */
 	public void SeedStatStore()
 	{
@@ -317,7 +360,7 @@ public partial class PartyMember : Godot.Node2D
 		return cooldown / spd;
 	}
 	/** Authored reach scaled by the AREA tag. */
-	public double EffRange() { return range * stat[StatTags.AREA]; }
+	public double EffRange() { return range * stat[StatTags.AREA] * (ultT > 0.0 ? ULT_RANGE : 1.0); }
 	/** Authored maxHp plus the additive HEALTH tag (points). */
 	public double EffMaxHp() { return maxHp + stat[StatTags.HEALTH]; }
 	/** Authored baseSpeed scaled by the MOVEMENT_SPEED tag. */
@@ -340,6 +383,10 @@ public partial class PartyMember : Godot.Node2D
 	 */
 	public double RollDamage(Godot.Node2D host, double amount)
 	{
+		// Giant's Might: +50% on every party hit while the buff is up (single choke
+		// point: all kits, the shot pool and insect seats route through here)
+		if (ultT > 0.0)
+			amount *= ULT_DMG;
 		if (host is Game g && g.Rng != null && g.Rng.Randf() < stat[StatTags.CRIT_CHANCE])
 			amount *= stat[StatTags.CRIT_DAMAGE];
 		double steal = amount * stat[StatTags.LIFESTEAL];
@@ -544,6 +591,16 @@ public partial class PartyMember : Godot.Node2D
 				_mini.Modulate = new Color(1.0f, 1.0f, 1.0f);
 		}
 		cdTimer -= delta;
+		ultCdT -= delta; // recharges on its own clock: bench ults stay ready when the seat flips
+		if (ultCdT < 0.0)
+			ultCdT = 0.0;
+		ultT -= delta;
+		if (_grown && ultT <= 0.0)
+		{
+			ultT = 0.0;
+			_grown = false;
+			Scale = new Vector2(1.0f, 1.0f); // grown visual shrinks back when the buff expires
+		}
 		if (dsHold > 0.0f)
 		{
 			dsHold -= delta;

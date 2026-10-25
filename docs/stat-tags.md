@@ -38,6 +38,7 @@ gets to invent another name for armour again.
 13 collection range   utility  multiplier  1.0     (magnet radius x stat)
 14 movement speed     utility  multiplier  1.0     (leader/escort move x stat)
 15 vulnerability      modifier points      0       (body-side pair: Combatant.vulnMul)
+16 ultimate cooldown  utility  multiplier  1.0     (ult gate: 120 s base / stat, cd-inside like attack speed)
 ```
 
 ## How grants combine (kind codes)
@@ -58,9 +59,11 @@ After `Rng.SetSeed(9001)` Game.cs prints one line per tag:
 [10thAge] stat tag <name> [<category> kind <0|1|2> base <seed>]
 ```
 
-Sixteen rows, dormant included — a missing row means the registry broke, and the
-gate should fail. The loop prints only; it consumes no RNG, so boot trails stay
-cross-gate aligned.
+Seventeen rows, dormant included — the 2026-10-25 ultimate button grew the registry
+16 → 17 (row 16 `ultimate cooldown`; Baldrun's Giant's Might gate is
+`ULT_CD_BASE 120 s / stat` inside PartyMember, same cd-inside convention as attack
+speed). A missing row means the registry broke, and the gate should fail. The loop
+prints only; it consumes no RNG, so boot trails stay cross-gate aligned.
 
 ## Upgrade-card grant chains (the 2026-10-24 cards)
 
@@ -75,6 +78,11 @@ cross-gate aligned.
 - Mosiah **deadly aim** — pure data: `OPT_CRIT` +0.08/rank straight into tag 3
   (`crit chance`, points kind). `RollDamage` already rolls the slot, so the
   card is 5% → 13/21/29% by rank with zero new code paths.
+- **Ultimate cooldown** (tag 16, user 2026-10-25 ult button) — no grant yet; the
+  slot exists so meta progression can raise the multiplier and shorten every PC's
+  120 s gate. `TryUltimate()` reads `ULT_CD_BASE / stat[StatTags.ULT]` at fire time
+  (Baldrun's **Giant's Might** only so far: root scale ×2, `EffRange` ×2, `RollDamage`
+  ×1.5 for 10 s — duration is the assistant pick, documented on the trail).
 
 ## Deliberately parked (this pass)
 

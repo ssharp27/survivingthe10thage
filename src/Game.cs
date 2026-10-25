@@ -338,6 +338,10 @@ public partial class Game : Godot.Node2D
 		int _lbChainFired = 0;
 		int _lbInsectBound = 0;
 		int _lbSpiritTaken = 0;
+		// ultimate (R, user 2026-10-25): _ultFired counts fires for the pilot readout;
+		// the cooldown itself lives on the PartyMember (ultCdT), gated by StatTags.ULT
+		// (gate = 120 s base / stat) so meta progression can shorten it later.
+		int _ultFired = 0;
 		// leader-bonus numbers: user dictates stay verbatim; the open picks are labelled
 		const double CHAIN_CHANCE = 0.05; // Baldrun: 5% proc per landed party hit (user)
 		const int CHAIN_BOUNCES = 4;      // up to 4 bounces (user)
@@ -1775,6 +1779,17 @@ public partial class Game : Godot.Node2D
 				_memberDashCdT = MEMBER_DASH_CD;
 			}
 		}
+		// ---------- ultimate (R, user 2026-10-25) ----------
+		// R fires the LEADER's ultimate when that PC owns one and its cooldown is
+		// ready. TryUltimate prints the reason on every press (still cooling / no
+		// ultimate authored yet). The pilot mirror auto-fires ONLY when the leader
+		// owns a ready ult, so no-ult bench lanes never spam the print.
+		if (leaderLive && (Input.IsActionJustPressed("ult") ||
+			(_pilot && leader.ultKey() > 0 && leader.ultCdT <= 0.0)))
+		{
+			if (leader.TryUltimate())
+				_ultFired += 1;
+		}
 		bool moved = dir.LengthSquared() > 0.0025f;
 		if (moved)
 		{
@@ -2102,7 +2117,8 @@ public partial class Game : Godot.Node2D
 						 " | beat " + BeatLabel() + " tier " + (int)GetHordeTier() + " boss " + BossReadout() +
 						 " | lv " + _level + " xp " + (int)_xpTotal + " | live enemies " + _liveEnemies +
 						 " | party: " + hps +
-						 " | lb chain " + _lbChainFired + " bound " + _lbInsectBound + " healed " + _lbSpiritTaken);
+						 " | lb chain " + _lbChainFired + " bound " + _lbInsectBound + " healed " + _lbSpiritTaken +
+						 " | ult " + _ultFired + " cd " + (_leader != null && _leader.ultCdT > 0.0 ? (int)System.Math.Ceiling(_leader.ultCdT) : 0));
 			}
 		}
 	}

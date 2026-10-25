@@ -491,6 +491,27 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   ring; the chain proc rolls once PER HIT LANDED (a cleave raking 3 bodies rolls 3x). Rng stream shifts
   downstream (proc/crit/heal draws) — lv/xp totals differ from the suction trio (535/533/552 vs 580/191/1250)
   while the beat schedule is untouched.
+- `smokeM2zx19` (camp skip), `smokeM2zx20` (camp skip, `M1_LEADER=Asper`), `smokeM2zx21` (camp skip,
+  `M1_LEADER=Yu`) — **ultimate-button build**: **VICTORY lv15/xp527, VICTORY lv15/xp533, VICTORY
+  lv15/xp548**, 0-byte `.err`, **17** `stat tag` rows each — the registry grew 16→17 with tag
+  16 `ultimate cooldown` (utility multiplier, seed 1.0) so meta progression can shorten the gate
+  later (user 2026-10-25). **R** (`ult` action, keycode 82, appended to project.godot's `[input]`
+  like the sibling `dev_*`/`dash` entries) fires the ultimate of the PC holding the **leader seat**
+  if it owns one and its cooldown is ready. **Baldrun "Giant's Might"** is the only lane authored:
+  root `Scale` ×2 (art and tele/aura pivots inherit; restore shrinks back exactly once via `_grown`),
+  `EffRange` ×2 (maul reach AND struck radius — every hit-test reads `EffRange`), and `RollDamage`
+  ×1.5 at the single party-side damage choke (all kits, shot pool, insect seats) — for **10 s**, the
+  assistant pick (user named no window, documented here); the cleave arc *angle* stays untouched
+  (already π-capped, "radius" read as reach + footprint). Gate `ULT_CD_BASE 120 s / stat[StatTags.ULT]`
+  (user: 120 s, tag reserved for meta progression, cd-inside convention like attack speed); the
+  per-PC `ultCdT` recharges on its own clock — bench ults stay ready when the seat flips — while
+  `ultT`/scale countdowns pause with the world's soft pause (buff never decays with a card up).
+  `TryUltimate` prints the reason on every press (`still cooling: N s` / `no ultimate yet`); the
+  pilot mirror auto-fires ONLY when the leader owns a ready ult, so no-ult benches never spam.
+  Fire itself consumes no RNG. Evidence is printed: zx19 shows 2 `(ult) Giant's Might` fires
+  (~t=120 and ~t=300, readout `ult 1/2`, `cd 120` re-armed then ticking `105→15` to the tail),
+  zx20/zx21 readouts hold `ult 0 cd 0` while their insect/spirit lanes run untouched and VICTORY
+  holds. Readout appends `" | ult fired cd"` reading `_leader.ultCdT`.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
@@ -544,4 +565,11 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   and the join draw both read the leader seat, so the swapped-in leader would march last and the lottery
   would key the OLD leader. Flip the seat BEFORE the draw; symptom of the bad order: boot prints the moved
   seat yet the first march strip's `party:` head is still the old leader.
+- Splice scripts: `str.rfind(sub, start)` searches FORWARD from `start` (the second arg is a bounds
+  floor, not a backseek) — to find the line START of a match, use `rfind(sub, 0, i)`. And readout
+  continuation lines mix tabs with alignment spaces: DERIVE the indent from the matched line instead
+  of guessing it, or the spliced line drifts out of the `GD.Print` chain.
+- The Giant's Might restore `Scale = Vector2(1,1)` is only exact while the root scale stays authored
+  (1,1): PartyMember writes scales ONLY on `_mini`/`_telePivot`/`_auraPivot` children. If a future
+  system ever scales a PC root, `_grown` must remember the pre-fire scale and restore THAT.
 
