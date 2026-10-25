@@ -310,6 +310,50 @@ public partial class Game : Godot.Node2D
 		Godot.Collections.Array<double> _summonR = new();      // blast radius, px
 		Godot.Collections.Array<float> _summonSpd = new();     // px/s this familiar runs
 		Godot.Collections.Array<bool> _summonBurst = new();    // slot is mid detonation flare
+		// bolt-pool pierce memo (leader bonus, user 2026-10-25): while Mosiah owns the
+		// leader seat a bolt punches through one body and keeps flying. _shotPen is the
+		// per-bolt pierce budget stamped at spawn; _shotLast memoizes the body the bolt
+		// just raked so a pierced bolt cannot re-hit the SAME body the next frame.
+		// (GetInstanceId is 64-bit, so the memo array is long-typed)
+		Godot.Collections.Array<double> _shotPen = new();
+		Godot.Collections.Array<long> _shotLast = new();
+		// ---------- leader-bonus helper pools (user 2026-10-25): Asper's insects, Yu's spirits ----------
+		// Pooled exactly like the summons: fixed slots, parallel arrays, parked past -9000.
+		// _insectLife counts down the CURRENT phase (waiting for a host / bound for 10 s);
+		// _insectCd is the fire cooldown while bound; _insectOwner is the bound member's
+		// memberIndex (-1 = still waiting). The counters are cumulative since boot and
+		// exist so a headless pilot run can SEE each leader lane doing its job.
+		Godot.Collections.Array<Godot.Node2D> _insects = new();
+		Godot.Collections.Array<double> _insectLife = new();
+		Godot.Collections.Array<double> _insectCd = new();
+		Godot.Collections.Array<int> _insectOwner = new();
+		Godot.Collections.Array<Godot.Node2D> _spirits = new();
+		Godot.Collections.Array<double> _spiritLife = new();
+		// spawn / regen clocks and the cumulative lane counters (pilot evidence).
+		// Clocks accumulate ONLY while that PC owns the leader seat (see UpdateHelpers),
+		// so a seat swap starts fresh instead of inheriting a charged clock.
+		double _insectClock = 0.0;
+		double _spiritClock = 0.0;
+		double _regenT = 0.0;
+		int _lbChainFired = 0;
+		int _lbInsectBound = 0;
+		int _lbSpiritTaken = 0;
+		// leader-bonus numbers: user dictates stay verbatim; the open picks are labelled
+		const double CHAIN_CHANCE = 0.05; // Baldrun: 5% proc per landed party hit (user)
+		const int CHAIN_BOUNCES = 4;      // up to 4 bounces (user)
+		const double CHAIN_DMG = 10.0;    // each bounce bites for 10 (user)
+		const double CHAIN_RANGE = 150.0; // hop range: left open by the user, this pick
+		const double REGEN_TICK = 10.0;   // Alvora: allies regen every 10 s (user)
+		const double REGEN_HP = 1.0;      // +1 HP per tick (user)
+		const double INSECT_EVERY = 30.0; // Asper: an insect waits every 30 s (user)
+		const double INSECT_LASTS = 10.0; // a claimed insect helps for 10 s (user)
+		const double INSECT_WAIT = 30.0;  // unclaimed wilts after 30 s: pick, keeps slots free
+		const double SPIRIT_EVERY = 30.0; // Yu: a spirit kindles every 30 s (user)
+		const double SPIRIT_LASTS = 30.0; // unclaimed wilts after 30 s: same pick
+		const double SPIRIT_HEAL = 10.0;  // a touched spirit heals its patient for 10 HP (user)
+		const double HELPER_PICK = 24.0;  // "getting close": walk-contact reach, pick
+		const double HELPER_RING_MIN = 90.0;  // spawn ring around the leader: picks
+		const double HELPER_RING_MAX = 170.0; // (never on top of the seat itself)
 	Godot.Collections.Array<Godot.Node2D> _enemies = new();
 	Godot.Collections.Array<Boss> _bosses = new();
 	int _liveEnemies = 0;
@@ -1192,6 +1236,39 @@ public partial class Game : Godot.Node2D
 			else if (n is Boss b)
 				_bosses.Add(b);
 		}
+		_pilot = OS.GetEnvironment("M1_PILOT") != null && OS.GetEnvironment("M1_PILOT") != "";
+		_devSkip = OS.GetEnvironment("M1_DEV_SKIP") == null ? "" : OS.GetEnvironment("M1_DEV_SKIP");
+		// TEST BENCH only (same discipline as M1_PILOT / M1_DEV_SKIP / M1_REAPER): M1_LEADER=<name>
+		// moves the leader seat to another roster PC at boot so a smoke run can stand under a
+		// given leader bonus; human play never sets it and keeps the Main.tscn export (Baldrun).
+		// This MUST precede the join lottery: the demoted seat waits for its join beat like
+		// any other recruit, and only a lottery that sees the swap can honour that.
+		if (_pilot)
+		{
+			string want = OS.GetEnvironment("M1_LEADER") == null ? "" : OS.GetEnvironment("M1_LEADER");
+			if (want != "" && _leader != null && want != _leader.displayName)
+			{
+				PartyMember seat = null;
+				foreach (PartyMember pm2 in _party)
+					if (pm2.displayName == want)
+						seat = pm2;
+				if (seat != null)
+				{
+					// the seat swap carries the arena spawn: the new Leader opens where the squad
+					// opened, the demoted Leader is parked off-world until its own join beat
+					Vector2 open = _leader.GlobalPosition;
+					foreach (PartyMember pm2 in _party)
+					{
+								bool lead = (pm2 == seat);
+								pm2.isLeader = lead;
+								pm2.joined = lead;
+								pm2.GlobalPosition = lead ? open : new Vector2(-9500.0f, -9500.0f);
+					}
+					_leader = seat;
+					GD.Print("[10thAge] (bench) leader seat moved to: " + want);
+				}
+			}
+		}
 		string roster = "";
 		foreach (PartyMember pm2 in _party)
 			roster += (roster == "" ? "" : " + ") + pm2.displayName + " (" + pm2.weaponName + ")";
@@ -1200,8 +1277,6 @@ public partial class Game : Godot.Node2D
 		// the join lottery rolls at boot so the pilot / escort paths never have to re-decide
 		// which PC a beat owns (the print keeps the smoke trails honest about who lands when)
 		BuildJoinLottery();
-		_pilot = OS.GetEnvironment("M1_PILOT") != null && OS.GetEnvironment("M1_PILOT") != "";
-		_devSkip = OS.GetEnvironment("M1_DEV_SKIP") == null ? "" : OS.GetEnvironment("M1_DEV_SKIP");
 		// the reaper is a pure death/revive TEST BENCH (no balance meaning): human play
 		// left it OFF now that the revive rules work, and M1_REAPER=1 puts it back on
 		// for testing (a pilot smoke with it ON still TPKs often - the Leader-down rule
@@ -1335,6 +1410,8 @@ public partial class Game : Godot.Node2D
 			_shotVel.Add(new Vector2(0, 0));
 			_shotDmg.Add(0.0);
 			_shotLife.Add(0.0);
+			_shotPen.Add(0.0);
+			_shotLast.Add(-1);
 		}
 		// Yu's familiars: pooled like the bolts and the gems, so a rank-3 multiattack ritual
 		// never allocates a node mid-horde. Shell-first so the creature reads as a body; the
@@ -1358,6 +1435,40 @@ public partial class Game : Godot.Node2D
 			_summonR.Add(0.0);
 			_summonSpd.Add(0.0f);
 			_summonBurst.Add(false);
+		}
+		// leader-bonus helper pools (user 2026-10-25): Asper's insects and Yu's spirits.
+		// Slots stay small because one spawns every 30 s and neither phase lives past
+		// 30 s - far more capacity than a run can ever have waiting at once.
+		for (int i = 0; i < 8; i++)
+		{
+			Godot.Node2D s = new Node2D();
+			Godot.ColorRect cr = new ColorRect();
+			cr.Size = new Vector2(12.0f, 12.0f);
+			cr.Position = new Vector2(-6.0f, -6.0f);
+			// chitin green: deliberately off every horde hue so a friendly bug never reads as prey
+			cr.Color = new Color(0.44f, 0.66f, 0.26f, 1.0f);
+			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			s.AddChild(cr);
+			s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+			AddChild(s);
+			_insects.Add(s);
+			_insectLife.Add(0.0);
+			_insectCd.Add(0.0);
+			_insectOwner.Add(-1);
+		}
+		for (int i = 0; i < 6; i++)
+		{
+			Godot.Node2D s = new Node2D();
+			Godot.ColorRect cr = new ColorRect();
+			cr.Size = new Vector2(12.0f, 12.0f);
+			cr.Position = new Vector2(-6.0f, -6.0f);
+			cr.Color = new Color(0.78f, 0.92f, 0.88f, 1.0f); // pale ghost teal: a kindness spirit
+			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			s.AddChild(cr);
+			s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+			AddChild(s);
+			_spirits.Add(s);
+			_spiritLife.Add(0.0);
 		}
 	}
 
@@ -1964,6 +2075,7 @@ public partial class Game : Godot.Node2D
 		UpdateBullets(delta);
 		UpdateShots(delta); // the party's own projectiles: mirror pool, opposite faction
 		UpdateSummons(delta); // Yu's familiars: run at prey, detonate on contact OR on the fuse
+		UpdateHelpers(delta); // leader-bonus lane (user 2026-10-25): Alvora regen, Asper insects, Yu spirits
 		PickerTick(d);
 		_hud.Text = "Surviving the 10th Age - " + STAGE_NAME + " (stage " + STAGE_NUMBER +
 					") | Lv " + _level +
@@ -1989,7 +2101,8 @@ public partial class Game : Godot.Node2D
 				GD.Print("[10thAge] (pilot) " + StateName(_state) + " t=" + (int)GetRunTime() +
 						 " | beat " + BeatLabel() + " tier " + (int)GetHordeTier() + " boss " + BossReadout() +
 						 " | lv " + _level + " xp " + (int)_xpTotal + " | live enemies " + _liveEnemies +
-						 " | party: " + hps);
+						 " | party: " + hps +
+						 " | lb chain " + _lbChainFired + " bound " + _lbInsectBound + " healed " + _lbSpiritTaken);
 			}
 		}
 	}
@@ -2000,6 +2113,366 @@ public partial class Game : Godot.Node2D
 	// his own bubble survives the scan below)
 	// the campfire vacuum (camp beat) still reels gems to the leader UNCHANGED
 	// (party suction on the field vs camp vacuum on the beat are separate lanes)
+	// ---------- leader bonuses (user 2026-10-25): signature perks keyed to leader identity ----------
+	// Exactly one perk runs at a time: the perk of whichever roster PC owns the leader seat.
+	// Every reader asks _leader live, so a future leadership change moves which lane runs by
+	// itself. Key names: 1 Baldrun chain lightning | 2 Mosiah pierce | 3 Alvora regen |
+	// 4 Asper friendly insects | 5 Yu kindling spirits. Display names are the roster key,
+	// same convention the card pool already uses ("Baldrun's draging maul"). Procs roll on
+	// the seeded run stream: a chain proc / spirit heal shifts horde draws downstream (as
+	// crit rolls already do), and every such draw is documented at its site.
+	private int LeaderBonusKey()
+	{
+		if (_leader == null)
+			return 0;
+		if (_leader.displayName == "Baldrun")
+			return 1;
+		if (_leader.displayName == "Mosiah")
+			return 2;
+		if (_leader.displayName == "Alvora")
+			return 3;
+		if (_leader.displayName == "Asper")
+			return 4;
+		if (_leader.displayName == "Yu")
+			return 5;
+		return 0;
+	}
+	
+	// Baldrun's seat: every party hit that LANDS rolls 5% to loose a lightning chain hopping
+	// body to body - up to 4 bounces, 10 damage each (user 2026-10-25). Hooked at EVERY party
+	// hit event (rapier lane, maul fan, guardian ring, bolt pool, familiar blast), so the
+	// proc is per landed hit and a cleave raking three bodies rolls three times. Bounces pick
+	// the nearest UNTOUCHED living body within CHAIN_RANGE (the user left the hop range open;
+	// 150 px is the pick) and a body killed but not yet swept by the kill scan (hp <= 0) is
+	// not a valid hop. Visual: each hopped body reads via the shared hurt flash this frame;
+	// a drawn bolt line is a display-pass follow-up.
+	public void TryChainLightning(Godot.Node2D struck)
+	{
+		if (LeaderBonusKey() != 1)
+			return; // not Baldrun's seat: zero roll cost, zero effect
+		Combatant src = (Combatant)struck;
+		if (src == null || src.kind == "dead" || src.hp <= 0.0f)
+			return; // a body dying from the hit itself cannot anchor a chain
+		if (Rng.Randf() >= CHAIN_CHANCE)
+			return; // the 5% proc: one run-stream draw per landed hit
+		_lbChainFired++;
+		// visit memo: no body hops twice in one chain (small alloc only on a proc)
+		Godot.Node2D[] vis = new Godot.Node2D[1 + CHAIN_BOUNCES];
+		vis[0] = struck;
+		int used = 1;
+		Godot.Node2D cur = struck;
+		for (int b = 0; b < CHAIN_BOUNCES; b++)
+		{
+			Godot.Node2D next = null;
+			float nd = (float)CHAIN_RANGE;
+			for (int e = 0; e < _enemies.Count; e++)
+			{
+				Godot.Node2D n = _enemies[e];
+				Combatant nc = (Combatant)n;
+				if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
+					continue;
+				bool seen = false;
+				for (int q = 0; q < used; q++)
+					if (vis[q].GetInstanceId() == n.GetInstanceId())
+						seen = true;
+				if (seen)
+					continue; // no body hops twice
+				float dd = WrapDelta(cur.GlobalPosition, n.GlobalPosition).Length();
+				if (dd < nd)
+				{
+					nd = dd;
+					next = n;
+				}
+			}
+			if (next == null)
+				break; // the chain dies when no other body stands in hop range
+			((Combatant)next).TakeDamage(CHAIN_DMG);
+			vis[used++] = next;
+			cur = next;
+		}
+	}
+	
+	// Mosiah's seat: one extra pierced body for every party attack while he leads. Bends only
+	// the two single-target verbs: the rapier lane reads this at its rank cap (PartyMember.cs
+	// via its GetParent() as Game handle) and the bolt pool stamps it as the per-bolt budget
+	// at spawn. Maul fan / guardian ring / familiar blast already sweep everything in shape,
+	// so there is nothing to bend there.
+	public int LeaderPierceBonus()
+	{
+		return LeaderBonusKey() == 2 ? 1 : 0;
+	}
+	
+	// per-frame half of the leader lane: regen ticks (Alvora), insect / spirit upkeep,
+	// and the seat-locked spawn clocks (Asper / Yu). Upkeep runs under ANY seat so a
+	// helper already out there keeps living; only clocks and regen tick are seat-gated.
+	private void UpdateHelpers(float delta)
+	{
+		int lb = LeaderBonusKey();
+		if (lb == 3)
+		{
+			// Alvora seat: every 10 s every standing ally regenerates 1 hp (user 2026-10-25).
+			// Own clock, not the dead hp-regen tag lane; never over-heals past the EffMaxHp
+			// ceiling; a stranded recruit is not yet an ally, a fallen body recovers via
+			// a death save, not a free heal.
+			_regenT += delta;
+			while (_regenT >= REGEN_TICK)
+			{
+				_regenT -= REGEN_TICK;
+				foreach (PartyMember m in _party)
+				{
+					if (!m.joined || m.downed || m.eliminated)
+					continue; // not arrived / fallen: no free heal
+					if (m.hp < m.EffMaxHp())
+					{
+						m.hp += (float)REGEN_HP;
+						if (m.hp > m.EffMaxHp())
+						m.hp = (float)m.EffMaxHp();
+					}
+				}
+			}
+		}
+		// spawn clocks charge ONLY under the owning PC: leadership is fixed at boot today,
+		// but the rule keeps the lane honest if the seat ever moves
+		if (lb == 4)
+		{
+			_insectClock += delta;
+			if (_insectClock >= INSECT_EVERY)
+			{
+				_insectClock = 0.0;
+				SpawnInsect();
+			}
+		}
+		else if (lb == 5)
+		{
+			_spiritClock += delta;
+			if (_spiritClock >= SPIRIT_EVERY)
+			{
+				_spiritClock = 0.0;
+				SpawnSpirit();
+			}
+		}
+		// upkeep is unconditional: a helper on the field keeps living even if the seat
+		// moved (nothing can move it today), so nothing pops off mid-raid. foreach over
+		// Godot.Collections.Array is safe: _party never shrinks (join/eliminate flip flags)
+		UpdateInsects(delta);
+		UpdateSpirits(delta);
+	}
+
+	// Asper's vigil spawner: next free slot (parked at -9000 like the summon pool), a
+	// random spot on a 90-170 px ring around the seat so an insect never kindles on
+	// top of the squad. Two Rng draws per spawn shift the run stream downstream (documented).
+	private void SpawnInsect()
+	{
+		if (_leader == null)
+		return;
+		for (int i = 0; i < _insects.Count; i++)
+		{
+			Godot.Node2D s = _insects[i];
+			if (!(s.GlobalPosition.X < -8000.0f))
+			continue; // slot busy: a run can never hold 8 vigils, guard only
+			double aw = Rng.Randf() * 2.0 * System.Math.PI;
+			double rr = HELPER_RING_MIN + Rng.Randf() * (HELPER_RING_MAX - HELPER_RING_MIN);
+			Vector2 lp = _leader.GlobalPosition;
+			s.GlobalPosition = lp + new Vector2((float)System.Math.Cos(aw), (float)System.Math.Sin(aw)) * (float)rr;
+			((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+			_insectLife[i] = INSECT_WAIT; // waiting phase: a host claims it on walk contact
+			_insectCd[i] = 0.0;
+			_insectOwner[i] = -1;
+			GD.Print("[10thAge] (bonus) insect kindles: one waits in the clearing");
+			return;
+		}
+	}
+
+	// Yu's spawner: next free slot, same ring pick. One Rng draw per vigil.
+	private void SpawnSpirit()
+	{
+		if (_leader == null)
+		return;
+		for (int i = 0; i < _spirits.Count; i++)
+		{
+			Godot.Node2D s = _spirits[i];
+			if (!(s.GlobalPosition.X < -8000.0f))
+			continue;
+			double aw = Rng.Randf() * 2.0 * System.Math.PI;
+			double rr = HELPER_RING_MIN + Rng.Randf() * (HELPER_RING_MAX - HELPER_RING_MIN);
+			Vector2 lp = _leader.GlobalPosition;
+			s.GlobalPosition = lp + new Vector2((float)System.Math.Cos(aw), (float)System.Math.Sin(aw)) * (float)rr;
+			((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+			_spiritLife[i] = SPIRIT_LASTS;
+			GD.Print("[10thAge] (bonus) kindness spirit kindles");
+			return;
+		}
+	}
+
+	// helpers free their slots the summon pool way: parked off-world, alpha back to 0
+	private void DespawnInsect(int i)
+	{
+		_insectLife[i] = 0.0;
+		_insectCd[i] = 0.0;
+		_insectOwner[i] = -1;
+		_insects[i].GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+		((Godot.ColorRect)_insects[i].GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+	}
+
+	private void DespawnSpirit(int i)
+	{
+		_spiritLife[i] = 0.0;
+		_spirits[i].GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+		((Godot.ColorRect)_spirits[i].GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+	}
+
+	// Asper seat upkeep: waiting insects wilt after INSECT_WAIT (pick); a standing ally
+	// walking within HELPER_PICK claims one (user's "getting close"): it rides 26 px above
+	// the host and fires the seat's own longbow numbers - same range, same attack speed,
+	// half the damage rolled (user 2026-10-25). No prey leaves the cooldown open so the
+	// first shot looses the instant prey arrives. host lookup keys on memberIndex.
+	private void UpdateInsects(float delta)
+	{
+		if (_leader == null)
+		return;
+		PartyMember seat = _leader;
+		for (int i = 0; i < _insects.Count; i++)
+		{
+			Godot.Node2D s = _insects[i];
+			if (s.GlobalPosition.X < -8000.0f)
+			continue; // free slot: same idiom as the summon pool
+			if (_insectOwner[i] >= 0)
+			{
+				// bound leg: ride the host, fire on the seat's own cooldown
+				_insectLife[i] -= delta;
+				if (_insectLife[i] <= 0.0)
+				{
+					DespawnInsect(i); // the 10 s ride is up (user)
+					continue;
+				}
+				PartyMember host = null;
+				foreach (PartyMember mm in _party)
+					if (mm.memberIndex == _insectOwner[i])
+						host = mm;
+				if (host == null)
+				{
+					DespawnInsect(i); // host left the squad: the ride drops, the slot frees
+					continue;
+				}
+				s.GlobalPosition = host.GlobalPosition + new Vector2(0.0f, -26.0f);
+				_insectCd[i] -= delta;
+				if (_insectCd[i] > 0.0)
+				continue; // shot window still open
+				Godot.Node2D prey = null;
+				float nd = (float)seat.EffRange();
+				for (int e = 0; e < _enemies.Count; e++)
+				{
+					Godot.Node2D en = _enemies[e];
+					Combatant nc = (Combatant)en;
+					if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
+					continue; // free / dead bodies are not prey
+					float dd = WrapDelta(en.GlobalPosition, s.GlobalPosition).Length();
+					if (dd < nd)
+					{
+						nd = dd;
+						prey = en;
+					}
+				}
+				if (prey == null)
+				continue; // cooldown stays open (see comment above)
+				Vector2 dir = WrapDelta(s.GlobalPosition, prey.GlobalPosition).Normalized();
+				double dmg = seat.RollDamage(this, seat.weaponDamage) * 0.5; // half damage (user)
+				SpawnShot(s.GlobalPosition + dir * 18.0f, dir * seat.projSpeed, dmg, seat.projLife);
+				_insectCd[i] = seat.EffCooldown(); // same attack speed as Asper (user)
+			}
+			else
+			{
+				// waiting leg: nearest standing ally within HELPER_PICK claims this vigil
+				_insectLife[i] -= delta;
+				if (_insectLife[i] <= 0.0)
+				{
+					DespawnInsect(i); // nobody came close in time: the vigil wilts (pick)
+					continue;
+				}
+				Vector2 ip = s.GlobalPosition;
+				PartyMember host = null;
+				float hd = (float)HELPER_PICK;
+				foreach (PartyMember mm in _party)
+				{
+					if (!mm.joined || mm.downed || mm.eliminated)
+					continue; // stranded / fallen bodies cannot claim a helper
+					float dd = WrapDelta(mm.GlobalPosition, ip).Length();
+					if (dd < hd)
+					{
+						hd = dd;
+						host = mm;
+					}
+				}
+				if (host == null)
+				continue;
+				_insectOwner[i] = host.memberIndex;
+				_insectLife[i] = INSECT_LASTS; // the 10 s ride starts AT pickup (user)
+				_insectCd[i] = 0.0; // the first volley looses the moment the ride starts
+				_lbInsectBound++;
+				GD.Print("[10thAge] (bonus) insect joins " + host.displayName + " for 10 s");
+			}
+		}
+	}
+
+	// Yu seat upkeep: a standing ally within HELPER_PICK touches a vigil; the patient is one
+	// RANDOM ally who has ACTUALLY LOST HP, healed 10 and the spirit is consumed (user
+	// 2026-10-25). A healthy squad never drinks: the vigil waits instead of being wasted.
+	// _party is a Godot.Collections.Array and never shrinks (join/eliminate flip flags),
+	// so plain foreach + a fixed candidate array is safe; one Rng draw per heal shifts
+	// the run stream (documented). Downed / eliminated bodies are excluded by design:
+	// down is a death-save situation, not an open hp wound.
+	private void UpdateSpirits(float delta)
+	{
+		for (int i = 0; i < _spirits.Count; i++)
+		{
+			Godot.Node2D s = _spirits[i];
+			if (s.GlobalPosition.X < -8000.0f)
+			continue; // free slot: same idiom as the summon pool
+			Vector2 ip = s.GlobalPosition;
+			bool touched = false;
+			foreach (PartyMember mm in _party)
+			{
+				if (!mm.joined || mm.downed || mm.eliminated)
+				continue; // stranded / fallen: cannot touch the vigil
+				if (WrapDelta(mm.GlobalPosition, ip).Length() < (float)HELPER_PICK)
+				{
+					touched = true;
+					break;
+				}
+			}
+			if (touched)
+			{
+				PartyMember[] cands = new PartyMember[8];
+				int cn = 0;
+				foreach (PartyMember mm in _party)
+				{
+					if (!mm.joined || mm.downed || mm.eliminated)
+					continue;
+					if (mm.hp < mm.EffMaxHp())
+					cands[cn++] = mm; // only real hp losses are patients
+				}
+				if (cn > 0)
+				{
+					PartyMember pat = cands[(int)(Rng.Randf() * cn)];
+					pat.hp += (float)SPIRIT_HEAL;
+					if (pat.hp > pat.EffMaxHp())
+					pat.hp = (float)pat.EffMaxHp();
+					_lbSpiritTaken++;
+					GD.Print("[10thAge] (bonus) spirit heals " + pat.displayName + " for 10 hp");
+					DespawnSpirit(i);
+					continue;
+				}
+				// healthy squad: the vigil is NOT consumed, it keeps waiting below
+			}
+			_spiritLife[i] -= delta;
+			if (_spiritLife[i] <= 0.0)
+			{
+				DespawnSpirit(i); // nobody hurt / nobody close in time: it dims (pick)
+				continue;
+			}
+		}
+	}
+
 	private void UpdateGems(float delta)
 	{
 		for (int i = 0; i < _gems.Count; i++)
@@ -2115,11 +2588,26 @@ public partial class Game : Godot.Node2D
 				float hitR = nc is Boss ? 8.0f + ((Boss)nc).radius : 20.0f;
 				if (p.DistanceTo(n.GlobalPosition) < hitR)
 				{
-					// one bolt, one body: the FAN is the multishot, pierce belongs to
-					// Mosiah's rapier. Damage still goes through the shared kill scan, so
-					// the gem drop / live-count release / escort meter stay enemy-owned.
+					// one bolt, one body: the FAN is the multishot, and pierce belongs to
+					// Mosiah's rapier - UNTIL Mosiah owns the leader seat, when every bolt
+					// punches through one body and keeps flying (user 2026-10-25). _shotPen is
+					// that per-bolt budget stamped at spawn; _shotLast memoizes the body just
+					// raked so a pierced bolt cannot re-hit the same body the next frame. Damage
+					// still goes through the shared kill scan, so the gem drop / live-count
+					// release / escort meter stay enemy-owned.
+					if (_shotLast[i] == (long)n.GetInstanceId())
+						continue; // this bolt already raked THIS body: it rides on down the lane
 					nc.TakeDamage(_shotDmg[i]);
-					DespawnShot(i);
+					TryChainLightning(n); // Baldrun seat: the hit may loose a chain (no-op for other seats)
+					if (_shotPen[i] > 0.0)
+					{
+						_shotPen[i] -= 1.0;
+						_shotLast[i] = (long)n.GetInstanceId();
+						// no DespawnShot: the pierced bolt keeps flying; the break below just bounds
+						// the hit to one body per frame, which is all a 5.7 px step needs
+					}
+					else
+						DespawnShot(i);
 					break;
 				}
 			}
@@ -2145,6 +2633,9 @@ public partial class Game : Godot.Node2D
 			_shotVel[i] = vel;
 			_shotDmg[i] = dmg;
 			_shotLife[i] = life;
+			// pierce budget stamped at spawn: 0 unless Mosiah owns the leader seat
+			_shotPen[i] = LeaderPierceBonus();
+			_shotLast[i] = -1;
 			((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
 			return;
 		}
@@ -2261,6 +2752,7 @@ public partial class Game : Godot.Node2D
 			if (WrapDelta(p, n.GlobalPosition).Length() > r)
 				continue;
 			nc.TakeDamage(dmg);
+			TryChainLightning(n); // Baldrun seat: the blast can loose a chain per caught body
 		}
 		// the slot BECOMES the blast for a beat: the shell grows to the radius it actually bit
 		// and fades, so the AoE reads without a HUD. Pure nodes - the C# _draw hook is dead in 4.7.

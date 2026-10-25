@@ -469,6 +469,28 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   print-shown: XP totals rise against the grace trio (580/191/1250 vs 536/149/1233; the join-skip
   trail jumps from lv8 to lv9) because stragglers now vacuum their side of the arena, and all
   three trails keep VICTORY with clean `.err`. No RNG consumed by the suction itself.
+- `smokeM2zx16` (camp skip), `smokeM2zx17` (camp skip, `M1_LEADER=Asper`), `smokeM2zx18` (camp skip,
+  `M1_LEADER=Yu`) — **leader-bonus build**: **VICTORY lv15/xp535, VICTORY lv15/xp533, VICTORY lv16/xp552**,
+  0-byte `.err`, 16 `stat tag` rows each. Each roster PC owns a signature perk while it holds the **leader
+  seat** (user 2026-10-25; ultimates deferred): **Baldrun** — every party hit rolls 5% for chain lightning,
+  up to **4 bounces of 10 damage** to the nearest UNTOUCHED living body (150 px hops, vis memo; visual is
+  the shared hurt flash, drawn lightning deferred); **Mosiah** — party bolts and the rapier lane punch
+  through **1 extra body** (`min(4, pierce + seat bonus)`, per-bolt budget + `_shotLast` memo of the last
+  raked body so a bolt never re-rakes); **Alvora** — every standing ally regenerates **1 HP every 10 s**
+  (own clock, clamped to `EffMaxHp()`; the dead `hp-regen` tag slot stays unused); **Asper** — friendly
+  **insects spawn every 30 s**, walk contact (24 px) makes one temporarily ride above the claimant and
+  fire the seat's bow — same range, same attack speed, **half damage** — for **10 s**; **Yu** — friendly
+  **spirits spawn every 30 s**, and touching one heals **10 HP on one RANDOM ally who has actually lost
+  HP** (a healthy squad never drinks the vigil). Lane clocks (`_insectClock`/`_spiritClock`/`_regenT`)
+  charge ONLY while the owner leads; upkeep is unconditional so a helper already out keeps living.
+  Evidence is printed: zx16 tail `lb chain 76` (other counters correctly 0), zx17 boot `(bench) leader
+  seat moved to: Asper` + 7 `insect kindles` / 6 `insect joins` (`bound 5` at t=415), zx18 8 `kindness
+  spirit kindles` / 4 `spirit heals ...` (`healed 4`). Bench valve `M1_LEADER` (pilot-gated) flips the
+  seat BEFORE `BuildJoinLottery()`, so the flipped leader carries the arena spawn and marches first.
+  Picks (not user-locked): 150 px hop range, 30 s waiting lifetimes, 24 px pick radius, 90-170 px spawn
+  ring; the chain proc rolls once PER HIT LANDED (a cleave raking 3 bodies rolls 3x). Rng stream shifts
+  downstream (proc/crit/heal draws) — lv/xp totals differ from the suction trio (535/533/552 vs 580/191/1250)
+  while the beat schedule is untouched.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
@@ -515,4 +537,11 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   end-to-end: eliminated members keep `stable == false`, so testing "still rolling" before "eliminated"
   silently re-opened the classic TPK. Symptom to trust: everyone `OUT` in every march strip yet no terminal
   line until the frame cap.
+- Godot C# bindings are **PascalCase**: `Vector2.Normalized()` (not `normalized()`), and `GetInstanceID()`
+  returns **ulong** — memoizing instance ids in an `Array<long>` needs `(long)` casts on BOTH the store and
+  the compare; a bare `==` mixes long/ulong and throws CS0034 "ambiguous", not the narrowing error you'd expect.
+- A bench `M1_LEADER` valve that swaps seats AFTER `BuildJoinLottery()` is half-true: the arena spawn order
+  and the join draw both read the leader seat, so the swapped-in leader would march last and the lottery
+  would key the OLD leader. Flip the seat BEFORE the draw; symptom of the bad order: boot prints the moved
+  seat yet the first march strip's `party:` head is still the old leader.
 

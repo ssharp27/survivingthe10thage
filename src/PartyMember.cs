@@ -614,6 +614,7 @@ public partial class PartyMember : Godot.Node2D
 				if ((n.GlobalPosition - p).Length() > reach)
 					continue;
 				nc.TakeDamage(RollDamage(pg, weaponDamage) * Strikes()); // FULL hit, not dmg / struck
+				pg.TryChainLightning(n); // Baldrun seat: each caught body may loose a chain
 				// guiding light: the pulse also MARKS what it caught (rank 0 = no mark),
 				// so the whole party bites marked bodies harder until the window decays
 				if (guidingLight > 0.0)
@@ -743,6 +744,7 @@ public partial class PartyMember : Godot.Node2D
 					System.Math.Abs(angleDiff((float)System.Math.Atan2(e.Y, e.X), facing)) <= arcEff)
 					{
 						nc.TakeDamage(dmg * Strikes()); // MULTISTRIKE: the whole swing repeats
+						pg.TryChainLightning(n); // Baldrun seat: the hit may loose a chain
 						// draging maul: rank-gated drag on caught bodies (2.5 s window, refresh-not-stack);
 						// bosses immune at the applier, so only the horde gets the tax. See Combatant.Slowed.
 						if (maulSlow > 0.0 && !(nc is Boss))
@@ -754,7 +756,12 @@ public partial class PartyMember : Godot.Node2D
 		{
 			// Rapier: thrust + pierce. The point lands on the pick; ranks let up to
 			// 1+pierce bodies share the lane and get skewered by the same lunge.
-			Godot.Node2D[] lane = new Godot.Node2D[1 + (pierce > 3 ? 3 : pierce)];
+			// Mosiah seat (user 2026-10-25): while he owns the leader seat the lane skewers
+			// one extra body (rank cap 4 total; base cap stays 3). pg handle = GetParent()
+			int laneRank = pierce + pg.LeaderPierceBonus();
+			if (laneRank > 4)
+				laneRank = 4;
+			Godot.Node2D[] lane = new Godot.Node2D[1 + laneRank];
 			lane[0] = best;
 			float laneHalf = (float)System.Math.Max((double)arcEff, 0.16);
 			for (int s = 1; s < lane.Length; s++)
@@ -795,7 +802,10 @@ public partial class PartyMember : Godot.Node2D
 			{
 				// pierce widens the lane but the rays past the last body stay empty
 				if (hit != null)
+				{
 					((Combatant)hit).TakeDamage(dmg * Strikes()); // MULTISTRIKE: the rapier re-thrusts
+					pg.TryChainLightning(hit); // Baldrun seat: each skewered body may loose a chain
+				}
 			}
 		}
 		_atkFlash = shotKit ? 0.08f : 0.12f; // a shooter flashes a shorter draw, never red
