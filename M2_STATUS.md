@@ -524,7 +524,9 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   7 px (the rig-origin pin is the topple pivot AND the dash-plate anchor — carrying 7 would have
   sunk Yu's feet 10 px into the clearing). `displayName == "Yu"` branch spliced into the art
   lookup via the git-splice route; headless smokes never see pixels, the audit print IS the
-  visual evidence for this gate.
+  visual evidence for this gate. (Note: `tools/artcheck.gd` is **tracked**, despite the older
+  gate's UNTRACKED claim — swap its path line for each audit but `git checkout HEAD --` it back
+  after, so the one-off probe state never ships.)
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
