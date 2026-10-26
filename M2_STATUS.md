@@ -92,6 +92,25 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 
 ## Landed this pass (uncommitted → committed this commit)
 
+- **Pre-run CHARACTER SELECT framework (user 2026-10-26, framework pass; real UI/art pass later)**:
+  boot card picks the run's LEADER. Read-the-card soft-pause shape: `_selHold` joins `GetWorldPause()`
+  and a `_Process` rail right after `MeasureWindow()` early-returns `PollSelect(delta)` so NO beat
+  burns while the card is up. Central board = **blocks of four** (2x2 page window, `SEL_PER_PAGE 4`
+  + 16-float `SEL_RECT` anchor-fraction table — flattened to 1D: Godot's C# frontend rejects 2D
+  shorthand initializers, same CS0623 family as `JOIN_W`); the five-PC tail pages onto board page two
+  — the same paging rule a future **stage select** will ride. Right panel = live breakdown (name,
+  live `m.hp`/`EffMaxHp()`, kit tracks auto-listed from `OPT_LABEL`/`OPT_MEMBER`, plus
+  `SEL_BONUS`/`SEL_ULT` blurbs indexed by memberIndex). Painted minis ride `SEL_ART` (memberIndex-keyed;
+  `miniPath` is a PM LOCAL, not a field) via the PM-verified `GD.Load(...) as Godot.Texture2D` + a
+  constructed `TextureRect` (STRETCH + KEEP aspect + NEAREST). Keys reuse the picker's `pick_1..pick_6`
+  grammar: first press BROWSES (highlight frame jumps, panel swaps), the SAME key again CONFIRMS —
+  a fresh tap can never seat (repeat-press grammar like the join banner; human card never times out).
+  Bench valve and select door share ONE `TrySeatLeader(want)` copy (bench prints `(bench) leader seat
+  moved to:`, select prints `(select) leader seated:`). `BuildJoinLottery()` is gated `if (!_selHold)`
+  and rolls inside `CloseSelect()` **AFTER** the seat swap (demoted Leader waits for its join beat
+  like any recruit; `_hpOrder` just builds later on such a run). NEW bench door `M1_SELECT=<name>`
+  lifts the card under pilot: auto-browse at `_selWait>=1.2` then auto-CONFIRM on the next tick
+  (`>=2.4`), unknown name = `(select) bench asked an unknown leader...` + default seat stands.
 - **Baseline 5% evasion for every PC (user follow-up 2026-10-24)**: one seed-table move in `StatTags.cs`,
   `BASE[EVASION]` 0 -> 0.05; the TakeHit dodge roll was already gated on `stat > 0`, so all five roster
   members dodge from run start with no other code touched. Docs registry table re-aligned; per-PC evasion
@@ -611,8 +630,24 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   line anchors only** - the file carries pre-existing `\r\r\n` artifacts (161 stray CRs already in
   the HEAD blob), so global CRLF normalization is OUT and anchors must never cross a line ending.
   No Rng consumed; kaka kills ride the shared kill scan so gems / escort meter stay enemy-owned.
+- `smokeSAzx37` (default pilot), `smokeSAzx38` (`M1_SELECT=Yu`), `smokeSAzx39` (`M1_LEADER=Asper`) — **pre-run character-select framework** (see the Landed bullet above): all three **VICTORY / 17 `stat tag` rows / 0-byte `.err`**. zx37 keeps the card SKIPPED under pilot (no regression: zero `(select)` prints, ordinary boot). zx38 walks the whole card ladder — `(select) open:` → `pilot auto-browse slot for: Yu` → `pilot confirm on browsed: Yu` → `leader seated: Yu` — then the lottery rolls AFTER the swap and the Kaka lane fires with Yu seated from boot. zx39 proves the shared `TrySeatLeader` regression for the old bench valve (`(bench) leader seat moved to: Asper`). Iterative debug: first gate red twice — (a) the pilot auto-browse block re-entered every tick and swallowed the confirm (hold never dropped, no VICTORY; fixed by gating browse `&& _selBrowse < 0` + a separate confirm rail at `_selWait >= 2.4`); (b) zx38's 1492-byte `.err` was Godot's exit-time leak warning (10 CanvasItem RIDs + 37 ODB instances + 5 resources) — `--verbose` named the five art PNGs "still in use", and the counts pinned **five slot Tiles never parented under the board window = orphans**; one `AddChild` closed the gate.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
+
+- **An unparented Control is an orphan**: tree teardown never frees it, so it leaks CanvasItem RIDs /
+  ObjectDB instances / held resources at exit and Godot prints leak warnings on stderr — breaking the
+  smoke gate's 0-byte `.err` contract. `QueueFree()` on the layer root cannot rescue a node `AddChild`
+  never ran, and nulling the C# field afterwards is equally useless. The exit-time COUNTS are a
+  localization tool: zx38's "10 CanvasItem RIDs + 5 resources" = exactly 5 slot tiles x (TextureRect +
+  name Label) + their art textures; re-run with `--verbose` and the "still in use" resources are named
+  on stdout.
+- **Pilot demo rails must not re-enter the action they just took**: the auto-browse block's gate never
+  excluded an already-browsed slot, so it fired every tick (spam forever) and the confirm check below
+  it was unreachable — the card held forever and the run never reached VICTORY. Split the door: browse
+  ONLY when `_selBrowse < 0`, then CONFIRM on a separate rail (`_selBrowse >= 0 && _selWait >= 2.4`).
+- **Godot's C# frontend rejects 2D shorthand even inside `new float[][] { { ... } }`** (CS0623 persists
+  on the inner braces): the small-table escape is to FLATTEN to a 1D `static readonly float[]` and
+  index `(i % PER) * 4 + axis` — 1D shorthand compiles (the `OPT_CD` tables set the precedent).
 
 - **Join-lottery index base**: `_allyBeatIdx` counts from **1** (0 = none fired), but `_joinOrder`
   is a 0-based draw order — looking up `_joinOrder[_allyBeatIdx]` silently skipped the FIRST drawn
