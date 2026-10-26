@@ -527,6 +527,23 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   visual evidence for this gate. (Note: `tools/artcheck.gd` is **tracked**, despite the older
   gate's UNTRACKED claim — swap its path line for each audit but `git checkout HEAD --` it back
   after, so the one-off probe state never ships.)
+- `smokeM2zx25` (camp skip), `smokeM2zx26` (camp skip, `M1_LEADER=Mosiah`), `smokeM2zx27` (camp
+  skip, `M1_LEADER=Asper`) — **Mosiah "Bardic Inspiration" ultimate lane** (user: all allies +25%
+  damage, +25% attack speed): **VICTORY lv15/xp541, VICTORY lv15/xp550, VICTORY lv16/xp557**,
+  0-byte `.err`, **17** `stat tag` rows each. Party-wide means **per-body clocks**: `insT` rides
+  the `_Process` tick block next to `ultT`/`ultCdT` so it pauses with the world's soft pause, and
+  `TryUltimate` stamps it on every ally *including the caster* through a new `Game.InspireParty`
+  walk (private `_party` lives on Game; the group API would wrestle Godot.Array bindings). The
+  two multipliers reuse the ult machinery's existing chokes — ×1.25 damage inside `RollDamage`
+  (all kits + shot pool + insect seats) and ×1.25 speed as an `EffCooldown` divisor, which is the
+  cadence for **all four kits** because the aura pulse rides the weapon cooldown, so Asper's bow
+  and Alvora's ring genuinely tick faster. Duration 10 s = assistant pick (user named no window,
+  same class as `ULT_LASTS`); gate stays shared `ULT_CD_BASE 120 s / StatTags.ULT`. Evidence:
+  zx25 keeps Baldrun byte-identical (2× `Giant's Might`, `ult 2 cd 15` tail), zx26 prints 2×
+  `(ult) Bardic Inspiration` with the final boss cut visibly faster (205 hp left at t=370 vs
+  zx25's 522 — the DPS signature), zx27 holds `ult 0 cd 0` silence while its insect lane runs
+  (`bound 5`). No new RNG consumed; cadence shift re-bakes downstream streams (lv/xp drift
+  legitimate). The R/pilot firing block needed no change — it keys generically on `ultKey() > 0`.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 

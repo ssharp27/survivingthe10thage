@@ -1068,6 +1068,15 @@ public partial class Game : Godot.Node2D
 		return _pickerActive || _joinWaiting;
 	}
 
+	// party-wide ult lane (Mosiah "Bardic Inspiration", 2026-10-26): the roster lives here
+	// (private _party) and every ally is a child of Game, so a party-wide effect walk
+	// starts at Game; the authoring + the cooldown gate stay on PartyMember.TryUltimate
+	public void InspireParty(double secs)
+	{
+		foreach (PartyMember m in _party)
+			m.insT = secs; // every ally carries its OWN bardic clock (bench too - harmless)
+	}
+
 	// how wide the camera can actually see: NOT assumed anymore. A DPI-scaled
 	// fullscreen window (canvas_items stretch, aspect expand) sees far more world than
 	// the 1920x1080 base viewport - the old hardcoded 960x540 left the pinned floor

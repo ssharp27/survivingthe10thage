@@ -73,6 +73,14 @@ public partial class PartyMember : Godot.Node2D
 	readonly double ULT_DMG = 1.5; // +50% damage while grown (RollDamage choke)
 	readonly double ULT_SIZE = 2.0; // root scale x2: art and tele/aura pivots inherit
 	readonly double ULT_RANGE = 2.0; // reach / hit radius x2 (EffRange)
+	// Mosiah "Bardic Inspiration" (user 2026-10-26): insT = bardic seconds left ON THIS
+	// body - the ult is PARTY-WIDE so every ally carries its own clock. INS_SPD divides
+	// EffCooldown, which IS the cadence for all four kits (the aura pulse rides the
+	// weapon cooldown too), and INS_DMG rides the RollDamage choke - no new RNG rolls.
+	public double insT = 0.0;
+	readonly double INS_LASTS = 10.0; // assistant pick (user named no window), like ULT_LASTS
+	readonly double INS_DMG = 1.25; // +25% damage while inspired (RollDamage choke)
+	readonly double INS_SPD = 1.25; // +25% attack speed: EffCooldown divisor, all kits
 	Godot.Node2D _telePivot; // telegraph armature (pure nodes: C# _draw is dead in 4.7)
 	Godot.ColorRect[] _teleParts;
 	float _teleHold = 0.0f; // telegraph visibility timer, set on each swing
@@ -327,6 +335,8 @@ public partial class PartyMember : Godot.Node2D
 	{
 		if (displayName == "Baldrun")
 			return 1; // Giant's Might
+		if (displayName == "Mosiah")
+			return 2; // Bardic Inspiration
 		return 0; // other PCs: no ultimate authored yet (future lanes land here)
 	}
 	public bool TryUltimate()
@@ -348,6 +358,19 @@ public partial class PartyMember : Godot.Node2D
 				" s, gate " + (int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
 			return true;
 		}
+		else if (ultKey() == 2)
+		{
+			ultCdT = ULT_CD_BASE / stat[StatTags.ULT];
+			// roster walk lives on Game (private _party; the group API would wrestle
+			// Godot.Array bindings); it sets insT on EVERY ally incl. the caster
+			Game g2 = GetParent() as Game;
+			if (g2 != null)
+				g2.InspireParty(INS_LASTS);
+			GD.Print("[10thAge] (ult) Bardic Inspiration: " + displayName +
+				" rallies ALL allies (+25% damage, +25% attack speed) for " + (int)INS_LASTS +
+				" s, gate " + (int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
+			return true;
+		}
 		GD.Print("[10thAge] (ult) " + displayName + " has no ultimate yet");
 		return false;
 	}
@@ -363,7 +386,7 @@ public partial class PartyMember : Godot.Node2D
 	/** Authored cooldown divided by the ATTACK_SPEED tag (higher = faster attacks). */
 	public double EffCooldown()
 	{
-		double spd = stat[StatTags.ATTACK_SPEED];
+		double spd = stat[StatTags.ATTACK_SPEED] * (insT > 0.0 ? INS_SPD : 1.0); // bardic +25%
 		if (spd < 0.05)
 			spd = 0.05; // clamp: stacked speed cards can't drive the timer to zero
 		return cooldown / spd;
@@ -396,6 +419,8 @@ public partial class PartyMember : Godot.Node2D
 		// point: all kits, the shot pool and insect seats route through here)
 		if (ultT > 0.0)
 			amount *= ULT_DMG;
+		if (insT > 0.0)
+			amount *= INS_DMG; // bardic: +25% on every ally hit while inspired
 		if (host is Game g && g.Rng != null && g.Rng.Randf() < stat[StatTags.CRIT_CHANCE])
 			amount *= stat[StatTags.CRIT_DAMAGE];
 		double steal = amount * stat[StatTags.LIFESTEAL];
@@ -603,6 +628,9 @@ public partial class PartyMember : Godot.Node2D
 		ultCdT -= delta; // recharges on its own clock: bench ults stay ready when the seat flips
 		if (ultCdT < 0.0)
 			ultCdT = 0.0;
+		insT -= delta; // bardic clock pauses with the world's soft pause too
+		if (insT < 0.0)
+			insT = 0.0;
 		ultT -= delta;
 		if (_grown && ultT <= 0.0)
 		{
