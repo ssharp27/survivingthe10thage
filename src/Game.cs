@@ -358,6 +358,27 @@ public partial class Game : Godot.Node2D
 		const double HELPER_PICK = 24.0;  // "getting close": walk-contact reach, pick
 		const double HELPER_RING_MIN = 90.0;  // spawn ring around the leader: picks
 		const double HELPER_RING_MAX = 170.0; // (never on top of the seat itself)
+		// Swarm of Bees (Asper ult, user 2026-10-26): six seekers on a 10 s leash (user),
+		// each latched to ONE body and biting 10 dmg/s (user); unlaunched they drift along
+		// their spawn ray - the cast fans them on a circle so the swarm spreads out to
+		// hunt (user). _beeTarget keeps the prey instance id (-1 = hunting): enemies QueueFree
+		// on death so a node ref would dangle while an id simply stops resolving and the
+		// bee drops its latch and re-hunts.
+		Godot.Collections.Array<Godot.Node2D> _bees = new();
+		Godot.Collections.Array<double> _beeLife = new();
+		Godot.Collections.Array<double> _beeBite = new(); // seconds to the next chomp
+		Godot.Collections.Array<double> _beeRay = new(); // spawn bearing: the search direction
+		Godot.Collections.Array<long> _beeTarget = new();
+		int _beesUp = 0;      // live bees this cast: the drop to 0 fires the dispersal print
+		int _beeDrained = 0;  // tally: latched prey that stopped resolving while bitten
+		bool _beeSwarmUp = false; // one dispersal print per cast
+		const int BEE_COUNT = 6;      // user: exactly six bees
+		const double BEE_LASTS = 10.0; // user: the swarm lives 10 s
+		const double BEE_BITE = 10.0;  // user: 10 damage per second to the latched body
+		const double BEE_SPEED = 300.0; // pick: fast hunter, outruns the horde
+		const double BEE_R = 48.0;     // pick: spawn-ring radius around Asper
+		const double BEE_FIND = 240.0; // pick: hunting reach: nearest body in range latches
+		const double BEE_LATCH = 16.0; // pick: bite range: the bee rides the body
 	Godot.Collections.Array<Godot.Node2D> _enemies = new();
 	Godot.Collections.Array<Boss> _bosses = new();
 	int _liveEnemies = 0;
@@ -1504,6 +1525,25 @@ public partial class Game : Godot.Node2D
 			_spirits.Add(s);
 			_spiritLife.Add(0.0);
 		}
+		// Swarm of Bees pool (Asper ult, user 2026-10-26): six slots like the cast, parked
+		// at -9000; casts reuse them, UpdateBees owns the leash.
+		for (int i = 0; i < 6; i++)
+		{
+			Godot.Node2D s = new Node2D();
+			Godot.ColorRect cr = new ColorRect();
+			cr.Size = new Vector2(10.0f, 10.0f);
+			cr.Position = new Vector2(-5.0f, -5.0f);
+			cr.Color = new Color(0.86f, 0.72f, 0.18f, 1.0f); // honey amber: off every horde hue AND the insect lane's chitin so a friendly bee never reads as prey
+			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			s.AddChild(cr);
+			s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+			AddChild(s);
+			_bees.Add(s);
+			_beeLife.Add(0.0);
+			_beeBite.Add(0.0);
+			_beeRay.Add(0.0);
+			_beeTarget.Add(-1L);
+		}
 	}
 
 	public override void _Process(double d)
@@ -2302,6 +2342,7 @@ public partial class Game : Godot.Node2D
 		// Godot.Collections.Array is safe: _party never shrinks (join/eliminate flip flags)
 		UpdateInsects(delta);
 		UpdateSpirits(delta);
+		UpdateBees(delta); // swarm upkeep: lives under ANY seat once a cast ran
 	}
 
 	// Asper's vigil spawner: next free slot (parked at -9000 like the summon pool), a
@@ -2460,6 +2501,127 @@ public partial class Game : Godot.Node2D
 		}
 	}
 
+	// Swarm of Bees cast (Asper ult, user 2026-10-26): six bees on a compass ring
+	// around the seat (user: circle + spread out to hunt): slot i keeps bearing i*60
+	// deg while searching, and the nearest body inside BEE_FIND latches it. No Rng
+	// draws - a fixed fan so the run stream stays put.
+	public void SpawnBees(Vector2 center)
+	{
+		_beeDrained = 0;
+		_beesUp = 0;
+		_beeSwarmUp = true;
+		for (int i = 0; i < _bees.Count; i++)
+		{
+			double a = System.Math.PI * 2.0 * i / BEE_COUNT;
+			_beeLife[i] = BEE_LASTS;
+			_beeBite[i] = 0.0;
+			_beeRay[i] = a;
+			_beeTarget[i] = -1L;
+			Godot.Node2D s = _bees[i];
+			s.GlobalPosition = WrapNearCamera(center + new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a)) * (float)BEE_R);
+			((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+			_beesUp++;
+		}
+	}
+	
+	// swarm upkeep: a latched bee rides its prey and chews 10 dmg/s (user); a hunting bee
+	// drifts along its spawn ray (user). Prey resolves by instance id because dead bodies
+	// QueueFree: an id that stops resolving means the quarry dropped WHILE bitten -
+	// attribution is heuristic (another hand may have landed the last blow), printed
+	// once per cast as the dispersal tally.
+	private void UpdateBees(float delta)
+	{
+		Godot.Collections.Array<Godot.Node2D> enemies = GetEnemies();
+		for (int i = 0; i < _bees.Count; i++)
+		{
+			Godot.Node2D s = _bees[i];
+			if (s.GlobalPosition.X < -8000.0f)
+				continue; // free slot: same idiom as every pool
+			_beeLife[i] -= delta;
+			s.GlobalPosition = WrapNearCamera(s.GlobalPosition);
+			Godot.Node2D prey = null;
+			if (_beeTarget[i] >= 0)
+			{
+				foreach (Godot.Node2D n in enemies)
+				{
+					if ((long)n.GetInstanceId() == _beeTarget[i])
+					{
+						prey = n;
+						break;
+					}
+				}
+				if (prey == null)
+				{
+					_beeTarget[i] = -1L;
+					_beeBite[i] = 0.0;
+					_beeDrained += 1; // the quarry dropped while this bee was biting it
+				}
+			}
+			else
+			{
+				double best = BEE_FIND * BEE_FIND;
+				Godot.Node2D pick = null;
+				foreach (Godot.Node2D n in enemies)
+				{
+					Vector2 off = WrapDelta(s.GlobalPosition, n.GlobalPosition);
+					double d2 = off.X * off.X + off.Y * off.Y;
+					if (d2 < best)
+					{
+						best = d2;
+						pick = n;
+					}
+				}
+				if (pick != null)
+				{
+					prey = pick;
+					_beeTarget[i] = (long)pick.GetInstanceId();
+					_beeBite[i] = 0.0; // the first chomp lands the moment the bee rides on
+				}
+			}
+			if (prey != null)
+			{
+				Vector2 off = WrapDelta(s.GlobalPosition, prey.GlobalPosition);
+				if (off.X * off.X + off.Y * off.Y > BEE_LATCH * BEE_LATCH)
+				{
+					s.GlobalPosition = WrapNearCamera(s.GlobalPosition + off.Normalized() * (float)(BEE_SPEED * delta));
+					_beeBite[i] = 0.0; // walking in: the chew only starts once it is riding
+				}
+				else
+				{
+					_beeBite[i] -= delta;
+					if (_beeBite[i] <= 0.0)
+					{
+						_beeBite[i] = 1.0; // 10 dmg per SECOND (user): whole-second chomps
+						((Combatant)prey).TakeDamage(BEE_BITE); // flat bite: no crit, no tag lane
+					}
+				}
+			}
+			else
+			{
+				// hunting: drift along the spawn ray (user: spread out in all directions)
+				Vector2 dir = new Vector2((float)System.Math.Cos(_beeRay[i]), (float)System.Math.Sin(_beeRay[i]));
+				s.GlobalPosition = WrapNearCamera(s.GlobalPosition + dir * (float)(BEE_SPEED * delta));
+			}
+			if (_beeLife[i] <= 0.0)
+			{
+				DespawnBee(i);
+				_beesUp -= 1;
+				if (_beeSwarmUp && _beesUp <= 0)
+				{
+					_beeSwarmUp = false;
+					GD.Print("[10thAge] (ult) Swarm of Bees disperses: " + _beeDrained + " prey drained by 6 bites of 10 dmg/s over 10 s");
+				}
+			}
+		}
+	}
+	
+	private void DespawnBee(int i)
+	{
+		Godot.Node2D s = _bees[i];
+		s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+		((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+	}
+	
 	// Yu seat upkeep: a standing ally within HELPER_PICK touches a vigil; the patient is one
 	// RANDOM ally who has ACTUALLY LOST HP, healed 10 and the spirit is consumed (user
 	// 2026-10-25). A healthy squad never drinks: the vigil waits instead of being wasted.

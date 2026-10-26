@@ -350,6 +350,8 @@ public partial class PartyMember : Godot.Node2D
 			return 2; // Bardic Inspiration
 		if (displayName == "Alvora")
 			return 3; // Guardian Awakening
+		if (displayName == "Asper")
+			return 4; // Swarm of Bees
 		return 0; // other PCs: no ultimate authored yet (future lanes land here)
 	}
 	public bool TryUltimate()
@@ -393,6 +395,19 @@ public partial class PartyMember : Godot.Node2D
 			GD.Print("[10thAge] (ult) Guardian Awakening: " + displayName +
 				" doubles ring reach (after ranks) and burns it +50% for " + (int)AWA_LASTS +
 				" s; every horde kill while awake heals ALL allies 1 hp, gate " +
+				(int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
+			return true;
+		}
+		else if (ultKey() == 4)
+		{
+			ultCdT = ULT_CD_BASE / stat[StatTags.ULT];
+			// the swarm lives on Game: it owns the enemy registry and the bee pool;
+				// the member just stamps the fan center (user: circle around Asper)
+			Game g3 = GetParent() as Game;
+			if (g3 != null)
+				g3.SpawnBees(GlobalPosition);
+			GD.Print("[10thAge] (ult) Swarm of Bees: " + displayName +
+				" looses 6 hunters in a circle (10 dmg/s each, 10 s) spread out to hunt, gate " +
 				(int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
 			return true;
 		}

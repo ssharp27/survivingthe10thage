@@ -567,6 +567,30 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   python splice (`fixGame.py`: from the Awakening comment's foreach to the SpawnGem line, whole-
   line replace, c.kind restored); lesson: multi-line C# edits into Game.cs go through python
   splices, not the edit tool, when the payload has brace-heavy indentation.
+- `smokeM2zx31` (camp skip), `smokeM2zx32` (camp skip, `M1_LEADER=Asper`), `smokeM2zx33` (camp
+  skip, `M1_LEADER=Yu`) — **Asper "Swarm of Bees" ultimate lane** (user: 6 bees, 10 s, 10 dmg/s,
+  latch one enemy at a time, spawn in a circle, spread out to hunt): **VICTORY lv15/xp543, VICTORY
+  lv15/xp507, VICTORY lv16/xp578**, 0-byte `.err`, **17** `stat tag` rows each. The swarm lives
+  entirely on Game: six-slot pool (honey-amber `ColorRect`, off every horde hue AND the insect
+  lane's chitin) + `SpawnBees` fans slot i onto bearing i×60° (user's compass circle; **no Rng
+  draws** — a fixed fan so the run stream stays put) + `UpdateBees` unconditional upkeep next to
+  `UpdateInsects/UpdateSpirits`. Latch discipline: `_beeTarget` holds the **prey instance id** —
+  dead bodies QueueFree, so a node ref would dangle while an id simply stops resolving and the
+  bee unlatches, tallies `_beeDrained`, and re-hunts; hunting bees drift along their spawn ray and
+  the **nearest body inside BEE_FIND 240 px** latches (spread ring + own-nearest = the fan
+  searches all directions); latched bees ride (`BEE_LATCH 16`) and chomp whole seconds via flat
+  `TakeDamage(10)` — no crit, no tag lane. One-shot dispersal print when `_beesUp` drops to 0
+  (`_beeSwarmUp` guard, same discipline as `_awaUp`). zx32 evidence: 2× `(ult) Swarm of Bees` +
+  dispersal tallies `0 prey drained` (first window at the mini-boss arena, honest empty case) and
+  `88 prey drained` (tier-4 stampede; the tally is **heuristic latch-break attribution** — another
+  hand may have landed the last blow, documented). zx31 keeps Baldrun's `Giant's Might` identical
+  (`ult 2 cd 15`, no bee prints), zx33 holds `ult 0 cd 0` Yu silence with spirit lane running
+  (`healed 2`). No Rng consumed; bee kills ride the shared kill scan so XP gems / escort meter
+  stay enemy-owned (downstream lv/xp drift legitimate). PITFALL: the harness **kills the whole
+  process tree when a background smoke exceeds an explicit timeout** — zx31 had finished, the
+  trio died between gates before zx32's redirect even created its file; lesson: verify via
+  `tasklist` no godot survives, then re-run the REMAINING gates from a fresh ps1 with **timeout
+  0** (background commands have no timeout by default).
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
