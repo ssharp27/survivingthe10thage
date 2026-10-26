@@ -512,6 +512,19 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   (~t=120 and ~t=300, readout `ult 1/2`, `cd 120` re-armed then ticking `105→15` to the tail),
   zx20/zx21 readouts hold `ult 0 cd 0` while their insect/spirit lanes run untouched and VICTORY
   holds. Readout appends `" | ult fired cd"` reading `_leader.ultCdT`.
+- `smokeM2zx22` (camp skip), `smokeM2zx23` (camp skip, `M1_LEADER=Asper`), `smokeM2zx24` (camp skip,
+  `M1_LEADER=Yu`) — **Yu roster art** (user dropped `art/yu.png` overnight): **VICTORY lv15/xp545,
+  VICTORY lv15/xp540, VICTORY lv16/xp563**, 0-byte `.err`, **17** `stat tag` rows each; zx22 still
+  auto-fires Baldrun's ult (`ult 1/2`, `cd 120` re-arm) and zx23/24 keep their insect/spirit lanes
+  byte-identical in kind. Audit passed the class via the one-off `tools/artcheck.gd` (UNTRACKED —
+  swap the path line, run `--headless --import` before auditing a fresh PNG): 85x114 canvas, hard
+  alpha (`soft_alpha_px=0`), 61 opaque colours, 1 px margins, cx_delta −0.5. **BUT the plinth is
+  deeper than the four**: the bottom row profile shows the base's bottom ellipse widest (centre) on
+  row 96 — **17.5 px up from the canvas edge**, so `miniRim = 17.5f` is MEASURED, not the carried
+  7 px (the rig-origin pin is the topple pivot AND the dash-plate anchor — carrying 7 would have
+  sunk Yu's feet 10 px into the clearing). `displayName == "Yu"` branch spliced into the art
+  lookup via the git-splice route; headless smokes never see pixels, the audit print IS the
+  visual evidence for this gate.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 

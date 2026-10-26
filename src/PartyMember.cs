@@ -193,6 +193,15 @@ public partial class PartyMember : Godot.Node2D
 		else if (displayName == "Alvora")
 			// Alvora art audit-passed the same class 2026-10-23 - rim/scale carry over
 			miniPath = "res://art/alvora.png";
+		else if (displayName == "Yu")
+		{
+			// 2026-10-26: Yu art audit-passed (85x114 canvas, hard alpha 0 soft px, 61 opaque
+			// colours, 1 px margins, cx_delta -0.5). BUT the plinth is deeper than the four:
+			// row profile shows the base bottom ellipse at its widest (centre) on row 96,
+			// 17.5 px up from the canvas edge - so the rim pin is MEASURED, not carried over
+			miniPath = "res://art/yu.png";
+			miniRim = 17.5f;   // rig origin pinned to the base ellipse centre (topple + dash plate)
+		}
 		if (miniPath != "")
 		{
 			Godot.Texture2D tex = GD.Load(miniPath) as Godot.Texture2D;
