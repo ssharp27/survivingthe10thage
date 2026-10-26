@@ -648,8 +648,29 @@ public partial class Game : Godot.Node2D
 			if (_escortLeft <= 0)
 				JoinRecruit();
 		}
+		// Guardian Awakening (Alvora ult, user 2026-10-26): every HORDE kill while an ally's
+		// awakening window is up heals the STANDING squad +1 hp each - same eligibility the
+		// spirit heals use (joined / not downed / not eliminated, clamp to EffMaxHp) - and
+		// tallies on the awakening owner so its expiry print can report the haul.
+		// Boss kills routed to OnBossKilled above and never count.
+		foreach (PartyMember m in _party)
+		{
+			if (m.awaT > 0.0)
+			{
+				m.awaKills += 1;
+				foreach (PartyMember mm in _party)
+				{
+					if (!mm.joined || mm.downed || mm.eliminated)
+						continue; // fallen bodies keep their own recovery lanes
+					mm.hp += 1.0f;
+					if (mm.hp > mm.EffMaxHp())
+						mm.hp = (float)mm.EffMaxHp(); // spirit-heal clamp: ceiling at own cap
+				}
+				break; // exactly one awakening owner per kill
+			}
+		}
 		SpawnGem(c.GlobalPosition, ((Enemy)c).xpValue);
-		c.kind = "dead";
+		c.kind = "dead"; // drop the registry entry in the kill scan
 		ReleaseLiveCount((Enemy)c); // ownership-flagged: never double-decrements
 		c.QueueFree();
 	}

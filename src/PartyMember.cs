@@ -81,6 +81,17 @@ public partial class PartyMember : Godot.Node2D
 	readonly double INS_LASTS = 10.0; // assistant pick (user named no window), like ULT_LASTS
 	readonly double INS_DMG = 1.25; // +25% damage while inspired (RollDamage choke)
 	readonly double INS_SPD = 1.25; // +25% attack speed: EffCooldown divisor, all kits
+	// Alvora "Guardian Awakening" (user 2026-10-26): ring reach x2 MULTIPLIED after the
+	// AREA tag (ranks keep widening the awakened ring - user asked for exactly that),
+	// guardian damage +50% at the RollDamage choke, and Game.OnEnemyKilled tallies awaKills:
+	// every horde kill while awake heals the standing squad +1 hp each. _awaUp guards the
+	// one-shot expiry print, same discipline as _grown.
+	public double awaT = 0.0;
+	public int awaKills = 0;
+	bool _awaUp = false;
+	readonly double AWA_LASTS = 10.0; // assistant pick (user named no window)
+	readonly double AWA_RANGE = 2.0; // ring reach x2, after the AREA tag (EffRange)
+	readonly double AWA_DMG = 1.5; // +50% guardian damage while awake (RollDamage choke)
 	Godot.Node2D _telePivot; // telegraph armature (pure nodes: C# _draw is dead in 4.7)
 	Godot.ColorRect[] _teleParts;
 	float _teleHold = 0.0f; // telegraph visibility timer, set on each swing
@@ -337,6 +348,8 @@ public partial class PartyMember : Godot.Node2D
 			return 1; // Giant's Might
 		if (displayName == "Mosiah")
 			return 2; // Bardic Inspiration
+		if (displayName == "Alvora")
+			return 3; // Guardian Awakening
 		return 0; // other PCs: no ultimate authored yet (future lanes land here)
 	}
 	public bool TryUltimate()
@@ -371,6 +384,18 @@ public partial class PartyMember : Godot.Node2D
 				" s, gate " + (int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
 			return true;
 		}
+		else if (ultKey() == 3)
+		{
+			ultCdT = ULT_CD_BASE / stat[StatTags.ULT];
+			awaT = AWA_LASTS;
+			awaKills = 0;
+			_awaUp = true;
+			GD.Print("[10thAge] (ult) Guardian Awakening: " + displayName +
+				" doubles ring reach (after ranks) and burns it +50% for " + (int)AWA_LASTS +
+				" s; every horde kill while awake heals ALL allies 1 hp, gate " +
+				(int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
+			return true;
+		}
 		GD.Print("[10thAge] (ult) " + displayName + " has no ultimate yet");
 		return false;
 	}
@@ -392,7 +417,7 @@ public partial class PartyMember : Godot.Node2D
 		return cooldown / spd;
 	}
 	/** Authored reach scaled by the AREA tag. */
-	public double EffRange() { return range * stat[StatTags.AREA] * (ultT > 0.0 ? ULT_RANGE : 1.0); }
+	public double EffRange() { return range * stat[StatTags.AREA] * (ultT > 0.0 ? ULT_RANGE : 1.0) * (awaT > 0.0 ? AWA_RANGE : 1.0); } // awakening widens too
 	/** Authored maxHp plus the additive HEALTH tag (points). */
 	public double EffMaxHp() { return maxHp + stat[StatTags.HEALTH]; }
 	/** Authored baseSpeed scaled by the MOVEMENT_SPEED tag. */
@@ -421,6 +446,8 @@ public partial class PartyMember : Godot.Node2D
 			amount *= ULT_DMG;
 		if (insT > 0.0)
 			amount *= INS_DMG; // bardic: +25% on every ally hit while inspired
+		if (awaT > 0.0)
+			amount *= AWA_DMG; // awakening: +50% on Alvora hits while awake
 		if (host is Game g && g.Rng != null && g.Rng.Randf() < stat[StatTags.CRIT_CHANCE])
 			amount *= stat[StatTags.CRIT_DAMAGE];
 		double steal = amount * stat[StatTags.LIFESTEAL];
@@ -581,7 +608,7 @@ public partial class PartyMember : Godot.Node2D
 		// a PULSE readable without a HUD. One pivot, so one Scale carries the "wider ring" rank.
 		if (weaponKit == "aura" && _auraPivot != null)
 		{
-			_auraPivot.Scale = new Vector2((float)stat[StatTags.AREA], (float)stat[StatTags.AREA]);
+			_auraPivot.Scale = new Vector2((float)(stat[StatTags.AREA] * (awaT > 0.0 ? AWA_RANGE : 1.0)), (float)(stat[StatTags.AREA] * (awaT > 0.0 ? AWA_RANGE : 1.0))); // awakened ring: visible pivot matches the doubled hit test
 			_auraPivot.Rotation += (float)(1.1 * delta);
 			if (_auraPulse > 0.0f)
 			{
@@ -631,6 +658,17 @@ public partial class PartyMember : Godot.Node2D
 		insT -= delta; // bardic clock pauses with the world's soft pause too
 		if (insT < 0.0)
 			insT = 0.0;
+		awaT -= delta; // awakening window ticks with the same soft-pause discipline
+		if (_awaUp && awaT <= 0.0)
+		{
+			_awaUp = false;
+			awaT = 0.0;
+			GD.Print("[10thAge] (ult) Guardian Awakening settles: " + awaKills +
+				" horde slain while awake - the standing squad healed " + awaKills +
+				" hp each (tally via Game.OnEnemyKilled)");
+		}
+		if (awaT < 0.0)
+			awaT = 0.0;
 		ultT -= delta;
 		if (_grown && ultT <= 0.0)
 		{

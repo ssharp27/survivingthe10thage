@@ -544,6 +544,29 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   zx25's 522 — the DPS signature), zx27 holds `ult 0 cd 0` silence while its insect lane runs
   (`bound 5`). No new RNG consumed; cadence shift re-bakes downstream streams (lv/xp drift
   legitimate). The R/pilot firing block needed no change — it keys generically on `ultKey() > 0`.
+- `smokeM2zx28` (camp skip), `smokeM2zx29` (camp skip, `M1_LEADER=Alvora`), `smokeM2zx30` (camp
+  skip, `M1_LEADER=Asper`) — **Alvora "Guardian Awakening" ultimate lane** (user: Spirit Guardians
+  range x2 *riding range upgrades*, guardians +50% damage, heal-all +1 hp per horde kill while
+  active): **VICTORY lv15/xp534, VICTORY lv15/xp488, VICTORY lv15/xp530**, 0-byte `.err`, **17**
+  `stat tag` rows each. Three effects, three homes: **×2 ring reach MULTIPLIED AFTER the AREA
+  tag** in `EffRange` (user asked for multiplicative-with-ranks explicitly; and the `Guardians`
+  pivot scale got the same factor so the visible ring matches the doubled hit test — the only
+  other place reading reach is the damage arc itself), **×1.5 damage at the `RollDamage` choke**
+  (only Alvora ever sets `awaT`, so it is his ring exactly), and the **per-kill heal hooked in
+  `Game.OnEnemyKilled`** non-boss path (boss kills route above and never count): each horde kill
+  while any `awaT` is up heals every standing ally +1 with the *spirit-heal eligibility* (joined
+  / not downed / not eliminated, clamp at `EffMaxHp`) and tallies `awaKills` on the owner; expiry
+  prints a one-shot `settles: N horde slain` line guarded by `_awaUp` (same discipline as `_grown`).
+  zx29 evidence: 2× `(ult) Guardian Awakening` + settle lines `0 horde slain` (first window,
+  honest empty case) and `4 horde slain ... healed 4 hp each`; boss1 eaten faster (500→400→270→147
+  hp at t=244-289). zx28 keeps Baldrun's lane firing identically (`ult 2 cd 15` tail), zx30 holds
+  `ult 0 cd 0` silence while its insect lane runs (`bound 5`). No new RNG consumed (heals are flat
+  +1); reach/damage shift re-bakes downstream streams (Alvora's lower lv/xp is the ring's slower
+  natural DPS). PITFALL: first two edit-tool attempts on Game.cs **garbled the hook** (nested
+  empty braces/stray semicolons) **and ate `c.kind = "dead";`** — repaired via a marker-matched
+  python splice (`fixGame.py`: from the Awakening comment's foreach to the SpawnGem line, whole-
+  line replace, c.kind restored); lesson: multi-line C# edits into Game.cs go through python
+  splices, not the edit tool, when the payload has brace-heavy indentation.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
