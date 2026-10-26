@@ -310,6 +310,7 @@ public partial class Game : Godot.Node2D
 		Godot.Collections.Array<double> _summonR = new();      // blast radius, px
 		Godot.Collections.Array<float> _summonSpd = new();     // px/s this familiar runs
 		Godot.Collections.Array<bool> _summonBurst = new();    // slot is mid detonation flare
+		Godot.Collections.Array<bool> _summonKaka = new();   // slot is an empowered Kaka familiar (ult): doubled numbers baked at spawn
 		// bolt-pool pierce memo (leader bonus, user 2026-10-25): while Mosiah owns the
 		// leader seat a bolt punches through one body and keeps flying. _shotPen is the
 		// per-bolt pierce budget stamped at spawn; _shotLast memoizes the body the bolt
@@ -378,7 +379,16 @@ public partial class Game : Godot.Node2D
 		const double BEE_SPEED = 300.0; // pick: fast hunter, outruns the horde
 		const double BEE_R = 48.0;     // pick: spawn-ring radius around Asper
 		const double BEE_FIND = 240.0; // pick: hunting reach: nearest body in range latches
-		const double BEE_LATCH = 16.0; // pick: bite range: the bee rides the body
+		const double BEE_LATCH = 16.0; // pick: bite range: the bee rides the body
+		// The Kaka (Yu ult, user 2026-10-26): six EMPOWERED copies of the ritual familiars -
+		// same pool, steering, fuse and no-split blast, only doubled reach and bite. The x2
+		// multiplies AFTER the rank scaling: the member passes already-scaled kit numbers and
+		// these ride on top (same discipline as AWA_RANGE after the AREA tag). They enter on a
+		// circle fanned around Yu so the flight spreads out, like the bees (user).
+		const int KAKA_COUNT = 6;       // user: exactly six empowered friends
+		const double KAKA_RING = 48.0;  // pick: spawn-circle radius around Yu, same as BEE_R
+		const double KAKA_DMG = 2.0;    // user: damage x2, after the upgrade scaling
+		const double KAKA_R = 2.0;      // user: blast radius x2, after the AREA ranks
 	Godot.Collections.Array<Godot.Node2D> _enemies = new();
 	Godot.Collections.Array<Boss> _bosses = new();
 	int _liveEnemies = 0;
@@ -1490,6 +1500,7 @@ public partial class Game : Godot.Node2D
 			_summonR.Add(0.0);
 			_summonSpd.Add(0.0f);
 			_summonBurst.Add(false);
+			_summonKaka.Add(false);
 		}
 		// leader-bonus helper pools (user 2026-10-25): Asper's insects and Yu's spirits.
 		// Slots stay small because one spawns every 30 s and neither phase lives past
@@ -2863,6 +2874,7 @@ public partial class Game : Godot.Node2D
 			_summonLife[i] = fuse;
 			_summonR[i] = radius;
 			_summonSpd[i] = speed;
+			_summonKaka[i] = false; // the ritual's own familiars never carry the Kaka's doubling
 			_summonBurst[i] = false;
 			// put the shell back: the slot may have been left mid-blast by DetonateSummon
 			Godot.ColorRect cr = (Godot.ColorRect)s.GetChild(0);
@@ -2872,6 +2884,40 @@ public partial class Game : Godot.Node2D
 			return;
 		}
 	}
+
+	public void SpawnKakas(Vector2 center, double dmg, double fuse, double radius, float speed)
+	{
+		// The Kaka entry (user 2026-10-26): empowered copies through the SAME plumbing SpawnSummon
+		// uses - pool idiom, shell restore, fuse - but the doubled numbers bake here so the x2
+		// multiplies AFTER the caller's rank scaling, and the compass fan seeds each familiar's
+		// velocity along its own bearing: with no prey around they drift outward like the bees,
+		// and the moment prey shows up the familiar's nearest-body steering takes over. KAKA_COUNT
+		// > free slots is tolerated like SpawnSummon tolerates it: a crowded pool drops the tail.
+		int born = 0;
+		for (int i = 0; i < _summons.Count; i++)
+		{
+			Godot.Node2D s = _summons[i];
+			if (s.GlobalPosition.X >= -8000.0f)
+				continue; // occupied slot
+			double a = System.Math.PI * 2.0 * born / KAKA_COUNT;
+			s.GlobalPosition = WrapNearCamera(center + new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a)) * (float)KAKA_RING);
+			_summonVel[i] = new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a)) * speed;
+			_summonDmg[i] = dmg * KAKA_DMG; // x2 AFTER RollDamage's rank scaling (user)
+			_summonLife[i] = fuse;          // same fuse: empowered friends live just as long
+			_summonR[i] = radius * KAKA_R;  // x2 AFTER the AREA tag (user: doubles the upgraded burst)
+			_summonSpd[i] = speed;
+			_summonBurst[i] = false;
+			_summonKaka[i] = true; // the doubling and the burst print ride this flag
+			Godot.ColorRect cr = (Godot.ColorRect)s.GetChild(0);
+			cr.Size = new Vector2(14.0f, 14.0f);
+			cr.Position = new Vector2(-7.0f, -7.0f);
+			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+			born++;
+			if (born >= KAKA_COUNT)
+				return;
+		}
+	}
+
 
 	private void UpdateSummons(float delta)
 	{
@@ -2948,6 +2994,7 @@ public partial class Game : Godot.Node2D
 		Vector2 p = s.GlobalPosition;
 		double dmg = _summonDmg[i];
 		double r = _summonR[i];
+		int caught = 0; // blast tally: only an empowered Kaka prints it
 		for (int e = 0; e < _enemies.Count; e++)
 		{
 			Godot.Node2D n = _enemies[e];
@@ -2961,7 +3008,10 @@ public partial class Game : Godot.Node2D
 				continue;
 			nc.TakeDamage(dmg);
 			TryChainLightning(n); // Baldrun seat: the blast can loose a chain per caught body
+			caught++;
 		}
+		if (_summonKaka[i])
+			GD.Print("[10thAge] (ult) The Kaka burst: " + caught + " body(s) caught in the doubled blast");
 		// the slot BECOMES the blast for a beat: the shell grows to the radius it actually bit
 		// and fades, so the AoE reads without a HUD. Pure nodes - the C# _draw hook is dead in 4.7.
 		_summonBurst[i] = true;

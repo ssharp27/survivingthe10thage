@@ -352,6 +352,8 @@ public partial class PartyMember : Godot.Node2D
 			return 3; // Guardian Awakening
 		if (displayName == "Asper")
 			return 4; // Swarm of Bees
+		if (displayName == "Yu")
+			return 5; // The Kaka
 		return 0; // other PCs: no ultimate authored yet (future lanes land here)
 	}
 	public bool TryUltimate()
@@ -408,6 +410,24 @@ public partial class PartyMember : Godot.Node2D
 				g3.SpawnBees(GlobalPosition);
 			GD.Print("[10thAge] (ult) Swarm of Bees: " + displayName +
 				" looses 6 hunters in a circle (10 dmg/s each, 10 s) spread out to hunt, gate " +
+				(int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
+			return true;
+		}
+		else if (ultKey() == 5)
+		{
+			ultCdT = ULT_CD_BASE / stat[StatTags.ULT];
+			// the empowered familiar lives on the Game-side summon pool: it already steers, fuses and
+			// blasts no-split, so the member just stamps the ring center and the ALREADY-SCALED
+			// kit numbers - the x2 damage and x2 blast multiply on top of that scaling inside
+			// SpawnKakas (same discipline as AWA_RANGE after the AREA tag).
+			Game g4 = GetParent() as Game;
+			if (g4 != null)
+			{
+				float blast = (float)(minionRadius * stat[StatTags.AREA]); // wider burst rank: same as the ritual
+				g4.SpawnKakas(GlobalPosition, RollDamage(g4, weaponDamage), minionFuse, blast, minionSpeed);
+			}
+			GD.Print("[10thAge] (ult) The Kaka: " + displayName +
+				" looses 6 empowered familiars in a circle (blast x2, damage x2 after ranks, same fuse) that spread out, gate " +
 				(int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
 			return true;
 		}

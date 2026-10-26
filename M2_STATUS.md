@@ -591,6 +591,26 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   trio died between gates before zx32's redirect even created its file; lesson: verify via
   `tasklist` no godot survives, then re-run the REMAINING gates from a fresh ps1 with **timeout
   0** (background commands have no timeout by default).
+- `smokeM9zx34` (camp skip), `smokeM9zx35` (camp skip, `M1_LEADER=Yu`), `smokeM9zx36` (camp
+  skip, `M1_LEADER=Asper`) — **Yu "The Kaka" ultimate lane** (user: 6 empowered familiars same
+  as the regular summons, blast radius x2 and damage x2 scaling AFTER upgrades, spawn in a circle
+  and spread out like the bees): **VICTORY lv15/xp551, VICTORY lv15/xp531, VICTORY lv15/xp527**,
+  0-byte `.err`, **17** `stat tag` rows each. Zero new plumbing: the Kaka rides the ritual's OWN
+  summon pool (64 slots; steering, fuse, contact/fuse detonation and the no-split blast untouched)
+  via a per-slot `_summonKaka` flag reset at every spawn point (no DespawnSummon hygiene edit
+  needed: every reuse path stamps the flag). `SpawnKakas` bakes `dmg*KAKA_DMG` / `radius*KAKA_R`
+  AFTER the caller's rank scaling (PM passes the ALREADY-scaled kit numbers - same after-ranks
+  discipline as AWA_RANGE after the AREA tag), fans 6 on a compass circle like `SpawnBees`
+  (fixed bearings, **no Rng draws**), and seeds each familiar's velocity along its spawn bearing
+  so an empty clearing still fans them outward (bee-style drift; the familiar's own nearest-body
+  steering takes over the moment prey shows). `DetonateSummon` tallies caught bodies and prints
+  ONLY for empowered slots. zx35 evidence: 2x `(ult) The Kaka` casts + six burst tallies per cast
+  (`0 body(s)` at the mini-boss arena = honest empty case, `1 body(s)` per burst in the tier-4
+  stampede); zx34 silent with Baldrun's lane identical (`ult 2 cd 15`), zx36 keeps the bee lane
+  intact (`53 prey drained`, no Kaka prints). Splice lesson: Game.cs marker splice with **single-
+  line anchors only** - the file carries pre-existing `\r\r\n` artifacts (161 stray CRs already in
+  the HEAD blob), so global CRLF normalization is OUT and anchors must never cross a line ending.
+  No Rng consumed; kaka kills ride the shared kill scan so gems / escort meter stay enemy-owned.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
