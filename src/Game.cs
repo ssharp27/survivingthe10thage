@@ -250,6 +250,32 @@ public partial class Game : Godot.Node2D
 	double _campWaitT = 0.0;
 	double _pickerWait = 0.0;
 	bool _pickerActive = false;
+		// ---------- pre-run character select (user 2026-10-26: framework pass) ----------
+		// Boot card in read-the-card soft-pause shape: roster blocks sit in a central
+		// element in BLOCKS OF FOUR (the five-PC tail pages onto board page two - the same
+		// paging rule a future stage select will ride), and the right panel carries the
+		// browsed PC's breakdown: mini art, HP, kit tracks, leader bonus, ultimate copy.
+		// Press 1..N browses; press the browsed number AGAIN seats that PC as the Leader.
+		// Human play holds here forever (the picker's no-timeout rule); pilot skips the
+		// card UNLESS the bench valve M1_SELECT=<name> lifts it so a smoke can walk the
+		// browse -> confirm -> lottery wiring. The swap rides ONE shared TrySeatLeader
+		// copy (bench and select doors), and the join lottery waits for the swap (the
+		// demoted Leader waits for its join beat like any other recruit; _hpOrder just
+		// builds later on such a run, which the camp-card fallback already survives).
+		bool _selHold = false;
+		bool _selDemo = false;            // bench door up: M1_SELECT=<name> under pilot
+		string _selWant = "";             // bench's wanted seat name (resolved at confirm)
+		double _selWait = 0.0;            // card clock: feeds ONLY the pilot auto door
+		int _selBrowse = -1;              // slot the card currently reads (-1 = nothing)
+		Godot.CanvasLayer _selLayer = null;
+		Control _selRoot = null;          // full-rect anchor parent for every piece
+		ColorRect _selBack = null;        // full-rect cover: the card hides the world frame
+		Control _selPage = null;          // the four-slot board window (2x2)
+		ColorRect _selFrame = null;       // highlight frame: anchors jump to the browsed slot
+		Label _selPanel = null;           // right-hand breakdown, rebuilt on every browse
+		Label _selHint = null;            // key-grammar reminder on the card
+		Control[] _selTile = new Control[0];
+		Label[] _selName = new Label[0];
 	bool _summaryPrinted = false;
 
 	Godot.Camera2D _camera;
@@ -1117,7 +1143,7 @@ public partial class Game : Godot.Node2D
 	// this treatment instead of a tree pause so its CLICK gate keeps receiving input.
 	public bool GetWorldPause()
 	{
-		return _pickerActive || _joinWaiting;
+		return _pickerActive || _joinWaiting || _selHold;
 	}
 
 	// party-wide ult lane (Mosiah "Bardic Inspiration", 2026-10-26): the roster lives here
@@ -1311,28 +1337,22 @@ public partial class Game : Godot.Node2D
 		if (_pilot)
 		{
 			string want = OS.GetEnvironment("M1_LEADER") == null ? "" : OS.GetEnvironment("M1_LEADER");
-			if (want != "" && _leader != null && want != _leader.displayName)
-			{
-				PartyMember seat = null;
-				foreach (PartyMember pm2 in _party)
-					if (pm2.displayName == want)
-						seat = pm2;
-				if (seat != null)
-				{
-					// the seat swap carries the arena spawn: the new Leader opens where the squad
-					// opened, the demoted Leader is parked off-world until its own join beat
-					Vector2 open = _leader.GlobalPosition;
-					foreach (PartyMember pm2 in _party)
-					{
-								bool lead = (pm2 == seat);
-								pm2.isLeader = lead;
-								pm2.joined = lead;
-								pm2.GlobalPosition = lead ? open : new Vector2(-9500.0f, -9500.0f);
-					}
-					_leader = seat;
+				// the swap rule lives in TrySeatLeader so the bench and the pre-run select
+				// share ONE copy; the seat swap MUST precede BuildJoinLottery either way
+				if (TrySeatLeader(want))
 					GD.Print("[10thAge] (bench) leader seat moved to: " + want);
-				}
-			}
+		}
+		// ---------- pre-run character select: the door opens before the roster print ----------
+		// human / bench-demo runs hold the boot loop (see the _Process rail) until a leader
+		// is seated; the panel opens on the roster head but the FIRST press only browses,
+		// so an accidental key at boot can never seat a Leader. The lottery waits too (E).
+		_selDemo = (OS.GetEnvironment("M1_SELECT") == null ? "" : OS.GetEnvironment("M1_SELECT")) != "";
+		_selWant = OS.GetEnvironment("M1_SELECT") == null ? "" : OS.GetEnvironment("M1_SELECT");
+		if (!_pilot || _selDemo)
+		{
+			_selHold = true;
+			BuildSelectScreen();
+			GD.Print("[10thAge] (select) open: press 1.." + _party.Count + " to browse, same key again seats the Leader");
 		}
 		string roster = "";
 		foreach (PartyMember pm2 in _party)
@@ -1341,7 +1361,9 @@ public partial class Game : Godot.Node2D
 				 (_leader != null ? _leader.displayName : "none"));
 		// the join lottery rolls at boot so the pilot / escort paths never have to re-decide
 		// which PC a beat owns (the print keeps the smoke trails honest about who lands when)
-		BuildJoinLottery();
+		// human / bench-demo runs roll it in CloseSelect, AFTER the seat swap
+		if (!_selHold)
+				BuildJoinLottery();
 		// the reaper is a pure death/revive TEST BENCH (no balance meaning): human play
 		// left it OFF now that the revive rules work, and M1_REAPER=1 puts it back on
 		// for testing (a pilot smoke with it ON still TPKs often - the Leader-down rule
@@ -1561,6 +1583,12 @@ public partial class Game : Godot.Node2D
 	{
 		float delta = (float)d;
 		MeasureWindow(); // keep frame/period honest for any window size (DPI scaling)
+		if (_selHold)
+		{
+			PollSelect(delta); // boot card: the whole run loop waits so no beat burns while a
+									   // human reads; even the pilot demo door rides this rail
+			return;
+		}
 		// the camp card's own clock: it holds during read-the-card soft pauses, which is
 		// how M1 kept a human parked on the card from burning beats. M2's beats ride
 		// _runT alone (below) off the beat table, so this clock only feeds the pilot's
@@ -3270,6 +3298,259 @@ public partial class Game : Godot.Node2D
 	// shows up on more runs; weight 0 = cannot appear this stage; a dry pool leaves the
 	// remaining slots -1 (logged no-op at the beat). _joinRng is unseeded on purpose so
 	// every smoke / every human run re-rolls.
+	// ---------- pre-run character select: card build + polling (framework pass) ----------
+	// One CanvasLayer under a full-rect anchor Control: every position is a fraction of
+	// the VISIBLE rect (MeasureWindow's probe proved that rect), so the card rides any
+	// window / DPI. Slots pre-allocate hidden like the boot pools; UI text rides base-
+	// viewport pixel sizes like the HUD's. The four-slot board window is the user's
+	// "blocks of four"; the five-PC tail pages onto page two, the same rule a future
+	// stage select will ride. Right panel = the browsed PC's art + HP + tracks + leader
+	// bonus + ultimate. Keys reuse the picker's pick_1..N number grammar (edge reads).
+	// Card copy is data-driven: tracks read OPT_LABEL/OPT_MEMBER live; the bonus / ult
+	// blurbs below stay honest to their live lanes (index = member index, the OPT_MEMBER
+	// convention: 0 Baldrun, 1 Mosiah, 2 Asper, 3 Alvora, 4 Yu). PLACEHOLDER frames get
+	// the real UI pass the user gathers; the art rects already show the painted minis.
+	const int SEL_PER_PAGE = 4; // user: central element in blocks of four (2x2 page)
+	// board slot rects as anchor fractions of the page window: slot i (i%4) -> L,T,R,B
+	static readonly float[] SEL_RECT = { 0.04f, 0.04f, 0.48f, 0.52f, 0.52f, 0.04f, 0.96f, 0.52f,
+													0.04f, 0.56f, 0.48f, 0.96f, 0.52f, 0.56f, 0.96f, 0.96f };
+	// painted mini art per roster seat (index = memberIndex: 0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu)
+		static readonly string[] SEL_ART = { "res://art/baldrun.png", "res://art/mosiah.png", "res://art/asper.png", "res://art/alvora.png", "res://art/yu.png" };
+		static readonly string[] SEL_BONUS = {
+		"Leader bonus: chain lightning - landed party hits can loose a lightning chain hopping between bodies",
+		"Leader bonus: pierce - every bolt punches through one body and keeps flying",
+		"Leader bonus: friendly insects kindle in the clearing; touching one joins the squad for 10 s",
+		"Leader bonus: field medic - every 10 s every standing ally regenerates 1 hp",
+		"Leader bonus: kindness spirits kindle in the clearing; touching one heals 10 hp" };
+	static readonly string[] SEL_ULT = {
+		"Ultimate: Giant's Might (R) - doubles size and reach, damage x1.5, for 10 s",
+		"Ultimate: Bardic Inspiration (R) - rallies ALL allies +25% damage and attack speed for 10 s",
+		"Ultimate: Swarm of Bees (R) - 6 hunters in a circle, one body latched each at 10 dmg/s for 10 s, spread out to hunt",
+		"Ultimate: Guardian Awakening (R) - ring reach x2 and +50% damage; every horde kill while awake heals ALL allies 1 hp for 10 s",
+		"Ultimate: The Kaka (R) - 6 empowered familiars in a circle, blast x2 and damage x2 after ranks, spread out" };
+	public void BuildSelectScreen()
+	{
+		_selLayer = new CanvasLayer();
+		_selLayer.Layer = 9; // above the HUD layer: the card owns the frame while up
+		AddChild(_selLayer);
+		_selRoot = new Control();
+		SetRectSel(_selRoot, 0.0f, 0.0f, 1.0f, 1.0f);
+		_selLayer.AddChild(_selRoot);
+		_selBack = new ColorRect();
+		SetRectSel(_selBack, 0.0f, 0.0f, 1.0f, 1.0f);
+		_selBack.Color = new Color(0.07f, 0.06f, 0.09f, 0.98f); // grimoire-dark board cover
+		_selRoot.AddChild(_selBack);
+		_selPage = new Control();
+		SetRectSel(_selPage, 0.06f, 0.24f, 0.56f, 0.74f); // the central four-slot window
+		_selRoot.AddChild(_selPage);
+		_selFrame = new ColorRect();
+		SetRectSel(_selFrame, SEL_RECT[0], SEL_RECT[1], SEL_RECT[2], SEL_RECT[3]);
+		_selFrame.Color = new Color(0.83f, 0.64f, 0.24f, 0.30f); // grimoire-gold highlight wash
+		_selPage.AddChild(_selFrame);
+		int n = _party.Count;
+		_selTile = new Control[n];
+		_selName = new Label[n];
+		int ti = 0;
+		foreach (PartyMember pm2 in _party)
+		{
+			// one slot: painted mini (TextureRect, aspect-kept, NEAREST like the stage
+			// minis) inside a name plate; page-parked by hiding when off-page (ShowSelPage)
+			if (pm2.memberIndex >= 0 && pm2.memberIndex < SEL_ART.Length)
+			{
+				Godot.Texture2D tex = GD.Load(SEL_ART[pm2.memberIndex]) as Godot.Texture2D; // PM-verified load idiom
+				if (tex == null)
+				{				Godot.ColorRect ph = new ColorRect();
+					ph.Color = new Color(0.16f, 0.15f, 0.18f, 1.0f); // placeholder block (framework)
+					SetRectSel(ph, 0.04f, 0.04f, 0.96f, 0.96f); // full-rect of the slot below
+					ph.AddChild(new Label()); // placeholder plate: a plain Control draws nothing
+					_selTile[ti] = ph;
+				}
+				else
+				{
+					Godot.TextureRect tr = new Godot.TextureRect(); tr.Texture = tex; // Control-friendly: anchor rects ride it
+						tr.Set("stretch_mode", 1); // STRETCH to the rect ...
+					tr.Set("stretch_aspect", 0); // ... KEEP aspect: letterboxed, never skewed
+					tr.Set("texture_filter", 0); // NEAREST like the stage minis (hard painted edges)
+					_selTile[ti] = tr;
+				}
+				SetRectSel(_selTile[ti], SEL_RECT[(ti % SEL_PER_PAGE) * 4], SEL_RECT[(ti % SEL_PER_PAGE) * 4 + 1],
+						SEL_RECT[(ti % SEL_PER_PAGE) * 4 + 2], SEL_RECT[(ti % SEL_PER_PAGE) * 4 + 3]);
+				_selName[ti] = new Label();
+				SetRectSel(_selName[ti], 0.02f, 0.78f, 0.98f, 0.96f);
+				_selName[ti].Text = pm2.displayName;
+				_selName[ti].Set("horizontal_alignment", 1); // CENTER (string key: binding-safe)
+				_selTile[ti].AddChild(_selName[ti]);
+				_selPage.AddChild(_selTile[ti]); // parent the slot: an orphan Control leaks at exit
+				ti++;
+			}
+		}
+		_selPanel = new Label();
+		SetRectSel(_selPanel, 0.62f, 0.16f, 0.98f, 0.92f); // the right-hand breakdown
+		_selPanel.Set("autowrap_mode", 2); // WORD wrap to the panel rect
+		_selRoot.AddChild(_selPanel);
+		_selHint = new Label();
+		SetRectSel(_selHint, 0.06f, 0.04f, 0.98f, 0.10f); // title strip: the key grammar itself
+		_selHint.Text = "PRE-RUN: who leads? press 1.." + _party.Count + " to browse, same key again to seat";
+		_selRoot.AddChild(_selHint);
+		ShowBreakdown(0); // the panel opens on the roster head; first press only browses
+		ShowSelPage();
+	}
+	// anchor-fraction setter: Godot 4 C# writes SetAnchor(Side, float) per side, the
+	// same idiom MeasureWindow's probe already uses
+	private void SetRectSel(Control node, float l, float t, float r, float b)
+	{
+		node.SetAnchor(Godot.Side.Left, l);
+		node.SetAnchor(Godot.Side.Top, t);
+		node.SetAnchor(Godot.Side.Right, r);
+		node.SetAnchor(Godot.Side.Bottom, b);
+	}
+	// page discipline: off-page slots park hidden, the highlight frame rides its slot's
+	// page rect (same rect for slot i and slot i+4: pages show the same 2x2 window)
+	private void ShowSelPage()
+	{
+		int page = _selBrowse < 0 ? 0 : _selBrowse / SEL_PER_PAGE;
+		for (int k = 0; k < _selTile.Length; k++)
+		{
+			if (k / SEL_PER_PAGE != page)
+				_selTile[k].Visible = false;
+			else
+				_selTile[k].Visible = true;
+			if (_selBrowse >= 0 && k % SEL_PER_PAGE == _selBrowse % SEL_PER_PAGE)
+				SetRectSel(_selFrame, SEL_RECT[(k % SEL_PER_PAGE) * 4], SEL_RECT[(k % SEL_PER_PAGE) * 4 + 1],
+						SEL_RECT[(k % SEL_PER_PAGE) * 4 + 2], SEL_RECT[(k % SEL_PER_PAGE) * 4 + 3]);
+		}
+	}
+	// the right-hand breakdown for one roster slot (framework copy; the real UI pass
+	// restyles, never re-authors): art is drawn by the slot block, panel = stats copy
+	private void ShowBreakdown(int slot)
+	{
+		if (slot < 0 || slot >= _party.Count)
+			return;
+		PartyMember m = _party[slot];
+		string txt = m.displayName + " - " + m.weaponName;
+		txt += "\nHP " + (int)m.hp + " / " + (int)m.EffMaxHp();
+		for (int o = 0; o < OPT_LABEL.Length; o++)
+			if (OPT_MEMBER[o] == slot)
+				txt += "\n" + OPT_LABEL[o];
+		txt += "\n" + SEL_BONUS[slot] + "\n" + SEL_ULT[slot];
+		_selPanel.Text = txt;
+	}
+	// card polling: a press browses, a press on the BROWSED slot CONFIRMS (repeat-press
+	// like the join banner's click; edge reads only, so a fresh tap is deliberate).
+	// Numbers reuse the picker's pick_1..pick_6 actions (existing input map, no new keys).
+	// The bench demo (M1_SELECT=<name>) auto-confirms on the pilot clock; the human card
+	// never times out (the picker's no-timeout rule), so the hold is infinite for humans.
+	private void PollSelect(double d)
+	{
+		_selWait += d;
+		int pressed = -1;
+		for (int k = 0; k < _party.Count && k < 6; k++)
+		{
+			if (!Input.IsActionJustPressed("pick_" + (k + 1)))
+				continue;
+			pressed = k;
+			break;
+		}
+		if (pressed < 0 && _pilot && _selBrowse < 0 && _selWait >= 1.2)
+		{
+			// bench auto door: resolve M1_SELECT=<name> to its roster slot
+			for (int k = 0; k < _party.Count; k++)
+				if (_party[k].displayName == _selWant)
+					pressed = k;
+			if (pressed < 0)
+			{
+				GD.Print("[10thAge] (select) bench asked an unknown leader: " + _selWant + " - default seat stands");
+				CloseSelect(false); // drop the card: the default seat stands, lottery rolls
+				return;
+			}
+			GD.Print("[10thAge] (select) pilot auto-browse slot for: " + _party[pressed].displayName);
+			_selBrowse = pressed;
+			ShowSelPage();
+			ShowBreakdown(pressed);
+			return; // auto-browse once; the pilot rail below confirms on the NEXT tick
+		}
+		// pilot confirm rail: one beat after the auto-browse, seat the browsed slot
+		if (pressed < 0 && _pilot && _selBrowse >= 0 && _selWait >= 2.4)
+		{
+			ShowSelPage();
+			ShowBreakdown(_selBrowse);
+			GD.Print("[10thAge] (select) pilot confirm on browsed: " + _party[_selBrowse].displayName);
+			// seat the browsed slot: the swap rides the same door CloseSelect takes
+			// (CloseSelect(true) prints '(select) leader seated:' via TrySeatLeader)
+			// and the demoted Leader waits for its join beat like any recruit
+			// (the lottery already waits on _selHold, so the swap precedes it by
+			// construction); then the hold drops and the run loop resumes normally
+			CloseSelect(true);
+			return;
+		}
+		if (pressed < 0)
+			return; // human card: waits for a real press forever
+		if (pressed == _selBrowse)
+		{
+			CloseSelect(true); // repeat press seats the browsed PC
+			return;
+		}
+		_selBrowse = pressed;
+		ShowSelPage();
+		ShowBreakdown(_selBrowse);
+		GD.Print("[10thAge] (select) browse: " + _party[_selBrowse].displayName);
+	}
+	// the card closes: seat swap (if confirmed) THEN the deferred lottery (the swap MUST
+	// precede it - same rule as the bench valve comment above: the demoted Leader waits
+	// for its join beat like any other recruit; _hpOrder just builds later on such a run)
+	private void CloseSelect(bool seated)
+	{
+		if (seated && _selBrowse >= 0 && _selBrowse < _party.Count)
+		{
+			if (TrySeatLeader(_party[_selBrowse].displayName))
+				GD.Print("[10thAge] (select) leader seated: " + _party[_selBrowse].displayName);
+		}
+		_selHold = false;
+		if (_selLayer != null)
+			_selLayer.QueueFree(); // the whole card is gone in one cut: no RID/ODB leftovers at exit
+		// C# discipline: a field holding a Godot node keeps it alive past the native
+		// free, so every card field must go null or the art textures stay "in use" at
+		// exit and Godot prints leak warnings on the smoke gate
+		_selLayer = null;
+		_selRoot = null;
+		_selBack = null;
+		_selPage = null;
+		_selFrame = null;
+		_selPanel = null;
+		_selHint = null;
+		for (int k = 0; k < _selTile.Length; k++)
+		{
+			_selTile[k] = null;
+			_selName[k] = null;
+		}
+		BuildJoinLottery();
+	}
+	// one shared swap rule (bench valve + select door): promote seat, demote the old
+	// Leader - it waits for its join beat like any other recruit - and carry the arena
+	// spawn the squad opened on. Returns whether the seat actually moved.
+	public bool TrySeatLeader(string want)
+	{
+		if (want == "" || _leader == null || want == _leader.displayName)
+			return false;
+		PartyMember seat = null;
+		foreach (PartyMember pm2 in _party)
+			if (pm2.displayName == want)
+				seat = pm2;
+		if (seat == null)
+			return false;
+		// the seat swap carries the arena spawn: the new Leader opens where the squad
+		// opened, the demoted Leader is parked off-world until its own join beat
+		Vector2 open = _leader.GlobalPosition;
+		foreach (PartyMember pm2 in _party)
+		{
+			bool lead = (pm2 == seat);
+			pm2.isLeader = lead;
+			pm2.joined = lead;
+			pm2.GlobalPosition = lead ? open : new Vector2(-9500.0f, -9500.0f);
+		}
+		_leader = seat;
+		return true;
+	}
 	private void BuildJoinLottery()
 	{
 		int row = STAGE_NUMBER - 1;
