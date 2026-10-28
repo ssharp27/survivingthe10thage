@@ -92,6 +92,9 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 
 ## Landed this pass (uncommitted → committed this commit)
 
+- **Yu nerf + Alvora reach-up NUMBER pass (user 2026-10-28, balance feel: Yu too strong / Alvora weakest)**: authored edits in Main.tscn ONLY, no C# touched (no rebuild needed, the headless run reads the .tscn straight):
+  - **Yu**: `cooldown 1.6 → 2.0`, `weaponDamage 20 → 15.0`. The ritual blast and the Kaka empowered ×2 BOTH ride the authored `weaponDamage` (the beat rolls it at spawn time), so the ult follows the nerf automatically — no code edit. ~12.5 → ~7.5 dps per familiar.
+  - **Alvora**: `range 96.0 → 192.0` — Spirit Guardians ring doubled at base (`EffRange = range × AREA` tag so ranks still multiply on top). His damage is left untouched: the ring FULL-hits every body inside reach every 1.15 s at **10 flat** through `RollDamage` (~8.7 dps each before crit/tags/buffs) — it was his **reach** that read as "contributes very little", not the number.
 - **Yu damage-aura BUGFIX (user 2026-10-28, found by hand-play with Yu seated as leader)**: enemies
   near Yu melted under pulses ticking on his **1.6 s cooldown**, long before any familiar ran the
   distance. Root cause: the `sumKit` ritual block never **returned** after loosing the volley — it
@@ -655,6 +658,16 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   (`(bench) leader seat moved to: Asper`). lv/xp drift vs the zx38 twin is the known unseeded join-lottery
   variance. NOTE: green gates NEVER proved the aura fix — the rapier thrust printed nothing; the
   fall-through was pinned by READING the dispatch, and only hand-play would see the fix in feel.
+- `smokeYUzx43` (default pilot), `smokeYUzx44` (`M1_SELECT=Yu`), `smokeYUzx45` (`M1_SELECT=Alvora`) —
+  **Yu nerf + Alvora ring-up number-pass trio**: all three **VICTORY / 17 `stat tag` rows / 0-byte
+  `.err``**. zx44 seats Yu from boot: Kaka 2 casts x 6 burst tallies (second volley catches
+  `2/3/2/1/1/2 body(s)` = the nerfed 15-dmg lane still reaps). zx45 seats Alvora: Guardian
+  Awakening fires twice, settles `0 horde` (honest empty arena) then **19 horde slain while awake**
+  — the doubled 192 px ring is now reaping bodies that used to sit out of reach (the tally only
+  counts kills the awake ring makes, so 19 proves the reach buff end-to-end). zx43 select-silent
+  as usual. lv/xp drift vs the zx40-42 twins = the known unseeded join-lottery variance.
+  REMINDER: gates never prove BALANCE (they only see VICTORY/rows/err) — the feel verdict is the
+  user's hand-play.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
