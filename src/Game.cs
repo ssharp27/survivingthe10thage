@@ -213,6 +213,7 @@ public partial class Game : Godot.Node2D
 	double _memberDashCdT = 0.0;
 	Godot.Node2D _dashBarPivot = null;    // ride-along pivot over the leader's head
 	Godot.ColorRect _dashBarFill = null;  // the gold fill, re-sized every frame
+	Godot.Label _ultLabel = null;         // ULT READY / countdown, rides the leader
 	double _dashPulse = 0.0;              // free-running clock behind the dash-ready flash
 	double _engageInvulnT = 0.0;          // 2 s party immunity window right after a boss engages
 
@@ -1458,6 +1459,11 @@ public partial class Game : Godot.Node2D
 		_dashBarFill.ZIndex = 8;
 		barBg.AddChild(_dashBarFill);
 		_dashBarPivot.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+		_ultLabel = new Godot.Label();
+		_ultLabel.Text = "ULT READY";
+		_ultLabel.ZIndex = 9;
+		AddChild(_ultLabel);
+		_ultLabel.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
 		for (int i = 0; i < 240; i++)
 		{
 			Godot.Node2D gem = new Node2D();
@@ -1602,7 +1608,11 @@ public partial class Game : Godot.Node2D
 		// "nobody chose a rest" timeout valve.
 		if (!GetWorldPause())
 			_campWaitT += d;
-		_ringAngle += 0.22 * d; // orbit clock (user: "rotate a little faster" - was 0.15)
+		if (!GetWorldPause())
+			_ringAngle += 0.22 * d; // orbit clock (user: "rotate a little faster" - was 0.15)
+			// user 2026-10-28: frozen while any soft pause runs. The clock advancing during a
+			// level-up card (bodies parked) made the 48 px leash snap the whole ring when the
+			// card closed - the jarring "standing reset" per level-up; only a revive now re-homes
 		_dashPulse += d;         // free-running clock for the dash-ready flash
 		if (_engageInvulnT > 0.0)
 			_engageInvulnT -= delta; // boss-engage immunity window (set in ActivateBoss)
@@ -2031,6 +2041,12 @@ public partial class Game : Godot.Node2D
 			if (leader != null)
 			{
 				_dashBarPivot.GlobalPosition = leader.GlobalPosition + new Vector2(0.0f, 12.0f);
+				if (_ultLabel != null)
+				{
+					_ultLabel.GlobalPosition = leader.GlobalPosition + new Vector2(20.0f, -66.0f);
+					_ultLabel.Visible = leader.ultKey() > 0;
+					_ultLabel.Text = leader.ultCdT <= 0.0 ? "ULT READY" : "ULT " + (int)System.Math.Ceiling(leader.ultCdT);
+				}
 				double ready = _dashCdT <= 0.0 ? 1.0 : 1.0 - _dashCdT / DASH_CD;
 				if (ready < 0.0)
 					ready = 0.0;
@@ -2048,7 +2064,11 @@ public partial class Game : Godot.Node2D
 											   0.24f + 0.11f * pulse, 1.0f);
 			}
 			else
+			{
 				_dashBarPivot.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+				if (_ultLabel != null)
+					_ultLabel.Visible = false;
+			}
 		}
 		// party Y-sort (user 2026-10-21): painted minis overlap on the table, so a
 		// bodyguard standing ABOVE the leader must paint UNDER him and vice versa.
@@ -3381,8 +3401,10 @@ public partial class Game : Godot.Node2D
 				else
 				{
 					Godot.TextureRect tr = new Godot.TextureRect(); tr.Texture = tex; // Control-friendly: anchor rects ride it
-						tr.Set("stretch_mode", 0); // STRETCH_SCALE (0): ONE art fills the slot
-					tr.Set("stretch_aspect", 1); // ... ASPECT_CENTERED: scaled whole, letterboxed, never skewed
+						tr.Set("stretch_mode", 3); // STRETCH_KEEP_CENTERED (3 in 4.7's renumbered enum,
+						// probed headless): art at NATIVE pixel size centered in the slot - user 2026-10-28
+						// said the 2.3x-scaled art looked stretched; native matches the stage minis
+					// (aspect is moot under KEEP_CENTERED: the art is never scaled at all)
 					tr.Set("texture_filter", 0); // NEAREST like the stage minis (hard painted edges)
 					_selTile[ti] = tr;
 				}
