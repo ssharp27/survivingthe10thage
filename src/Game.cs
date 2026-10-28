@@ -30,7 +30,7 @@ public partial class Game : Godot.Node2D
 	// existing squad reads IDENTICALLY; what changed is that seats are now a table instead
 	// of math that folded index 1 onto the same seat as index 3 - a fourth PC used to
 	// weld straight onto Mosiah. Distinct seats hold up to the 5-PC roster.
-	static readonly int[] RING_SLOT = { 0, 3, 2, 4, 5, 1 }; // [memberIndex] -> seat number
+	static readonly int[] RING_SLOT = { 0, 3, 2, 4, 1, 5 }; // [memberIndex] -> seat 0..5 (0..4 distinct at 0.4rad; 5 = reserved, 360deg would weld to 0)
 	// ---------- player revive (leader stands still near a body) ----------
 	// 56 (was 30): widened so a bodyguard slot and the rescue share a spot
 	readonly double REVIVE_RANGE = 56.0;
@@ -3381,8 +3381,8 @@ public partial class Game : Godot.Node2D
 				else
 				{
 					Godot.TextureRect tr = new Godot.TextureRect(); tr.Texture = tex; // Control-friendly: anchor rects ride it
-						tr.Set("stretch_mode", 1); // STRETCH to the rect ...
-					tr.Set("stretch_aspect", 0); // ... KEEP aspect: letterboxed, never skewed
+						tr.Set("stretch_mode", 0); // STRETCH_SCALE (0): ONE art fills the slot
+					tr.Set("stretch_aspect", 1); // ... ASPECT_CENTERED: scaled whole, letterboxed, never skewed
 					tr.Set("texture_filter", 0); // NEAREST like the stage minis (hard painted edges)
 					_selTile[ti] = tr;
 				}
@@ -3457,6 +3457,10 @@ public partial class Game : Godot.Node2D
 		node.SetAnchor(Godot.Side.Top, t);
 		node.SetAnchor(Godot.Side.Right, r);
 		node.SetAnchor(Godot.Side.Bottom, b);
+		node.Set("offset_left", 0.0f); // set_anchor ALONE compensates offsets to keep the
+		node.Set("offset_top", 0.0f);   // old rect parked: a runtime re-anchor (the ring riding a
+		node.Set("offset_right", 0.0f);  // newly selected slot) never moved. Pin offsets to 0 so
+		node.Set("offset_bottom", 0.0f); // the rect IS the anchor rect (build nodes ride it too)
 	}
 	// one board, one page: the gold ring rides the selected slot (its rect grown
 	// +/- 0.02 so the edge reads as a frame AROUND the tile); nothing selected parks
