@@ -92,6 +92,21 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 
 ## Landed this pass (uncommitted → committed this commit)
 
+- **Yu damage-aura BUGFIX (user 2026-10-28, found by hand-play with Yu seated as leader)**: enemies
+  near Yu melted under pulses ticking on his **1.6 s cooldown**, long before any familiar ran the
+  distance. Root cause: the `sumKit` ritual block never **returned** after loosing the volley — it
+  fell through into the shared lane/fan target search, and Yu (neither `shotKit` nor `cleaver`)
+  landed in the rapier `else`: every ritual beat ALSO skewered up to 1+4 lane bodies inside the
+  **320 px** reach for full damage (+ melee telegraph spokes at his feet = the "large radius" read).
+  `git grep` proved the fall-through existed in EVERY blob since `4f6adde` (the Yu landing commit) —
+  latent from day one; the select framework seating Yu at t=0 is what finally exposed it. Fix =
+  **5-line insert** (comment + `return;`) as the last statement of the `if (sumKit)` block, mirroring
+  `auraKit`'s early return: the ritual's damage now lives ONLY in the familiar (user rule: "his
+  attack should only spawn minions... his minions are his damage"). PM.cs via the git-splice route
+  (`splicePM8.py`): `SpawnSummon(p + dir * 26.0f...)` line + two-brace tail anchor, LF/CRLF dual
+  probe, `return;` count asserted as delta **+1**, `hash-object` → `update-index --cacheinfo` →
+  `checkout-index -f`.
+
 - **Pre-run CHARACTER SELECT framework (user 2026-10-26, framework pass; real UI/art pass later)**:
   boot card picks the run's LEADER. Read-the-card soft-pause shape: `_selHold` joins `GetWorldPause()`
   and a `_Process` rail right after `MeasureWindow()` early-returns `PollSelect(delta)` so NO beat
@@ -631,9 +646,25 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   the HEAD blob), so global CRLF normalization is OUT and anchors must never cross a line ending.
   No Rng consumed; kaka kills ride the shared kill scan so gems / escort meter stay enemy-owned.
 - `smokeSAzx37` (default pilot), `smokeSAzx38` (`M1_SELECT=Yu`), `smokeSAzx39` (`M1_LEADER=Asper`) — **pre-run character-select framework** (see the Landed bullet above): all three **VICTORY / 17 `stat tag` rows / 0-byte `.err`**. zx37 keeps the card SKIPPED under pilot (no regression: zero `(select)` prints, ordinary boot). zx38 walks the whole card ladder — `(select) open:` → `pilot auto-browse slot for: Yu` → `pilot confirm on browsed: Yu` → `leader seated: Yu` — then the lottery rolls AFTER the swap and the Kaka lane fires with Yu seated from boot. zx39 proves the shared `TrySeatLeader` regression for the old bench valve (`(bench) leader seat moved to: Asper`). Iterative debug: first gate red twice — (a) the pilot auto-browse block re-entered every tick and swallowed the confirm (hold never dropped, no VICTORY; fixed by gating browse `&& _selBrowse < 0` + a separate confirm rail at `_selWait >= 2.4`); (b) zx38's 1492-byte `.err` was Godot's exit-time leak warning (10 CanvasItem RIDs + 37 ODB instances + 5 resources) — `--verbose` named the five art PNGs "still in use", and the counts pinned **five slot Tiles never parented under the board window = orphans**; one `AddChild` closed the gate.
+- `smokeYUzx40` (default pilot), `smokeYUzx41` (`M1_SELECT=Yu`), `smokeYUzx42` (`M1_LEADER=Asper`) —
+  **Yu damage-aura fix trio**: all three **VICTORY / 17 `stat tag` rows / 0-byte `.err`**. zx41 walks
+  the full card ladder (`(select) open:` → `pilot auto-browse slot for: Yu` → `pilot confirm on
+  browsed: Yu` → `leader seated: Yu`), Kaka fires 2 casts x 6 burst tallies (second volley catches
+  `4/1/4/4/2/1 body(s)` = the familiar lane still bites with Yu seated from boot); zx40 stays
+  select-silent (no regression), zx42 proves the shared `TrySeatLeader` bench regression
+  (`(bench) leader seat moved to: Asper`). lv/xp drift vs the zx38 twin is the known unseeded join-lottery
+  variance. NOTE: green gates NEVER proved the aura fix — the rapier thrust printed nothing; the
+  fall-through was pinned by READING the dispatch, and only hand-play would see the fix in feel.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
+- **A kit verb that owns its damage must RETURN before the shared dispatch**: the `sumKit` ritual
+  block fell through the lane/fan target search and Yu — neither `shotKit` nor `cleaver — landed in
+  the rapier `else`, silently gaining a free thrust at up to 5 bodies inside 320 px reach EVERY
+  beat. Green smoke gates cannot see a silent extra weapon: VICTORY + 17 rows + 0-byte `.err` all
+  stayed green while the hand-played horde melted. Kit blocks share the `shotKit`/`cleaver`/else
+  dispatch, so a special verb that is none of those arms must exit BEFORE it (`auraKit`'s early
+  `return` was the precedent to follow).
 - **An unparented Control is an orphan**: tree teardown never frees it, so it leaks CanvasItem RIDs /
   ObjectDB instances / held resources at exit and Godot prints leak warnings on stderr — breaking the
   smoke gate's 0-byte `.err` contract. `QueueFree()` on the layer root cannot rescue a node `AddChild`

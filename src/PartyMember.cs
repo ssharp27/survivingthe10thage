@@ -840,6 +840,11 @@ public partial class PartyMember : Godot.Node2D
 				Vector2 dir = new Vector2(aim.X * ca - aim.Y * sa, aim.X * sa + aim.Y * ca);
 				pg.SpawnSummon(p + dir * 26.0f, (float)RollDamage(pg, weaponDamage), minionFuse, blast, minionSpeed);
 			}
+			// the ritual IS the familiar: once the volley is loosed the beat must NOT
+			// fall through into the shared lane/fan search below (user bugfix 2026-10-28:
+			// the fall-through handed Yu a free rapier thrust at anything inside reach every
+			// beat, reading as a damage aura around him; his minions ARE his damage)
+			return;
 		}
 		Godot.Node2D best = null;
 		float bestD = 1e9f;
