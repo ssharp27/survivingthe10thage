@@ -177,7 +177,7 @@ public partial class Game : Godot.Node2D
 										   "quicker pulse (guardian rate)", "guiding light (ring vulnerability)",
 										   "occult flame (blast damage)", "wider burst (blast reach)",
 										   "quicker ritual (summon rate)", "twin ritual (one more familiar)", "draging maul (slow on hit)",
-										   "deadly aim (crit chance)", "keener flame (firebolt damage)", "quicker fuse (firebolt cooldown)", "split bolt (firebolt pierce)", "kindling sparks (burn spreads)", "linger flame (burn lasts longer)" };
+										   "deadly aim (crit chance)", "keener flame (firebolt damage)", "quicker fuse (firebolt cooldown)", "split bolt (firebolt pierce)", "cinder bloom (burning bodies burst)", "linger flame (burn lasts longer)" };
 	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5 };
 	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
 	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
@@ -199,11 +199,13 @@ public partial class Game : Godot.Node2D
 	static readonly double[] OPT_SLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0 };
 	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0 };
 	// firebolt kit cards (Stack, user 2026-10-30): OPT_BURN = +2 s of linger per rank onto
-	// PartyMember.burnDur; OPT_SPREAD = kindling sparks rank = the hop budget on Combatant
-	// (a burning body ignites that many nearby unburnt bodies, each one hop cheaper). Rows
+	// PartyMember.burnDur; OPT_CINDER = cinder bloom rank: a body that dies STILL burning bursts
+	// in CINDER_R px, scorching the live horde bodies in the blast for 25/50/75% of the firebolt's
+	// roll at rank 1/2/3 (Game.CinderBurst, hooked in the kill scan). Rows
 	// 25-29 of the now 25-wide tables.
 	static readonly double[] OPT_BURN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0 };
-	static readonly int[] OPT_SPREAD = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 };
+	static readonly int[] OPT_CINDER = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 };
+	static readonly double CINDER_R = 60.0; // cinder bloom blast radius (assistant pick: small)
 	int[] _pickRank = new int[OPT_LABEL.Length];
 	int[] _optRoll = new int[PICK_SLOTS]; // this card's offered options (slot -> option, -1 = empty slot)
 
@@ -362,7 +364,7 @@ public partial class Game : Godot.Node2D
 		Godot.Collections.Array<double> _shotPen = new();
 		Godot.Collections.Array<double> _shotBurnD = new();   // firebolt burn: dps stamped at spawn (0 = inert)
 		Godot.Collections.Array<double> _shotBurnT = new();   // burn window start, seconds
-		Godot.Collections.Array<int> _shotBurnHop = new();  // kindling sparks hop budget stamped at spawn
+		Godot.Collections.Array<double> _shotCinderD = new();  // cinder bloom burst damage stamped at spawn
 		Godot.Collections.Array<long> _shotLast = new();
 		// ---------- leader-bonus helper pools (user 2026-10-25): Asper's insects, Yu's spirits ----------
 		// Pooled exactly like the summons: fixed slots, parallel arrays, parked past -9000.
@@ -1525,7 +1527,7 @@ public partial class Game : Godot.Node2D
 			_shotPen.Add(0.0);
 			_shotBurnD.Add(0.0); // burn memo grows WITH the pool: every slot needs every column
 			_shotBurnT.Add(0.0);
-			_shotBurnHop.Add(0);
+			_shotCinderD.Add(0.0);
 			_shotLast.Add(-1);
 		}
 		// Yu's familiars: pooled like the bolts and the gems, so a rank-3 multiattack ritual
@@ -2239,6 +2241,7 @@ public partial class Game : Godot.Node2D
 				OnBossKilled(c);
 			else
 			{
+				CinderBurst(c); // cinder bloom: burst BEFORE the corpse is freed (reads its live pos + stamp)
 				OnEnemyKilled(c);
 				_enemies.RemoveAt(i);
 			}
@@ -2247,7 +2250,6 @@ public partial class Game : Godot.Node2D
 		UpdateGems(delta);
 		UpdateBullets(delta);
 		UpdateShots(delta); // the party's own projectiles: mirror pool, opposite faction
-		SpreadScan(); // kindling sparks: burning bodies ignite near ones (hop budget = rank)
 		UpdateSummons(delta); // Yu's familiars: run at prey, detonate on contact OR on the fuse
 		UpdateHelpers(delta); // leader-bonus lane (user 2026-10-25): Alvora regen, Asper insects, Yu spirits
 		PickerTick(d);
@@ -2898,7 +2900,7 @@ public partial class Game : Godot.Node2D
 					TryChainLightning(n); // Baldrun seat: the hit may loose a chain (no-op for other seats)
 					// firebolt window opens on this body (0 dps = plain bolt: nothing burns)
 					if (_shotBurnD[i] > 0.0)
-						nc.Burn(_shotBurnD[i], _shotBurnT[i], _shotBurnHop[i]); // kills still land on the shared scan
+						nc.Burn(_shotBurnD[i], _shotBurnT[i], _shotCinderD[i]); // kills still land on the shared scan
 					if (_shotPen[i] > 0.0)
 					{
 						_shotPen[i] -= 1.0;
@@ -2921,52 +2923,35 @@ public partial class Game : Godot.Node2D
 		((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
 	}
 
-	// a PC fires one bolt: same free-slot scan the boss pool uses, no allocation
-	private void SpreadScan()
+	// cinder bloom (user 2026-10-30 card swap: kindling sparks OUT, burning corpses burst IN):
+	// a horde body that dies WHILE still burning bursts in CINDER_R px, scorching every live horde
+	// body caught in the blast for the cinder damage STAMPED on the corpse at bolt spawn - the shot
+	// call site computes it as 25/50/75% of the firebolt's live roll at rank 1/2/3, so damage cards
+	// scale the burst WITH the DoT. The kill scan calls this before freeing the corpse; burst kills
+	// land on the same scan (the reverse pass still visits lower slots this frame, higher slots the
+	// next) and each corpse bursts at most once since it is freed on award - so a burning chain of
+	// corpses is bounded by the horde itself and needs no budget. Bosses hold their own lane.
+	private void CinderBurst(Combatant corpse)
 	{
-		// kindling sparks (Stack card, user 2026-10-30): a burning body with hop budget left
-		// ignites NEARBY unburnt horde bodies, each ignition one hop cheaper, so rank 3 chains
-		// at most three new bodies. Ignitions are collected first and applied after the scan,
-		// so a body lit this pass cannot relay the flame the same frame. Bosses are skipped:
-		// spread hops through the horde only, and the radius is the authored silhouette plus
-		// a 30 px spark gap, like the bolt hit test's maths.
-		Godot.Collections.Array<Godot.Node2D> ignite = new();
-		Godot.Collections.Array<double> dpsA = new();
-		Godot.Collections.Array<double> durA = new();
-		Godot.Collections.Array<int> hopA = new();
-		for (int a = 0; a < _enemies.Count; a++)
+		if (corpse.burnT <= 0.0 || corpse.burnCinder <= 0.0 || corpse is Boss)
+			return; // only a burning horde body carrying a cinder stamp bursts
+		double dmg = corpse.burnCinder;
+		Vector2 at = corpse.GlobalPosition;
+		int hit = 0;
+		for (int i = 0; i < _enemies.Count; i++)
 		{
-			Combatant ca = (Combatant)_enemies[a];
-			if (ca == null || ca.kind == "dead" || ca.burnT <= 0.0 || ca.burnHop <= 0)
-				continue; // only a burning body with budget left can spread
-			Vector2 pa = ca.GlobalPosition;
-			for (int b = 0; b < _enemies.Count; b++)
-			{
-				if (b == a)
-					continue;
-				Godot.Node2D nb = _enemies[b];
-				Combatant cb = (Combatant)nb;
-				if (cb == null || cb.kind == "dead" || cb is Boss || cb.burnT > 0.0)
-					continue; // already burning: it rides its own window; bosses hold their own lane
-				double rad = 20.0 + 30.0; // horde silhouettes share one spark gap (bosses are skipped above)
-				if (pa.DistanceSquaredTo(nb.GlobalPosition) > rad * rad)
-					continue;
-				ignite.Add(nb);
-				dpsA.Add(ca.burnDps);
-				durA.Add(ca.burnT); // pass the REMAINING window: the flame rides one clock face
-				hopA.Add(ca.burnHop - 1);
-			}
+			Combatant nc = (Combatant)_enemies[i];
+			if (nc == null || nc.kind == "dead" || nc.hp <= 0.0 || nc is Boss)
+				continue; // already-dying bodies leave on their own; bosses hold their own lane
+			if (at.DistanceSquaredTo(nc.GlobalPosition) > CINDER_R * CINDER_R)
+				continue; // small radius: the blast sweeps what stood beside the pyre
+			nc.TakeDamage(dmg);
+			hit++;
 		}
-		if (ignite.Count == 0)
-			return;
-		GD.Print("[10thAge] (spread) ignite=", ignite.Count);
-		for (int i = 0; i < ignite.Count; i++)
-		{
-			Combatant cb = (Combatant)ignite[i];
-			cb.Burn(dpsA[i], durA[i], hopA[i]);
-		}
+		if (hit > 0)
+			GD.Print("[10thAge] (cinder) burst hit=", hit, " dmg=", (int)dmg);
 	}
-	public void SpawnShot(Vector2 pos, Vector2 vel, double dmg, double life, double pen = 0.0, double burnDur = 0.0, double burnDps = 0.0, int spread = 0) // pen/burn/hop stamped at spawn: Asper + Mosiah pierce, Stack firebolt burn; everyone else keeps the 0 defaults
+	public void SpawnShot(Vector2 pos, Vector2 vel, double dmg, double life, double pen = 0.0, double burnDur = 0.0, double burnDps = 0.0, double cinder = 0.0) // pen/burn/cinder stamped at spawn: Asper + Mosiah pierce, Stack firebolt burn + cinder bloom; everyone else keeps the 0 defaults
 	{
 		for (int i = 0; i < _shots.Count; i++)
 		{
@@ -2979,10 +2964,10 @@ public partial class Game : Godot.Node2D
 			_shotLife[i] = life;
 			// pierce budget stamped at spawn: Mosiah leader seat + the shooter's own pen (Asper card)
 			_shotPen[i] = LeaderPierceBonus() + pen;
-			// firebolt burn / hop budget stamped at spawn too (all 0 = inert for other lanes)
+			// firebolt burn / cinder-bloom damage stamped at spawn too (all 0 = inert for other lanes)
 			_shotBurnT[i] = burnDur;
 			_shotBurnD[i] = burnDps;
-			_shotBurnHop[i] = spread;
+			_shotCinderD[i] = cinder;
 			_shotLast[i] = -1;
 			((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
 			return;
@@ -3959,7 +3944,7 @@ public partial class Game : Godot.Node2D
 		{ m.maulSlow += OPT_SLOW[option]; } // draging maul: drag strength per rank onto the kit field
 		{ m.stat[StatTags.CRIT_CHANCE] += OPT_CRIT[option]; } // deadly aim: crit points on the tag store
 		{ m.burnDur += OPT_BURN[option]; } // linger flame: +2 s of burn per rank on the kit field
-		{ m.burnSpread += OPT_SPREAD[option]; } // kindling sparks: spread hop budget on the kit field
+		{ m.cinderRank += OPT_CINDER[option]; } // cinder bloom rank: burst pct rides the firebolt's live roll at the shot call site
 		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
 						 OPT_LABEL[option] + " x" + _pickRank[option];
 		GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +

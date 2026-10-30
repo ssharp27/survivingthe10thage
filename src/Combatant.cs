@@ -47,23 +47,23 @@ public partial class Combatant : Godot.Node2D
     public double slowMul = 0.0;
     public double slowT = 0.0;
 
-    // firebolt burn (Stack's firebolt DoT, user 2026-10-30): bodies hit by a burning bolt
-    // run burnDps damage/sec for burnT seconds. Kills still die through the Game's shared
-    // kill scan. burnHop is the SPREAD budget (kindling sparks rank): while hop > 0 a
-    // burning body can ignite that many nearby unburnt bodies, each one hop cheaper
-    // (Game.SpreadScan).
+	// firebolt burn (Stack's firebolt DoT, user 2026-10-30): bodies hit by a burning bolt
+	// run burnDps damage/sec for burnT seconds. Kills still die through the Game's shared
+    // kill scan. burnCinder is the CINDER stamp (cinder bloom rides the stronger flame): a body
+    // that dies while still burning bursts in a small radius and scorches the bodies standing there
+    // (Game.CinderBurst, hooked in the kill scan).
     public double burnDps = 0.0;
     public double burnT = 0.0;
-    public int burnHop = 0;
+    public double burnCinder = 0.0;
 
-    public void Burn(double dps, double dur, int hop = 0)
+    public void Burn(double dps, double dur, double cinder = 0.0)
     {
         if (dps <= 0.0 || dur <= 0.0)
             return; // a plain bolt never sets a window
         if (dps >= burnDps)
         {
             burnDps = dps;
-            burnHop = hop; // stronger flame overwrites, like the vuln mark does
+            burnCinder = cinder; // the burst stamp rides the stronger flame, like the vuln mark does
         }
         if (dur > burnT)
             burnT = dur; // the window refreshes, never stacks
