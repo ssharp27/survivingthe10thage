@@ -1,6 +1,6 @@
-# RESUME NOTES — Surviving the 10th Age — 2026-10-30 Stack roster session (CURRENT)
+# RESUME NOTES — Surviving the 10th Age — 2026-10-30 Stack roster + cinder swap sessions (CURRENT)
 
-Session stopped on request (user 2026-10-26). Start with **M2_STATUS.md** (the authoritative M2 trail + pitfalls) and this block. The 2026-10-21 block and everything below is archive history.
+Session stopped on request (user 2026-10-30 night pause — "we'll pick up again tomorrow"). Start with **M2_STATUS.md** (the authoritative M2 trail + pitfalls) and this block. The 2026-10-21 block and everything below is archive history. Nothing queued — next request is user-driven.
 
 ## Where we are (2026-10-28→30 select-visual + ring-seat + polish + ring/Asper + Stack roster + cinder swap passes — CURRENT)
 - HEAD = **cinder swap pass `31ee623` + its notes refresh** on `main` (notes sits on top of `31ee623` > notes refresh `e335160` > Stack roster pass `34b2bbc` > ring+Asper pass `c7aeee3` > notes refresh `a35f470` > polish pass `2c70c89` > notes refresh `9a0a4d1` > fix pass `81c0234` > notes refresh `bfc900f` > mockup pass `6e3992c`), **pushed to origin** (github.com/ssharp27/survivingthe10thage), tree clean.
