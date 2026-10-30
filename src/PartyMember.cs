@@ -47,6 +47,13 @@ public partial class PartyMember : Godot.Node2D
 	[Export] public string weaponKit = "melee"; // "melee" | "shot" | "aura" | "summon"
 	[Export] public float projSpeed = 340.0f;  // px/s a bug projectile travels
 	[Export] public float projLife = 2.2f;     // seconds a bolt may fly before it expires
+	// firebolt kit knobs (Stack, user 2026-10-30): a hit sets a burn window on the body (dps x
+	// seconds, Combatant.Burn); burnSpread = how many NEAR bodies that flame may ignite. The
+	// DoT dps scales with the damage card at the call site (stat[ATTACK_DAMAGE] is the card
+	// product; crits and ults stay per-swing like every other weapon)
+	[Export] public double burnDps = 0.0;   // damage/sec stamped on bodies this member hits (0 = no burn)
+	[Export] public double burnDur = 0.0;   // seconds that burn runs; linger flame cards raise it
+	[Export] public int burnSpread = 0;     // kindling sparks rank: spread hop budget on the flame
 	// Yu's familiars (M2, user dictation 2026-10-22): the fuse is the summon's LIFETIME, and
 	// the familiar detonates on contact with prey OR when that fuse burns out - the fuse is
 	// what keeps a player from parking a pile of them under a boss and saving them for later.
@@ -221,6 +228,10 @@ public partial class PartyMember : Godot.Node2D
 			miniPath = "res://art/yu.png";
 			miniRim = 17.5f;   // rig origin pinned to the base ellipse centre (topple + dash plate)
 		}
+		else if (displayName == "Stack")
+			// 2026-10-30: Stack art audit-passed (81x117 canvas, hard alpha 0 soft px, 51 opaque
+			// colours, 1-2 px margins, cx_delta 0.0) - margins match the class, so scale/rim carry
+			miniPath = "res://art/stack.png";
 		if (miniPath != "")
 		{
 			Godot.Texture2D tex = GD.Load(miniPath) as Godot.Texture2D;
@@ -895,7 +906,7 @@ public partial class PartyMember : Godot.Node2D
 				float off = (s - (bolts - 1) * 0.5f) * 0.16f; // rad of fan per extra bolt
 				float a2 = ang + off;
 				Vector2 dir = new Vector2((float)System.Math.Cos(a2), (float)System.Math.Sin(a2));
-				pg.SpawnShot(p + dir * 18.0f, dir * projSpeed, dmg, projLife, pierce);
+				pg.SpawnShot(p + dir * 18.0f, dir * projSpeed, dmg, projLife, pierce, burnDur, burnDps * (float)stat[StatTags.ATTACK_DAMAGE], burnSpread); // firebolt: DoT rides the damage card, not crits
 			}
 		}
 		else if (cleaver)

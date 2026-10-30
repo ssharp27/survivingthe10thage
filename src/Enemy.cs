@@ -68,6 +68,7 @@ public partial class Enemy : Combatant
         float delta = (float)d;
         TickVuln((double)delta); // guiding-light window decays on every body, even off-screen
         TickSlow((double)delta); // draging-maul window decays on every body, like guiding light
+        TickBurn((double)delta); // firebolt burn ticks like the vuln/slow windows do
         float spd = speed * (slowT > 0.0 ? 1.0f - (float)slowMul : 1.0f); // draging maul: a dragged body shambles
         if (_body == null)
             InitVisuals();

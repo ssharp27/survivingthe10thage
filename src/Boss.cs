@@ -68,6 +68,7 @@ public partial class Boss : Combatant
             return;
         float delta = (float)d;
         TickVuln((double)delta); // a marching boss decays its mark; dormant bosses hold still
+        TickBurn((double)delta); // bosses burn too: the beat loop cannot stall past a DoT
         Game g = GetParent() as Game;
         if (g == null)
             return;

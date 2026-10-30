@@ -84,6 +84,23 @@ minionRadius = 56.0
 minionFuse = 6.0
 class_ = "Occultist"
 
+[node name="Stack" type="Node2D" parent="."]
+script = ExtResource("3_pm")
+displayName = "Stack"
+weaponName = "Firebolt"
+memberIndex = 5
+maxHp = 60.0
+baseSpeed = 128.0
+weaponDamage = 10.0
+cooldown = 0.8
+range = 260.0
+weaponKit = "shot"
+projSpeed = 420.0
+projLife = 0.8
+burnDps = 1.0
+burnDur = 5.0
+class_ = "Artificer"
+
 [node name="BossMini" type="Node2D" parent="."]
 script = ExtResource("4_boss")
 kind = "mini1"

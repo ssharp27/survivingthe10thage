@@ -128,11 +128,11 @@ public partial class Game : Godot.Node2D
 	// without-replacement draw per ally beat, taken at boot. The run's own leader never
 	// rolls onto its own pool (it CAN show up on runs where it is not the leader).
 	// Row = STAGE_NUMBER - 1; columns are memberIndex order
-	// (0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu). Weight 0 = cannot appear
+	// (0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack). Weight 0 = cannot appear
 	// on that stage. Stage 1 per the user: Baldrun + Mosiah more likely than the rest.
 	// Sanity numbers - the user will add rows/weights per future stage.
 	// the new-style initializer: Godot's C# build trips CS0623 on nested old-style braces
-	private static readonly int[][] JOIN_W = { new int[] { 3, 3, 1, 1, 1 } };   // row 0 = stage 1: Baldrun + Mosiah heavy
+	private static readonly int[][] JOIN_W = { new int[] { 3, 3, 1, 1, 1, 1 } };   // row 0 = stage 1: Baldrun + Mosiah heavy, the rest parity
 	private int[] _joinOrder = new int[0]; // ally slot k -> memberIndex drawn for it
 	private Godot.Collections.Array<int> _hpOrder = new(); // HUD strip slot -> memberIndex: the join order (see BuildJoinLottery)
 	private Godot.RandomNumberGenerator _joinRng; // UNSEEDED on purpose: a fresh process re-rolls
@@ -160,14 +160,14 @@ public partial class Game : Godot.Node2D
 	// Human-test: a fixed 3-option card felt the same every level - roll variety instead.
 	// user RE-LOCK (2026-10-23): the card shows one still-open track per member in play
 	// PLUS one fully-wild slot (a random open track from ANY member, never a repeat) -
-	// M1's wildcard is back by user request. With five PCs that's up to six keys.
+	// M1's wildcard is back by user request. With six PCs that's up to seven keys.
 	// A member whose every track is capped simply drops its slot, so the card never
 	// shows a pick that cannot be taken.
 	// Offense only - never HP, speed or healing (those live in campfires and revives); the
 	// kit-native ranks (pierce, multishot) ride the same cap. Ranks cap at 3 per DESIGN; the
 	// 4th rank would be the evolution (Stormcaller / Viperkiss), still stubbed for M2.
 	const int PICK_RANK_CAP = 3;
-	const int PICK_SLOTS = 6;   // keys pick_1..pick_6: five members + one wild slot
+	const int PICK_SLOTS = 7;   // keys pick_1..pick_7: six members + one wild slot (pick_7 entered the input map 2026-10-30)
 	static readonly string[] OPT_LABEL = { "longer reach (maul)", "heavier blows (maul damage)",
 										   "swifter swings (cooldown)", "quicker thrusts (cooldown)",
 										   "deeper thrust (reach + pierce)", "sharper points (damage)",
@@ -177,18 +177,18 @@ public partial class Game : Godot.Node2D
 										   "quicker pulse (guardian rate)", "guiding light (ring vulnerability)",
 										   "occult flame (blast damage)", "wider burst (blast reach)",
 										   "quicker ritual (summon rate)", "twin ritual (one more familiar)", "draging maul (slow on hit)",
-										   "deadly aim (crit chance)" };
-	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1 };
-	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f };
-	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f };
-	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // rows 4 + 8: Mosiah deeper thrust / Asper piercing shot (user 2026-10-30)
-	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
+										   "deadly aim (crit chance)", "keener flame (firebolt damage)", "quicker fuse (firebolt cooldown)", "split bolt (firebolt pierce)", "kindling sparks (burn spreads)", "linger flame (burn lasts longer)" };
+	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5 };
+	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f };
+	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }; // rows 4 + 8: Mosiah deeper thrust / Asper piercing shot (user 2026-10-30)
+	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
 	// guiding light (Alvora): the ring MARKS caught bodies for +10%/rank incoming damage
 	// from EVERY source, a window on the body that decays on its own (Combatant.TickVuln).
 	// The user swapped the old flat-armour defence for this offense (2026-10-23): the squad
 	// keeps no mitigation, but the cleric's ring becomes the party's damage setup.
-	static readonly int[] OPT_VULN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_VULN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 	// draging maul (Baldrun 4th card, user 2026-10-24): connected maul hits drag caught bodies to
 	// (1 - 0.25/rank) speed for a 2.5 s window (Combatant.slowMul/slowT, refresh-not-stack); only
 	// horde movement reads it and the cleave hook never marks Bosses. deadly aim (Mosiah 4th card):
@@ -196,8 +196,14 @@ public partial class Game : Godot.Node2D
 	// so the crit card is pure table data. Rows 18/19 of the 20-wide tables; caps bound both:
 	// drag <= 0.75 at rank 3, crit <= 0.05 + 3 x 0.08 = 0.29.
 	// OPT_SLOW = drag strength/rank (Baldrun row 18); OPT_CRIT = crit points/rank (Mosiah row 19).
-	static readonly double[] OPT_SLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0 };
-	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08 };
+	static readonly double[] OPT_SLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0 };
+	// firebolt kit cards (Stack, user 2026-10-30): OPT_BURN = +2 s of linger per rank onto
+	// PartyMember.burnDur; OPT_SPREAD = kindling sparks rank = the hop budget on Combatant
+	// (a burning body ignites that many nearby unburnt bodies, each one hop cheaper). Rows
+	// 25-29 of the now 25-wide tables.
+	static readonly double[] OPT_BURN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0 };
+	static readonly int[] OPT_SPREAD = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 };
 	int[] _pickRank = new int[OPT_LABEL.Length];
 	int[] _optRoll = new int[PICK_SLOTS]; // this card's offered options (slot -> option, -1 = empty slot)
 
@@ -354,6 +360,9 @@ public partial class Game : Godot.Node2D
 		// just raked so a pierced bolt cannot re-hit the SAME body the next frame.
 		// (GetInstanceId is 64-bit, so the memo array is long-typed)
 		Godot.Collections.Array<double> _shotPen = new();
+		Godot.Collections.Array<double> _shotBurnD = new();   // firebolt burn: dps stamped at spawn (0 = inert)
+		Godot.Collections.Array<double> _shotBurnT = new();   // burn window start, seconds
+		Godot.Collections.Array<int> _shotBurnHop = new();  // kindling sparks hop budget stamped at spawn
 		Godot.Collections.Array<long> _shotLast = new();
 		// ---------- leader-bonus helper pools (user 2026-10-25): Asper's insects, Yu's spirits ----------
 		// Pooled exactly like the summons: fixed slots, parallel arrays, parked past -9000.
@@ -1514,6 +1523,9 @@ public partial class Game : Godot.Node2D
 			_shotDmg.Add(0.0);
 			_shotLife.Add(0.0);
 			_shotPen.Add(0.0);
+			_shotBurnD.Add(0.0); // burn memo grows WITH the pool: every slot needs every column
+			_shotBurnT.Add(0.0);
+			_shotBurnHop.Add(0);
 			_shotLast.Add(-1);
 		}
 		// Yu's familiars: pooled like the bolts and the gems, so a rank-3 multiattack ritual
@@ -2235,6 +2247,7 @@ public partial class Game : Godot.Node2D
 		UpdateGems(delta);
 		UpdateBullets(delta);
 		UpdateShots(delta); // the party's own projectiles: mirror pool, opposite faction
+		SpreadScan(); // kindling sparks: burning bodies ignite near ones (hop budget = rank)
 		UpdateSummons(delta); // Yu's familiars: run at prey, detonate on contact OR on the fuse
 		UpdateHelpers(delta); // leader-bonus lane (user 2026-10-25): Alvora regen, Asper insects, Yu spirits
 		PickerTick(d);
@@ -2883,6 +2896,9 @@ public partial class Game : Godot.Node2D
 						continue; // this bolt already raked THIS body: it rides on down the lane
 					nc.TakeDamage(_shotDmg[i]);
 					TryChainLightning(n); // Baldrun seat: the hit may loose a chain (no-op for other seats)
+					// firebolt window opens on this body (0 dps = plain bolt: nothing burns)
+					if (_shotBurnD[i] > 0.0)
+						nc.Burn(_shotBurnD[i], _shotBurnT[i], _shotBurnHop[i]); // kills still land on the shared scan
 					if (_shotPen[i] > 0.0)
 					{
 						_shotPen[i] -= 1.0;
@@ -2906,7 +2922,51 @@ public partial class Game : Godot.Node2D
 	}
 
 	// a PC fires one bolt: same free-slot scan the boss pool uses, no allocation
-	public void SpawnShot(Vector2 pos, Vector2 vel, double dmg, double life, double pen = 0.0) // pen: shooter's own pierce budget; insects keep the 0 default
+	private void SpreadScan()
+	{
+		// kindling sparks (Stack card, user 2026-10-30): a burning body with hop budget left
+		// ignites NEARBY unburnt horde bodies, each ignition one hop cheaper, so rank 3 chains
+		// at most three new bodies. Ignitions are collected first and applied after the scan,
+		// so a body lit this pass cannot relay the flame the same frame. Bosses are skipped:
+		// spread hops through the horde only, and the radius is the authored silhouette plus
+		// a 30 px spark gap, like the bolt hit test's maths.
+		Godot.Collections.Array<Godot.Node2D> ignite = new();
+		Godot.Collections.Array<double> dpsA = new();
+		Godot.Collections.Array<double> durA = new();
+		Godot.Collections.Array<int> hopA = new();
+		for (int a = 0; a < _enemies.Count; a++)
+		{
+			Combatant ca = (Combatant)_enemies[a];
+			if (ca == null || ca.kind == "dead" || ca.burnT <= 0.0 || ca.burnHop <= 0)
+				continue; // only a burning body with budget left can spread
+			Vector2 pa = ca.GlobalPosition;
+			for (int b = 0; b < _enemies.Count; b++)
+			{
+				if (b == a)
+					continue;
+				Godot.Node2D nb = _enemies[b];
+				Combatant cb = (Combatant)nb;
+				if (cb == null || cb.kind == "dead" || cb is Boss || cb.burnT > 0.0)
+					continue; // already burning: it rides its own window; bosses hold their own lane
+				double rad = 20.0 + 30.0; // horde silhouettes share one spark gap (bosses are skipped above)
+				if (pa.DistanceSquaredTo(nb.GlobalPosition) > rad * rad)
+					continue;
+				ignite.Add(nb);
+				dpsA.Add(ca.burnDps);
+				durA.Add(ca.burnT); // pass the REMAINING window: the flame rides one clock face
+				hopA.Add(ca.burnHop - 1);
+			}
+		}
+		if (ignite.Count == 0)
+			return;
+		GD.Print("[10thAge] (spread) ignite=", ignite.Count);
+		for (int i = 0; i < ignite.Count; i++)
+		{
+			Combatant cb = (Combatant)ignite[i];
+			cb.Burn(dpsA[i], durA[i], hopA[i]);
+		}
+	}
+	public void SpawnShot(Vector2 pos, Vector2 vel, double dmg, double life, double pen = 0.0, double burnDur = 0.0, double burnDps = 0.0, int spread = 0) // pen/burn/hop stamped at spawn: Asper + Mosiah pierce, Stack firebolt burn; everyone else keeps the 0 defaults
 	{
 		for (int i = 0; i < _shots.Count; i++)
 		{
@@ -2919,6 +2979,10 @@ public partial class Game : Godot.Node2D
 			_shotLife[i] = life;
 			// pierce budget stamped at spawn: Mosiah leader seat + the shooter's own pen (Asper card)
 			_shotPen[i] = LeaderPierceBonus() + pen;
+			// firebolt burn / hop budget stamped at spawn too (all 0 = inert for other lanes)
+			_shotBurnT[i] = burnDur;
+			_shotBurnD[i] = burnDps;
+			_shotBurnHop[i] = spread;
 			_shotLast[i] = -1;
 			((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
 			return;
@@ -3180,8 +3244,9 @@ public partial class Game : Godot.Node2D
 		// fresh tap is a deliberate pick. Slots map through _optRoll (this card's roll).
 		int choice = -1;
 		// card-shaped key scan: the number of keys the card can show is the squad size
-		// (+1 wild), so scan the slots rather than three hand-written branches (pick_1..pick_6
-		// exist in the input map; an empty slot is not rendered, so a press there is a no-op)
+		// (+1 wild), so scan the slots rather than three hand-written branches (pick_1..pick_7
+		// exist in the input map - pick_7 joined the map with the sixth face; an empty slot is
+		// not rendered, so a press there is a no-op
 		for (int s = 0; s < PICK_SLOTS; s++)
 		{
 			if (!Input.IsActionJustPressed("pick_" + (s + 1)))
@@ -3339,8 +3404,8 @@ public partial class Game : Godot.Node2D
 	// One CanvasLayer under a full-rect anchor Control: every position is a fraction of
 	// the VISIBLE rect (MeasureWindow's probe proved that rect), so the card rides any
 	// window / DPI. Slots pre-allocate hidden like the boot pools; UI text rides base-
-	// viewport pixel sizes like the HUD's. MOCKUP: ONE board page holds all five
-	// seats in rows of three (3+2; four per row needs room five seats never have).
+	// viewport pixel sizes like the HUD's. MOCKUP: ONE board page holds all six
+	// seats in rows of three (3+3; the bottom row fills once the sixth face lands).
 	// Click a portrait to SELECT it (the gold ring box rides that slot); click the
 	// CONFIRM plate at the card bottom to seat that PC. The right side stacks the
 	// SELECTED PC's sheet over the ALWAYS-up party stats box; the "(+0)" rows on
@@ -3348,29 +3413,31 @@ public partial class Game : Godot.Node2D
 	// box = party-wide) M3 programs into the 17-stat tag registry.
 	// Card copy is data-driven: tracks read OPT_LABEL/OPT_MEMBER live; the bonus / ult
 	// blurbs below stay honest to their live lanes (index = member index, the OPT_MEMBER
-	// convention: 0 Baldrun, 1 Mosiah, 2 Asper, 3 Alvora, 4 Yu). PLACEHOLDER frames get
+	// convention: 0 Baldrun, 1 Mosiah, 2 Asper, 3 Alvora, 4 Yu, 5 Stack). PLACEHOLDER frames get
 	// the real UI pass the user gathers; the art rects already show the painted minis.
 	// Board slot rects as anchor fractions of the page window: slot i -> L,T,R,B
-	// (three across, two rows: 0,1,2 top | 3,4 bottom)
+	// (three across, two rows: 0,1,2 top | 3,4,5 bottom)
 	static readonly float[] SEL_GRID = { 0.04f, 0.04f, 0.30f, 0.48f, 0.35f, 0.04f, 0.61f, 0.48f,
-		0.66f, 0.04f, 0.96f, 0.48f, 0.04f, 0.54f, 0.30f, 0.98f, 0.35f, 0.54f, 0.61f, 0.98f };
+		0.66f, 0.04f, 0.96f, 0.48f, 0.04f, 0.54f, 0.30f, 0.98f, 0.35f, 0.54f, 0.61f, 0.98f, 0.66f, 0.54f, 0.96f, 0.98f };
 	static readonly float[] SEL_PAGE = { 0.05f, 0.14f, 0.60f, 0.86f }; // the board window the build draws AND the click maps into
-	static readonly bool[] SEL_LOCKED = { false, false, false, false, false };
+	static readonly bool[] SEL_LOCKED = { false, false, false, false, false, false };
 	static readonly float[] SEL_CONFIRM = { 0.32f, 0.88f, 0.58f, 0.96f };
-	// painted mini art per roster seat (index = memberIndex: 0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu)
-		static readonly string[] SEL_ART = { "res://art/baldrun.png", "res://art/mosiah.png", "res://art/asper.png", "res://art/alvora.png", "res://art/yu.png" };
+	// painted mini art per roster seat (index = memberIndex: 0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack)
+		static readonly string[] SEL_ART = { "res://art/baldrun.png", "res://art/mosiah.png", "res://art/asper.png", "res://art/alvora.png", "res://art/yu.png", "res://art/stack.png" };
 		static readonly string[] SEL_BONUS = {
 		"Leader bonus: chain lightning - landed party hits can loose a lightning chain hopping between bodies",
 		"Leader bonus: pierce - every bolt punches through one body and keeps flying",
 		"Leader bonus: friendly insects kindle in the clearing; touching one joins the squad for 10 s",
 		"Leader bonus: field medic - every 10 s every standing ally regenerates 1 hp",
-		"Leader bonus: kindness spirits kindle in the clearing; touching one heals 10 hp" };
+		"Leader bonus: kindness spirits kindle in the clearing; touching one heals 10 hp",
+		"Leader bonus: none yet - Stack's leader lane ships in a future pass" };
 	static readonly string[] SEL_ULT = {
 		"Ultimate: Giant's Might (R) - doubles size and reach, damage x1.5, for 10 s",
 		"Ultimate: Bardic Inspiration (R) - rallies ALL allies +25% damage and attack speed for 10 s",
 		"Ultimate: Swarm of Bees (R) - 6 hunters in a circle, one body latched each at 10 dmg/s for 10 s, spread out to hunt",
 		"Ultimate: Guardian Awakening (R) - ring reach x2 and +50% damage; every horde kill while awake heals ALL allies 1 hp for 10 s",
-		"Ultimate: The Kaka (R) - 6 empowered familiars in a circle, blast x2 and damage x2 after ranks, spread out" };
+		"Ultimate: The Kaka (R) - 6 empowered familiars in a circle, blast x2 and damage x2 after ranks, spread out",
+		"Ultimate: none yet - Stack's ultimate ships in a future pass" };
 	public void BuildSelectScreen()
 	{
 		_selLayer = new CanvasLayer();
@@ -3891,6 +3958,8 @@ public partial class Game : Godot.Node2D
 		{ m.guidingLight += 0.10 * OPT_VULN[option]; } // guiding light: marked bodies +10%/rank incoming
 		{ m.maulSlow += OPT_SLOW[option]; } // draging maul: drag strength per rank onto the kit field
 		{ m.stat[StatTags.CRIT_CHANCE] += OPT_CRIT[option]; } // deadly aim: crit points on the tag store
+		{ m.burnDur += OPT_BURN[option]; } // linger flame: +2 s of burn per rank on the kit field
+		{ m.burnSpread += OPT_SPREAD[option]; } // kindling sparks: spread hop budget on the kit field
 		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
 						 OPT_LABEL[option] + " x" + _pickRank[option];
 		GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +
