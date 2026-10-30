@@ -886,16 +886,16 @@ public partial class PartyMember : Godot.Node2D
 		{
 			// Longbow: the commit fires the Game's PARTY-SIDE shot pool at the closest body in
 			// sight. Damage is not split - every bolt that connects takes the full hit, and a
-			// miss simply expires (no pierce: the FAN is the multishot upgrade, pierce is the
-			// rapier's). Bolts fan tightly around the aim line so rank 1..3 reads as a wedge
-			// of chitin, not a stack of overlapping shots.
+			// miss simply expires; the "piercing shot" card (user 2026-10-30: replaced the old
+			// "farther shot" reach rank) stamps a per-bolt pierce budget so raked bolts keep flying
+			// Bolts still fan tight: rank 1..3 reads as a wedge of chitin, not a stack.
 			int bolts = Strikes(); // MULTISTRIKE tag fans one more bolt per rank
 			for (int s = 0; s < bolts; s++)
 			{
 				float off = (s - (bolts - 1) * 0.5f) * 0.16f; // rad of fan per extra bolt
 				float a2 = ang + off;
 				Vector2 dir = new Vector2((float)System.Math.Cos(a2), (float)System.Math.Sin(a2));
-				pg.SpawnShot(p + dir * 18.0f, dir * projSpeed, dmg, projLife);
+				pg.SpawnShot(p + dir * 18.0f, dir * projSpeed, dmg, projLife, pierce);
 			}
 		}
 		else if (cleaver)

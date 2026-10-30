@@ -30,7 +30,10 @@ public partial class Game : Godot.Node2D
 	// existing squad reads IDENTICALLY; what changed is that seats are now a table instead
 	// of math that folded index 1 onto the same seat as index 3 - a fourth PC used to
 	// weld straight onto Mosiah. Distinct seats hold up to the 5-PC roster.
-	static readonly int[] RING_SLOT = { 0, 3, 2, 4, 1, 5 }; // [memberIndex] -> seat 0..5 (0..4 distinct at 0.4rad; 5 = reserved, 360deg would weld to 0)
+	// RETIRED 2026-10-30: the follow loop now divides 2pi by the count of LIVE movers, so the
+	// leader's own seat is no longer a pocket of air in the orbit (the missing-corner box the
+	// user saw). Table kept for the audit trail:
+	static readonly int[] RING_SLOT = { 0, 3, 2, 4, 1, 5 };
 	// ---------- player revive (leader stands still near a body) ----------
 	// 56 (was 30): widened so a bodyguard slot and the rescue share a spot
 	readonly double REVIVE_RANGE = 56.0;
@@ -169,7 +172,7 @@ public partial class Game : Godot.Node2D
 										   "swifter swings (cooldown)", "quicker thrusts (cooldown)",
 										   "deeper thrust (reach + pierce)", "sharper points (damage)",
 										   "heavier arrows (longbow damage)", "quicker draw (longbow cooldown)",
-										   "farther shot (longbow reach)", "multishot (fan of shots)",
+										   "piercing shot (longbow pierce)", "multishot (fan of shots)",
 										   "spirit brand (guardian damage)", "wider ring (guardian reach)",
 										   "quicker pulse (guardian rate)", "guiding light (ring vulnerability)",
 										   "occult flame (blast damage)", "wider burst (blast reach)",
@@ -177,9 +180,9 @@ public partial class Game : Godot.Node2D
 										   "deadly aim (crit chance)" };
 	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1 };
 	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f };
-	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.18f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f };
+	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f };
 	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // rows 4 + 8: Mosiah deeper thrust / Asper piercing shot (user 2026-10-30)
 	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
 	// guiding light (Alvora): the ring MARKS caught bodies for +10%/rank incoming damage
 	// from EVERY source, a window on the body that decays on its own (Combatant.TickVuln).
@@ -1974,15 +1977,22 @@ public partial class Game : Godot.Node2D
 		{
 			Vector2 anchor = leader != null ? leader.GlobalPosition : new Vector2(0, 0);
 			float leadSpeed = leader != null ? (float)leader.EffMove() : 128.0f;
+			// even ring (user 2026-10-30): the fixed seat table left the leader's own seat as an
+			// empty pocket in the orbit (the "box with a missing corner" in their screenshot). Spacing
+			// now divides 2pi by the count of LIVE movers: 4 members circle a true box, 3 a triangle,
+			// 2 face off; a revive re-spreads the ring as the follow below re-homes the bodies.
+			int ringN = 0; int ringOrd = -1;
+			foreach (PartyMember m2 in _party)
+				if (m2.joined && !m2.isLeader && !m2.downed && !m2.eliminated)
+					ringN++;
 			foreach (PartyMember m in _party)
 			{
 				if (!m.joined || m.isLeader || m.downed || m.eliminated)
 					continue; // fallen bodies stay where they fell (locked); a stranded
 							  // recruit stands where it fell IN, welded to its own spot
-				int k = m.memberIndex;
-				if (k < 0 || k >= RING_SLOT.Length)
-					k = 1 + (k % (RING_SLOT.Length - 1)); // roster past the table: give it a seat
-				double slot = RING_SLOT[k] * System.Math.PI * 0.4;
+				ringOrd++; // ordinal among live movers: same skip test + same iteration order as the
+							   // count pass above, so each body keeps its arc position frame to frame
+				double slot = (double)ringOrd * System.Math.PI * 2.0 / (double)(ringN > 0 ? ringN : 1);
 				Vector2 aim = new Vector2((float)System.Math.Cos(_ringAngle + slot),
 										  (float)System.Math.Sin(_ringAngle + slot));
 				Vector2 target = anchor + aim * (float)RING_RADIUS;
@@ -2896,7 +2906,7 @@ public partial class Game : Godot.Node2D
 	}
 
 	// a PC fires one bolt: same free-slot scan the boss pool uses, no allocation
-	public void SpawnShot(Vector2 pos, Vector2 vel, double dmg, double life)
+	public void SpawnShot(Vector2 pos, Vector2 vel, double dmg, double life, double pen = 0.0) // pen: shooter's own pierce budget; insects keep the 0 default
 	{
 		for (int i = 0; i < _shots.Count; i++)
 		{
@@ -2907,8 +2917,8 @@ public partial class Game : Godot.Node2D
 			_shotVel[i] = vel;
 			_shotDmg[i] = dmg;
 			_shotLife[i] = life;
-			// pierce budget stamped at spawn: 0 unless Mosiah owns the leader seat
-			_shotPen[i] = LeaderPierceBonus();
+			// pierce budget stamped at spawn: Mosiah leader seat + the shooter's own pen (Asper card)
+			_shotPen[i] = LeaderPierceBonus() + pen;
 			_shotLast[i] = -1;
 			((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
 			return;
