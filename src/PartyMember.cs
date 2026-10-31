@@ -44,7 +44,7 @@ public partial class PartyMember : Godot.Node2D
 	// heavy AoE verbs now bite crowds at full strength. Warding light is GONE (user 2026-10-23
 	// swapped it for offense): the cleric's fourth track is guiding light, a VULNERABILITY
 	// mark - ring-caught bodies take +10%/rank damage from every source for a window.
-	[Export] public string weaponKit = "melee"; // "melee" | "shot" | "aura" | "summon" | "shield" | "axe"
+	[Export] public string weaponKit = "melee"; // "melee" | "shot" | "aura" | "summon" | "shield" | "axe" | "dagger"
 	[Export] public float projSpeed = 340.0f;  // px/s a bug projectile travels
 	[Export] public float projLife = 2.2f;     // seconds a bolt may fly before it expires
 	// firebolt kit knobs (Stack, user 2026-10-30): a hit sets a burn window on the body (dps x
@@ -73,6 +73,21 @@ public partial class PartyMember : Godot.Node2D
 	[Export] public int bleedR = 0;     // bleed rank: hit bodies bleed like the fire DoT
 	public double orbitT = 0.0;         // "Axes Away!" spin clock: seconds of orbit left (Game sets)
 	double orbitAng = 0.0;              // spin angle: blades ride orbitAng + i * 2pi/blades
+	// Brook's twin daggers (user 2026-10-31): TWO daggers, 7 damage EACH, thrust at the nearest
+	// prey ALONG ONE LINE one right after the other (user: "attacks twice in the same direction,
+	// one after another with a very small delay"): the beat lands the FIRST jab and parks cdTimer
+	// at TWIN_STAGGER, so the second lands ~0.15 s later down the stored aim - the stagger is the
+	// assistant pick (user named only "a very small delay"). Each jab stabs every body inside a
+	// narrow corridor to the prey point; hits stamp POISON, its OWN status pair mirroring burn/
+	// bleed (fire DoT lanes stay Stack-only). Kit fields like pierce/axeN, NOT tag slots.
+	[Export] public double poisonDps = 0.0;   // damage/sec stamped on stabbed bodies (0 = no venom)
+	[Export] public double poisonDur = 0.0;   // seconds the poison runs; lingering venom raises it
+	[Export] public double baseEvasion = 0.0; // per-PC authored evasion seeded into the EVASION tag (Brook 10%)
+	public double multiChance = 0.0;  // lucky strikes card: +0.05/rank chance a hit deals damage TWICE
+	public bool twinArm = false;      // first dagger landed: the second repeats the SAME line
+	public double twinDmg = 0.0;      // beat-wide crit/steal/multistrike roll the two daggers share
+	public Vector2 twinAim = new Vector2(1.0f, 0.0f); // second dagger repeats the first's direction
+	static readonly double TWIN_STAGGER = 0.15; // seconds between the two jabs (assistant pick)
 	// Yu's familiars (M2, user dictation 2026-10-22): the fuse is the summon's LIFETIME, and
 	// the familiar detonates on contact with prey OR when that fuse burns out - the fuse is
 	// what keeps a player from parking a pile of them under a boss and saving them for later.
@@ -133,6 +148,10 @@ public partial class PartyMember : Godot.Node2D
 	// harmless, same discipline as insT/elixir clocks) carries +25% move (EffMove), +5 armour (TakeHit)
 	// and regen 1% max hp/s (REGEN block). Set by Game.OakHollowParty; duration lives on the Game side.
 	public double oakT = 0.0;   // seconds of Oakhollow Assemble! left on this body
+	// Assassination window seconds left on this body (user 2026-10-31 Brook ult): while up,
+	// RollDamage gives +15% crit CHANCE points, crit damage x1.25 and 25% multistrike CHANCE.
+	// NO stat-store writes: the window is temporary, the 17-row audit stays a permanent-grant ledger.
+	public double assT = 0.0;
 	Godot.Node2D _telePivot; // telegraph armature (pure nodes: C# _draw is dead in 4.7)
 	Godot.ColorRect[] _teleParts;
 	float _teleHold = 0.0f; // telegraph visibility timer, set on each swing
@@ -275,8 +294,14 @@ public partial class PartyMember : Godot.Node2D
 			// 2026-10-31: Bruno art audit-passed (85x118 canvas, hard alpha 0 soft px, 61 opaque
 			// colours, 1 px margins all sides, cx_delta -3.2). Row profile shows the base plate
 			// shallow at the canvas edge like the class (identical bottom profile to Wash), so
-			// scale/rim carry over; the wider cx_delta is his two-handed axe stance, honest
+			// 			// scale/rim carry over; the wider cx_delta is his two-handed axe stance, honest
 			miniPath = "res://art/bruno.png";
+		else if (displayName == "Brook")
+			// 2026-10-31: Brook art audit-passed (80x118 canvas, hard alpha 4017 px, 0 soft
+			// px, 61 opaque colours, 1 px margins all sides, cx_delta -1.65). Row profile is
+			// IDENTICAL bottom geometry to Bruno (22 px baseline, same widening ramp), so
+			// scale/rim carry over; his cx_delta sits centred like the class
+			miniPath = "res://art/brook.png";
 		if (miniPath != "")
 		{
 			Godot.Texture2D tex = GD.Load(miniPath) as Godot.Texture2D;
@@ -418,6 +443,10 @@ public partial class PartyMember : Godot.Node2D
 		// are PartyMember lanes, Game only sets the spin clock
 		if (displayName == "Bruno")
 			return 8; // Axes Away! (the spin clock lives on Game.BrunoAxesAway)
+		// Brook "Assassination" (user 2026-10-31): party-wide window, the walk lives on Game
+		// like bardic/oak/elixir (every ally carries its OWN assT clock set by the walk)
+		if (displayName == "Brook")
+			return 9; // Assassination (the window lives on Game.AssassinationParty)
 		return 0; // other PCs: no ultimate authored yet (future lanes land here)
 	}
 	public bool TryUltimate()
@@ -535,7 +564,21 @@ public partial class PartyMember : Godot.Node2D
 				(int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
 			return true;
 		}
-		GD.Print("[10thAge] (ult) " + displayName + " has no ultimate yet");
+		// Brook "Assassination" (user 2026-10-31): the identification IS the window - the
+		// party reads weak points through its own crit/multistrike readers (RollDamage asks
+		// assT live), so Game only walks the roster to set each ally's own assT clock.
+		else if (ultKey() == 9)
+		{
+			ultCdT = ULT_CD_BASE / stat[StatTags.ULT];
+			Game g8 = GetParent() as Game;
+			if (g8 != null)
+				g8.AssassinationParty();
+			GD.Print("[10thAge] (ult) Assassination: " + displayName +
+				" reads the prey's weak points - ALL allies gain +25% multistrike, +15% crit chance and +25% crit damage for 10 s, gate " +
+				(int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
+			return true;
+		}
+		// GD.Print("[10thAge] (ult) " + displayName + " has no ultimate yet");
 		return false;
 	}
 
@@ -545,6 +588,9 @@ public partial class PartyMember : Godot.Node2D
 		for (int i = 0; i < StatTags.N; i += 1)
 			stat[i] = StatTags.BASE[i];
 		stat[StatTags.ARMOUR] += baseArmour; // per-PC authored armour lands on the store
+		// Brook authored evasion (user 2026-10-31: 10% dodge): like armour, the EVASION tag
+		// seeds at BASE then adds this per-PC number (reader lives on Game.TakeHit)
+	 stat[StatTags.EVASION] += baseEvasion;    // authored dodge lands on the store
 	}
 	/** Authored weaponDamage scaled by the ATTACK_DAMAGE tag. */
 	public double EffDamage() { return weaponDamage * stat[StatTags.ATTACK_DAMAGE]; }
@@ -596,8 +642,15 @@ public partial class PartyMember : Godot.Node2D
 			amount *= AWA_DMG; // awakening: +50% on Alvora hits while awake
 		if (elixBoldT > 0.0)
 			amount *= 1.10; // Boldness elixir: +10% on every hit while brewed
-		if (host is Game g && g.Rng != null && g.Rng.Randf() < stat[StatTags.CRIT_CHANCE] + (elixPrecT > 0.0 ? 0.10 : 0.0) + (g.WashUp() ? 0.05 : 0.0)) // Precision +10% while brewed | Smite passive +5% while Wash stands
-			amount *= stat[StatTags.CRIT_DAMAGE] * (host is Game gsw && gsw.WashUp() ? 1.25 : 1.0); // Smite passive: crits bite 25% harder while Wash stands in the squad
+		// multistrike CHANCE (Brook's lucky-strikes card + Assassination window): on a proc THIS
+		// hit deals damage TWICE (user 2026-10-31: 5%/rank on attacks, the ult gives ALL allies
+		// 25%). One extra run-stream draw only while a chance is live (zero cost otherwise);
+		// lifesteal below rides the doubled hit, so a proc steals proportionally.
+	 double msChance = multiChance + (assT > 0.0 ? 0.25 : 0.0);
+		if (msChance > 0.0 && host is Game gms && gms.Rng != null && gms.Rng.Randf() < msChance)
+			amount *= 2.0; // damage twice: the commit repeats its bite on the same strike
+		if (host is Game g && g.Rng != null && g.Rng.Randf() < stat[StatTags.CRIT_CHANCE] + (elixPrecT > 0.0 ? 0.10 : 0.0) + (g.WashUp() ? 0.05 : 0.0) + (assT > 0.0 ? 0.15 : 0.0)) // Precision +10% while brewed | Smite +5% while Wash stands | Assassination +15% while the window is up
+			amount *= stat[StatTags.CRIT_DAMAGE] * (host is Game gsw && gsw.WashUp() ? 1.25 : 1.0) * (assT > 0.0 ? 1.25 : 1.0); // Smite +25% crit bite | Assassination weak points bite +25%
 		double steal = amount * stat[StatTags.LIFESTEAL];
 		if (steal > 0.0)
 		{
@@ -825,6 +878,9 @@ public partial class PartyMember : Godot.Node2D
 		elixPrecT = System.Math.Max(0.0, elixPrecT - delta);
 		elixMagT = System.Math.Max(0.0, elixMagT - delta);
 		oakT = System.Math.Max(0.0, oakT - delta); // Oakhollow clock ticks with the same soft-pause discipline
+		// Assassination window ticks on the same soft-pause discipline (party-wide: every ally
+		// carries its OWN assT, like the oak/bardic/elixir clocks)
+		assT = System.Math.Max(0.0, assT - delta);
 		// Bruno's "Axes Away!" spin: the clock decays with the same soft-pause discipline, and
 		// the ANGLE advances every frame one FULL circle per cooldown window, so the quick-throw
 		// card spins the orbit faster (attack speed is an "effect of the upgrades" the spin gains)
@@ -900,6 +956,8 @@ public partial class PartyMember : Godot.Node2D
 		// (half-arc out + back over the same path, rakes everything in the blade band)
 		// plus a spin lane ("Axes Away!") that orbits massive blades while the clock runs
 		bool axeKit = weaponKit == "axe";
+		// Brook's twin daggers (user 2026-10-31): the SIXTH verb, a same-line double jab
+		bool daggerKit = weaponKit == "dagger";
 		if (auraKit)
 		{
 			// the ring is a full-body sweep, so the lane/fan target search below is skipped
@@ -1090,6 +1148,98 @@ public partial class PartyMember : Godot.Node2D
 				GD.Print("[10thAge] (spin) Axes Away!: " + displayName + " massive blades rake " + bitN + " bodies");
 			return; // the spin owns its whole beat: the crescents resume when the clock expires
 		}
+		// ---------- Brook's twin daggers (user 2026-10-31): same-line double jab ----------
+		// TWO daggers, 7 damage EACH, thrust at the nearest prey ALONG ONE LINE one right after
+		// the other (user: "attacks twice in the same direction, one after another with a very
+		// small delay between them"): the beat lands the FIRST jab and parks cdTimer at TWIN_STAGGER
+		// (0.15 s, assistant pick: the user named only "a very small delay") so the SECOND jab
+		// lands on the next arrival down the stored aim - the stagger is what reads them as two
+		// distinct jabs, and the cadence rides the attack-speed card exactly like every other
+		// cooldown. Each jab stabs EVERY body inside a narrow corridor to the prey point (band
+		// half-width is an assistant pick, it rides the AREA tag like other attack sizes); hits
+		// stamp POISON, its OWN status pair mirroring burn/bleed (user kit: 1 dmg/s for 5 s,
+		// dps scales with the damage card at the call site like the burn/bleed stamps; the fire
+		// DoT lanes stay Stack-only). ONE crit/steal/multistrike roll SHARED by BOTH daggers
+		// like the axe volley shares one roll across its crescents. Instant like the other melee
+		// verbs: the thrust corridor is deterministic geometry, no shot-pool column to mirror.
+		if (daggerKit)
+		{
+			// second dagger: repeat the STORED line, then the beat is DONE (real cooldown)
+			if (twinArm)
+			{
+				twinArm = false;
+				_atkFlash = 0.08f; // the second jab flashes short like a draw, never the harm lane
+				float band2 = (float)(14.0 * stat[StatTags.AREA] * LeaderAreaMul()); // corridor half-width, rides attack size
+				int hitN2 = 0;
+				for (int i = 0; i < enemies.Count; i++)
+				{
+					Godot.Node2D n = enemies[i];
+					Combatant nc = (Combatant)n;
+					if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
+						continue;
+					Vector2 v = pg.WrapDelta(p, n.GlobalPosition);
+					double along = v.Dot(twinAim);
+					if (along < 0.0 || along > (double)reach)
+						continue; // outside the thrust corridor (segment p -> p + aim * reach)
+					if ((v - twinAim * (float)along).Length() > band2)
+						continue; // clear of the blade lane
+					nc.TakeDamage(twinDmg);
+					nc.Poison(poisonDps * stat[StatTags.ATTACK_DAMAGE], poisonDur); // venom stamp: dps rides the damage card
+					hitN2++;
+				}
+				GD.Print("[10thAge] (dagger) " + displayName + " second dagger stabs " + hitN2 + " bodies");
+				cdTimer = (float)EffCooldown(); // the beat completes: full cooldown from here
+				return;
+			}
+			// first dagger: pick the prey, share ONE roll across both jabs
+			Godot.Node2D prey = null;
+			double preyD = 1e9;
+			for (int i = 0; i < enemies.Count; i++)
+			{
+				Godot.Node2D n = enemies[i];
+				Combatant nc = (Combatant)n;
+				if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
+					continue;
+				Vector2 v = pg.WrapDelta(p, n.GlobalPosition);
+				double dd = v.Length();
+				if (dd < preyD)
+				{
+					preyD = dd;
+					prey = n;
+				}
+			}
+			if (prey == null || preyD > (double)reach)
+				return; // an empty clearing never burns the beat
+			Vector2 aimv = pg.WrapDelta(p, prey.GlobalPosition);
+			if (aimv.Length() < 0.01f)
+				twinAim = new Vector2(1.0f, 0.0f); // prey standing on the blade: stab the facing line
+			else
+				twinAim = aimv / aimv.Length();
+			twinDmg = RollDamage(pg, weaponDamage); // ONE crit/steal/multistrike roll shared by BOTH daggers
+			twinArm = true;
+			cdTimer = (float)TWIN_STAGGER; // the very small delay between the jabs
+			float band = (float)(14.0 * stat[StatTags.AREA] * LeaderAreaMul()); // corridor half-width, rides attack size
+			int hitN = 0;
+			for (int i = 0; i < enemies.Count; i++)
+			{
+				Godot.Node2D n = enemies[i];
+				Combatant nc = (Combatant)n;
+				if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
+					continue;
+				Vector2 v = pg.WrapDelta(p, n.GlobalPosition);
+				double along = v.Dot(twinAim);
+				if (along < 0.0 || along > (double)reach)
+					continue;
+				if ((v - twinAim * (float)along).Length() > band)
+					continue;
+				nc.TakeDamage(twinDmg);
+				nc.Poison(poisonDps * stat[StatTags.ATTACK_DAMAGE], poisonDur); // venom stamp: dps rides the damage card
+				hitN++;
+			}
+			GD.Print("[10thAge] (dagger) " + displayName + " first dagger stabs " + hitN + " bodies");
+			return; // the beat is mid-swing: the second dagger lands when cdTimer expires
+		}
+
 		// ---------- Bruno's throwing axes (user 2026-10-31): boomerang crescents ----------
 		// ONE axe traces a crescent moon: it flies out along a half-arc centred on the thrower
 		// and boomerangs BACK OVER THE SAME PATH, so every body within the blade band is raked

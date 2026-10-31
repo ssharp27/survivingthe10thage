@@ -106,6 +106,34 @@ public partial class Combatant : Godot.Node2D
 		TakeDamage(bleedDps * delta); // bleed kills ride the shared kill scan like any other
 	}
 
+	// Brook's twin-dagger venom (user 2026-10-31): its OWN status pair mirroring burn/bleed -
+	// bodies stabbed by a poisoned dagger run poisonDps damage/sec for poisonT seconds (user
+	// kit: 1 dmg/s for 5 s, functionally the same DoT lane the fire/bleed pairs carry).
+	// Deliberately SEPARATE so neither cinder bloom (which rides the burn stamp) nor the
+	// Drink "burning body" bonus can key on it: the fire DoT lanes stay Stack-only.
+	public double poisonDps = 0.0;
+	public double poisonT = 0.0;
+
+	public void Poison(double dps, double dur)
+	{
+		if (dps <= 0.0 || dur <= 0.0)
+			return; // a clean dagger never sets a window
+		if (dps >= poisonDps)
+			poisonDps = dps; // the stronger venom owns the tick
+		if (dur > poisonT)
+			poisonT = dur; // the window refreshes, never stacks
+	}
+
+	public void TickPoison(double delta)
+	{
+		if (poisonT <= 0.0)
+			return;
+		poisonT -= delta;
+		if (poisonT < 0.0)
+			poisonT = 0.0;
+		TakeDamage(poisonDps * delta); // poison kills ride the shared kill scan like any other
+	}
+
 	public void Slowed(double mul, double duration)
 	{
 		if (mul > slowMul)

@@ -70,6 +70,7 @@ public partial class Boss : Combatant
         TickVuln((double)delta); // a marching boss decays its mark; dormant bosses hold still
         TickBurn((double)delta); // bosses burn too: the beat loop cannot stall past a DoT
         TickBleed((double)delta); // bosses bleed too: same own-pair discipline as burn
+        TickPoison((double)delta); // bosses get poisoned too: same own-pair discipline
         Game g = GetParent() as Game;
         if (g == null)
             return;
