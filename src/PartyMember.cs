@@ -487,7 +487,7 @@ public partial class PartyMember : Godot.Node2D
 			Game g4 = GetParent() as Game;
 			if (g4 != null)
 			{
-				float blast = (float)(minionRadius * stat[StatTags.AREA]); // wider burst rank: same as the ritual
+				float blast = (float)(minionRadius * stat[StatTags.AREA] * LeaderAreaMul()); // wider burst rank: same as the ritual | Bruno lead +15%
 				g4.SpawnKakas(GlobalPosition, RollDamage(g4, weaponDamage), minionFuse, blast, minionSpeed);
 			}
 			GD.Print("[10thAge] (ult) The Kaka: " + displayName +
@@ -556,12 +556,18 @@ public partial class PartyMember : Godot.Node2D
 			spd = 0.05; // clamp: stacked speed cards can't drive the timer to zero
 		return cooldown / spd;
 	}
-	/** Authored reach scaled by the AREA tag. */
-	public double EffRange() { return range * stat[StatTags.AREA] * (ultT > 0.0 ? ULT_RANGE : 1.0) * (awaT > 0.0 ? AWA_RANGE : 1.0); } // awakening widens too
+	/** Bruno seat 7 perk readers (user 2026-10-31: "All allies gain 15% increased attack size
+	(area) and 10% increased movement speed" while Bruno leads): the Game handle multiplies at the
+	READER sites like Mosiah's pierce - NO stat-store writes, so the 17-row audit stays a
+	permanent-grant ledger and a seat swap retargets by itself. */
+	private double LeaderAreaMul() { Game g = GetParent() as Game; return g == null ? 1.0 : g.LeaderAreaMul(); }
+	private double LeaderMoveMul() { Game g = GetParent() as Game; return g == null ? 1.0 : g.LeaderMoveMul(); }
+	/** Authored reach scaled by the AREA tag (Bruno lead: +15%). */
+	public double EffRange() { return range * stat[StatTags.AREA] * (ultT > 0.0 ? ULT_RANGE : 1.0) * (awaT > 0.0 ? AWA_RANGE : 1.0) * LeaderAreaMul(); } // awakening widens too | Bruno lead widens too
 	/** Authored maxHp plus the additive HEALTH tag (points). */
 	public double EffMaxHp() { return maxHp + stat[StatTags.HEALTH]; }
 	/** Authored baseSpeed scaled by the MOVEMENT_SPEED tag. */
-	public double EffMove() { return baseSpeed * stat[StatTags.MOVEMENT_SPEED] * (elixSwiftT > 0.0 ? 1.10 : 1.0) * (oakT > 0.0 ? 1.25 : 1.0); } // Swiftness elixir +10% | Oakhollow +25%: move while up
+	public double EffMove() { return baseSpeed * stat[StatTags.MOVEMENT_SPEED] * (elixSwiftT > 0.0 ? 1.10 : 1.0) * (oakT > 0.0 ? 1.25 : 1.0) * LeaderMoveMul(); } // Swiftness elixir +10% | Oakhollow +25% | Bruno lead +10%: move while up
 	/** Whole repeats of the current attack (MULTISTRIKE tag, kind COUNT). */
 	public int Strikes()
 	{
@@ -750,7 +756,7 @@ public partial class PartyMember : Godot.Node2D
 		// a PULSE readable without a HUD. One pivot, so one Scale carries the "wider ring" rank.
 		if (weaponKit == "aura" && _auraPivot != null)
 		{
-			_auraPivot.Scale = new Vector2((float)(stat[StatTags.AREA] * (awaT > 0.0 ? AWA_RANGE : 1.0)), (float)(stat[StatTags.AREA] * (awaT > 0.0 ? AWA_RANGE : 1.0))); // awakened ring: visible pivot matches the doubled hit test
+			_auraPivot.Scale = new Vector2((float)(stat[StatTags.AREA] * LeaderAreaMul() * (awaT > 0.0 ? AWA_RANGE : 1.0)), (float)(stat[StatTags.AREA] * LeaderAreaMul() * (awaT > 0.0 ? AWA_RANGE : 1.0))); // awakened ring: visible pivot matches the doubled hit test (hit test rides EffRange, same multiplier)
 			_auraPivot.Rotation += (float)(1.1 * delta);
 			if (_auraPulse > 0.0f)
 			{
@@ -1051,7 +1057,7 @@ public partial class PartyMember : Godot.Node2D
 			// as one action like every single-commit weapon, same discipline as the volley roll)
 			double spDmg = RollDamage(pg, weaponDamage);
 			float spR = 70.0f; // arm's-length whirl: hugging bodies ride inside the disc's reach
-			float spDisc = 40.0f * (float)(1.0 + 0.25 * (double)axeSize); // MASSIVE disc, size rank grows it
+			float spDisc = (float)(40.0 * (1.0 + 0.25 * (double)axeSize) * LeaderAreaMul()); // MASSIVE disc, size rank grows it | Bruno lead +15%
 			int blades = 2 + axeN; // user: TWO massive axes; the extra-axes rank adds more blades
 			bool bled = bleedR > 0; // own pair (dur 4.0 s, dps 1.0 baseline scaled by the card below)
 			int bitN = 0;
@@ -1130,7 +1136,7 @@ public partial class PartyMember : Godot.Node2D
 			// like the burn stamp (dur 4.0 s assistant pick, 1.0 dps baseline like the fire DoT)
 			int crescents = 1 + axeN; // base ONE axe; extra-axes card adds crescents alternating arcs
 			float arcR = preyD < 40.0f ? 40.0f : (preyD > reach ? reach : preyD); // ride the prey line, clamped
-			float band = 26.0f * (float)(1.0 + 0.25 * (double)axeSize); // blade disc + band depth
+			float band = (float)(26.0 * (1.0 + 0.25 * (double)axeSize) * LeaderAreaMul()); // blade disc + band depth: Bruno lead widens the crescent band too
 			Vector2 aimv = pg.WrapDelta(p, prey.GlobalPosition); // the SHORT way: the arc rides reach
 			float a0 = (float)System.Math.Atan2(aimv.Y, aimv.X); // throw line angle
 			bool bled = bleedR > 0;

@@ -2441,7 +2441,7 @@ public partial class Game : Godot.Node2D
 	// Exactly one perk runs at a time: the perk of whichever roster PC owns the leader seat.
 	// Every reader asks _leader live, so a future leadership change moves which lane runs by
 	// itself. Key names: 1 Baldrun chain lightning | 2 Mosiah pierce | 3 Alvora regen |
-	// 4 Asper friendly insects | 5 Yu kindling spirits | 6 Stack drink seat. Display names are the roster key,
+	// 4 Asper friendly insects | 5 Yu kindling spirits | 6 Stack drink seat | 7 Bruno area+move seat. Display names are the roster key,
 	// same convention the card pool already uses ("Baldrun's draging maul"). Procs roll on
 	// the seeded run stream: a chain proc / spirit heal shifts horde draws downstream (as
 	// crit rolls already do), and every such draw is documented at its site.
@@ -2459,6 +2459,8 @@ public partial class Game : Godot.Node2D
 			return 4;
 		if (_leader.displayName == "Stack")
 			return 6; // Experimental Elixir + Have a Drink!
+		if (_leader.displayName == "Bruno")
+			return 7; // all allies +15% attack area + +10% move: readers multiply via LeaderAreaMul/LeaderMoveMul
 		if (_leader.displayName == "Yu")
 			return 5;
 		return 0;
@@ -2526,6 +2528,20 @@ public partial class Game : Godot.Node2D
 	public int LeaderPierceBonus()
 	{
 		return LeaderBonusKey() == 2 ? 1 : 0;
+	}
+	
+	// Bruno's seat (user 2026-10-31: "All allies gain 15% increased attack size (area) and
+	// 10% increased movement speed"): multipliers at the READER sites - EffRange/EffMove,
+	// the Kaka blast, the guardian-ring pivot and Bruno's own blade discs ride these. NO
+	// stat-store writes: a seat perk is temporary, so the 17-row audit stays a permanent-grant
+	// ledger and - because every reader asks _leader live - a seat swap retargets by itself.
+	public double LeaderAreaMul()
+	{
+		return LeaderBonusKey() == 7 ? 1.15 : 1.0;
+	}
+	public double LeaderMoveMul()
+	{
+		return LeaderBonusKey() == 7 ? 1.10 : 1.0;
 	}
 	
 	// per-frame half of the leader lane: regen ticks (Alvora), insect / spirit upkeep,
@@ -3566,7 +3582,7 @@ public partial class Game : Godot.Node2D
 		"Leader bonus: kindness spirits kindle in the clearing; touching one heals 10 hp",
 		"Leader bonus: Have a Drink! - while Stack leads, burning enemies deal 10% less damage and move 10% slower",
 		"Leader bonus: none yet - Wash leads with no seat lane (his Smite passive runs while he stands)",
-		"Leader bonus: none yet - Bruno leads with no seat lane (the user has not picked his bonus yet: whetstone / home run / spinner were pitched)" };
+		"Leader bonus: all allies gain +15% attack size (area) and +10% movement speed while Bruno leads (bolts, rings, blasts and his own crescents all widen)" };
 	static readonly string[] SEL_ULT = {
 		"Ultimate: Giant's Might (R) - doubles size and reach, damage x1.5, for 10 s",
 		"Ultimate: Bardic Inspiration (R) - rallies ALL allies +25% damage and attack speed for 10 s",
