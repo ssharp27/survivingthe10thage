@@ -1,4 +1,4 @@
-# M2 STATUS - **IN PROGRESS** (opened 2026-10-22; join lottery + stage label + picker re-wild landed this pass)
+# M2 STATUS - **IN PROGRESS** (opened 2026-10-22; roster grew 5→8 PCs — Asper/Alvora/Yu in the M2 pass, then Stack/Wash/Bruno + Bruno leader bonus landed 2026-10-30/31)
 
 M2 = the campaign roster. Scope, locked decisions, and gate trail live here; `M1_STATUS.md` stays the
 authoritative M1 record (passes 1–22, signed off at `f0ca883` + `demo_final.zip` shipped, human test
@@ -6,15 +6,17 @@ PASSED). Tree was clean at M1 sign-off when M2 opened.
 
 ## Scope (`DESIGN.md`:52 — "M2 — the campaign roster")
 
-- All **5 PCs** with classes, signature attacks, and **rank-4 subclass evolutions** (Stormcaller /
-  Viperkiss / …; `DESIGN.md`:17 "3 ranks, then an evolution = subclass choice", data-driven).
+- All **8 PCs** (DESIGN grew 5→8 as the user dictated more; all landed 2026-10-31) with classes, signature attacks,
+  and **rank-4 subclass evolutions** (Stormcaller / Viperkiss / …; `DESIGN.md`:17 "3 ranks, then an evolution =
+  subclass choice", data-driven — evolutions stay **parked**).
 - **Recruitment wiring** for the whole roster (M1 shipped one join beat: Mosiah).
 - **Meta-progression**: unlock characters, who can be recruited. The starting-party-size knob
   (1→2→3) is **deferred** per the user.
 
-Progress this pass: **5 of 5 roster PCs in play** — Baldrun + Mosiah (M1) + **Asper** + **Alvora** + **Yu**.
-The stage **beat loop**, the **5-slot picker** and the escort-cage join path carry all five, and the
-roster is now complete (meta/unlocks and the party-size knob stay deferred).
+Progress: **8 of 8 roster PCs in play** — Baldrun + Mosiah (M1) + **Asper** + **Alvora** + **Yu** (M2 pass)
++ **Stack** + **Wash** + **Bruno** (user dictations 2026-10-30/31). The stage **beat loop**, the **9-slot picker**
+(keys `pick_1..pick_9`) and the escort-cage join path carry all eight, and the roster is now complete
+(meta/unlocks and the party-size knob stay deferred).
 
 ## Stage beat loop — user RE-LOCKED 2026-10-23 (second lock: more scaling runway)
 
@@ -88,7 +90,50 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
   `weaponKit = "summon"`, `class_ = "Occultist"`). Sanity defaults below are **assistant-designed**
   (the user dictated only damage and HP): ritual sight 320 px, cooldown 1.6 s, familiar speed 84 px/s
   (a hair under a goblin's 90), blast 56 px, fuse 6 s — vetoable.
+
+## Roster dictation (user) — later passes (2026-10-30/31)
+
+- **Stack** — Artificer (user 2026-10-30: "a 6th PC — Artificer, firebolt + burn"). **Firebolt** (reuses the
+  shot lane) sets **burn** 1 dmg/s × 5 s; the DoT scales with the damage card. Damage 10 / HP 60 are the user's;
+  cooldown 0.8 s / range 520 px are assistant knobs. Five-card track (rows 20-24): keener flame / quicker fuse /
+  split bolt (pierce) / **cinder bloom** (a body that dies still burning bursts for 25/50/75% of the bolt's live
+  roll, radius 60 px) / linger flame (+2 s burn per rank). **LANDED** (`Main.tscn` `memberIndex = 5`,
+  `weaponKit = "shot"`, `class_ = "Artificer"`).
+- **Wash** — Paladin (user 2026-10-31). **Shield throw**: hits one body then **bounces to one more** at short
+  range (SHIELD_HOP 160 px assistant knob; `OPT_BOUNCE` = +1 bounce/rank). Passive **Smite**: while Wash is in
+  play, crit rolls get +5% chance and crits bite ×1.25 (`Game.WashUp()` probe). Damage 10 / HP 70 / 1 armour /
+  240 px are the user's; cooldown 1.0 s assistant. **LANDED** (`memberIndex = 6`, `weaponKit = "shield"`,
+  `class_ = "Paladin"`, `baseArmour = 1` seeds `stat[ARMOUR]`).
+- **Bruno** — Axethrower (user 2026-10-31). **Crescent-boomerang axes**: one axe thrown in a returning half-moon
+  arc, 10 dmg, hits **every body it passes** (verb `"axe"` owns its whole beat in `PartyMember.cs` — no shot-pool
+  columns). Cards = damage / attack speed / **number of axes** (4 total, arcs alternate top/bottom) / **axe size**
+  (blade disc + band depth read `1.0 + 0.25 * rank`) / **axes apply bleed** — a NEW status pair (`bleedDps`/`bleedT`
+  + `Bleed()`/`TickBleed()` mirroring burn, 1 dps × 4 s). Damage 10 / HP 60 / 260 px are the user's; cooldown 1.0 s
+  assistant. **LANDED** (`memberIndex = 7`, `weaponKit = "axe"`, `class_ = "Axethrower"`). Ult **Axes Away!**: two
+  massive axes carrying ALL his upgrade ranks spin around him on a 70 px ring for 10 s. His **leader seat**
+  (user 2026-10-31, commit `a8a2966`): while Bruno leads, ALL allies get **+15% attack size (area)** and
+  **+10% movement speed** — pure reader multipliers (`LeaderAreaMul()` / `LeaderMoveMul()` asked by
+  `EffRange()`, `EffMove()`, the Kaka blast, Alvora's aura pivot and Bruno's own discs), so the `stat tag`
+  audit never lies and a seat swap retargets by itself.
+
 - Projectiles, rays, summons and AoEs are all in scope eventually.
+
+## Shared data widths at 8 PCs (verify before touching any table — 2026-10-31)
+
+- **Card tables are 35 wide** (`OPT_LABEL`/`OPT_MEMBER`/`OPT_CD`/`OPT_RANGE`/`OPT_DMG`/`OPT_PIERCE`/
+  `OPT_SHOTS`/`OPT_VULN`/`OPT_SLOW`/`OPT_CRIT`/`OPT_BURN`/`OPT_CINDER`/`OPT_BOUNCE`/`OPT_CRITD`/
+  `OPT_AXE`/`OPT_SIZE`/`OPT_BLEED`): rows 0-2 Baldrun, 3-5 Mosiah, 6-9 Asper, 10-13 Alvora, 14-17 Yu,
+  18 Baldrun wild, 19 Mosiah wild, 20-24 Stack, 25-29 Wash, **30-34 Bruno** (heavier axe / quicker throw /
+  extra axes / broader blade / bleeding edge). `PICK_RANK_CAP = 3` per row.
+- **`PICK_SLOTS = 9`** — eight member options + one wild; `pick_9` (keycode 57) entered `project.godot` with Bruno.
+- **`JOIN_W` = one row per PC**: `{3,3,1,1,1,1,1,1}` (stage-1 lottery weights; Wash + Bruno at parity with the rest).
+- **`SEL_ART`/`SEL_BONUS`/`SEL_ULT`/`SEL_LOCKED` are 8 wide** (index = `memberIndex`).
+- **Ring seats are NOT table-driven** — the follow ring is an **ordinal among live movers** (even 2π/N spacing,
+  `Game.cs` ~2155). `RING_SLOT = {0,3,2,4,1,5}` at `Game.cs`:36 is **dead legacy data** (no reads anywhere);
+  leave it or ignore it, do not treat it as the seat map.
+- **Audit line prints 17 `stat tag` rows** (the ULT tag joined the registry) — a green trio expects 17, not 16.
+- **Camp menu (`ui/Campfire.gd`) still lists 5 strips** (`var slots: int = 5`) — members 6-8 (Stack/Wash/Bruno)
+  are hidden on the camp card. Cosmetic, unfixed: queued as an open item below.
 
 ## Landed this pass (uncommitted → committed this commit)
 
@@ -295,14 +340,21 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 
 ## M2 backlog / open items
 
-- **Roster complete at 5 PCs**: Yu landed this pass. What remains roster-wise is the **rank-4 evolution
-  shape** (below in "Needs the user's word") — none of the new PCs has a named evolution yet.
+- **Roster complete at 8 PCs** (Asper/Alvora/Yu landed in the M2 pass; Stack, Wash and Bruno landed 2026-10-30/31
+  — see the "Roster dictation (user) — later passes" section and `RESUME_NOTES.md`). What remains roster-wise is
+  the **rank-4 evolution shape** (below in "Needs the user's word") — none of the new PCs has a named evolution yet.
+- **Camp card hides members 6-8** (dossier finding 2026-10-31): `ui/Campfire.gd` renders a fixed `slots = 5` of
+  roster strips, so Stack / Wash / Bruno have no HP+state strip at camp even though `CampfireCards()` sends all
+  eight. Cosmetic (the rest math is server-side over `_party`), but it should grow to 8 strips + a taller card
+  block on the next camp-UI pass.
 - **M1 carry-over, not M2 scope unless the user pulls it**: deferred human-playtest checklist (dash
   feel, escort contact chips, live HUD strip, 25% join-HP floor, picker gating, DPI frame, escort-KILL
   joins), camp alignment round 3, 20-minute run-curve pass (see decision 2 — becomes load-bearing).
-- **Doc staleness**: `ui/INTEGRATION.md` still shows `_state = StageState.PLAY2` (states collapsed to
-  `PLAY` this pass); no `.gd` reads the state machine, so it is documentation-only. Fix when the doc is
-  next touched.
+- **Doc staleness — CLOSED by the 2026-10-31 doc-sync pass**: `ui/INTEGRATION.md` no longer shows the
+  dead `CAMPFIRE_LEN` auto-advance or `_state = StageState.PLAY2` (states are `PLAY`/`CAMPFIRE`/`DEAD`/`VICTORY`),
+  the campfire rest snippet now matches shipped `EndCampfire`, and the RunSummary section records the shipped
+  lazy-load + `R` retry flow. `DESIGN.md` and this file carry the 8-PC roster. No `.gd` reads the state machine,
+  so this stayed documentation-only.
 
 ## Gate trail (this pass)
 

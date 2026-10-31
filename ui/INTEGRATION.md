@@ -48,32 +48,26 @@ _summary.GetNode("RunSummary").Connect("dismissed", new Callable(this, nameof(_O
 
 (Godot 4 C#: `Node.Connect(StringName, Callable)`; `Callable.From(this, nameof(...))` also works.)
 
-### 2. CAMPFIRE state becomes player-driven (Game._Process, lines 541-547)
+### 2. CAMPFIRE state becomes player-driven (Game._Process)
 
-Current:
-
-```csharp
-case StageState.CAMPFIRE:
-    if (_stageT >= CAMPFIRE_LEN)
-    {
-        _state = StageState.PLAY2;
-        _stageT = 0.0;
-    }
-    break;
-```
-
-Replace with a wait-for-input branch (the 8s auto-advance is removed; CAMPFIRE_LEN can be kept
-as an optional fallback "auto short rest" timeout — an open question below):
+Shipped (synced 2026-10-31): the 8 s auto-advance and `CAMPFIRE_LEN` are **gone** from `Game.cs` — the
+camp beat waits for a real choice. A human camp **never times out** (user-locked 2026-10-19, re-locked
+2026-10-31: no countdown, no AFK default). The only timeout is `CAMPFIRE_WAIT_TIMEOUT = 25.0`, which
+runs just for the pilot autopilot (headless verification smokes) and as a missing-scene soft-lock guard.
 
 ```csharp
 case StageState.CAMPFIRE:
     if (!_campfireWaiting)
     {
         _campfireWaiting = true;
-        _stageT = 0.0;
+        _campWaitT = 0.0;
         ShowCampfire();   // see #3
     }
-    // remains in CAMPFIRE until _OnCampfireChosen advances to PLAY2
+    else if ((_pilot || _campfire == null) && _campWaitT >= CAMPFIRE_WAIT_TIMEOUT)
+    {
+        // BENCH ONLY: pilot smokes / missing scene. Never fires for a human player.
+        EndCampfire("short");
+    }
     break;
 ```
 
@@ -97,57 +91,34 @@ private void ShowCampfire()
 ```
 
 `state` strings the GDScript reads: `"up" | "down" | "stable" | "out"`; `leader: bool`.
-`partySnapshot()` maps each `PartyMember` in `_party` (leader first) to one dictionary; out-of-roster
-slots render as empty automatically (grid draws 6 slots).
+Shipped (2026-10-31 sync): the helper is `Game.CampfireCards()`, re-sent every frame the camp is up
+(`Game.cs`:4150 area) so a cancel re-offers fresh data. **Open item**: `ui/Campfire.gd` still renders
+`slots = 5` strips — at the 8-PC roster, Stack/Wash/Bruno get no camp strip (cosmetic, queued in `M2_STATUS.md`).
 
 ### 4. Apply the chosen rest (new Game handler)
+
+Shipped (synced 2026-10-31): the handler is thin; all of the rest math lives in `Game.EndCampfire(restType)`.
+The user-approved risk-vs-reward flip is live — **SHORT = power** (+25% max-HP heal + one free upgrade rank
+offered as a `SHORT REST GIFT` card the player picks), **LONG = safety** (whole squad revived to FULL HP, no
+free rank), and **both** rests pay `×1.20` multiplicative horde scaling (`_hordeScale`, read by the beat
+director through `GetHordeScale()`). The camp also vacuums loose xp gems into the Leader's ring (2026-10-20).
 
 ```csharp
 private void _OnCampfireChosen(string restType)
 {
-    _campfire.Hide();
-    _campfireWaiting = false;
-
-    if (restType == "short")
-    {
-        // SHORT REST: heal everyone +25% max HP (clamped), horde pacing unchanged.
-        foreach (PartyMember m in _party)
-        {
-            m.hp += m.maxHp * 0.25f;
-            if (m.hp > m.maxHp) m.hp = m.maxHp;
-        }
-    }
-    else
-    {
-        // LONG REST: full heal, fallen return at 25% HP, next-stage power, horde scaling grows.
-        ReviveAllAtCampfire(); // Game.cs:198 — revived members come back at 25% HP
-        foreach (PartyMember m in _party)
-        {
-            m.hp = m.maxHp;    // full heal for the living (ReviveAllAtCampfire only adds +25%)
-        }
-        // TODO M2: grant one member a damage rank (ApplyUpgrade-like hook) + set a horde-scaling
-        // flag consumed by Director.cs spawn pacing (Director.cs:29-32 already ramps post-mini-boss).
-    }
-
-    _state = StageState.PLAY2;
-    _stageT = 0.0;
-}
-
-private void _OnCampfireCancelled()
-{
-    // stay in CAMPFIRE; screen stays visible so the player can re-choose
-    _campfireWaiting = false;
-    ShowCampfire(); // or leave showing; keep simple: leave visible
+    EndCampfire(restType);   // hides the card, applies the rest, advances back to PLAY
 }
 ```
 
 Notes:
-- `ReviveAllAtCampfire()` already exists (Game.cs:198-236): eliminates→return at 25%, downed→stand up,
-  everyone +25% clamped. Long rest layers full heal on top of it.
+- `ReviveAllAtCampfire()` still exists (`Game.cs`:198-236): eliminated → return at 25%, downed → stand up,
+  everyone +25% clamped. `EndCampfire("short")` calls it; `EndCampfire("long")` full-heals the squad outright.
 - `TakeHit`/`ReviveAllAtCampfire` already reset death-save fields, so revived members re-enter cleanly.
-- The level-up picker (`PickerTick`, Game.cs:871-904) is orthogonal: it fires during PLAY1/PLAY2 on XP
-  thresholds; the campfire does not open the picker. If the dev wants long rest to include a pick,
-  expose `ApplyUpgrade` (currently private, Game.cs:906) or add a public `GrantRank(int memberIndex)`.
+- The free rank is **player-chosen**, not dealt: `EndCampfire("short")` opens the same smart-random options
+  the level-up picker rolls (`RollOptions()` + `PICK_SLOTS`), so no `ApplyUpgrade`/`GrantRank` exposure is
+  needed. `ApplyUpgrade` stays private and is only the capped-rank fallback.
+- The level-up picker remains orthogonal: it fires on XP thresholds during `PLAY`; the camp gift card is
+  a separate opening of the same picker.
 
 ### 5. Cancel path
 If `cancelled` fires, the screen stays visible in CAMPFIRE and the player may re-choose; Game does not
@@ -158,14 +129,22 @@ advance the stage.
 RunSummary root: `CanvasLayer` named `RunSummary`, script `RunSummary.gd`, layer 3.
 Signal: `dismissed` (journal / main-menu buttons, or ESC).
 
-### 1. Instance + connect (same `_EnterTree` block as above)
+### 1. Instance + connect (shipped: NOT in `_EnterTree` — `ShowRunSummary` lazy-loads on run end)
+
 ```csharp
-_summary.GetNode("RunSummary").Connect("dismissed", new Callable(this, nameof(_OnSummaryDismissed)));
+_summary.Connect("dismissed", new Callable(this, "_OnSummaryDismissed"));
 ```
 
-### 2. Show on run end (Game.PrintSummary, lines 929-935)
+(The campfire layer still connects in `_EnterTree`; the summary layer is instantiated only when a run
+ends, so the boot path stays clean and a missing `RunSummary.tscn` degrades to print-only.)
 
-Replace the print-only body:
+### 2. Show on run end (shipped 2026-10-31: `Game.PrintSummary` → `ShowRunSummary`)
+
+`PrintSummary` keeps the GD.Print line (a headless smoke run still logs the terminal beat) and hands
+the card to `ShowRunSummary`, which **lazy-loads** `res://ui/RunSummary.tscn` (missing scene = print-only
+warning, never a crash), sets the scene's `result` / `stage_name` / `level` / `xp_total` / `members`
+props, parents the layer, connects `dismissed`, and **un-pauses the tree** so the R retry key gets input
+frames (the card itself pauses on `_ready`).
 
 ```csharp
 private void PrintSummary(string s)
@@ -173,16 +152,13 @@ private void PrintSummary(string s)
     if (_summaryPrinted) return;
     _summaryPrinted = true;
     GD.Print("[10thAge] " + s + " | level " + _level + " | xp total " + (int)_xpTotal);
-
-    var screen = (RunSummaryScreen)_summary.GetNode("RunSummary");
-    screen.Result = s.Contains("VICTORY") ? "victory" : "tpk";
-    screen.StageName = "Tanurial Forest";   // read from stage data when meta-map exists (M3)
-    screen.Level = _level;
-    screen.XpTotal = (int)_xpTotal;
-    screen.Members = partySnapshot();       // {name, state, picks} — picks placeholder until tracked (M2)
-    _summary.Show();
+    ShowRunSummary(s);
 }
 ```
+
+`members` rows come from `Game.SummaryCards()` — `{name, state, picks}` where **picks are now tracked**:
+every upgrade appends to `PartyMember.pickHistory` (`Game.cs`:4122), so the card's pick-history rows are
+real copy, not the old placeholder.
 
 `state` strings: `"survived" | "downed" | "stable" | "fallen"`.
 
@@ -200,10 +176,10 @@ private void _OnSummaryDismissed()
 end states flow through the same summary screen without touching those call sites.
 
 ## Open questions (for the UX / developer)
-1. Keep `CAMPFIRE_LEN = 8.0` (Game.cs:38) as an auto-short-rest timeout, or make campfire purely player-driven?
-2. Long-rest "next-stage power": which member gets the rank, and how does Director horde scaling change (Director.cs:29-32)?
-3. Where does RunSummary dismiss to — title screen, campaign map (M3/M4), or re-run?
-4. Per-member pick history (`picks`) is not tracked yet; placeholder text renders until M2 tracking exists.
+1. ~~Keep `CAMPFIRE_LEN = 8.0` as an auto-short-rest timeout?~~ — **CLOSED (user 2026-10-19, re-locked 2026-10-31)**: campfire is purely player-driven. `CAMPFIRE_LEN` is gone; the only valve is `CAMPFIRE_WAIT_TIMEOUT = 25.0` and it runs **only** under `_pilot` or when the campfire scene is missing (soft-lock guard). A human camp waits for a real rest choice forever.
+2. ~~Long-rest "next-stage power": which member gets the rank?~~ — **CLOSED (user 2026-10-19 rebalance)**: long rest grants **no** rank (full revive + full heal); the **short** rest gifts one free rank as a player-chosen `SHORT REST GIFT` picker card. Both rests pay the `×1.20` `_hordeScale` price the beat director consumes.
+3. Where does RunSummary dismiss to — title screen, campaign map (M3/M4), or re-run? — shipped M1 behaviour: **R retries the stage** (`_RetryRun`, at most once per run); the journal/menu stays M4.
+4. ~~Per-member pick history not tracked yet~~ — **CLOSED**: `PartyMember.pickHistory` appends every upgrade (`Game.cs`:4122) and renders on the card.
 5. Confirm modal pauses the tree while open; confirm that pause blends with the dev's eventual flow (e.g. no input conflicts behind the modal).
 
 ## Read order (screenshot-style description)
