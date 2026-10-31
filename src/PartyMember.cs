@@ -182,6 +182,9 @@ public partial class PartyMember : Godot.Node2D
 	// tag slot: the slow is a BODY status (slowMul/slowT on the body), not a party stat.
 	// deadly aim needs no field: its card writes the CRIT_CHANCE slot of the stat store.
 	public double maulSlow = 0.0; // drag strength per rank: rank 3 = a quarter speed, no clamp
+	public double fireDps = 0.0;  // fire rune (Baldrun row 40): the maul sets caught bodies burning, rank = Burn dps
+	public double ringSlow = 0.0; // weighty ring (Alvora row 43): the pulse drags what it caught, rank = slow strength
+	public double luckR = 0.0;    // lucky explosions (Yu row 44): familiars may detonate with a second blast pass
 	[Export] public string class_ = ""; // display class for the ui/ cards (empty = weapon fallback)
 	public string pickHistory = ""; // tracks taken so far, rendered on the run-summary card
 
@@ -517,7 +520,7 @@ public partial class PartyMember : Godot.Node2D
 			if (g4 != null)
 			{
 				float blast = (float)(minionRadius * stat[StatTags.AREA] * LeaderAreaMul()); // wider burst rank: same as the ritual | Bruno lead +15%
-				g4.SpawnKakas(GlobalPosition, RollDamage(g4, weaponDamage), minionFuse, blast, minionSpeed);
+				g4.SpawnKakas(GlobalPosition, RollDamage(g4, weaponDamage), minionFuse, blast, minionSpeed, luckR);
 			}
 			GD.Print("[10thAge] (ult) The Kaka: " + displayName +
 				" looses 6 empowered familiars in a circle (blast x2, damage x2 after ranks, same fuse) that spread out, gate " +
@@ -976,6 +979,8 @@ public partial class PartyMember : Godot.Node2D
 				// so the whole party bites marked bodies harder until the window decays
 				if (guidingLight > 0.0)
 					nc.Vulnerable(guidingLight, 4.0);
+				if (ringSlow > 0.0 && !(nc is Boss))
+					nc.Slowed(ringSlow, 2.5); // weighty ring: same drag lane as draging maul (10/20/30%, 2.5 s, bosses immune)
 				struck++;
 			}
 			if (struck <= 0)
@@ -1028,7 +1033,7 @@ public partial class PartyMember : Godot.Node2D
 				float ca = (float)System.Math.Cos(off); // rotate the aim: Godot C# Vector2 has no .rotated()
 				float sa = (float)System.Math.Sin(off);
 				Vector2 dir = new Vector2(aim.X * ca - aim.Y * sa, aim.X * sa + aim.Y * ca);
-				pg.SpawnSummon(p + dir * 26.0f, (float)RollDamage(pg, weaponDamage), minionFuse, blast, minionSpeed);
+				pg.SpawnSummon(p + dir * 26.0f, (float)RollDamage(pg, weaponDamage), minionFuse, blast, minionSpeed, luckR);
 			}
 			// the ritual IS the familiar: once the volley is loosed the beat must NOT
 			// fall through into the shared lane/fan search below (user bugfix 2026-10-28:
@@ -1416,6 +1421,8 @@ public partial class PartyMember : Godot.Node2D
 						// bosses immune at the applier, so only the horde gets the tax. See Combatant.Slowed.
 						if (maulSlow > 0.0 && !(nc is Boss))
 							nc.Slowed(maulSlow, 2.5);
+						if (fireDps > 0.0)
+							nc.Burn(fireDps, 5.0); // fire rune: 1/2/3 dps over 5 s; cinder stamp stays 0 so the burst keeps riding the firebolt ONLY
 					}
 			}
 		}
