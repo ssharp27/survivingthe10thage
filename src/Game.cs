@@ -2626,7 +2626,16 @@ public partial class Game : Godot.Node2D
 		}
 		else if (lb == 5)
 		{
-			_spiritClock += delta;
+			// user 2026-11-01 (fix pass): a downed Yu must stop kindling kindness spirits. His KIT
+			// already returns at PartyMember.cs:805 while down/eliminated, so this seat lane was the
+			// only ungated spawner left. WashUp presence discipline read off the SEAT itself (lb == 5
+			// means _leader is Yu): while he is downed or eliminated the kindle clock DRAINS to 0
+			// instead of accumulating, so nothing spawns AND a Yu revived at a campfire resumes the
+			// 30 s cadence instead of burst-spawning the banked time.
+			if (_leader.downed || _leader.eliminated)
+				_spiritClock = 0.0;
+			else
+				_spiritClock += delta;
 			if (_spiritClock >= SPIRIT_EVERY)
 			{
 				_spiritClock = 0.0;
@@ -2946,7 +2955,7 @@ public partial class Game : Godot.Node2D
 			}
 			if (touched)
 			{
-				PartyMember[] cands = new PartyMember[8];
+				PartyMember[] cands = new PartyMember[9]; // roster-wide bound (9 PCs at 2026-11-01; was exact-fit at 8)
 				int cn = 0;
 				foreach (PartyMember mm in _party)
 				{
