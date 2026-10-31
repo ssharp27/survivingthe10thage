@@ -44,7 +44,7 @@ public partial class PartyMember : Godot.Node2D
 	// heavy AoE verbs now bite crowds at full strength. Warding light is GONE (user 2026-10-23
 	// swapped it for offense): the cleric's fourth track is guiding light, a VULNERABILITY
 	// mark - ring-caught bodies take +10%/rank damage from every source for a window.
-	[Export] public string weaponKit = "melee"; // "melee" | "shot" | "aura" | "summon" | "shield"
+	[Export] public string weaponKit = "melee"; // "melee" | "shot" | "aura" | "summon" | "shield" | "axe"
 	[Export] public float projSpeed = 340.0f;  // px/s a bug projectile travels
 	[Export] public float projLife = 2.2f;     // seconds a bolt may fly before it expires
 	// firebolt kit knobs (Stack, user 2026-10-30): a hit sets a burn window on the body (dps x
@@ -62,6 +62,17 @@ public partial class PartyMember : Godot.Node2D
 	// authored armour base (Wash 1 armour, user 2026-10-31): the ARMOUR tag seeds at BASE then adds
 	// this per-PC number; the flat-subtract lane with never-below-1 floor lives in Game.TakeHit.
 	[Export] public double baseArmour = 0.0;    // per-PC armour seeded into the ARMOUR tag
+	// Bruno's throwing axes (user 2026-10-31): base ONE crescent per beat (a half-arc the axe
+	// traces OUT and boomerangs back over, raking everything within the blade band once per
+	// crescent: out leg + back leg share the path, so one pass of one blade); the extra-axes
+	// card adds one more crescent per rank, arcs ALTERNATING top/bottom of the throw line.
+	// Kit fields like pierce/guidingLight, NOT tag slots: crescents/area/bleed are BODY
+	// lanes; bleed is its OWN status pair mirroring burn (the fire DoT lanes stay Stack-only).
+	[Export] public int axeN = 0;        // extra crescents per volley (0 = base one axe)
+	[Export] public int axeSize = 0;    // size ranks: blade disc + band read 1.0 + 0.25 * rank
+	[Export] public int bleedR = 0;     // bleed rank: hit bodies bleed like the fire DoT
+	public double orbitT = 0.0;         // "Axes Away!" spin clock: seconds of orbit left (Game sets)
+	double orbitAng = 0.0;              // spin angle: blades ride orbitAng + i * 2pi/blades
 	// Yu's familiars (M2, user dictation 2026-10-22): the fuse is the summon's LIFETIME, and
 	// the familiar detonates on contact with prey OR when that fuse burns out - the fuse is
 	// what keeps a player from parking a pile of them under a boss and saving them for later.
@@ -260,6 +271,12 @@ public partial class PartyMember : Godot.Node2D
 			// colours, 1 px margins all sides, cx_delta -0.7). Row profile shows the base plate shallow
 			// at the canvas edge like the class, so scale/rim carry over
 			miniPath = "res://art/wash.png";
+		else if (displayName == "Bruno")
+			// 2026-10-31: Bruno art audit-passed (85x118 canvas, hard alpha 0 soft px, 61 opaque
+			// colours, 1 px margins all sides, cx_delta -3.2). Row profile shows the base plate
+			// shallow at the canvas edge like the class (identical bottom profile to Wash), so
+			// scale/rim carry over; the wider cx_delta is his two-handed axe stance, honest
+			miniPath = "res://art/bruno.png";
 		if (miniPath != "")
 		{
 			Godot.Texture2D tex = GD.Load(miniPath) as Godot.Texture2D;
@@ -397,6 +414,10 @@ public partial class PartyMember : Godot.Node2D
 			return 6; // Experimental Elixir (the draw lives on Game.ElixirParty)
 		if (displayName == "Wash")
 			return 7; // Oakhollow Assemble! (the walk lives on Game.OakHollowParty)
+		// Bruno "Axes Away!" (user 2026-10-31): his OWN orbit, no roster walk - the blades
+		// are PartyMember lanes, Game only sets the spin clock
+		if (displayName == "Bruno")
+			return 8; // Axes Away! (the spin clock lives on Game.BrunoAxesAway)
 		return 0; // other PCs: no ultimate authored yet (future lanes land here)
 	}
 	public bool TryUltimate()
@@ -496,6 +517,21 @@ public partial class PartyMember : Godot.Node2D
 				g6.OakhollowParty();
 			GD.Print("[10thAge] (ult) Oakhollow Assemble!: " + displayName +
 				" rallies ALL allies (+25% move, +5 armour, regen 1% max hp/s) for 10 s, gate " +
+				(int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
+			return true;
+		}
+		// Bruno "Axes Away!" (user 2026-10-31): the spin clock lives on the Game side like
+		// the oak walk (Game sets m.orbitT + prints the cast line); the blades + pulses are
+		// PartyMember lanes (his own orbit, no roster walk needed). Blades + disc + bleed are
+		// read LIVE by the spin lane, so the spin "gains the effects of all upgrades".
+		else if (ultKey() == 8)
+		{
+			ultCdT = ULT_CD_BASE / stat[StatTags.ULT];
+			Game g7 = GetParent() as Game;
+			if (g7 != null)
+				g7.BrunoAxesAway(this);
+			GD.Print("[10thAge] (ult) Axes Away!: " + displayName +
+				" hurls " + (2 + axeN) + " massive axes that spin around him for 10 s (size + spin speed + bleed ride his ranks), gate " +
 				(int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
 			return true;
 		}
@@ -783,6 +819,12 @@ public partial class PartyMember : Godot.Node2D
 		elixPrecT = System.Math.Max(0.0, elixPrecT - delta);
 		elixMagT = System.Math.Max(0.0, elixMagT - delta);
 		oakT = System.Math.Max(0.0, oakT - delta); // Oakhollow clock ticks with the same soft-pause discipline
+		// Bruno's "Axes Away!" spin: the clock decays with the same soft-pause discipline, and
+		// the ANGLE advances every frame one FULL circle per cooldown window, so the quick-throw
+		// card spins the orbit faster (attack speed is an "effect of the upgrades" the spin gains)
+		orbitT = System.Math.Max(0.0, orbitT - delta);
+		if (orbitT > 0.0)
+			orbitAng += (double)delta * System.Math.PI * 2.0 / (float)EffCooldown(); // spin cadence: one circle per EffCooldown
 		ultT -= delta;
 		if (_grown && ultT <= 0.0)
 		{
@@ -848,6 +890,10 @@ public partial class PartyMember : Godot.Node2D
 		// the fourth verb is keyed on the kit name like every other weapon
 		bool sumKit = weaponKit == "summon"; // Occultist ritual: fuse-driven familiars run at prey
 		bool shieldKit = weaponKit == "shield"; // Wash's shield: short throw, then body-to-body bounces
+		// Bruno's throwing axes (user 2026-10-31): the FIFTH verb, a boomerang crescent
+		// (half-arc out + back over the same path, rakes everything in the blade band)
+		// plus a spin lane ("Axes Away!") that orbits massive blades while the clock runs
+		bool axeKit = weaponKit == "axe";
 		if (auraKit)
 		{
 			// the ring is a full-body sweep, so the lane/fan target search below is skipped
@@ -984,6 +1030,160 @@ public partial class PartyMember : Godot.Node2D
 			if (used > 1)
 				GD.Print("[10thAge] (shield) " + displayName + " shield bounds " + (used - 1) + " more bodies");
 			return; // the throw owns its whole beat: never fall through to the lane/fan search
+		}
+		// ---------- Bruno's "Axes Away!" spin (user 2026-10-31): orbiting massive blades ----------
+		// While the spin clock runs, THE beat IS the spin: blades = 2 + extra-axes rank ride
+		// evenly spaced angles, the ANGLE advanced every frame one full circle per EffCooldown
+		// (quick-throw spins it faster), and each beat pulses ONE bite per blade through whatever
+		// stands in its disc (40 px MASSIVE base, size rank grows it like the crescents). Each
+		// blade tests each body ONCE per pulse, so one blade never double-bites; a body under
+		// TWO blades takes two honest bites. The spin GAINS the effects of ALL upgrades (user):
+		// damage rides the shared roll choke, count/size/spin ride the kit fields, bleed stamps
+		// its own pair when the rank is up. No prey gate: the beat IS the spin itself, so the
+		// cd always cycles while spinning (the crescents resume when the clock expires).
+		// Spin radius = 70 px ARM LENGTH: the horde hugs the party at 30-60 px, so the disc must
+		// sweep THAT ring (a wide 117 px ring would spin outside the swarm and rake nothing).
+		if (orbitT > 0.0)
+		{
+			cdTimer = (float)EffCooldown();
+			_atkFlash = 0.08f; // same commit pulse every kit uses, never the red harm lane
+			// ONE shared crit/steal roll for the whole pulse across the blades (the spin commits
+			// as one action like every single-commit weapon, same discipline as the volley roll)
+			double spDmg = RollDamage(pg, weaponDamage);
+			float spR = 70.0f; // arm's-length whirl: hugging bodies ride inside the disc's reach
+			float spDisc = 40.0f * (float)(1.0 + 0.25 * (double)axeSize); // MASSIVE disc, size rank grows it
+			int blades = 2 + axeN; // user: TWO massive axes; the extra-axes rank adds more blades
+			bool bled = bleedR > 0; // own pair (dur 4.0 s, dps 1.0 baseline scaled by the card below)
+			int bitN = 0;
+			Godot.Node2D[] bit = new Godot.Node2D[enemies.Count]; // unique tally for the honest print
+			for (int i = 0; i < enemies.Count; i++)
+			{
+				Godot.Node2D n = enemies[i];
+				Combatant nc = (Combatant)n;
+				if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
+					continue; // killed-but-unswept bodies are not valid bites (chain discipline)
+				for (int b = 0; b < blades; b++)
+				{
+					// blades ride evenly spaced angles on the current spin clock
+					float ba = (float)(orbitAng + (double)b * System.Math.PI * 2.0 / (double)blades);
+					Vector2 bp = p + new Vector2((float)System.Math.Cos(ba), (float)System.Math.Sin(ba)) * spR;
+					if ((n.GlobalPosition - bp).Length() > spDisc)
+						continue;
+					nc.TakeDamage(spDmg);
+					if (bled)
+						nc.Bleed(4.0, 1.0 * stat[StatTags.ATTACK_DAMAGE]); // card-scaled dps like the burn stamp
+					bool counted = false;
+					for (int t = 0; t < bitN; t++)
+						if (bit[t] == n)
+						{ counted = true; break; }
+					if (!counted)
+						bit[bitN++] = n;
+				}
+			}
+			if (bitN > 0)
+				GD.Print("[10thAge] (spin) Axes Away!: " + displayName + " massive blades rake " + bitN + " bodies");
+			return; // the spin owns its whole beat: the crescents resume when the clock expires
+		}
+		// ---------- Bruno's throwing axes (user 2026-10-31): boomerang crescents ----------
+		// ONE axe traces a crescent moon: it flies out along a half-arc centred on the thrower
+		// and boomerangs BACK OVER THE SAME PATH, so every body within the blade band is raked
+		// once per crescent (out leg + back leg = one pass of one blade). Base ONE crescent per
+		// beat; the extra-axes card adds one more per rank, arcs ALTERNATING top/bottom of the
+		// throw line (user: "one coming from the top, then bottom, then top..."). ONE roll
+		// shared across the volley like every single-commit weapon. Bleed rank stamps its OWN
+		// status pair (NOT the fire DoT: cinder bloom and the Drink burning-body bonus stay
+		// Stack-only). Instant like the shield verb: the swept path is deterministic geometry,
+		// so there is no shot-pool column to mirror. Print tallies unique bodies raked.
+		if (axeKit)
+		{
+			// prey pick mirrors the ritual: nearest living body whatever way he faces (torus
+			// delta: the crescent radius rides reach, an absolute delta would pop the loop
+			// over a seam); an empty clearing never stalls the beat, like every kit
+			Godot.Node2D prey = null;
+			float preyD = 1e9f;
+			for (int i = 0; i < enemies.Count; i++)
+			{
+				Godot.Node2D n = enemies[i];
+				Combatant nc = (Combatant)n;
+				if (nc == null || nc.kind == "dead")
+					continue;
+				float dd = pg.WrapDelta(p, n.GlobalPosition).Length();
+				if (dd >= preyD)
+					continue;
+				preyD = dd;
+				prey = n;
+			}
+			if (prey == null || preyD > reach)
+				return; // nothing in sight: the beat stays ready, an empty clearing never stalls it
+			cdTimer = (float)EffCooldown();
+			_atkFlash = 0.08f; // same commit pulse every kit uses, never the red harm lane
+			double axDmg = RollDamage(pg, weaponDamage); // ONE crit/steal roll for the whole volley
+			// crescent geometry: radius = the PREY distance clamped 40..reach, so the boomerang's
+			// loop always passes the crowd it spotted (floor: the loop starts a step out of his
+			// hands, not under his feet; ceiling: the axe is a range weapon). Band = blade disc:
+			// 26 px base grown +25%/rank by the size card, raked on BOTH sides of the swept arc.
+			// 33 samples per crescent: 32 along the half-arc (~27 px apart at 260 px reach, never
+			// wider than the grown disc) plus the RELEASE/CATCH point itself at the thrower, so
+			// the return bite exists. Per-crescent memo = one strike per crescent; a body under
+			// TWO crescents takes two honest bites (different blades), the print tallies uniques.
+			// bleed: own pair mirroring burn, dps scaled by the damage card at the call site
+			// like the burn stamp (dur 4.0 s assistant pick, 1.0 dps baseline like the fire DoT)
+			int crescents = 1 + axeN; // base ONE axe; extra-axes card adds crescents alternating arcs
+			float arcR = preyD < 40.0f ? 40.0f : (preyD > reach ? reach : preyD); // ride the prey line, clamped
+			float band = 26.0f * (float)(1.0 + 0.25 * (double)axeSize); // blade disc + band depth
+			Vector2 aimv = pg.WrapDelta(p, prey.GlobalPosition); // the SHORT way: the arc rides reach
+			float a0 = (float)System.Math.Atan2(aimv.Y, aimv.X); // throw line angle
+			bool bled = bleedR > 0;
+			Godot.Node2D[] bit = new Godot.Node2D[enemies.Count]; // volley-wide unique memo for the print
+			int bitN = 0;
+			for (int c = 0; c < crescents; c++)
+			{
+				// arcs ALTERNATE top/bottom of the throw line: even crescents sweep LEFT (over
+				// top), odd sweep RIGHT (under) - user: one from the top, then the bottom...
+				int side = (c % 2) == 0 ? 1 : -1;
+				Godot.Node2D[] struck = new Godot.Node2D[enemies.Count]; // per-crescent memo
+				int used = 0;
+				for (int s = 0; s < 33; s++)
+				{
+					Vector2 sp2;
+					if (s < 32)
+					{
+						// half-circle sweep from the throw line: 32 samples per crescent
+						float sa = a0 + (float)side * (float)System.Math.PI * (float)s / 31.0f;
+						sp2 = p + new Vector2((float)System.Math.Cos(sa), (float)System.Math.Sin(sa)) * arcR;
+					}
+					else
+						sp2 = p; // the release/catch sample: the return bite past his own hands
+					for (int i = 0; i < enemies.Count; i++)
+					{
+						Godot.Node2D n = enemies[i];
+						Combatant nc = (Combatant)n;
+						if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
+							continue; // killed-but-unswept bodies are not valid bites (chain discipline)
+						bool done = false;
+						for (int h = 0; h < used; h++)
+							if (struck[h] == n)
+							{ done = true; break; }
+						if (done)
+							continue;
+						if ((n.GlobalPosition - sp2).Length() > band)
+							continue;
+						nc.TakeDamage(axDmg);
+						if (bled)
+							nc.Bleed(4.0, 1.0 * stat[StatTags.ATTACK_DAMAGE]); // card-scaled dps like the burn stamp
+						struck[used++] = n;
+						bool counted = false;
+						for (int t = 0; t < bitN; t++)
+							if (bit[t] == n)
+							{ counted = true; break; }
+						if (!counted)
+							bit[bitN++] = n;
+					}
+				}
+			}
+			if (bitN > 0)
+				GD.Print("[10thAge] (axe) " + displayName + " crescents rake " + bitN + " bodies");
+			return; // the volley owns its whole beat: never fall through to the lane/fan search
 		}
 		Godot.Node2D best = null;
 		float bestD = 1e9f;

@@ -56,57 +56,84 @@ public partial class Combatant : Godot.Node2D
     public double burnT = 0.0;
     public double burnCinder = 0.0;
 
-    public void Burn(double dps, double dur, double cinder = 0.0)
-    {
-        if (dps <= 0.0 || dur <= 0.0)
-            return; // a plain bolt never sets a window
-        if (dps >= burnDps)
-        {
-            burnDps = dps;
-            burnCinder = cinder; // the burst stamp rides the stronger flame, like the vuln mark does
-        }
-        if (dur > burnT)
-            burnT = dur; // the window refreshes, never stacks
-    }
+	// Bruno's bleeding edge (user 2026-10-31): its OWN status pair mirroring burn - bodies set
+	// by a bleeding axe run bleedDps damage/sec for bleedT seconds. Deliberately SEPARATE from
+	// burn so neither cinder bloom (which rides the burn stamp) nor the Drink "burning body"
+	// bonus can key on it: the fire DoT lanes stay Stack-only. Kills ride the shared kill scan.
+	public double bleedDps = 0.0;
+	public double bleedT = 0.0;
 
-    public void TickBurn(double delta)
-    {
-        if (burnT <= 0.0)
-            return;
-        burnT -= delta;
-        if (burnT < 0.0)
-            burnT = 0.0;
-        TakeDamage(burnDps * delta); // burn kills ride the shared kill scan like any other
-    }
+	public void Burn(double dps, double dur, double cinder = 0.0)
+	{
+		if (dps <= 0.0 || dur <= 0.0)
+			return; // a plain bolt never sets a window
+		if (dps >= burnDps)
+		{
+			burnDps = dps;
+			burnCinder = cinder; // the burst stamp rides the stronger flame, like the vuln mark does
+		}
+		if (dur > burnT)
+			burnT = dur; // the window refreshes, never stacks
+	}
 
-    public void Slowed(double mul, double duration)
-    {
-        if (mul > slowMul)
-            slowMul = mul;
-        if (duration > slowT)
-            slowT = duration; // refresh only: two overlapping marks never stack
-    }
+	public void TickBurn(double delta)
+	{
+		if (burnT <= 0.0)
+			return;
+		burnT -= delta;
+		if (burnT < 0.0)
+			burnT = 0.0;
+		TakeDamage(burnDps * delta); // burn kills ride the shared kill scan like any other
+	}
 
-    public void TickSlow(double delta)
-    {
-        if (slowT > 0.0)
-        {
-            slowT -= delta;
-            if (slowT <= 0.0)
-                slowMul = 0.0; // the mark decays with the window
-        }
-    }
-    public void Hurt()
-    {
-        hurtFlash = 0.12f;
-    }
+	public void Bleed(double dps, double dur)
+	{
+		if (dps <= 0.0 || dur <= 0.0)
+			return; // an axe without the card never sets a window
+		if (dps >= bleedDps)
+			bleedDps = dps; // the stronger edge owns the tick
+		if (dur > bleedT)
+			bleedT = dur; // the window refreshes, never stacks
+	}
 
-    public virtual void TakeDamage(double amount)
-    {
-        // guiding light: a marked body bites harder against whatever strikes it
-        if (vulnT > 0.0)
-            amount *= (1.0 + vulnMul);
-        hp -= (float)amount;
-        Hurt();
-    }
+	public void TickBleed(double delta)
+	{
+		if (bleedT <= 0.0)
+			return;
+		bleedT -= delta;
+		if (bleedT < 0.0)
+			bleedT = 0.0;
+		TakeDamage(bleedDps * delta); // bleed kills ride the shared kill scan like any other
+	}
+
+	public void Slowed(double mul, double duration)
+	{
+		if (mul > slowMul)
+			slowMul = mul;
+		if (duration > slowT)
+			slowT = duration; // refresh only: two overlapping marks never stack
+	}
+
+	public void TickSlow(double delta)
+	{
+		if (slowT > 0.0)
+		{
+			slowT -= delta;
+			if (slowT <= 0.0)
+				slowMul = 0.0; // the mark decays with the window
+		}
+	}
+	public void Hurt()
+	{
+		hurtFlash = 0.12f;
+	}
+
+	public virtual void TakeDamage(double amount)
+	{
+		// guiding light: a marked body bites harder against whatever strikes it
+		if (vulnT > 0.0)
+			amount *= (1.0 + vulnMul);
+		hp -= (float)amount;
+		Hurt();
+	}
 }

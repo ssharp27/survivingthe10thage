@@ -115,6 +115,19 @@ weaponKit = "shield"
 baseArmour = 1.0
 class_ = "Paladin"
 
+[node name="Bruno" type="Node2D" parent="."]
+script = ExtResource("3_pm")
+displayName = "Bruno"
+weaponName = "Axes"
+memberIndex = 7
+maxHp = 60.0
+baseSpeed = 128.0
+weaponDamage = 10.0
+cooldown = 1.0
+range = 260.0
+weaponKit = "axe"
+class_ = "Axethrower"
+
 [node name="BossMini" type="Node2D" parent="."]
 script = ExtResource("4_boss")
 kind = "mini1"

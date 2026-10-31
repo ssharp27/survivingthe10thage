@@ -69,6 +69,7 @@ public partial class Enemy : Combatant
         TickVuln((double)delta); // guiding-light window decays on every body, even off-screen
         TickSlow((double)delta); // draging-maul window decays on every body, like guiding light
         TickBurn((double)delta); // firebolt burn ticks like the vuln/slow windows do
+        TickBleed((double)delta); // Bruno's bleed ticks on the same discipline (own pair)
         Game g = GetParent() as Game; // hoisted: the drink seat gates the spd calc below
         if (g == null)
             return;
