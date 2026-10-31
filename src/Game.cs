@@ -128,11 +128,11 @@ public partial class Game : Godot.Node2D
 	// without-replacement draw per ally beat, taken at boot. The run's own leader never
 	// rolls onto its own pool (it CAN show up on runs where it is not the leader).
 	// Row = STAGE_NUMBER - 1; columns are memberIndex order
-	// (0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack). Weight 0 = cannot appear
+	// (0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash). Weight 0 = cannot appear
 	// on that stage. Stage 1 per the user: Baldrun + Mosiah more likely than the rest.
 	// Sanity numbers - the user will add rows/weights per future stage.
 	// the new-style initializer: Godot's C# build trips CS0623 on nested old-style braces
-	private static readonly int[][] JOIN_W = { new int[] { 3, 3, 1, 1, 1, 1 } };   // row 0 = stage 1: Baldrun + Mosiah heavy, the rest parity
+	private static readonly int[][] JOIN_W = { new int[] { 3, 3, 1, 1, 1, 1, 1 } };   // row 0 = stage 1: Baldrun + Mosiah heavy, Wash parity with the rest
 	private int[] _joinOrder = new int[0]; // ally slot k -> memberIndex drawn for it
 	private Godot.Collections.Array<int> _hpOrder = new(); // HUD strip slot -> memberIndex: the join order (see BuildJoinLottery)
 	private Godot.RandomNumberGenerator _joinRng; // UNSEEDED on purpose: a fresh process re-rolls
@@ -167,7 +167,7 @@ public partial class Game : Godot.Node2D
 	// kit-native ranks (pierce, multishot) ride the same cap. Ranks cap at 3 per DESIGN; the
 	// 4th rank would be the evolution (Stormcaller / Viperkiss), still stubbed for M2.
 	const int PICK_RANK_CAP = 3;
-	const int PICK_SLOTS = 7;   // keys pick_1..pick_7: six members + one wild slot (pick_7 entered the input map 2026-10-30)
+	const int PICK_SLOTS = 8;   // keys pick_1..pick_8: seven members + one wild slot (pick_8 entered the input map 2026-10-31 with Wash)
 	static readonly string[] OPT_LABEL = { "longer reach (maul)", "heavier blows (maul damage)",
 										   "swifter swings (cooldown)", "quicker thrusts (cooldown)",
 										   "deeper thrust (reach + pierce)", "sharper points (damage)",
@@ -177,18 +177,18 @@ public partial class Game : Godot.Node2D
 										   "quicker pulse (guardian rate)", "guiding light (ring vulnerability)",
 										   "occult flame (blast damage)", "wider burst (blast reach)",
 										   "quicker ritual (summon rate)", "twin ritual (one more familiar)", "draging maul (slow on hit)",
-										   "deadly aim (crit chance)", "keener flame (firebolt damage)", "quicker fuse (firebolt cooldown)", "split bolt (firebolt pierce)", "cinder bloom (burning bodies burst)", "linger flame (burn lasts longer)" };
-	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5 };
-	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f };
-	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 }; // rows 4 + 8: Mosiah deeper thrust / Asper piercing shot (user 2026-10-30)
-	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
+										   "deadly aim (crit chance)", "keener flame (firebolt damage)", "quicker fuse (firebolt cooldown)", "split bolt (firebolt pierce)", "cinder bloom (burning bodies burst)", "linger flame (burn lasts longer)", "heavier shield (shield damage)", "quicker hurl (shield cooldown)", "more rebounds (shield bounces)", "sharper rim (crit chance)", "crushing blow (crit damage)" };
+	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, };
+	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, };
+	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, };
+	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, };
+	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, }; // rows 4 + 8: Mosiah deeper thrust / Asper piercing shot (user 2026-10-30)
+	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
 	// guiding light (Alvora): the ring MARKS caught bodies for +10%/rank incoming damage
 	// from EVERY source, a window on the body that decays on its own (Combatant.TickVuln).
 	// The user swapped the old flat-armour defence for this offense (2026-10-23): the squad
 	// keeps no mitigation, but the cleric's ring becomes the party's damage setup.
-	static readonly int[] OPT_VULN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_VULN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, };
 	// draging maul (Baldrun 4th card, user 2026-10-24): connected maul hits drag caught bodies to
 	// (1 - 0.25/rank) speed for a 2.5 s window (Combatant.slowMul/slowT, refresh-not-stack); only
 	// horde movement reads it and the cleave hook never marks Bosses. deadly aim (Mosiah 4th card):
@@ -196,16 +196,22 @@ public partial class Game : Godot.Node2D
 	// so the crit card is pure table data. Rows 18/19 of the 20-wide tables; caps bound both:
 	// drag <= 0.75 at rank 3, crit <= 0.05 + 3 x 0.08 = 0.29.
 	// OPT_SLOW = drag strength/rank (Baldrun row 18); OPT_CRIT = crit points/rank (Mosiah row 19).
-	static readonly double[] OPT_SLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_SLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, };
+	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, };
 	// firebolt kit cards (Stack, user 2026-10-30): OPT_BURN = +2 s of linger per rank onto
 	// PartyMember.burnDur; OPT_CINDER = cinder bloom rank: a body that dies STILL burning bursts
 	// in CINDER_R px, scorching the live horde bodies in the blast for 25/50/75% of the firebolt's
 	// roll at rank 1/2/3 (Game.CinderBurst, hooked in the kill scan). Rows
 	// 25-29 of the now 25-wide tables.
-	static readonly double[] OPT_BURN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0 };
-	static readonly int[] OPT_CINDER = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 };
+	static readonly double[] OPT_BURN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 0, };
+	static readonly int[] OPT_CINDER = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, };
 	static readonly double CINDER_R = 60.0; // cinder bloom blast radius (assistant pick: small)
+	// shield kit cards (Wash, user 2026-10-31): OPT_BOUNCE = +1 shield bounce per rank (the thrown
+	// shield hits its prey then hops to one MORE body per bounce; the hop lane lives on PartyMember);
+	// OPT_CRITD = +0.25 CRIT_DAMAGE points per rank on the tag store. Rows 25-29 of the now 30-wide
+	// tables: heavier shield | quicker hurl | more rebounds | sharper rim | crushing blow.
+	static readonly int[] OPT_BOUNCE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 };
+	static readonly double[] OPT_CRITD = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25 };
 	int[] _pickRank = new int[OPT_LABEL.Length];
 	int[] _optRoll = new int[PICK_SLOTS]; // this card's offered options (slot -> option, -1 = empty slot)
 
@@ -556,9 +562,9 @@ public partial class Game : Godot.Node2D
 			GD.Print("[10thAge] " + m.displayName + " EVASION dodge - the hit glances off");
 			return;
 		}
-		if (m.stat[StatTags.ARMOUR] > 0.0)
+		if (m.stat[StatTags.ARMOUR] + (m.oakT > 0.0 ? 5.0 : 0.0) > 0.0) // Oakhollow Assemble!: +5 armour while assembled
 		{
-			amount -= m.stat[StatTags.ARMOUR];
+			amount -= m.stat[StatTags.ARMOUR] + (m.oakT > 0.0 ? 5.0 : 0.0); // oak armour rides the same flat-subtract lane
 			if (amount < 1.0)
 				amount = 1.0; // flat reduction with a never-below-1 floor
 		}
@@ -1259,6 +1265,33 @@ public partial class Game : Godot.Node2D
 		if (m.elixMagT > 0.0)
 			s += (s == "" ? " (" : " + ") + ELIXIR_NAMES[5];
 		return s == "" ? "" : s + ")";
+	}
+	// Oakhollow Assemble! (user 2026-10-31, Wash's ult): ONE clock on EVERY member (bench too - harmless,
+	// same discipline as insT/elixir clocks) carries all three party-wide effects: EffMove x1.25,
+	// +5 armour in Game.TakeHit (rides the flat-subtract lane above), regen 1% max hp/s in the PM
+	// REGEN block. Deterministic cast: zero RNG draws, the run stream stays put.
+	public void OakhollowParty()
+	{
+		// clocks on EVERY member (bench too - harmless, same discipline as insT/elixir clocks)
+		foreach (PartyMember m in _party)
+		{
+			m.oakT = OAK_LASTS; // +25% move / +5 armour / regen all ride this one clock
+		}
+		GD.Print("[10thAge] (oak) Oakhollow Assemble!: ALL allies +25% move speed, +5 armour, regen 1% max hp/s for " + (int)OAK_LASTS + " s");
+	}
+	static readonly double OAK_LASTS = 10.0; // user: the effects last 10 seconds
+
+	// Smite passive probe (user 2026-10-31, Wash): the crit readers (PartyMember.RollDamage) ask
+	// whether Wash stands anywhere in the squad - joined, not downed, not eliminated. No roll, no
+	// clock: live presence check only, so a downed Wash stops smiting and a revive brings it back.
+	public bool WashUp()
+	{
+		foreach (PartyMember m in _party)
+		{
+			if (m.displayName == "Wash" && m.joined && !m.downed && !m.eliminated)
+				return true;
+		}
+		return false;
 	}
 	// party-wide ult lane (Mosiah "Bardic Inspiration", 2026-10-26): the roster lives here
 	// (private _party) and every ally is a child of Game, so a party-wide effect walk
@@ -3497,27 +3530,29 @@ public partial class Game : Godot.Node2D
 	// the real UI pass the user gathers; the art rects already show the painted minis.
 	// Board slot rects as anchor fractions of the page window: slot i -> L,T,R,B
 	// (three across, two rows: 0,1,2 top | 3,4,5 bottom)
-	static readonly float[] SEL_GRID = { 0.04f, 0.04f, 0.30f, 0.48f, 0.35f, 0.04f, 0.61f, 0.48f,
-		0.66f, 0.04f, 0.96f, 0.48f, 0.04f, 0.54f, 0.30f, 0.98f, 0.35f, 0.54f, 0.61f, 0.98f, 0.66f, 0.54f, 0.96f, 0.98f };
+	static readonly float[] SEL_GRID = { 0.04f, 0.04f, 0.30f, 0.32f, 0.35f, 0.04f, 0.61f, 0.32f,
+		0.66f, 0.04f, 0.96f, 0.32f, 0.04f, 0.36f, 0.30f, 0.64f, 0.35f, 0.36f, 0.61f, 0.64f, 0.66f, 0.36f, 0.96f, 0.64f, 0.35f, 0.68f, 0.61f, 0.96f };
 	static readonly float[] SEL_PAGE = { 0.05f, 0.14f, 0.60f, 0.86f }; // the board window the build draws AND the click maps into
-	static readonly bool[] SEL_LOCKED = { false, false, false, false, false, false };
+	static readonly bool[] SEL_LOCKED = { false, false, false, false, false, false, false, };
 	static readonly float[] SEL_CONFIRM = { 0.32f, 0.88f, 0.58f, 0.96f };
-	// painted mini art per roster seat (index = memberIndex: 0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack)
-		static readonly string[] SEL_ART = { "res://art/baldrun.png", "res://art/mosiah.png", "res://art/asper.png", "res://art/alvora.png", "res://art/yu.png", "res://art/stack.png" };
+	// painted mini art per roster seat (index = memberIndex: 0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash)
+		static readonly string[] SEL_ART = { "res://art/baldrun.png", "res://art/mosiah.png", "res://art/asper.png", "res://art/alvora.png", "res://art/yu.png", "res://art/stack.png", "res://art/wash.png" };
 		static readonly string[] SEL_BONUS = {
 		"Leader bonus: chain lightning - landed party hits can loose a lightning chain hopping between bodies",
 		"Leader bonus: pierce - every bolt punches through one body and keeps flying",
 		"Leader bonus: friendly insects kindle in the clearing; touching one joins the squad for 10 s",
 		"Leader bonus: field medic - every 10 s every standing ally regenerates 1 hp",
 		"Leader bonus: kindness spirits kindle in the clearing; touching one heals 10 hp",
-		"Leader bonus: Have a Drink! - while Stack leads, burning enemies deal 10% less damage and move 10% slower" };
+		"Leader bonus: Have a Drink! - while Stack leads, burning enemies deal 10% less damage and move 10% slower",
+		"Leader bonus: none yet - Wash leads with no seat lane (his Smite passive runs while he stands)" };
 	static readonly string[] SEL_ULT = {
 		"Ultimate: Giant's Might (R) - doubles size and reach, damage x1.5, for 10 s",
 		"Ultimate: Bardic Inspiration (R) - rallies ALL allies +25% damage and attack speed for 10 s",
 		"Ultimate: Swarm of Bees (R) - 6 hunters in a circle, one body latched each at 10 dmg/s for 10 s, spread out to hunt",
 		"Ultimate: Guardian Awakening (R) - ring reach x2 and +50% damage; every horde kill while awake heals ALL allies 1 hp for 10 s",
 		"Ultimate: The Kaka (R) - 6 empowered familiars in a circle, blast x2 and damage x2 after ranks, spread out",
-		"Ultimate: Experimental Elixir (R) - two random elixirs of six (10% all six) for ALL allies for 10 s" };
+		"Ultimate: Experimental Elixir (R) - two random elixirs of six (10% all six) for ALL allies for 10 s",
+		"Ultimate: Oakhollow Assemble! (R) - ALL allies +25% move speed, +5 armour and regen 1% max hp per second for 10 s" };
 	public void BuildSelectScreen()
 	{
 		_selLayer = new CanvasLayer();
@@ -4040,6 +4075,8 @@ public partial class Game : Godot.Node2D
 		{ m.stat[StatTags.CRIT_CHANCE] += OPT_CRIT[option]; } // deadly aim: crit points on the tag store
 		{ m.burnDur += OPT_BURN[option]; } // linger flame: +2 s of burn per rank on the kit field
 		{ m.cinderRank += OPT_CINDER[option]; } // cinder bloom rank: burst pct rides the firebolt's live roll at the shot call site
+		{ m.shieldBounce += OPT_BOUNCE[option]; } // extra rebounds: +1 bounce per rank on the kit field
+		{ m.stat[StatTags.CRIT_DAMAGE] += OPT_CRITD[option]; } // crushing blow: crit damage points on the tag store
 		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
 						 OPT_LABEL[option] + " x" + _pickRank[option];
 		GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +

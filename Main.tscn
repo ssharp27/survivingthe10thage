@@ -101,6 +101,20 @@ burnDps = 1.0
 burnDur = 5.0
 class_ = "Artificer"
 
+[node name="Wash" type="Node2D" parent="."]
+script = ExtResource("3_pm")
+displayName = "Wash"
+weaponName = "Shield"
+memberIndex = 6
+maxHp = 70.0
+baseSpeed = 128.0
+weaponDamage = 10.0
+cooldown = 1.0
+range = 240.0
+weaponKit = "shield"
+baseArmour = 1.0
+class_ = "Paladin"
+
 [node name="BossMini" type="Node2D" parent="."]
 script = ExtResource("4_boss")
 kind = "mini1"

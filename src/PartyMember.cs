@@ -44,7 +44,7 @@ public partial class PartyMember : Godot.Node2D
 	// heavy AoE verbs now bite crowds at full strength. Warding light is GONE (user 2026-10-23
 	// swapped it for offense): the cleric's fourth track is guiding light, a VULNERABILITY
 	// mark - ring-caught bodies take +10%/rank damage from every source for a window.
-	[Export] public string weaponKit = "melee"; // "melee" | "shot" | "aura" | "summon"
+	[Export] public string weaponKit = "melee"; // "melee" | "shot" | "aura" | "summon" | "shield"
 	[Export] public float projSpeed = 340.0f;  // px/s a bug projectile travels
 	[Export] public float projLife = 2.2f;     // seconds a bolt may fly before it expires
 	// firebolt kit knobs (Stack, user 2026-10-30): a hit sets a burn window on the body (dps x
@@ -54,6 +54,14 @@ public partial class PartyMember : Godot.Node2D
 	[Export] public double burnDps = 0.0;   // damage/sec stamped on bodies this member hits (0 = no burn)
 	[Export] public double burnDur = 0.0;   // seconds that burn runs; linger flame cards raise it
 	[Export] public int cinderRank = 0;      // cinder bloom rank: burning bodies burst on death
+	// Wash's shield throw (user 2026-10-31): hits nearest prey in its SHORT reach, then bounces body
+	// to body: base ONE bounce (hits 1, bounces to 1 more - user), extra rebounds card adds +1/rank.
+	// Hop range is the assistant pick (160 px, kept tight to the short throw).
+	public int shieldBounce = 1;      // bounces after the first body (base + extra rebounds ranks)
+	static readonly double SHIELD_HOP = 160.0; // px a bounce may hop to the next nearest fresh body
+	// authored armour base (Wash 1 armour, user 2026-10-31): the ARMOUR tag seeds at BASE then adds
+	// this per-PC number; the flat-subtract lane with never-below-1 floor lives in Game.TakeHit.
+	[Export] public double baseArmour = 0.0;    // per-PC armour seeded into the ARMOUR tag
 	// Yu's familiars (M2, user dictation 2026-10-22): the fuse is the summon's LIFETIME, and
 	// the familiar detonates on contact with prey OR when that fuse burns out - the fuse is
 	// what keeps a player from parking a pile of them under a boss and saving them for later.
@@ -110,6 +118,10 @@ public partial class PartyMember : Godot.Node2D
 	public double elixBoldT = 0.0;  // Boldness: deal 10% more damage
 	public double elixPrecT = 0.0;  // Precision: +10% critical chance
 	public double elixMagT = 0.0;   // Magnetism: collection bubble +10%
+	// Oakhollow Assemble! (user 2026-10-31, Wash's ult): ONE clock on EVERY member (bench too -
+	// harmless, same discipline as insT/elixir clocks) carries +25% move (EffMove), +5 armour (TakeHit)
+	// and regen 1% max hp/s (REGEN block). Set by Game.OakHollowParty; duration lives on the Game side.
+	public double oakT = 0.0;   // seconds of Oakhollow Assemble! left on this body
 	Godot.Node2D _telePivot; // telegraph armature (pure nodes: C# _draw is dead in 4.7)
 	Godot.ColorRect[] _teleParts;
 	float _teleHold = 0.0f; // telegraph visibility timer, set on each swing
@@ -243,6 +255,11 @@ public partial class PartyMember : Godot.Node2D
 			// 2026-10-30: Stack art audit-passed (81x117 canvas, hard alpha 0 soft px, 51 opaque
 			// colours, 1-2 px margins, cx_delta 0.0) - margins match the class, so scale/rim carry
 			miniPath = "res://art/stack.png";
+		else if (displayName == "Wash")
+			// 2026-10-31: Wash art audit-passed (80x121 canvas, hard alpha 0 soft px, 60 opaque
+			// colours, 1 px margins all sides, cx_delta -0.7). Row profile shows the base plate shallow
+			// at the canvas edge like the class, so scale/rim carry over
+			miniPath = "res://art/wash.png";
 		if (miniPath != "")
 		{
 			Godot.Texture2D tex = GD.Load(miniPath) as Godot.Texture2D;
@@ -378,6 +395,8 @@ public partial class PartyMember : Godot.Node2D
 			return 5; // The Kaka
 		if (displayName == "Stack")
 			return 6; // Experimental Elixir (the draw lives on Game.ElixirParty)
+		if (displayName == "Wash")
+			return 7; // Oakhollow Assemble! (the walk lives on Game.OakHollowParty)
 		return 0; // other PCs: no ultimate authored yet (future lanes land here)
 	}
 	public bool TryUltimate()
@@ -467,6 +486,19 @@ public partial class PartyMember : Godot.Node2D
 				(int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
 			return true;
 		}
+		else if (ultKey() == 7)
+		{
+			ultCdT = ULT_CD_BASE / stat[StatTags.ULT];
+			// the party-wide clock lives on the Game side: it owns the roster walk (same discipline as
+			// bardic/bees/kaka/elixir)
+			Game g6 = GetParent() as Game;
+			if (g6 != null)
+				g6.OakhollowParty();
+			GD.Print("[10thAge] (ult) Oakhollow Assemble!: " + displayName +
+				" rallies ALL allies (+25% move, +5 armour, regen 1% max hp/s) for 10 s, gate " +
+				(int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
+			return true;
+		}
 		GD.Print("[10thAge] (ult) " + displayName + " has no ultimate yet");
 		return false;
 	}
@@ -476,6 +508,7 @@ public partial class PartyMember : Godot.Node2D
 	{
 		for (int i = 0; i < StatTags.N; i += 1)
 			stat[i] = StatTags.BASE[i];
+		stat[StatTags.ARMOUR] += baseArmour; // per-PC authored armour lands on the store
 	}
 	/** Authored weaponDamage scaled by the ATTACK_DAMAGE tag. */
 	public double EffDamage() { return weaponDamage * stat[StatTags.ATTACK_DAMAGE]; }
@@ -492,7 +525,7 @@ public partial class PartyMember : Godot.Node2D
 	/** Authored maxHp plus the additive HEALTH tag (points). */
 	public double EffMaxHp() { return maxHp + stat[StatTags.HEALTH]; }
 	/** Authored baseSpeed scaled by the MOVEMENT_SPEED tag. */
-	public double EffMove() { return baseSpeed * stat[StatTags.MOVEMENT_SPEED] * (elixSwiftT > 0.0 ? 1.10 : 1.0); } // Swiftness elixir: 10% faster
+	public double EffMove() { return baseSpeed * stat[StatTags.MOVEMENT_SPEED] * (elixSwiftT > 0.0 ? 1.10 : 1.0) * (oakT > 0.0 ? 1.25 : 1.0); } // Swiftness elixir +10% | Oakhollow +25%: move while up
 	/** Whole repeats of the current attack (MULTISTRIKE tag, kind COUNT). */
 	public int Strikes()
 	{
@@ -521,8 +554,8 @@ public partial class PartyMember : Godot.Node2D
 			amount *= AWA_DMG; // awakening: +50% on Alvora hits while awake
 		if (elixBoldT > 0.0)
 			amount *= 1.10; // Boldness elixir: +10% on every hit while brewed
-		if (host is Game g && g.Rng != null && g.Rng.Randf() < stat[StatTags.CRIT_CHANCE] + (elixPrecT > 0.0 ? 0.10 : 0.0)) // Precision elixir: +10% crit chance while brewed
-			amount *= stat[StatTags.CRIT_DAMAGE];
+		if (host is Game g && g.Rng != null && g.Rng.Randf() < stat[StatTags.CRIT_CHANCE] + (elixPrecT > 0.0 ? 0.10 : 0.0) + (g.WashUp() ? 0.05 : 0.0)) // Precision +10% while brewed | Smite passive +5% while Wash stands
+			amount *= stat[StatTags.CRIT_DAMAGE] * (host is Game gsw && gsw.WashUp() ? 1.25 : 1.0); // Smite passive: crits bite 25% harder while Wash stands in the squad
 		double steal = amount * stat[StatTags.LIFESTEAL];
 		if (steal > 0.0)
 		{
@@ -551,12 +584,12 @@ public partial class PartyMember : Godot.Node2D
 		if (invuln > 0.0f)
 			invuln -= delta; // post-revive immunity window, ticks always
 		// hp regen (REGEN tag): points per second, never while downed or unjoined
-		if (!downed && joined && (stat[StatTags.REGEN] > 0.0 || elixHealT > 0.0)) // Healing elixir rides the same lane
+		if (!downed && joined && (stat[StatTags.REGEN] > 0.0 || elixHealT > 0.0 || oakT > 0.0)) // Healing elixir + Oakhollow ride the same lane
 		{
 			double regenCap = EffMaxHp();
 			if (hp < regenCap)
 			{
-				hp += (float)((stat[StatTags.REGEN] + (elixHealT > 0.0 ? EffMaxHp() * 0.01 : 0.0)) * delta); // Healing elixir: 1% max hp per second
+				hp += (float)((stat[StatTags.REGEN] + (elixHealT > 0.0 ? EffMaxHp() * 0.01 : 0.0) + (oakT > 0.0 ? EffMaxHp() * 0.01 : 0.0)) * delta); // Healing elixir + Oakhollow: 1% max hp/s each
 				if (hp > regenCap)
 					hp = (float)regenCap;
 			}
@@ -749,6 +782,7 @@ public partial class PartyMember : Godot.Node2D
 		elixBoldT = System.Math.Max(0.0, elixBoldT - delta);
 		elixPrecT = System.Math.Max(0.0, elixPrecT - delta);
 		elixMagT = System.Math.Max(0.0, elixMagT - delta);
+		oakT = System.Math.Max(0.0, oakT - delta); // Oakhollow clock ticks with the same soft-pause discipline
 		ultT -= delta;
 		if (_grown && ultT <= 0.0)
 		{
@@ -813,6 +847,7 @@ public partial class PartyMember : Godot.Node2D
 		float reach = (float)EffRange();
 		// the fourth verb is keyed on the kit name like every other weapon
 		bool sumKit = weaponKit == "summon"; // Occultist ritual: fuse-driven familiars run at prey
+		bool shieldKit = weaponKit == "shield"; // Wash's shield: short throw, then body-to-body bounces
 		if (auraKit)
 		{
 			// the ring is a full-body sweep, so the lane/fan target search below is skipped
@@ -890,6 +925,65 @@ public partial class PartyMember : Godot.Node2D
 			// the fall-through handed Yu a free rapier thrust at anything inside reach every
 			// beat, reading as a damage aura around him; his minions ARE his damage)
 			return;
+		}
+		// ---------- Wash's shield throw (user 2026-10-31): a SHORT hurl that bounces ----------
+		// the shield hits the nearest prey inside its short reach, then bounces to ONE MORE fresh
+		// body per bounce (base 1 + extra rebounds ranks): nearest living body NOT yet struck this
+		// throw within SHIELD_HOP of the last hit, structural like the Baldrun chain hop but ungated
+		// (it IS the weapon). ONE roll shared across every body - the shield is one object, one bite.
+		if (shieldKit)
+		{
+			Godot.Node2D prey = null;
+			float preyD = 1e9f;
+			for (int i = 0; i < enemies.Count; i++)
+			{
+				Godot.Node2D n = enemies[i];
+				Combatant nc = (Combatant)n;
+				if (nc == null || nc.kind == "dead")
+					continue;
+				float dd = (n.GlobalPosition - p).Length();
+				if (dd >= preyD)
+					continue;
+				preyD = dd;
+				prey = n;
+			}
+			if (prey == null || preyD > reach)
+				return; // nothing in the throw: the beat stays ready, an empty clearing never stalls it
+			cdTimer = (float)EffCooldown();
+			_atkFlash = 0.08f; // same commit pulse every kit uses, never the red harm lane
+			double shdDmg = RollDamage(pg, weaponDamage); // ONE crit/lifesteal roll for the whole throw
+			Godot.Node2D[] hit = new Godot.Node2D[1 + shieldBounce]; // memo: no body twice in one throw
+			hit[0] = prey; int used = 1;
+			((Combatant)prey).TakeDamage(shdDmg);
+			Godot.Node2D cur = prey;
+			for (int b = 0; b < shieldBounce; b++)
+			{
+				Godot.Node2D nx = null; float nxDb = 1e9f;
+				for (int i = 0; i < enemies.Count; i++)
+				{
+					Godot.Node2D n = enemies[i]; Combatant nc = (Combatant)n;
+					if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
+						continue; // killed-but-unswept bodies are not valid hops (chain-lightning discipline)
+					bool done = false;
+					for (int h = 0; h < used; h++)
+						if (hit[h] == n)
+						{ done = true; break; }
+					if (done)
+						continue;
+					Vector2 dv = pg.WrapDelta(cur.GlobalPosition, n.GlobalPosition);
+					float dd2 = dv.Length();
+					if (dd2 >= nxDb || dd2 > (float)SHIELD_HOP)
+						continue;
+				nxDb = dd2; nx = n;
+				}
+				if (nx == null)
+					break; // the shield found no fresh prey: the throw ends with what it bit
+				((Combatant)nx).TakeDamage(shdDmg);
+				hit[used++] = nx; cur = nx;
+			}
+			if (used > 1)
+				GD.Print("[10thAge] (shield) " + displayName + " shield bounds " + (used - 1) + " more bodies");
+			return; // the throw owns its whole beat: never fall through to the lane/fan search
 		}
 		Godot.Node2D best = null;
 		float bestD = 1e9f;
