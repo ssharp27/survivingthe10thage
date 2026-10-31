@@ -1135,7 +1135,7 @@ public partial class PartyMember : Godot.Node2D
 						continue;
 					nc.TakeDamage(spDmg);
 					if (bled)
-						nc.Bleed(4.0, 1.0 * stat[StatTags.ATTACK_DAMAGE]); // card-scaled dps like the burn stamp
+						nc.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 4.0); // card-scaled dps for a 4 s window (FIXED 2026-11-01: the args were reversed)
 					bool counted = false;
 					for (int t = 0; t < bitN; t++)
 						if (bit[t] == n)
@@ -1326,7 +1326,7 @@ public partial class PartyMember : Godot.Node2D
 							continue;
 						nc.TakeDamage(axDmg);
 						if (bled)
-							nc.Bleed(4.0, 1.0 * stat[StatTags.ATTACK_DAMAGE]); // card-scaled dps like the burn stamp
+							nc.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 4.0); // card-scaled dps for a 4 s window (FIXED 2026-11-01: the args were reversed)
 						struck[used++] = n;
 						bool counted = false;
 						for (int t = 0; t < bitN; t++)

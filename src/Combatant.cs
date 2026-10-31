@@ -84,6 +84,8 @@ public partial class Combatant : Godot.Node2D
 		if (burnT < 0.0)
 			burnT = 0.0;
 		TakeDamage(burnDps * delta); // burn kills ride the shared kill scan like any other
+		if (burnT <= 0.0)
+			burnDps = 0.0; // expiry clears the dps so a later WEAKER mark owns the tick (FIXED 2026-11-01: the stale rate kept ticking)
 	}
 
 	public void Bleed(double dps, double dur)
@@ -104,6 +106,8 @@ public partial class Combatant : Godot.Node2D
 		if (bleedT < 0.0)
 			bleedT = 0.0;
 		TakeDamage(bleedDps * delta); // bleed kills ride the shared kill scan like any other
+		if (bleedT <= 0.0)
+			bleedDps = 0.0; // expiry clears the dps (same fix as the burn pair)
 	}
 
 	// Brook's twin-dagger venom (user 2026-10-31): its OWN status pair mirroring burn/bleed -
@@ -132,6 +136,8 @@ public partial class Combatant : Godot.Node2D
 		if (poisonT < 0.0)
 			poisonT = 0.0;
 		TakeDamage(poisonDps * delta); // poison kills ride the shared kill scan like any other
+		if (poisonT <= 0.0)
+			poisonDps = 0.0; // expiry clears the dps (same fix as the burn/bleed pairs)
 	}
 
 	public void Slowed(double mul, double duration)
