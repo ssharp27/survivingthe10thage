@@ -69,15 +69,15 @@ public partial class Enemy : Combatant
         TickVuln((double)delta); // guiding-light window decays on every body, even off-screen
         TickSlow((double)delta); // draging-maul window decays on every body, like guiding light
         TickBurn((double)delta); // firebolt burn ticks like the vuln/slow windows do
-        float spd = speed * (slowT > 0.0 ? 1.0f - (float)slowMul : 1.0f); // draging maul: a dragged body shambles
+        Game g = GetParent() as Game; // hoisted: the drink seat gates the spd calc below
+        if (g == null)
+            return;
+        float spd = speed * (slowT > 0.0 ? 1.0f - (float)slowMul : 1.0f) * (burnT > 0.0 && g.LeaderDrink() ? 0.90f : 1.0f); // Have a Drink!: burning bodies shamble
         if (_body == null)
             InitVisuals();
         if (kind == "dead")
             return; // despawned: parked offscreen and inert; the node is NOT freed, so
                     // without this guard a dead reaper would walk back into the arena
-        Game g = GetParent() as Game;
-        if (g == null)
-            return;
         if (g.GetWorldPause())
             return; // picker / join-banner soft pause: the horde holds still while the card is read
         // creature walk bob (user 2026-10-21): enemies are creatures, not minis - vertical
@@ -137,7 +137,7 @@ public partial class Enemy : Combatant
                 if (hl < 30.0f && _contactCd <= 0.0f)
                 {
                     _contactCd = 1.0f;
-                    g.EscortHitRecruit(g.GetRecruitPending(), contactDamage);
+                    g.EscortHitRecruit(g.GetRecruitPending(), contactDamage * g.DrinkMul(this)); // Have a Drink!: burning escorts chip softer too
                 }
             }
         }
@@ -158,7 +158,7 @@ public partial class Enemy : Combatant
                 if (dist < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
                 {
                     _contactCd = 1.0f;
-                    g.TakeHit(m, contactDamage);
+                    g.TakeHit(m, contactDamage * g.DrinkMul(this)); // Have a Drink!: burning bodies hit 10% softer
                 }
             }
             // downed bodies are still run into even though nobody chases them
@@ -167,7 +167,7 @@ public partial class Enemy : Combatant
                 g.WrapDelta(p, hitAny.GlobalPosition).Length() < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
             {
                 _contactCd = 1.0f;
-                g.TakeHit(hitAny, contactDamage);
+                g.TakeHit(hitAny, contactDamage * g.DrinkMul(this)); // Have a Drink!: burning bodies hit 10% softer
             }
         }
         // separation: n-bounded push apart (spatial hash replaces this in M2)

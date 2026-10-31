@@ -99,6 +99,17 @@ public partial class PartyMember : Godot.Node2D
 	readonly double AWA_LASTS = 10.0; // assistant pick (user named no window)
 	readonly double AWA_RANGE = 2.0; // ring reach x2, after the AREA tag (EffRange)
 	readonly double AWA_DMG = 1.5; // +50% guardian damage while awake (RollDamage choke)
+	// Experimental Elixir (user 2026-10-31, Stack's ult): SIX one-shot party buffs, each riding
+	// its OWN 10 s clock on every member (bench too - harmless, same discipline as insT). The
+	// draw lives on Game.ElixirParty (two DISTINCT of six, 10% ALL six). Readers:
+	// elixHealT=regen block below, elixSwiftT=EffMove, elixHardT=Game.TakeHit,
+	// elixBoldT=RollDamage, elixPrecT=crit roll, elixMagT=Game.UpdateGems bubble.
+	public double elixHealT = 0.0;  // Healing: regen 1% max hp per second
+	public double elixSwiftT = 0.0; // Swiftness: move 10% faster
+	public double elixHardT = 0.0;  // Resilience: take 10% less damage
+	public double elixBoldT = 0.0;  // Boldness: deal 10% more damage
+	public double elixPrecT = 0.0;  // Precision: +10% critical chance
+	public double elixMagT = 0.0;   // Magnetism: collection bubble +10%
 	Godot.Node2D _telePivot; // telegraph armature (pure nodes: C# _draw is dead in 4.7)
 	Godot.ColorRect[] _teleParts;
 	float _teleHold = 0.0f; // telegraph visibility timer, set on each swing
@@ -365,6 +376,8 @@ public partial class PartyMember : Godot.Node2D
 			return 4; // Swarm of Bees
 		if (displayName == "Yu")
 			return 5; // The Kaka
+		if (displayName == "Stack")
+			return 6; // Experimental Elixir (the draw lives on Game.ElixirParty)
 		return 0; // other PCs: no ultimate authored yet (future lanes land here)
 	}
 	public bool TryUltimate()
@@ -442,6 +455,18 @@ public partial class PartyMember : Godot.Node2D
 				(int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
 			return true;
 		}
+		else if (ultKey() == 6)
+		{
+			ultCdT = ULT_CD_BASE / stat[StatTags.ULT];
+			// the draw + the six clocks live on the Game side: it owns the roster walk and the RNG
+			Game g5 = GetParent() as Game;
+			if (g5 != null)
+				g5.ElixirParty();
+			GD.Print("[10thAge] (ult) Experimental Elixir: " + displayName +
+				" brews TWO random elixirs of six (10% all six) for ALL allies 10 s, gate " +
+				(int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
+			return true;
+		}
 		GD.Print("[10thAge] (ult) " + displayName + " has no ultimate yet");
 		return false;
 	}
@@ -467,7 +492,7 @@ public partial class PartyMember : Godot.Node2D
 	/** Authored maxHp plus the additive HEALTH tag (points). */
 	public double EffMaxHp() { return maxHp + stat[StatTags.HEALTH]; }
 	/** Authored baseSpeed scaled by the MOVEMENT_SPEED tag. */
-	public double EffMove() { return baseSpeed * stat[StatTags.MOVEMENT_SPEED]; }
+	public double EffMove() { return baseSpeed * stat[StatTags.MOVEMENT_SPEED] * (elixSwiftT > 0.0 ? 1.10 : 1.0); } // Swiftness elixir: 10% faster
 	/** Whole repeats of the current attack (MULTISTRIKE tag, kind COUNT). */
 	public int Strikes()
 	{
@@ -494,7 +519,9 @@ public partial class PartyMember : Godot.Node2D
 			amount *= INS_DMG; // bardic: +25% on every ally hit while inspired
 		if (awaT > 0.0)
 			amount *= AWA_DMG; // awakening: +50% on Alvora hits while awake
-		if (host is Game g && g.Rng != null && g.Rng.Randf() < stat[StatTags.CRIT_CHANCE])
+		if (elixBoldT > 0.0)
+			amount *= 1.10; // Boldness elixir: +10% on every hit while brewed
+		if (host is Game g && g.Rng != null && g.Rng.Randf() < stat[StatTags.CRIT_CHANCE] + (elixPrecT > 0.0 ? 0.10 : 0.0)) // Precision elixir: +10% crit chance while brewed
 			amount *= stat[StatTags.CRIT_DAMAGE];
 		double steal = amount * stat[StatTags.LIFESTEAL];
 		if (steal > 0.0)
@@ -524,12 +551,12 @@ public partial class PartyMember : Godot.Node2D
 		if (invuln > 0.0f)
 			invuln -= delta; // post-revive immunity window, ticks always
 		// hp regen (REGEN tag): points per second, never while downed or unjoined
-		if (!downed && joined && stat[StatTags.REGEN] > 0.0)
+		if (!downed && joined && (stat[StatTags.REGEN] > 0.0 || elixHealT > 0.0)) // Healing elixir rides the same lane
 		{
 			double regenCap = EffMaxHp();
 			if (hp < regenCap)
 			{
-				hp += (float)(stat[StatTags.REGEN] * delta);
+				hp += (float)((stat[StatTags.REGEN] + (elixHealT > 0.0 ? EffMaxHp() * 0.01 : 0.0)) * delta); // Healing elixir: 1% max hp per second
 				if (hp > regenCap)
 					hp = (float)regenCap;
 			}
@@ -715,6 +742,13 @@ public partial class PartyMember : Godot.Node2D
 		}
 		if (awaT < 0.0)
 			awaT = 0.0;
+		// Experimental Elixir clocks tick with the same soft-pause discipline as bardic/awakening
+		elixHealT = System.Math.Max(0.0, elixHealT - delta);
+		elixSwiftT = System.Math.Max(0.0, elixSwiftT - delta);
+		elixHardT = System.Math.Max(0.0, elixHardT - delta);
+		elixBoldT = System.Math.Max(0.0, elixBoldT - delta);
+		elixPrecT = System.Math.Max(0.0, elixPrecT - delta);
+		elixMagT = System.Math.Max(0.0, elixMagT - delta);
 		ultT -= delta;
 		if (_grown && ultT <= 0.0)
 		{

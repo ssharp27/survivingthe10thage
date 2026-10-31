@@ -386,6 +386,7 @@ public partial class Game : Godot.Node2D
 		double _regenT = 0.0;
 		int _lbChainFired = 0;
 		int _lbInsectBound = 0;
+		int _lbDrinkHits = 0; // Have a Drink!: hits softened on burning bodies while Stack leads
 		int _lbSpiritTaken = 0;
 		// ultimate (R, user 2026-10-25): _ultFired counts fires for the pilot readout;
 		// the cooldown itself lives on the PartyMember (ultCdT), gated by StatTags.ULT
@@ -545,6 +546,8 @@ public partial class Game : Godot.Node2D
 					// that is still reacting (or parked at the camp beat)
 		if (m.invuln > 0.0f || m.reviveShield)
 			return; // post-revive shield, or the body is mid-rescue: immune
+		if (m.elixHardT > 0.0)
+			amount *= 0.90; // Resilience elixir: every ally takes 10% less while brewed
 		// defence tags (ARMOUR/EVASION): evasion rolls first for a full dodge,
 		// then armour subtracts flat - never below 1 damage (user floor 2026-10-24)
 		if (Rng != null && m.stat[StatTags.EVASION] > 0.0 && Rng.Randf() < m.stat[StatTags.EVASION])
@@ -1168,6 +1171,95 @@ public partial class Game : Godot.Node2D
 		return _pickerActive || _joinWaiting || _selHold;
 	}
 
+	// Experimental Elixir (user 2026-10-31, Stack's ult): the ONLY randomness of the cast lives
+	// in this draw - 10% ALL SIX, else TWO DISTINCT of six (three seeded Rng draws: like every
+	// other proc, the run stream shifts downstream). Each effect rides its own 10 s clock on
+	// EVERY member (bench too - harmless, same discipline as insT). Readers: Healing=PartyMember
+	// regen block, Swiftness=EffMove, Resilience=TakeHit, Boldness=RollDamage, Precision=crit
+	// roll, Magnetism=UpdateGems bubble. Names ride the HUD strip via StackElixirTag.
+	public void ElixirParty()
+	{
+		bool allSix = Rng.Randf() < 0.10; // user: 10% chance for ALL of the elixirs instead
+		int a = (int)(Rng.Randf() * 6.0);
+		int b = (int)(Rng.Randf() * 5.0);
+		if (b >= a)
+			b++; // second pick from the remaining five, kept DISTINCT
+		bool heal = allSix || a == 0 || b == 0;
+		bool swift = allSix || a == 1 || b == 1;
+		bool hard = allSix || a == 2 || b == 2;
+		bool bold = allSix || a == 3 || b == 3;
+		bool prec = allSix || a == 4 || b == 4;
+		bool mag = allSix || a == 5 || b == 5;
+		foreach (PartyMember m in _party)
+		{
+			if (heal)
+				m.elixHealT = ELIXIR_LASTS;
+			if (swift)
+				m.elixSwiftT = ELIXIR_LASTS;
+			if (hard)
+				m.elixHardT = ELIXIR_LASTS;
+			if (bold)
+				m.elixBoldT = ELIXIR_LASTS;
+			if (prec)
+				m.elixPrecT = ELIXIR_LASTS;
+			if (mag)
+				m.elixMagT = ELIXIR_LASTS;
+		}
+		string drew = "";
+		if (heal)
+			drew += (drew == "" ? "" : " + ") + ELIXIR_NAMES[0];
+		if (swift)
+			drew += (drew == "" ? "" : " + ") + ELIXIR_NAMES[1];
+		if (hard)
+			drew += (drew == "" ? "" : " + ") + ELIXIR_NAMES[2];
+		if (bold)
+			drew += (drew == "" ? "" : " + ") + ELIXIR_NAMES[3];
+		if (prec)
+			drew += (drew == "" ? "" : " + ") + ELIXIR_NAMES[4];
+		if (mag)
+			drew += (drew == "" ? "" : " + ") + ELIXIR_NAMES[5];
+		GD.Print("[10thAge] (elixir) Experimental Elixir: ALL allies brew " + drew +
+			(allSix ? " (ALL SIX!)" : "") + " for " + (int)ELIXIR_LASTS + " s");
+	}
+	static readonly double ELIXIR_LASTS = 10.0; // user: the effects last 10 seconds
+	static readonly string[] ELIXIR_NAMES = { "Healing", "Swiftness", "Resilience", "Boldness", "Precision", "Magnetism" };
+
+	// Have a Drink! (user 2026-10-31, Stack's leader bonus): while Stack owns the leader seat,
+	// EVERY burning body hits 10% softer - horde contact AND boss melee share Game.TakeHit, so
+	// the multiplier rides the CALL SITES (the body knows its own burnT); boss BULLET lanes are
+	// NOT softened (a bullet is not a burning body). No roll cost: pure state check, tallied.
+	public double DrinkMul(Combatant src)
+	{
+		if (LeaderBonusKey() != 6 || src.burnT <= 0.0)
+			return 1.0;
+		_lbDrinkHits++; // bench tally: every softened hit is visible on the audit line
+		return 0.90;
+	}
+	public bool LeaderDrink()
+	{
+		return LeaderBonusKey() == 6; // movement readers: Enemy spd lane, Boss drift lane
+	}
+
+	// HUD strip suffix (user: name each active elixir next to Stack's name in the party list)
+	private string StackElixirTag(PartyMember m)
+	{
+		if (m == null || m.displayName != "Stack")
+			return ""; // the names only ride Stack's own strip, from Stack's own clocks
+		string s = "";
+		if (m.elixHealT > 0.0)
+			s += (s == "" ? " (" : " + ") + ELIXIR_NAMES[0];
+		if (m.elixSwiftT > 0.0)
+			s += (s == "" ? " (" : " + ") + ELIXIR_NAMES[1];
+		if (m.elixHardT > 0.0)
+			s += (s == "" ? " (" : " + ") + ELIXIR_NAMES[2];
+		if (m.elixBoldT > 0.0)
+			s += (s == "" ? " (" : " + ") + ELIXIR_NAMES[3];
+		if (m.elixPrecT > 0.0)
+			s += (s == "" ? " (" : " + ") + ELIXIR_NAMES[4];
+		if (m.elixMagT > 0.0)
+			s += (s == "" ? " (" : " + ") + ELIXIR_NAMES[5];
+		return s == "" ? "" : s + ")";
+	}
 	// party-wide ult lane (Mosiah "Bardic Inspiration", 2026-10-26): the roster lives here
 	// (private _party) and every ally is a child of Game, so a party-wide effect walk
 	// starts at Game; the authoring + the cooldown gate stay on PartyMember.TryUltimate
@@ -2271,7 +2363,7 @@ public partial class Game : Godot.Node2D
 				{
 					if (!mm.joined)
 						continue; // not squad yet: no phantom hp readout
-					hps += (hps == "" ? "" : "  ") + mm.displayName +
+					hps += (hps == "" ? "" : "  ") + mm.displayName + StackElixirTag(mm) +
 						   (mm.eliminated ? " OUT" : (mm.downed ? " down " + mm.dsFails + "/" + DS_FAIL_LIMIT : " " + (int)mm.hp + "hp"));
 				}
 				GD.Print("[10thAge] (pilot) " + StateName(_state) + " t=" + (int)GetRunTime() +
@@ -2279,6 +2371,7 @@ public partial class Game : Godot.Node2D
 						 " | lv " + _level + " xp " + (int)_xpTotal + " | live enemies " + _liveEnemies +
 						 " | party: " + hps +
 						 " | lb chain " + _lbChainFired + " bound " + _lbInsectBound + " healed " + _lbSpiritTaken +
+						 " drink " + _lbDrinkHits +
 						 " | ult " + _ultFired + " cd " + (_leader != null && _leader.ultCdT > 0.0 ? (int)System.Math.Ceiling(_leader.ultCdT) : 0));
 			}
 		}
@@ -2294,7 +2387,7 @@ public partial class Game : Godot.Node2D
 	// Exactly one perk runs at a time: the perk of whichever roster PC owns the leader seat.
 	// Every reader asks _leader live, so a future leadership change moves which lane runs by
 	// itself. Key names: 1 Baldrun chain lightning | 2 Mosiah pierce | 3 Alvora regen |
-	// 4 Asper friendly insects | 5 Yu kindling spirits. Display names are the roster key,
+	// 4 Asper friendly insects | 5 Yu kindling spirits | 6 Stack drink seat. Display names are the roster key,
 	// same convention the card pool already uses ("Baldrun's draging maul"). Procs roll on
 	// the seeded run stream: a chain proc / spirit heal shifts horde draws downstream (as
 	// crit rolls already do), and every such draw is documented at its site.
@@ -2310,6 +2403,8 @@ public partial class Game : Godot.Node2D
 			return 3;
 		if (_leader.displayName == "Asper")
 			return 4;
+		if (_leader.displayName == "Stack")
+			return 6; // Experimental Elixir + Have a Drink!
 		if (_leader.displayName == "Yu")
 			return 5;
 		return 0;
@@ -2794,7 +2889,7 @@ public partial class Game : Godot.Node2D
 					continue; // downed/eliminated bodies + stranded recruits: no bubble
 				Vector2 mt = mm.GlobalPosition - gem.GlobalPosition;
 				float md = mt.Length();
-				if (md < 110.0f * (float)mm.stat[StatTags.COLLECTION_RANGE] && md < dist)
+				if (md < 110.0f * (float)mm.stat[StatTags.COLLECTION_RANGE] * (mm.elixMagT > 0.0 ? 1.10f : 1.0f) && md < dist) // Magnetism elixir: bubble +10%
 				{
 					puller = mm;
 					dist = md;
@@ -3363,7 +3458,7 @@ public partial class Game : Godot.Node2D
 				frac = 0.0f; // HP floors at 0 (overkill never poisons the bar)
 			if (frac > 1.0f)
 				frac = 1.0f;
-			string tag = (m.isLeader ? "* " : "") + m.displayName;
+			string tag = (m.isLeader ? "* " : "") + m.displayName + StackElixirTag(m); // elixir names ride next to Stack while brewed
 			bool stranded = !m.joined; // field beat only: live strip tracks the join HP
 			n.Text = stranded ? tag + " STRANDED " + (int)m.hp + "/" + (int)m.EffMaxHp()
 							 : (isOut ? tag + " OUT (campfire)"
@@ -3415,14 +3510,14 @@ public partial class Game : Godot.Node2D
 		"Leader bonus: friendly insects kindle in the clearing; touching one joins the squad for 10 s",
 		"Leader bonus: field medic - every 10 s every standing ally regenerates 1 hp",
 		"Leader bonus: kindness spirits kindle in the clearing; touching one heals 10 hp",
-		"Leader bonus: none yet - Stack's leader lane ships in a future pass" };
+		"Leader bonus: Have a Drink! - while Stack leads, burning enemies deal 10% less damage and move 10% slower" };
 	static readonly string[] SEL_ULT = {
 		"Ultimate: Giant's Might (R) - doubles size and reach, damage x1.5, for 10 s",
 		"Ultimate: Bardic Inspiration (R) - rallies ALL allies +25% damage and attack speed for 10 s",
 		"Ultimate: Swarm of Bees (R) - 6 hunters in a circle, one body latched each at 10 dmg/s for 10 s, spread out to hunt",
 		"Ultimate: Guardian Awakening (R) - ring reach x2 and +50% damage; every horde kill while awake heals ALL allies 1 hp for 10 s",
 		"Ultimate: The Kaka (R) - 6 empowered familiars in a circle, blast x2 and damage x2 after ranks, spread out",
-		"Ultimate: none yet - Stack's ultimate ships in a future pass" };
+		"Ultimate: Experimental Elixir (R) - two random elixirs of six (10% all six) for ALL allies for 10 s" };
 	public void BuildSelectScreen()
 	{
 		_selLayer = new CanvasLayer();

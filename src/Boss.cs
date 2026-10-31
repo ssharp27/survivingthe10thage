@@ -95,11 +95,11 @@ public partial class Boss : Combatant
             // close to melee reach: party signature weapons top out ~130px, so the
             // boss must settle inside that or it can never be struck
             if (dist > 100.0f)
-                GlobalPosition = g.WrapNearCamera(GlobalPosition + to.Normalized() * driftSpeed * delta);
+                GlobalPosition = g.WrapNearCamera(GlobalPosition + to.Normalized() * driftSpeed * delta * (burnT > 0.0 && g.LeaderDrink() ? 0.90f : 1.0f)); // Have a Drink!: a burning boss drifts slower
             if (dist < radius + g.MEMBER_RADIUS && _contactCd <= 0.0f)
             {
                 _contactCd = 0.8f;
-                g.TakeHit(target, 12.0);
+                g.TakeHit(target, 12.0 * g.DrinkMul(this)); // Have a Drink!: a burning boss hits 10% softer
             }
         }
         // downed bodies still get body-checked by the boss (toroidal: a body across a
@@ -109,7 +109,7 @@ public partial class Boss : Combatant
             g.WrapDelta(GlobalPosition, hitAny.GlobalPosition).Length() < radius + g.MEMBER_RADIUS && _contactCd <= 0.0f)
         {
             _contactCd = 0.8f;
-            g.TakeHit(hitAny, 12.0);
+            g.TakeHit(hitAny, 12.0 * g.DrinkMul(this)); // Have a Drink!: a burning boss hits 10% softer
         }
 
         _eventTimer -= delta;
