@@ -87,8 +87,8 @@ public partial class PartyMember : Godot.Node2D
 	// damage lands at the blade's own position: what is ON SCREEN is what damages.
 	// (assistant pick: travel adds NO Rng draws; the volley still rolls once at commit, so the
 	// Rng stream is untouched and the smoke stays comparable to the pre-fix runs)
-	// (assistant pick: 0.55 s of blade travel per volley - the user asked for the blades to be
-	// visible the whole spin, not for a longer beat, so flight is pure motion)
+	// (assistant pick: 0.85 s per volley since the loop path is twice the old half-arc - the
+	// user asked for the WHOLE boomerang out and back on screen, not a longer beat; still pure motion, NO extra Rng draws)
 	// NOTE: the tick section has no commit locals, so the flight re-reads GetEnemies() and its
 	// own position itself; the spin clock owns the same _axeFx slots, so the flight freezes
 	// while orbitT runs and resumes when that clock expires - neither lane steals frames
@@ -108,15 +108,15 @@ public partial class PartyMember : Godot.Node2D
 	// Brook's dagger art spans the jab corridor on BOTH jabs; the second repeats the first line
 	float _cresDur = 0.0f; // active-volley flag: total flight seconds (0 = no volley flying)
 	float _cresT = 0.0f; // flight seconds left on the current volley
-	double _cresA0 = 0.0; // throw-line angle the alternating arcs sweep out from
-	float _cresR = 0.0f; // flight arc radius: rides the prey line, clamped like the rake
+	double _cresA0 = 0.0; // prey-line angle: the loop's WIDEST point rides this at mid-flight
+	float _cresR = 0.0f; // loop's max radius (mid-flight bulge): rides the prey line, clamped like the rake
 	float _cresBand = 0.0f; // blade disc + band depth: grown by the size card
 	double _cresDmg = 0.0; // the volley-wide roll the flying blades bite with
 	int _cresNC = 0; // crescents flying this volley (base one + extra-axes ranks)
 	bool _cresBled = false; // bleed stamp carries onto the flight bites
 	int _cresBit = 0; // unique-body tally: printed the moment the flight lands
 	int[] _cresMemo = null; // per-body crescent-bite bits (256 = tallied)
-	static readonly double CRESCENT_FLIGHT = 0.55; // seconds of blade travel per volley
+	static readonly double CRESCENT_FLIGHT = 0.85; // seconds of blade travel per volley: OUT to reach and BOOMERANG back (assistant pick: the loop path is twice the old half-arc, so travel stays pure motion)
 	Godot.Vector2[] _hops = null; // [0] = thrower, then one entry per body the shield bites
 	int _hopN = 0; // baked polyline length
 	float _shieldT = 0.0f; // hurl flight clock (seconds left)
@@ -1019,14 +1019,14 @@ public partial class PartyMember : Godot.Node2D
 						_axeFx[b2].Visible = false;
 				}
 			}
-		// user 2026-11-01 (user bug batch): TRAVELLING crescent hitboxes - the rake is no longer
-		// instant: the blade flies its half-arc frame by frame and bites at ITS OWN position, so
-		// what is on screen is what hurts (the brief flash the user saw is replaced by the whole
-		// throw). Same shared roll/band disc; the print lands with the flight.
+		// user 2026-11-01 + follow-up: BOOMERANG crescent hitboxes - the blade leaves from his OWN
+		// hands, swings widest on the prey line at mid-flight, and RETURNS like a boomerang, so
+		// the disc bites at ITS OWN position along the out-and-back loop: what is ON SCREEN is what
+		// hurts. Same shared roll/band disc; the print lands when the blade returns to the throw.
 		if (_cresDur > 0.0f && orbitT <= 0.0)
 		{
 			_cresT -= delta;
-			double progF = 1.0 - (double)_cresT / CRESCENT_FLIGHT; // 0..1 along the half-arc
+			double progF = 1.0 - (double)_cresT / CRESCENT_FLIGHT; // 0..1 along the OUT-and-BACK loop
 			if (progF > 1.0)
 				progF = 1.0;
 			Game wpg = GetParent() as Game;
@@ -1034,8 +1034,8 @@ public partial class PartyMember : Godot.Node2D
 			for (int cc = 0; cc < _cresNC; cc++)
 			{
 				double sgn = (cc % 2) == 0 ? 1.0 : -1.0; // arcs alternate top/bottom like the volley
-				double angB = _cresA0 + sgn * System.Math.PI * progF; // half-circle sweep per blade
-				Godot.Vector2 biteP = GlobalPosition + new Godot.Vector2((float)System.Math.Cos(angB), (float)System.Math.Sin(angB)) * _cresR;
+				double angB = _cresA0 + sgn * System.Math.PI * (2.0 * progF - 1.0); // FULL loop sweep around the thrower: prey line dead at mid-flight
+				Godot.Vector2 biteP = GlobalPosition + new Godot.Vector2((float)System.Math.Cos(angB), (float)System.Math.Sin(angB)) * _cresR * (float)System.Math.Sin(System.Math.PI * progF); // sin bulge: radius 0 AT the hands at both ends, arcR on the prey line at mid-flight (boomerang out AND back)
 				if (_axeFx != null && cc < 5)
 				{
 					_axeFx[cc].GlobalPosition = biteP;
@@ -1547,10 +1547,10 @@ public partial class PartyMember : Godot.Node2D
 			Vector2 aimv = pg.WrapDelta(p, prey.GlobalPosition); // the SHORT way: the arc rides reach
 			float a0 = (float)System.Math.Atan2(aimv.Y, aimv.X); // throw line angle
 			bool bled = bleedR > 0;
-			// fx + hitbox (user 2026-11-01): the crescent blades are now TRAVELLING hitboxes -
-			// the instant rake (same geometry, same ONE shared roll) is replaced by a flight
-			// state the _Process block advances frame by frame; blades light up at the throw
-			// start and the block bites at the blade position, prints on landing. The spin
+			// fx + hitbox (user 2026-11-01 + follow-up): the crescent is an OUT-and-BACK boomerang -
+			// the blade leaves from his OWN hands (first frame AT the hands, NOT the crowd), swings
+			// out to the prey line at mid-flight, and boomerangs back: the sin-bulged loop is the
+			// hitbox the user asked for. Same ONE shared roll, same band disc, prints on landing. The
 			// clock owns these slots, so the flight freezes while spinning and resumes when
 			// that clock expires. Same grown band disc; one bite per body per crescent.
 			_cresNC = crescents;
@@ -1572,8 +1572,8 @@ public partial class PartyMember : Godot.Node2D
 					if (c2 < crescents)
 					{
 						float sa2 = (c2 % 2) == 0 ? 1.0f : -1.0f;
-						float ca2 = a0 + sa2 * 0.3f; // first sliver of the crescent's own side
-						_axeFx[c2].GlobalPosition = p + new Vector2((float)System.Math.Cos(ca2), (float)System.Math.Sin(ca2)) * arcR;
+						float ca2 = a0 - sa2 * 3.1416f + sa2 * 0.3f; // first sliver at the DEPARTURE side of the loop
+						_axeFx[c2].GlobalPosition = p + new Vector2((float)System.Math.Cos(ca2), (float)System.Math.Sin(ca2)) * (arcR * 0.12f); // first frame AT the hands (sin bulge starts at 0); the tick block takes over
 						_axeFx[c2].Rotation = ca2 + sa2 * 1.5708f;
 					}
 				}

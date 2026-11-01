@@ -1,23 +1,21 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://do2qfp308mgas"]
 
-[ext_resource type="Script" path="res://src/Game.cs" id="1_game"]
-[ext_resource type="Script" path="res://src/Director.cs" id="2_dir"]
-[ext_resource type="Script" path="res://src/PartyMember.cs" id="3_pm"]
-[ext_resource type="Script" path="res://src/Boss.cs" id="4_boss"]
+[ext_resource type="Script" uid="uid://v0rin3flmosm" path="res://src/Game.cs" id="1_game"]
+[ext_resource type="Script" uid="uid://d4nm6wo8lrwao" path="res://src/Director.cs" id="2_dir"]
+[ext_resource type="Script" uid="uid://bsnf2tlgxqi1n" path="res://src/PartyMember.cs" id="3_pm"]
+[ext_resource type="Script" uid="uid://cgdbhqdvjq3u1" path="res://src/Boss.cs" id="4_boss"]
 
-[node name="Main" type="Node2D"]
+[node name="Main" type="Node2D" unique_id=2009210980]
 script = ExtResource("1_game")
 
-[node name="Camera2D" type="Camera2D" parent="."]
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1439226664]
 
-[node name="Director" type="Node2D" parent="."]
+[node name="Director" type="Node2D" parent="." unique_id=898921877]
 script = ExtResource("2_dir")
 
-[node name="Baldrun" type="Node2D" parent="."]
+[node name="Baldrun" type="Node2D" parent="." unique_id=1868535477]
 script = ExtResource("3_pm")
 displayName = "Baldrun"
-weaponName = "Maul"
-memberIndex = 0
 isLeader = true
 maxHp = 80.0
 baseSpeed = 128.0
@@ -29,51 +27,44 @@ baseArmour = 1.0
 meleeFxArt = "res://art/fx/sweep.png"
 class_ = "Rune Knight"
 
-[node name="Mosiah" type="Node2D" parent="."]
+[node name="Mosiah" type="Node2D" parent="." unique_id=1484357247]
 script = ExtResource("3_pm")
 displayName = "Mosiah"
 weaponName = "Rapier"
 memberIndex = 1
-maxHp = 60.0
 baseSpeed = 140.0
 weaponDamage = 15.0
 cooldown = 0.6
 range = 115.0
 arcHalf = 0.35
-baseEvasion = 0.05
 meleeFxArt = "res://art/fx/lunge.png"
+baseEvasion = 0.05
 class_ = "Bard"
 
-[node name="Asper" type="Node2D" parent="."]
+[node name="Asper" type="Node2D" parent="." unique_id=1228689200]
 script = ExtResource("3_pm")
 displayName = "Asper"
 weaponName = "Longbow"
 memberIndex = 2
-maxHp = 60.0
 baseSpeed = 132.0
-weaponDamage = 10.0
 cooldown = 0.9
 range = 520.0
 weaponKit = "shot"
-projSpeed = 340.0
-projLife = 2.2
 class_ = "Arcane Archer"
 
-[node name="Alvora" type="Node2D" parent="."]
+[node name="Alvora" type="Node2D" parent="." unique_id=108209611]
 script = ExtResource("3_pm")
 displayName = "Alvora"
 weaponName = "Guardians"
 memberIndex = 3
 maxHp = 80.0
 baseSpeed = 124.0
-weaponDamage = 10.0
-cooldown = 1.15
 range = 192.0
 weaponKit = "aura"
 baseArmour = 1.0
 class_ = "Twilight Cleric"
 
-[node name="Yu" type="Node2D" parent="."]
+[node name="Yu" type="Node2D" parent="." unique_id=875256559]
 script = ExtResource("3_pm")
 displayName = "Yu"
 weaponName = "Familiars"
@@ -84,19 +75,14 @@ weaponDamage = 15.0
 cooldown = 2.0
 range = 320.0
 weaponKit = "summon"
-minionSpeed = 84.0
-minionRadius = 56.0
-minionFuse = 6.0
 class_ = "Occultist"
 
-[node name="Stack" type="Node2D" parent="."]
+[node name="Stack" type="Node2D" parent="." unique_id=2084420700]
 script = ExtResource("3_pm")
 displayName = "Stack"
 weaponName = "Firebolt"
 memberIndex = 5
-maxHp = 60.0
 baseSpeed = 128.0
-weaponDamage = 10.0
 cooldown = 0.8
 range = 520.0
 weaponKit = "shot"
@@ -106,41 +92,37 @@ burnDps = 1.0
 burnDur = 5.0
 class_ = "Artificer"
 
-[node name="Wash" type="Node2D" parent="."]
+[node name="Wash" type="Node2D" parent="." unique_id=904465949]
 script = ExtResource("3_pm")
 displayName = "Wash"
 weaponName = "Shield"
 memberIndex = 6
 maxHp = 70.0
 baseSpeed = 128.0
-weaponDamage = 10.0
 cooldown = 1.0
 range = 240.0
 weaponKit = "shield"
-shieldFxArt = "res://art/fx/shield.png"
 baseArmour = 1.0
+shieldFxArt = "res://art/fx/shield.png"
 class_ = "Paladin"
 
-[node name="Bruno" type="Node2D" parent="."]
+[node name="Bruno" type="Node2D" parent="." unique_id=1352607294]
 script = ExtResource("3_pm")
 displayName = "Bruno"
 weaponName = "Axes"
 memberIndex = 7
-maxHp = 60.0
 baseSpeed = 128.0
-weaponDamage = 10.0
 cooldown = 2.0
 range = 260.0
 weaponKit = "axe"
 axeFxArt = "res://art/fx/axe.png"
 class_ = "Axethrower"
 
-[node name="Brook" type="Node2D" parent="."]
+[node name="Brook" type="Node2D" parent="." unique_id=1544587456]
 script = ExtResource("3_pm")
 displayName = "Brook"
 weaponName = "Daggers"
 memberIndex = 8
-maxHp = 60.0
 baseSpeed = 128.0
 weaponDamage = 7.0
 cooldown = 0.9
@@ -152,38 +134,33 @@ poisonDur = 5.0
 baseEvasion = 0.05
 class_ = "Rogue"
 
-[node name="BossMini" type="Node2D" parent="."]
+[node name="BossMini" type="Node2D" parent="." unique_id=321225898]
+position = Vector2(0, -500)
 script = ExtResource("4_boss")
-kind = "mini1"
 maxHp = 300.0
-radius = 46.0
-driftSpeed = 42.0
-bulletDamage = 10.0
-position = Vector2(0.0, -500.0)
+kind = "mini1"
 
-[node name="BossMid" type="Node2D" parent="."]
+[node name="BossMid" type="Node2D" parent="." unique_id=1786505761]
+position = Vector2(0, -620)
 script = ExtResource("4_boss")
-kind = "boss1"
-maxHp = 520.0
 radius = 56.0
 driftSpeed = 46.0
 bulletDamage = 11.0
-position = Vector2(0.0, -620.0)
+maxHp = 520.0
+kind = "boss1"
 
-[node name="BossMini2" type="Node2D" parent="."]
+[node name="BossMini2" type="Node2D" parent="." unique_id=1840666997]
+position = Vector2(0, -740)
 script = ExtResource("4_boss")
-kind = "mini2"
-maxHp = 380.0
-radius = 46.0
 driftSpeed = 44.0
-bulletDamage = 10.0
-position = Vector2(0.0, -740.0)
+maxHp = 380.0
+kind = "mini2"
 
-[node name="BossFinal" type="Node2D" parent="."]
+[node name="BossFinal" type="Node2D" parent="." unique_id=975914059]
+position = Vector2(0, -860)
 script = ExtResource("4_boss")
-kind = "final"
-maxHp = 800.0
 radius = 60.0
 driftSpeed = 48.0
 bulletDamage = 12.0
-position = Vector2(0.0, -860.0)
+maxHp = 800.0
+kind = "final"
