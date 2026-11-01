@@ -399,6 +399,10 @@ public partial class Game : Godot.Node2D
 		Godot.Collections.Array<bool> _summonBurst = new();    // slot is mid detonation flare
 		Godot.Collections.Array<bool> _summonKaka = new();   // slot is an empowered Kaka familiar (ult): doubled numbers baked at spawn
 		Godot.Collections.Array<double> _summonLuck = new(); // lucky explosions: double-blast chance baked on the slot at spawn
+
+		// Yu minion art (2026-11-01 art pass part 2): true when the flame-stump familiar loaded;
+		// the shell reclaims its Color alpha ONLY while it IS the blast (see DetonateSummon)
+		bool _famArt = false;
 		// bolt-pool pierce memo (leader bonus, user 2026-10-25): while Mosiah owns the
 		// leader seat a bolt punches through one body and keeps flying. _shotPen is the
 		// per-bolt pierce budget stamped at spawn; _shotLast memoizes the body the bolt
@@ -409,6 +413,12 @@ public partial class Game : Godot.Node2D
 		Godot.Collections.Array<double> _shotBurnT = new();   // burn window start, seconds
 		Godot.Collections.Array<double> _shotCinderD = new();  // cinder bloom burst damage stamped at spawn
 		Godot.Collections.Array<long> _shotLast = new();
+
+		// shot-lane fx art (2026-11-01 art pass): null-safe one-time loads at spawn; if the
+		// art never imports, the greybox shell keeps drawing (the smoke contract never depends on art)
+		Godot.Texture2D _fxArrowTex = null;
+		Godot.Texture2D _fxFlameTex = null;
+		bool _fxTried = false;
 		// ---------- leader-bonus helper pools (user 2026-10-25): Asper's insects, Yu's spirits ----------
 		// Pooled exactly like the summons: fixed slots, parallel arrays, parked past -9000.
 		// _insectLife counts down the CURRENT phase (waiting for a host / bound for 10 s);
@@ -1704,6 +1714,14 @@ public partial class Game : Godot.Node2D
 			cr.Position = new Vector2(-4.5f, -3.5f);
 			cr.Color = new Color(0.42f, 0.34f, 0.12f, 1.0f); // insect-chitin amber
 			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			// fx art child (2026-11-01 art pass): the sprite rides INSIDE the shell, so the
+			// flash/despawn Modulate the shot lane applies to the shell carries it for free;
+			// the shell's own draw is alpha-toggled at spawn (no art on disk = greybox stays)
+			Godot.Sprite2D fxs = new Godot.Sprite2D();
+			fxs.Set("texture_filter", 0); // NEAREST like the painted minis: hard edges
+			fxs.Position = new Vector2(4.5f, 3.5f); // Control origin is the rect corner -> centred
+			fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			cr.AddChild(fxs);
 			s.AddChild(cr);
 			s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
 			AddChild(s);
@@ -1721,6 +1739,8 @@ public partial class Game : Godot.Node2D
 		// never allocates a node mid-horde. Shell-first so the creature reads as a body; the
 		// detonation re-sizes this SAME rect to the blast it actually made (see DetonateSummon),
 		// which is why SpawnSummon has to put the shell back before every reuse.
+		Godot.Texture2D fxStumpTex = GD.Load("res://art/fx/stump.png") as Godot.Texture2D;
+		_famArt = fxStumpTex != null;
 		for (int i = 0; i < 64; i++)
 		{
 			Godot.Node2D s = new Node2D();
@@ -1729,6 +1749,13 @@ public partial class Game : Godot.Node2D
 			cr.Position = new Vector2(-7.0f, -7.0f);
 			cr.Color = new Color(0.26f, 0.2f, 0.34f, 1.0f); // occult violet shell
 			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			Godot.Sprite2D fxs = new Godot.Sprite2D();
+			fxs.Texture = fxStumpTex;
+			fxs.Set("texture_filter", 0); // NEAREST like the painted minis: hard edges
+			fxs.Position = new Vector2(7.0f, 7.0f); // Control origin is the rect corner -> centred
+			cr.AddChild(fxs);
+			if (_famArt)
+				cr.Color = new Color(0.26f, 0.2f, 0.34f, 0.0f); // art rides: shell stops drawing
 			s.AddChild(cr);
 			s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
 			AddChild(s);
@@ -1762,6 +1789,7 @@ public partial class Game : Godot.Node2D
 			_insectCd.Add(0.0);
 			_insectOwner.Add(-1);
 		}
+		Godot.Texture2D fxTreeTex = GD.Load("res://art/fx/tree.png") as Godot.Texture2D;
 		for (int i = 0; i < 6; i++)
 		{
 			Godot.Node2D s = new Node2D();
@@ -1770,6 +1798,13 @@ public partial class Game : Godot.Node2D
 			cr.Position = new Vector2(-6.0f, -6.0f);
 			cr.Color = new Color(0.78f, 0.92f, 0.88f, 1.0f); // pale ghost teal: a kindness spirit
 			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			Godot.Sprite2D fxs = new Godot.Sprite2D();
+			fxs.Texture = fxTreeTex;
+			fxs.Set("texture_filter", 0); // NEAREST like the painted minis: hard edges
+			fxs.Position = new Vector2(6.0f, 6.0f); // Control origin is the rect corner -> centred
+			cr.AddChild(fxs);
+			if (fxTreeTex != null)
+				cr.Color = new Color(0.78f, 0.92f, 0.88f, 0.0f); // art rides: shell stops drawing
 			s.AddChild(cr);
 			s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
 			AddChild(s);
@@ -3204,6 +3239,25 @@ public partial class Game : Godot.Node2D
 			_shotCinderD[i] = cinder;
 			_shotLast[i] = -1;
 			((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+			// fx art: the burn stamped at spawn is Stack's own fire DoT (the only fire lane
+			// riding this pool) -> flame sprite; every other party bolt rides Asper's arrow,
+			// rotated to its own velocity. No art on disk = the amber shell keeps drawing
+			Godot.ColorRect shell = (Godot.ColorRect)s.GetChild(0);
+			if (!_fxTried)
+			{
+				_fxTried = true;
+				_fxArrowTex = GD.Load("res://art/fx/arrow.png") as Godot.Texture2D;
+				_fxFlameTex = GD.Load("res://art/fx/firebolt.png") as Godot.Texture2D;
+			}
+			Godot.Texture2D tx = burnDps > 0.0 ? _fxFlameTex : _fxArrowTex;
+			if (tx != null)
+			{
+				Godot.Sprite2D fxs = (Godot.Sprite2D)shell.GetChild(0);
+				fxs.Texture = tx;
+				fxs.Rotation = (float)System.Math.Atan2((double)vel.Y, (double)vel.X);
+				fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+				shell.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f); // shell stops drawing while art rides
+			}
 			return;
 		}
 	}
@@ -3229,6 +3283,10 @@ public partial class Game : Godot.Node2D
 			Godot.ColorRect cr = (Godot.ColorRect)s.GetChild(0);
 			cr.Size = new Vector2(14.0f, 14.0f);
 			cr.Position = new Vector2(-7.0f, -7.0f);
+			Godot.Sprite2D fxs = (Godot.Sprite2D)cr.GetChild(0);
+			fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f); // wake the sprite: a detonated slot left it sunk
+			if (_famArt)
+				cr.Color = new Color(0.26f, 0.2f, 0.34f, 0.0f); // art rides: shell stops drawing
 			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
 			return;
 		}
@@ -3261,6 +3319,10 @@ public partial class Game : Godot.Node2D
 			Godot.ColorRect cr = (Godot.ColorRect)s.GetChild(0);
 			cr.Size = new Vector2(14.0f, 14.0f);
 			cr.Position = new Vector2(-7.0f, -7.0f);
+			Godot.Sprite2D fxs = (Godot.Sprite2D)cr.GetChild(0);
+			fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+			if (_famArt)
+				cr.Color = new Color(0.26f, 0.2f, 0.34f, 0.0f); // art rides: shell stops drawing
 			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
 			born++;
 			if (born >= KAKA_COUNT)
@@ -3380,6 +3442,8 @@ public partial class Game : Godot.Node2D
 		cr.Size = new Vector2((float)r * 2.0f, (float)r * 2.0f);
 		cr.Position = new Vector2((float)-r, (float)-r);
 		cr.Modulate = new Color(1.5f, 0.9f, 1.3f, 0.55f);
+		cr.Color = new Color(0.26f, 0.2f, 0.34f, 1.0f); // the shell IS the blast again: reclaim the draw
+		((Godot.Sprite2D)cr.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f); // the familiar sinks into its own blast
 	}
 
 	private void DespawnSummon(int i)

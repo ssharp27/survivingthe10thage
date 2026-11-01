@@ -73,6 +73,15 @@ public partial class PartyMember : Godot.Node2D
 	[Export] public int bleedR = 0;     // bleed rank: hit bodies bleed like the fire DoT
 	public double orbitT = 0.0;         // "Axes Away!" spin clock: seconds of orbit left (Game sets)
 	double orbitAng = 0.0;              // spin angle: blades ride orbitAng + i * 2pi/blades
+	// fx art (2026-11-01 art pass): per-PC effect sprites on the Main.tscn exports; "" = greybox
+	// exactly as shipped. Data-driven like weaponKit: only the listed PCs build the armature.
+	[Export] public string meleeFxArt = ""; // shared melee commit flash (Baldrun sweep arc / Mosiah rapier sliver)
+	[Export] public string axeFxArt = "";   // Bruno: crescent volley flash + "Axes Away!" spin blades
+	[Export] public string shieldFxArt = ""; // Wash: hurl disc caught mid-hurl on the commit
+	Godot.Sprite2D _meleeFx = null;
+	Godot.Sprite2D _shieldFx = null;
+	Godot.Sprite2D[] _axeFx = null; // 5 blade slots: up to 4 crescents OR up to 5 spin blades, never both
+	float _fxT = 0.0f; // commit-fx visibility timer: decays with the world clock, hides sprites off-beat
 	// Brook's twin daggers (user 2026-10-31): TWO daggers, 7 damage EACH, thrust at the nearest
 	// prey ALONG ONE LINE one right after the other (user: "attacks twice in the same direction,
 	// one after another with a very small delay"): the beat lands the FIRST jab and parks cdTimer
@@ -321,6 +330,50 @@ public partial class PartyMember : Godot.Node2D
 				_mini.Position = new Vector2(0.0f, -(tex.GetHeight() * 0.5f - miniRim) * miniScale);
 				_rig.AddChild(_mini);
 				_body.Size = new Vector2(0.0f, 0.0f); // art replaces the square outright
+			}
+		}
+		// fx art armature (2026-11-01 art pass): sprites exist ONLY when the PC carries art on its
+		// export; a missing load = null and the kit stays greybox exactly as shipped (the smoke
+		// contract never depends on art). Children of the member node, parked invisible; the commit
+		// hooks pose them with GlobalPosition and _fxT decay hides them off-beat.
+		if (meleeFxArt != "")
+		{
+			Godot.Texture2D fxT = GD.Load(meleeFxArt) as Godot.Texture2D;
+			if (fxT != null)
+			{
+				_meleeFx = new Godot.Sprite2D();
+				_meleeFx.Texture = fxT;
+				_meleeFx.Set("texture_filter", 0); // NEAREST like the painted minis: hard edges
+				_meleeFx.Visible = false;
+				AddChild(_meleeFx);
+			}
+		}
+		if (shieldFxArt != "")
+		{
+			Godot.Texture2D fxT = GD.Load(shieldFxArt) as Godot.Texture2D;
+			if (fxT != null)
+			{
+				_shieldFx = new Godot.Sprite2D();
+				_shieldFx.Texture = fxT;
+				_shieldFx.Set("texture_filter", 0);
+				_shieldFx.Visible = false;
+				AddChild(_shieldFx);
+			}
+		}
+		if (axeFxArt != "")
+		{
+			Godot.Texture2D fxT = GD.Load(axeFxArt) as Godot.Texture2D;
+			if (fxT != null)
+			{
+				_axeFx = new Godot.Sprite2D[5];
+				for (int f2 = 0; f2 < 5; f2++)
+				{
+					_axeFx[f2] = new Godot.Sprite2D();
+					_axeFx[f2].Texture = fxT;
+					_axeFx[f2].Set("texture_filter", 0);
+					_axeFx[f2].Visible = false;
+					AddChild(_axeFx[f2]);
+				}
 			}
 		}
 		_ds = new Label();
@@ -855,6 +908,23 @@ public partial class PartyMember : Godot.Node2D
 			if (_mini != null)
 				_mini.Modulate = new Color(1.0f, 1.0f, 1.0f);
 		}
+		// fx art decay: commit flashes live ~0.15 s then drop; while the spin clock runs, the
+		// spin block re-places the blade slots every frame, so this decay only hunts crescent,
+		// shield and melee flashes off-beat (world clock: soft-pause discipline, no real-time leak)
+		if (_fxT > 0.0f)
+		{
+			_fxT -= delta;
+			if (_fxT <= 0.0f)
+			{
+				if (_meleeFx != null)
+					_meleeFx.Visible = false;
+				if (_shieldFx != null)
+					_shieldFx.Visible = false;
+				if (_axeFx != null && orbitT <= 0.0)
+					foreach (Godot.Sprite2D sx in _axeFx)
+						sx.Visible = false; // crescent flash done; the spin owns its slots while its clock runs
+			}
+		}
 		cdTimer -= delta;
 		ultCdT -= delta; // recharges on its own clock: bench ults stay ready when the seat flips
 		if (ultCdT < 0.0)
@@ -890,6 +960,25 @@ public partial class PartyMember : Godot.Node2D
 		orbitT = System.Math.Max(0.0, orbitT - delta);
 		if (orbitT > 0.0)
 			orbitAng += (double)delta * System.Math.PI * 2.0 / (float)EffCooldown(); // spin cadence: one circle per EffCooldown
+			// fx art: spin blades are real sprites riding the same orbit clock and radius the
+			// rakes read (arm 70 px = the rake lane's own spin radius, tangent rotation)
+			if (_axeFx != null)
+			{
+				_fxT = 0.3f; // keeps the crescent-hide decay honest while the clock runs
+				int bl = 2 + axeN; // rake cadence mirror: base pair + extra-axes ranks
+				for (int b2 = 0; b2 < 5; b2++)
+				{
+					if (b2 < bl)
+					{
+						float ba2 = (float)(orbitAng + (double)b2 * System.Math.PI * 2.0 / (double)bl);
+						_axeFx[b2].GlobalPosition = GlobalPosition + new Vector2((float)System.Math.Cos(ba2), (float)System.Math.Sin(ba2)) * 70.0f;
+						_axeFx[b2].Rotation = ba2 + (float)System.Math.PI * 0.5f; // blade rides tangential
+						_axeFx[b2].Visible = true;
+					}
+					else
+						_axeFx[b2].Visible = false;
+				}
+			}
 		ultT -= delta;
 		if (_grown && ultT <= 0.0)
 		{
@@ -1066,6 +1155,16 @@ public partial class PartyMember : Godot.Node2D
 				return; // nothing in the throw: the beat stays ready, an empty clearing never stalls it
 			cdTimer = (float)EffCooldown();
 			_atkFlash = 0.08f; // same commit pulse every kit uses, never the red harm lane
+			// fx art: disc caught mid-hurl along the throw line (the throw is instant math, so
+			// the commit paints the line for one beat; _fxT decay carries it through)
+			if (_shieldFx != null)
+			{
+				Vector2 shdHop = pg.WrapDelta(p, prey.GlobalPosition);
+				_shieldFx.GlobalPosition = p + shdHop * 0.5f;
+				_shieldFx.Rotation = (float)System.Math.Atan2((double)shdHop.Y, (double)shdHop.X);
+				_shieldFx.Visible = true;
+				_fxT = 0.16f;
+			}
 			double shdDmg = RollDamage(pg, weaponDamage); // ONE crit/lifesteal roll for the whole throw
 			Godot.Node2D[] hit = new Godot.Node2D[1 + shieldBounce]; // memo: no body twice in one throw
 			hit[0] = prey; int used = 1;
@@ -1295,6 +1394,26 @@ public partial class PartyMember : Godot.Node2D
 			Vector2 aimv = pg.WrapDelta(p, prey.GlobalPosition); // the SHORT way: the arc rides reach
 			float a0 = (float)System.Math.Atan2(aimv.Y, aimv.X); // throw line angle
 			bool bled = bleedR > 0;
+			// fx art: each crescent's blade caught at its own arc apex, alternating sides exactly
+			// like the rake geometry; the spin owns these slots while its clock runs, so this
+			// volley skips posing while spinning
+			if (_axeFx != null && orbitT <= 0.0)
+			{
+				_fxT = 0.14f;
+				for (int c2 = 0; c2 < 5; c2++)
+				{
+					if (c2 < crescents)
+					{
+						float sa2 = (c2 % 2) == 0 ? 1.0f : -1.0f; // rake alternates top/bottom: same rule
+						float ca2 = a0 + sa2 * 1.5708f; // apex: a quarter-circle into the crescent's own side
+						_axeFx[c2].GlobalPosition = p + new Vector2((float)System.Math.Cos(ca2), (float)System.Math.Sin(ca2)) * arcR;
+						_axeFx[c2].Rotation = ca2 + sa2 * 1.5708f; // blade tangential to travel
+						_axeFx[c2].Visible = true;
+					}
+					else
+						_axeFx[c2].Visible = false;
+				}
+			}
 			Godot.Node2D[] bit = new Godot.Node2D[enemies.Count]; // volley-wide unique memo for the print
 			int bitN = 0;
 			for (int c = 0; c < crescents; c++)
@@ -1498,6 +1617,15 @@ public partial class PartyMember : Godot.Node2D
 					_teleParts[i].Rotation = (float)(-arcEff + 2.0 * arcEff * i / (nsp - 1));
 			}
 			_teleHold = 0.18f;
+			// fx art: the shared melee commit flash rides the facing the telegraph already knows
+			// (Baldrun's sweep arc / Mosiah's rapier sliver per the PC's art export; "" = no sprite)
+			if (_meleeFx != null)
+			{
+				_meleeFx.GlobalPosition = p + new Vector2((float)System.Math.Cos(facing), (float)System.Math.Sin(facing)) * 26.0f;
+				_meleeFx.Rotation = facing;
+				_meleeFx.Visible = true;
+				_fxT = 0.16f;
+			}
 		}
 	}
 
