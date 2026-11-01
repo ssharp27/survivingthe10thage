@@ -1753,6 +1753,7 @@ public partial class Game : Godot.Node2D
 			fxs.Texture = fxStumpTex;
 			fxs.Set("texture_filter", 0); // NEAREST like the painted minis: hard edges
 			fxs.Position = new Vector2(7.0f, 7.0f); // Control origin is the rect corner -> centred
+			fxs.Scale = new Vector2(0.5f, 0.5f); // user 2026-11-01: familiars halve (39x59 art read huge over a 14 px shell)
 			cr.AddChild(fxs);
 			if (_famArt)
 				cr.Color = new Color(0.26f, 0.2f, 0.34f, 0.0f); // art rides: shell stops drawing
@@ -1802,6 +1803,7 @@ public partial class Game : Godot.Node2D
 			fxs.Texture = fxTreeTex;
 			fxs.Set("texture_filter", 0); // NEAREST like the painted minis: hard edges
 			fxs.Position = new Vector2(6.0f, 6.0f); // Control origin is the rect corner -> centred
+			fxs.Scale = new Vector2(0.5f, 0.5f); // user 2026-11-01: spirits halve to match the smaller familiars
 			cr.AddChild(fxs);
 			if (fxTreeTex != null)
 				cr.Color = new Color(0.78f, 0.92f, 0.88f, 0.0f); // art rides: shell stops drawing

@@ -82,6 +82,46 @@ public partial class PartyMember : Godot.Node2D
 	Godot.Sprite2D _shieldFx = null;
 	Godot.Sprite2D[] _axeFx = null; // 5 blade slots: up to 4 crescents OR up to 5 spin blades, never both
 	float _fxT = 0.0f; // commit-fx visibility timer: decays with the world clock, hides sprites off-beat
+	// user 2026-11-01 art/feel pass (user's bug batch): crescent blades are TRAVELLING hitboxes
+	// - the flight state rides the member, the _Process block below advances it every frame, and
+	// damage lands at the blade's own position: what is ON SCREEN is what damages.
+	// (assistant pick: travel adds NO Rng draws; the volley still rolls once at commit, so the
+	// Rng stream is untouched and the smoke stays comparable to the pre-fix runs)
+	// (assistant pick: 0.55 s of blade travel per volley - the user asked for the blades to be
+	// visible the whole spin, not for a longer beat, so flight is pure motion)
+	// NOTE: the tick section has no commit locals, so the flight re-reads GetEnemies() and its
+	// own position itself; the spin clock owns the same _axeFx slots, so the flight freezes
+	// while orbitT runs and resumes when that clock expires - neither lane steals frames
+	// NOTE: one bite per body per crescent (memo bit 1<<c); bit 256 tallies uniques for the
+	// print. crescents max at 5 slots so the bits never collide, and the memo is indexed by the
+	// stable enemy-list index (dead bodies keep their slot and skip on the kind check)
+	// NOTE: same as the rake lane, an empty clearing never stalls the beat: the blades still fly
+	// (assistant pick: the catch bite at flight end re-samples GetEnemies() at the member's own
+	// position - the old release sample, once per blade, so a body that only straddled the
+	// release ring still gets exactly one honest bite)
+	// Wash's shield HURLS visibly from himself along the bounce chain (user: it appeared mid-air
+	// and vanished): the polyline is baked at the commit during the chain walk, _shieldT lerps
+	// the disc along it. The damage stays instant - the flight is the visual trail of an
+	// already-resolved throw. Hop legs run at 0.09 s each (assistant pick, pure cosmetics)
+	// NOTE: the bounce ramp is FLAT 75% per hop (user: first body full, second and every body
+	// after it 75%) - it does not compound to 0.75^n
+	// Brook's dagger art spans the jab corridor on BOTH jabs; the second repeats the first line
+	float _cresDur = 0.0f; // active-volley flag: total flight seconds (0 = no volley flying)
+	float _cresT = 0.0f; // flight seconds left on the current volley
+	double _cresA0 = 0.0; // throw-line angle the alternating arcs sweep out from
+	float _cresR = 0.0f; // flight arc radius: rides the prey line, clamped like the rake
+	float _cresBand = 0.0f; // blade disc + band depth: grown by the size card
+	double _cresDmg = 0.0; // the volley-wide roll the flying blades bite with
+	int _cresNC = 0; // crescents flying this volley (base one + extra-axes ranks)
+	bool _cresBled = false; // bleed stamp carries onto the flight bites
+	int _cresBit = 0; // unique-body tally: printed the moment the flight lands
+	int[] _cresMemo = null; // per-body crescent-bite bits (256 = tallied)
+	static readonly double CRESCENT_FLIGHT = 0.55; // seconds of blade travel per volley
+	Godot.Vector2[] _hops = null; // [0] = thrower, then one entry per body the shield bites
+	int _hopN = 0; // baked polyline length
+	float _shieldT = 0.0f; // hurl flight clock (seconds left)
+	float _shieldDur = 0.0f; // total hurl seconds for the current throw (0 = no live hurl)
+	float _twinLen = 0.0f; // first jab's stab length: the second dagger repeats it
 	// Brook's twin daggers (user 2026-10-31): TWO daggers, 7 damage EACH, thrust at the nearest
 	// prey ALONG ONE LINE one right after the other (user: "attacks twice in the same direction,
 	// one after another with a very small delay"): the beat lands the FIRST jab and parks cdTimer
@@ -979,6 +1019,103 @@ public partial class PartyMember : Godot.Node2D
 						_axeFx[b2].Visible = false;
 				}
 			}
+		// user 2026-11-01 (user bug batch): TRAVELLING crescent hitboxes - the rake is no longer
+		// instant: the blade flies its half-arc frame by frame and bites at ITS OWN position, so
+		// what is on screen is what hurts (the brief flash the user saw is replaced by the whole
+		// throw). Same shared roll/band disc; the print lands with the flight.
+		if (_cresDur > 0.0f && orbitT <= 0.0)
+		{
+			_cresT -= delta;
+			double progF = 1.0 - (double)_cresT / CRESCENT_FLIGHT; // 0..1 along the half-arc
+			if (progF > 1.0)
+				progF = 1.0;
+			Game wpg = GetParent() as Game;
+			Godot.Collections.Array<Godot.Node2D> live = wpg != null ? wpg.GetEnemies() : null;
+			for (int cc = 0; cc < _cresNC; cc++)
+			{
+				double sgn = (cc % 2) == 0 ? 1.0 : -1.0; // arcs alternate top/bottom like the volley
+				double angB = _cresA0 + sgn * System.Math.PI * progF; // half-circle sweep per blade
+				Godot.Vector2 biteP = GlobalPosition + new Godot.Vector2((float)System.Math.Cos(angB), (float)System.Math.Sin(angB)) * _cresR;
+				if (_axeFx != null && cc < 5)
+				{
+					_axeFx[cc].GlobalPosition = biteP;
+					_axeFx[cc].Rotation = (float)angB + (float)(sgn * 1.5708) + (float)progF * 18.84f; // tumbles 3 turns per flight
+					_axeFx[cc].Visible = true;
+				}
+				if (live == null)
+					continue; // no world handle: visual-only frame, the volley still completes
+				for (int ii = 0; ii < live.Count && ii < _cresMemo.Length; ii++)
+				{
+					Godot.Node2D en = live[ii];
+					Combatant ec = (Combatant)en;
+					if (ec == null || ec.kind == "dead" || ec.hp <= 0.0f)
+						continue;
+					if ((_cresMemo[ii] & (1 << cc)) != 0)
+						continue; // this blade already bit this body: one honest bite per crescent
+					if ((en.GlobalPosition - biteP).Length() > _cresBand)
+						continue; // disc at the BLADE position: the hitbox the user asked for
+					ec.TakeDamage(_cresDmg);
+					if (_cresBled)
+						ec.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 4.0); // same card-scaled stamp as the rake
+					_cresMemo[ii] |= (1 << cc) | 256;
+					_cresBit++;
+				}
+			}
+			if (_cresT <= 0.0f)
+			{
+				// the catch bite past the thrower's own hands: the old release sample, once per blade
+				if (live != null)
+				{
+					for (int cc = 0; cc < _cresNC; cc++)
+						for (int ii = 0; ii < live.Count && ii < _cresMemo.Length; ii++)
+						{
+							Godot.Node2D en = live[ii];
+							Combatant ec = (Combatant)en;
+							if (ec == null || ec.kind == "dead" || ec.hp <= 0.0f)
+								continue;
+							if ((_cresMemo[ii] & (1 << cc)) != 0)
+								continue;
+							if ((en.GlobalPosition - GlobalPosition).Length() > _cresBand)
+								continue;
+							ec.TakeDamage(_cresDmg);
+							if (_cresBled)
+								ec.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 4.0);
+							_cresMemo[ii] |= (1 << cc) | 256;
+							_cresBit++;
+						}
+				}
+				if (_cresBit > 0)
+					GD.Print("[10thAge] (axe) " + displayName + " crescents rake " + _cresBit + " bodies");
+				_cresDur = 0.0f; // volley done: the _fxT decay hides the blades off the throw
+			}
+		}
+		// user 2026-11-01: the shield HURLS visibly from Wash down the bounce chain - the commit
+		// baked the polyline into _hops during the chain walk, this clock lerps the disc along it
+		// so the bounces read end to end instead of a single mid-air flash (damage stays instant:
+		// the flight is the visual trail of an already-resolved throw)
+		if (_shieldFx != null && _shieldDur > 0.0f)
+		{
+			_shieldT -= delta;
+			float flown = _shieldDur - _shieldT; // seconds flown along the chain
+			int leg = (int)(flown / 0.09f); // one hop-leg per 0.09 s of flight
+			if (leg >= _hopN - 1)
+				_shieldFx.GlobalPosition = _hops[_hopN - 1]; // parked on the last bite
+			else
+			{
+				float fr = (flown - (float)leg * 0.09f) / 0.09f;
+				Godot.Vector2 hopA = _hops[leg];
+				Godot.Vector2 hopV = _hops[leg + 1] - hopA;
+				_shieldFx.GlobalPosition = hopA + hopV * fr;
+				_shieldFx.Rotation = (float)System.Math.Atan2((double)hopV.Y, (double)hopV.X) + flown * 12.0f; // tumbles while flying
+			}
+			_shieldFx.Visible = true;
+			if (_shieldT <= 0.0f)
+			{
+				_shieldT = 0.0f;
+				_shieldDur = 0.0f; // throw done: hide on landing so the decay cannot fight the final placement
+				_shieldFx.Visible = false; // the flight ends the moment it lands
+			}
+		}
 		ultT -= delta;
 		if (_grown && ultT <= 0.0)
 		{
@@ -1155,15 +1292,18 @@ public partial class PartyMember : Godot.Node2D
 				return; // nothing in the throw: the beat stays ready, an empty clearing never stalls it
 			cdTimer = (float)EffCooldown();
 			_atkFlash = 0.08f; // same commit pulse every kit uses, never the red harm lane
-			// fx art: disc caught mid-hurl along the throw line (the throw is instant math, so
-			// the commit paints the line for one beat; _fxT decay carries it through)
+			// fx art (user 2026-11-01 rework): the disc HURLS from Wash along the whole bounce chain
+			// instead of a mid-air flash - the polyline is baked into _hops during the chain walk
+			// below, and the _Process hurl clock lerps the sprite along it (damage stays instant:
+			// the flight is the visual trail of an already-resolved throw)
 			if (_shieldFx != null)
 			{
-				Vector2 shdHop = pg.WrapDelta(p, prey.GlobalPosition);
-				_shieldFx.GlobalPosition = p + shdHop * 0.5f;
-				_shieldFx.Rotation = (float)System.Math.Atan2((double)shdHop.Y, (double)shdHop.X);
+				if (_hops == null)
+					_hops = new Godot.Vector2[8]; // thrower + more bodies than one throw can ever bite
+				_hops[0] = p;
+				_hopN = 1;
+				_shieldFx.GlobalPosition = p; // starts in his hand: the throw visibly LEAVES the model
 				_shieldFx.Visible = true;
-				_fxT = 0.16f;
 			}
 			double shdDmg = RollDamage(pg, weaponDamage); // ONE crit/lifesteal roll for the whole throw
 			Godot.Node2D[] hit = new Godot.Node2D[1 + shieldBounce]; // memo: no body twice in one throw
@@ -1192,8 +1332,16 @@ public partial class PartyMember : Godot.Node2D
 				}
 				if (nx == null)
 					break; // the shield found no fresh prey: the throw ends with what it bit
-				((Combatant)nx).TakeDamage(shdDmg);
+				((Combatant)nx).TakeDamage(shdDmg * 0.75); // user 2026-11-01: every bounce after the first body is FLAT 75% of the roll (not compounding)
 				hit[used++] = nx; cur = nx;
+				if (_hops != null && _hopN < _hops.Length)
+					_hops[_hopN++] = nx.GlobalPosition; // bake the bounce leg for the visible hurl
+			}
+			if (_shieldFx != null && _hops != null && _hopN > 0)
+			{
+				_shieldDur = 0.09f * (float)_hopN; // one hop-leg per 0.09 s: the flight spans the whole chain
+				_shieldT = _shieldDur;
+				_fxT = _shieldDur; // the decay block hides the disc exactly as the flight lands
 			}
 			if (used > 1)
 				GD.Print("[10thAge] (shield) " + displayName + " shield bounds " + (used - 1) + " more bodies");
@@ -1291,6 +1439,8 @@ public partial class PartyMember : Godot.Node2D
 					nc.Poison(poisonDps * stat[StatTags.ATTACK_DAMAGE], poisonDur); // venom stamp: dps rides the damage card
 					hitN2++;
 				}
+				if (_twinLen > 0.0f)
+					PoseStabFx(p, twinAim, _twinLen); // the second dagger repeats the stored line
 				GD.Print("[10thAge] (dagger) " + displayName + " second dagger stabs " + hitN2 + " bodies");
 				cdTimer = (float)EffCooldown(); // the beat completes: full cooldown from here
 				return;
@@ -1340,6 +1490,9 @@ public partial class PartyMember : Godot.Node2D
 				nc.Poison(poisonDps * stat[StatTags.ATTACK_DAMAGE], poisonDur); // venom stamp: dps rides the damage card
 				hitN++;
 			}
+			float jabLen = preyD < (double)reach ? (float)preyD : reach; // art spans the corridor to the prey
+			_twinLen = jabLen; // the second dagger repeats the SAME line length
+			PoseStabFx(p, twinAim, jabLen); // user 2026-11-01: the stab art rides the jab lane like the rest
 			GD.Print("[10thAge] (dagger) " + displayName + " first dagger stabs " + hitN + " bodies");
 			return; // the beat is mid-swing: the second dagger lands when cdTimer expires
 		}
@@ -1394,76 +1547,38 @@ public partial class PartyMember : Godot.Node2D
 			Vector2 aimv = pg.WrapDelta(p, prey.GlobalPosition); // the SHORT way: the arc rides reach
 			float a0 = (float)System.Math.Atan2(aimv.Y, aimv.X); // throw line angle
 			bool bled = bleedR > 0;
-			// fx art: each crescent's blade caught at its own arc apex, alternating sides exactly
-			// like the rake geometry; the spin owns these slots while its clock runs, so this
-			// volley skips posing while spinning
+			// fx + hitbox (user 2026-11-01): the crescent blades are now TRAVELLING hitboxes -
+			// the instant rake (same geometry, same ONE shared roll) is replaced by a flight
+			// state the _Process block advances frame by frame; blades light up at the throw
+			// start and the block bites at the blade position, prints on landing. The spin
+			// clock owns these slots, so the flight freezes while spinning and resumes when
+			// that clock expires. Same grown band disc; one bite per body per crescent.
+			_cresNC = crescents;
+			_cresR = arcR;
+			_cresBand = band;
+			_cresA0 = (double)a0;
+			_cresDmg = axDmg;
+			_cresBled = bled;
+			_cresBit = 0;
+			_cresT = (float)CRESCENT_FLIGHT;
+			_cresDur = (float)CRESCENT_FLIGHT; // active-volley flag: zeroed when the flight lands
+			_cresMemo = new int[64]; // one bite per body per crescent (bit 256 = tallied)
+			_fxT = (float)CRESCENT_FLIGHT + 0.06f; // decay hides the blades the moment the flight lands
 			if (_axeFx != null && orbitT <= 0.0)
 			{
-				_fxT = 0.14f;
 				for (int c2 = 0; c2 < 5; c2++)
 				{
+					_axeFx[c2].Visible = c2 < crescents; // blades light up at the throw start
 					if (c2 < crescents)
 					{
-						float sa2 = (c2 % 2) == 0 ? 1.0f : -1.0f; // rake alternates top/bottom: same rule
-						float ca2 = a0 + sa2 * 1.5708f; // apex: a quarter-circle into the crescent's own side
+						float sa2 = (c2 % 2) == 0 ? 1.0f : -1.0f;
+						float ca2 = a0 + sa2 * 0.3f; // first sliver of the crescent's own side
 						_axeFx[c2].GlobalPosition = p + new Vector2((float)System.Math.Cos(ca2), (float)System.Math.Sin(ca2)) * arcR;
-						_axeFx[c2].Rotation = ca2 + sa2 * 1.5708f; // blade tangential to travel
-						_axeFx[c2].Visible = true;
-					}
-					else
-						_axeFx[c2].Visible = false;
-				}
-			}
-			Godot.Node2D[] bit = new Godot.Node2D[enemies.Count]; // volley-wide unique memo for the print
-			int bitN = 0;
-			for (int c = 0; c < crescents; c++)
-			{
-				// arcs ALTERNATE top/bottom of the throw line: even crescents sweep LEFT (over
-				// top), odd sweep RIGHT (under) - user: one from the top, then the bottom...
-				int side = (c % 2) == 0 ? 1 : -1;
-				Godot.Node2D[] struck = new Godot.Node2D[enemies.Count]; // per-crescent memo
-				int used = 0;
-				for (int s = 0; s < 33; s++)
-				{
-					Vector2 sp2;
-					if (s < 32)
-					{
-						// half-circle sweep from the throw line: 32 samples per crescent
-						float sa = a0 + (float)side * (float)System.Math.PI * (float)s / 31.0f;
-						sp2 = p + new Vector2((float)System.Math.Cos(sa), (float)System.Math.Sin(sa)) * arcR;
-					}
-					else
-						sp2 = p; // the release/catch sample: the return bite past his own hands
-					for (int i = 0; i < enemies.Count; i++)
-					{
-						Godot.Node2D n = enemies[i];
-						Combatant nc = (Combatant)n;
-						if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
-							continue; // killed-but-unswept bodies are not valid bites (chain discipline)
-						bool done = false;
-						for (int h = 0; h < used; h++)
-							if (struck[h] == n)
-							{ done = true; break; }
-						if (done)
-							continue;
-						if ((n.GlobalPosition - sp2).Length() > band)
-							continue;
-						nc.TakeDamage(axDmg);
-						if (bled)
-							nc.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 4.0); // card-scaled dps for a 4 s window (FIXED 2026-11-01: the args were reversed)
-						struck[used++] = n;
-						bool counted = false;
-						for (int t = 0; t < bitN; t++)
-							if (bit[t] == n)
-							{ counted = true; break; }
-						if (!counted)
-							bit[bitN++] = n;
+						_axeFx[c2].Rotation = ca2 + sa2 * 1.5708f;
 					}
 				}
 			}
-			if (bitN > 0)
-				GD.Print("[10thAge] (axe) " + displayName + " crescents rake " + bitN + " bodies");
-			return; // the volley owns its whole beat: never fall through to the lane/fan search
+			return; // the volley owns its whole beat: the flight block prints when it lands
 		}
 		Godot.Node2D best = null;
 		float bestD = 1e9f;
@@ -1616,12 +1731,40 @@ public partial class PartyMember : Godot.Node2D
 				for (int i = 0; i < nsp; i++)
 					_teleParts[i].Rotation = (float)(-arcEff + 2.0 * arcEff * i / (nsp - 1));
 			}
-			_teleHold = 0.18f;
-			// fx art: the shared melee commit flash rides the facing the telegraph already knows
-			// (Baldrun's sweep arc / Mosiah's rapier sliver per the PC's art export; "" = no sprite)
+			if (_meleeFx != null && !cleaver)
+			{
+				// user 2026-11-01: on the rapier the stab ART replaces the telegraph line (the
+				// user saw line + sliver drawn at once). Zero the spoke alpha outright: the
+				// decay only fades while _teleHold is live, so a dead hold alone would linger
+				_teleHold = 0.0f;
+				if (_teleParts != null)
+					foreach (Godot.ColorRect s in _teleParts)
+						s.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			}
+			else
+				_teleHold = 0.18f; // the maul keeps its ~150 deg fan spokes as the swing's telegraph
+			// fx art (user 2026-11-01 fix): the art FILLS the swing - the maul arc is authored
+			// centred on the thrower so it radiates from the model at the swing's true radius,
+			// and the rapier sliver spans the full stab line anchored at the model. Scale is
+			// recomputed each beat: reach cards and the size ranks stretch the art too
 			if (_meleeFx != null)
 			{
-				_meleeFx.GlobalPosition = p + new Vector2((float)System.Math.Cos(facing), (float)System.Math.Sin(facing)) * 26.0f;
+				float texW = 128.0f, texH = 128.0f;
+				if (_meleeFx.Texture != null)
+				{
+					texW = (float)_meleeFx.Texture.GetWidth();
+					texH = (float)_meleeFx.Texture.GetHeight();
+				}
+				if (cleaver)
+				{
+					_meleeFx.GlobalPosition = p; // arc radiates from his feet, not a floating sliver
+					_meleeFx.Scale = new Vector2(reach * 2.0f / texW, reach * 2.0f / texH);
+				}
+				else
+				{
+					_meleeFx.GlobalPosition = p + new Vector2((float)System.Math.Cos(facing), (float)System.Math.Sin(facing)) * (reach * 0.5f); // centred on the stab corridor
+					_meleeFx.Scale = new Vector2(reach / texW, (float)stat[StatTags.AREA]); // X spans the thrust, Y rides attack size
+				}
 				_meleeFx.Rotation = facing;
 				_meleeFx.Visible = true;
 				_fxT = 0.16f;
@@ -1629,6 +1772,21 @@ public partial class PartyMember : Godot.Node2D
 		}
 	}
 
+	// user 2026-11-01: Brook's dagger ART - a stab sliver from the model down the jab corridor,
+	// the same corridor the jab math bites (both jabs fire it; "" art keeps the greybox)
+	private void PoseStabFx(Vector2 from, Vector2 aim, float len)
+	{
+		if (_meleeFx == null || len <= 0.0f)
+			return; // greybox stays greybox: nothing painted, nothing decayed
+		float texW = 112.0f;
+		if (_meleeFx.Texture != null)
+			texW = (float)_meleeFx.Texture.GetWidth();
+		_meleeFx.GlobalPosition = from + aim * (len * 0.5f); // centred on the stab corridor
+		_meleeFx.Rotation = (float)System.Math.Atan2((double)aim.Y, (double)aim.X);
+		_meleeFx.Scale = new Vector2(len / texW, 1.0f); // X spans the jab, Y keeps the authored height
+		_meleeFx.Visible = true;
+		_fxT = 0.16f; // same commit-flash decay clock every kit uses
+	}
 	private static double angleDiff(double a, double b)
 	{
 		double t = a - b;
