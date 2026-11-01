@@ -116,6 +116,27 @@ public partial class PartyMember : Godot.Node2D
 	bool _cresBled = false; // bleed stamp carries onto the flight bites
 	int _cresBit = 0; // unique-body tally: printed the moment the flight lands
 	int[] _cresMemo = null; // per-body crescent-bite bits (256 = tallied)
+	// ult fix (user 2026-11-01 follow-up): the spin blades were PERMANENTLY visible
+	// (the art block in _Process was MISSING BRACES - the clock check guarded only the
+	// angle line, so the blades sat on the 70 px ring EVERY frame of the run, which is
+	// what the user saw as axes parked on either side of Bruno) and raked NOTHING (the
+	// beat commit sampled bodies at the commit instant only, inside a ring the hugging
+	// horde stands INSIDE of: the gate smokes printed zero (spin) rakes across two casts).
+	// The fix arms a TRAVELLING hitbox sweep in the tick below: the blades bite at their
+	// OWN positions every frame while the clock runs, ONE shared roll per cast (the spin
+	// is one action like every single-commit weapon), ONE honest bite per body per blade
+	// per CIRCLE (the bite bits clear at every full turn), and the unique-body tally
+	// prints the moment the clock expires. The DEFAULT ATTACK is OFF while the ult runs
+	// (user): the cast voids an in-flight volley and the spin beat owns the commit, so
+	// the crescents never fight the spin slots or the five blade sprites.
+	bool _spinAct = false;      // sweep armed flag: cast arms the roll/memos, expiry prints + hides
+	double _spinDmg = 0.0;      // the cast-wide roll the flying blades bite with
+	bool _spinBled = false;     // bleed stamp carries onto the sweep bites
+	double _spinA0 = 0.0;       // cast start angle: revolutions measured off this
+	int _spinRev = 0;           // full circles the clock has already burned (bite bits clear each)
+	int _spinBit = 0;           // unique-body tally: printed the moment the spin expires
+	int[] _spinMemo = null;     // per-body bite bits for the CURRENT circle (1 << blade)
+	int[] _spinCounted = null;  // per-body print bits across the whole cast (256 = tallied)
 	static readonly double CRESCENT_FLIGHT = 0.85; // seconds of blade travel per volley: OUT to reach and BOOMERANG back (assistant pick: the loop path is twice the old half-arc, so travel stays pure motion)
 	Godot.Vector2[] _hops = null; // [0] = thrower, then one entry per body the shield bites
 	int _hopN = 0; // baked polyline length
@@ -999,13 +1020,45 @@ public partial class PartyMember : Godot.Node2D
 		// card spins the orbit faster (attack speed is an "effect of the upgrades" the spin gains)
 		orbitT = System.Math.Max(0.0, orbitT - delta);
 		if (orbitT > 0.0)
+		{
+			if (!_spinAct)
+			{
+				// cast just armed: ONE shared roll for the WHOLE cast (the spin is one action
+				// like every single-commit weapon), bite memos clear per circle, print memos clear
+				// per cast, and the DEFAULT ATTACK IS OFF while the ult runs (user): a volley
+				// already in flight is voided at cast so the crescents never fight the spin slots
+				_spinAct = true;
+				Game spg = GetParent() as Game;
+				_spinDmg = spg != null ? RollDamage(spg, weaponDamage) : weaponDamage;
+				_spinBled = bleedR > 0;
+				_spinMemo = new int[64];
+				_spinCounted = new int[64];
+				_spinBit = 0;
+				_spinRev = 0;
+				_spinA0 = orbitAng;
+				_cresDur = 0.0f; // any in-flight volley is voided: the spin owns the beat
+			}
+			while (orbitAng - _spinA0 >= (double)(_spinRev + 1) * System.Math.PI * 2.0)
+			{
+				_spinRev++;
+				for (int q2 = 0; q2 < _spinMemo.Length; q2++)
+					_spinMemo[q2] = 0; // fresh bite window: every blade rakes every body once per circle
+			}
 			orbitAng += (double)delta * System.Math.PI * 2.0 / (float)EffCooldown(); // spin cadence: one circle per EffCooldown
+			// user 2026-11-01 (ult bugged: blades visible + biting nothing): THE SWEEP IS THE
+			// HITBOX - the blades bite at their OWN positions every frame while the clock runs,
+			// one honest bite per body per blade per CIRCLE. What is ON SCREEN is what hurts,
+			// like the boomerang fix the user approved (the old commit-only sample raked nothing,
+			// and the missing braces left the pair parked on the ring all run).
 			// fx art: spin blades are real sprites riding the same orbit clock and radius the
 			// rakes read (arm 70 px = the rake lane's own spin radius, tangent rotation)
 			if (_axeFx != null)
 			{
 				_fxT = 0.3f; // keeps the crescent-hide decay honest while the clock runs
 				int bl = 2 + axeN; // rake cadence mirror: base pair + extra-axes ranks
+				float spDisc = (float)(40.0 * (1.0 + 0.25 * (double)axeSize) * LeaderAreaMul()); // MASSIVE disc, size rank grows it | Bruno lead +15%
+				Game spg2 = GetParent() as Game;
+				Godot.Collections.Array<Godot.Node2D> live = spg2 != null ? spg2.GetEnemies() : null;
 				for (int b2 = 0; b2 < 5; b2++)
 				{
 					if (b2 < bl)
@@ -1014,11 +1067,46 @@ public partial class PartyMember : Godot.Node2D
 						_axeFx[b2].GlobalPosition = GlobalPosition + new Vector2((float)System.Math.Cos(ba2), (float)System.Math.Sin(ba2)) * 70.0f;
 						_axeFx[b2].Rotation = ba2 + (float)System.Math.PI * 0.5f; // blade rides tangential
 						_axeFx[b2].Visible = true;
+						if (live != null)
+						{
+							for (int ii = 0; ii < live.Count && ii < _spinMemo.Length; ii++)
+							{
+								if ((_spinMemo[ii] & (1 << b2)) != 0)
+									continue; // this blade already bit this body this circle: one honest bite
+								Godot.Node2D en = live[ii];
+								Combatant ec = (Combatant)en;
+								if (ec == null || ec.kind == "dead" || ec.hp <= 0.0f)
+									continue; // killed-but-unswept bodies are not valid bites (chain discipline)
+								if ((en.GlobalPosition - _axeFx[b2].GlobalPosition).Length() > spDisc)
+									continue; // disc at the BLADE position: the hitbox the user asked for
+								ec.TakeDamage(_spinDmg);
+								if (_spinBled)
+									ec.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 4.0); // same card-scaled stamp as the rake
+								_spinMemo[ii] |= (1 << b2);
+								if ((_spinCounted[ii] & 256) == 0)
+								{
+									_spinCounted[ii] |= 256;
+									_spinBit++; // unique-body tally for the expiry print
+								}
+							}
+						}
 					}
 					else
 						_axeFx[b2].Visible = false;
 				}
 			}
+		}
+		else if (_spinAct)
+		{
+			// the spin just expired: the tally lands here (one print per cast, house style like a
+			// flight landing) and the blades hide CLEANLY - the permanent pair the user saw is gone
+			_spinAct = false;
+			if (_spinBit > 0)
+				GD.Print("[10thAge] (spin) Axes Away!: " + displayName + " massive blades rake " + _spinBit + " bodies");
+			if (_axeFx != null)
+				for (int b2 = 0; b2 < 5; b2++)
+					_axeFx[b2].Visible = false;
+		}
 		// user 2026-11-01 + follow-up: BOOMERANG crescent hitboxes - the blade leaves from his OWN
 		// hands, swings widest on the prey line at mid-flight, and RETURNS like a boomerang, so
 		// the disc bites at ITS OWN position along the out-and-back loop: what is ON SCREEN is what
@@ -1348,56 +1436,19 @@ public partial class PartyMember : Godot.Node2D
 			return; // the throw owns its whole beat: never fall through to the lane/fan search
 		}
 		// ---------- Bruno's "Axes Away!" spin (user 2026-10-31): orbiting massive blades ----------
-		// While the spin clock runs, THE beat IS the spin: blades = 2 + extra-axes rank ride
-		// evenly spaced angles, the ANGLE advanced every frame one full circle per EffCooldown
-		// (quick-throw spins it faster), and each beat pulses ONE bite per blade through whatever
-		// stands in its disc (40 px MASSIVE base, size rank grows it like the crescents). Each
-		// blade tests each body ONCE per pulse, so one blade never double-bites; a body under
-		// TWO blades takes two honest bites. The spin GAINS the effects of ALL upgrades (user):
-		// damage rides the shared roll choke, count/size/spin ride the kit fields, bleed stamps
-		// its own pair when the rank is up. No prey gate: the beat IS the spin itself, so the
-		// cd always cycles while spinning (the crescents resume when the clock expires).
-		// Spin radius = 70 px ARM LENGTH: the horde hugs the party at 30-60 px, so the disc must
-		// sweep THAT ring (a wide 117 px ring would spin outside the swarm and rake nothing).
+		// (ult fix user 2026-11-01: the instant rake is GONE - the old sample only bit bodies
+		// at the commit instant inside the arm's-length ring, and the hugging horde stands INSIDE
+		// that ring, so the whirl raked practically nothing (zero (spin) prints across two casts
+		// in the gate smokes). Damage now lives in the _Process tick above: the blades bite at
+		// their OWN positions every frame while the clock runs (one shared roll per cast, one
+		// honest bite per body per blade per circle, unique-body tally printed when the clock
+		// expires). The DEFAULT ATTACK IS OFF while the ult runs (user): this beat only cycles
+		// the cd - no crescent commit can fire below this return while spinning, and the cast
+		// voided any volley already in flight, so the two lanes never fight over the five slots.)
 		if (orbitT > 0.0)
 		{
 			cdTimer = (float)EffCooldown();
 			_atkFlash = 0.08f; // same commit pulse every kit uses, never the red harm lane
-			// ONE shared crit/steal roll for the whole pulse across the blades (the spin commits
-			// as one action like every single-commit weapon, same discipline as the volley roll)
-			double spDmg = RollDamage(pg, weaponDamage);
-			float spR = 70.0f; // arm's-length whirl: hugging bodies ride inside the disc's reach
-			float spDisc = (float)(40.0 * (1.0 + 0.25 * (double)axeSize) * LeaderAreaMul()); // MASSIVE disc, size rank grows it | Bruno lead +15%
-			int blades = 2 + axeN; // user: TWO massive axes; the extra-axes rank adds more blades
-			bool bled = bleedR > 0; // own pair (dur 4.0 s, dps 1.0 baseline scaled by the card below)
-			int bitN = 0;
-			Godot.Node2D[] bit = new Godot.Node2D[enemies.Count]; // unique tally for the honest print
-			for (int i = 0; i < enemies.Count; i++)
-			{
-				Godot.Node2D n = enemies[i];
-				Combatant nc = (Combatant)n;
-				if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
-					continue; // killed-but-unswept bodies are not valid bites (chain discipline)
-				for (int b = 0; b < blades; b++)
-				{
-					// blades ride evenly spaced angles on the current spin clock
-					float ba = (float)(orbitAng + (double)b * System.Math.PI * 2.0 / (double)blades);
-					Vector2 bp = p + new Vector2((float)System.Math.Cos(ba), (float)System.Math.Sin(ba)) * spR;
-					if ((n.GlobalPosition - bp).Length() > spDisc)
-						continue;
-					nc.TakeDamage(spDmg);
-					if (bled)
-						nc.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 4.0); // card-scaled dps for a 4 s window (FIXED 2026-11-01: the args were reversed)
-					bool counted = false;
-					for (int t = 0; t < bitN; t++)
-						if (bit[t] == n)
-						{ counted = true; break; }
-					if (!counted)
-						bit[bitN++] = n;
-				}
-			}
-			if (bitN > 0)
-				GD.Print("[10thAge] (spin) Axes Away!: " + displayName + " massive blades rake " + bitN + " bodies");
 			return; // the spin owns its whole beat: the crescents resume when the clock expires
 		}
 		// ---------- Brook's twin daggers (user 2026-10-31): same-line double jab ----------
