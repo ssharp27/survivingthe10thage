@@ -27,7 +27,7 @@ public partial class Director : Godot.Node2D
         // table means there is one marching state, so ask the stage whether it marches.
         if (!g.GetHordeActive())
             return; // CAMPFIRE / DEAD / VICTORY hold the march back
-        _spawnTimer -= (float)d;
+        _spawnTimer -= (float)d * (float)g.GetTimeWarp(); // TEST M1_TIMEWARP: cadence charges on the RUN clock so legs keep their NORMAL spawn budgets at warp speed
         if (_spawnTimer > 0.0f)
             return;
         // user rule (human playtest 2026-10-22): the horde SCALES TO THE PARTY. A solo
