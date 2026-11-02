@@ -2371,9 +2371,10 @@ public partial class PartyMember : Godot.Node2D
 		// the flight is the visual trail of an already-resolved throw)
 		// 2026-11-02 follow-up (user: "The shield moves far too quickly so it looks terrible... it
 		// needs to be a smooth bounce between enemies"): the 0.09 s-per-hop lerp was a BLUR. The disc
-		// now flies at CONSTANT SHIELD_HURL_SPEED px/s measured in CUMULATIVE chain px, settling 4 px
-		// past every waypoint so each strike reads as a BOUNCE, and the PREY rides as the first
-		// waypoint. PURE MOTION ONLY - the damage model stays instant-at-commit on exact bodies.
+		// now flies at CONSTANT SHIELD_HURL_SPEED px/s measured in CUMULATIVE chain px: each leg ends
+		// squarely ON its waypoint, where the disc pivots and homes on the NEXT body = the readable
+		// BOUNCE, and the PREY rides as the first waypoint. PURE MOTION ONLY - the damage model stays
+		// instant-at-commit on exact bodies.
 		if (_shieldFx != null && _shieldDur > 0.0f)
 		{
 			_shieldT -= delta;
