@@ -329,7 +329,7 @@ public partial class PartyMember : Godot.Node2D
 
 	public Vector2 twinAim = new Vector2(1.0f, 0.0f); // second dagger repeats the first's direction
 
-	static readonly double TWIN_STAGGER = 0.15; // seconds between the two jabs (assistant pick)
+	static readonly double TWIN_STAGGER = 0.1; // user 2026-11-02: "add a 0.1 second delay to the second attack... so there's a way to tell it's two attacks"
 
 	// Yu's familiars (M2, user dictation 2026-10-22): the fuse is the summon's LIFETIME, and
 
@@ -1102,15 +1102,39 @@ public partial class PartyMember : Godot.Node2D
 
 					_auraSprites[i2].Position = _auraParts[i2].Position; // same authored ring spot as the greybox
 
-					_auraSprites[i2].Scale = new Vector2(0.33f, 0.33f); // user: ~1/3 of the 94x104 art (-> ~31x35 on screen)
+					_auraSprites[i2].Scale = new Vector2(0.25f, 0.25f); // user 2026-11-02: 1/4 of the 94x104 art (-> ~24x26 on screen)
 
-					_auraSprites[i2].Modulate = new Color(0.55f, 0.78f, 1.0f, 1.0f); // spectral blue (assistant pick of the user's "spectral blue")
+					_auraSprites[i2].Modulate = new Color(0.62f, 0.88f, 0.85f, 1.0f); // very light teal-blue (user 2026-11-02: "very light blue, like a teal tint"; exact mix is an assistant pick - retunable via gate)
 
 					_auraSprites[i2].ZIndex = 4; // same layer the greybox motes hold, under the body (5)
 
 					_auraPivot.AddChild(_auraSprites[i2]);
 
 				}
+
+				// user 2026-11-02: a translucent teal disc out to the spirit ring so the aura READS as an area,
+
+				// not six lone dots - it rides the SAME pivot, so wide-ring/AREA scaling stretches it exactly
+
+				// like the hit test does (hit test, ring ranks and pulse timing untouched: PURE ART)
+
+				Godot.Polygon2D auraDisc = new Godot.Polygon2D();
+
+				auraDisc.Name = "AuraArea";
+
+				auraDisc.ZIndex = 3; // under the motes (4) and the body (5)
+
+				auraDisc.Set("modulate", new Color(0.35f, 0.75f, 0.72f, 0.18f)); // light teal fill, ~18% alpha (assistant pick of the user's "semi-transparent teal")
+
+				Vector2[] disc = new Vector2[24]; // 24-gon: smooth enough at ring scale, zero Rng
+
+				for (int i3 = 0; i3 < 24; i3++)
+
+					disc[i3] = new Vector2((float)(System.Math.Cos(System.Math.PI * 2.0 * i3 / 24.0) * range), (float)(System.Math.Sin(System.Math.PI * 2.0 * i3 / 24.0) * range)); // reaches the spirit ring spots (same authored radius)
+
+				auraDisc.Polygon = disc;
+
+				_auraPivot.AddChild(auraDisc);
 
 			}
 
@@ -2921,11 +2945,12 @@ public partial class PartyMember : Godot.Node2D
 
 				((Combatant)nx).TakeDamage(shdDmg * 0.75); // user 2026-11-01: every bounce after the first body is FLAT 75% of the roll (not compounding)
 
-				hit[used++] = nx; cur = nx;
+				hit[used++] = nx;
 
 				{
-					_shldLen += (nx.GlobalPosition - cur.GlobalPosition).Length(); // bake this bounce-leg px (guarded like the bake)
+					_shldLen += (nx.GlobalPosition - cur.GlobalPosition).Length(); // bake this bounce-leg px
 					_hops[_hopN++] = nx.GlobalPosition; // bake the bounce leg for the visible hurl
+					cur = nx; // 2026-11-02 BUGFIX (user: "it just shows in a straight line for a set distance and vanishes"): cur advanced BEFORE the bake, so every bounce leg baked 0 px and _shieldDur only ever covered the THROW leg - the disc flew straight at the first victim and hid before it could ride the bounces
 				}
 
 			}
@@ -2995,7 +3020,7 @@ public partial class PartyMember : Godot.Node2D
 
 		// small delay between them"): the beat lands the FIRST jab and parks cdTimer at TWIN_STAGGER
 
-		// (0.15 s, assistant pick: the user named only "a very small delay") so the SECOND jab
+		// (0.1 s, user 2026-11-02 number) so the SECOND jab
 
 		// lands on the next arrival down the stored aim - the stagger is what reads them as two
 
@@ -3167,7 +3192,7 @@ public partial class PartyMember : Godot.Node2D
 
 			}
 
-			float jabLen = preyD < (double)reach ? (float)preyD : reach; // art spans the corridor to the prey
+			float jabLen = reach; // user 2026-11-02: jabs ALWAYS render at FULL reach ("attacks seem to shrink based on how close an enemy is... they should always be attacking at maximum distance")
 
 			_twinLen = jabLen; // the second dagger repeats the SAME line length
 
@@ -3257,9 +3282,9 @@ public partial class PartyMember : Godot.Node2D
 
 			// 26 px base grown +25%/rank by the size card, raked on BOTH sides of the swept arc.
 
-			// 33 samples per crescent: 32 along the half-arc (~27 px apart at 260 px reach, never
+			// 33 samples per crescent: 32 along the half-arc (~13 px apart at the 130 px halved reach,
 
-			// wider than the grown disc) plus the RELEASE/CATCH point itself at the thrower, so
+			// never wider than the grown disc) plus the RELEASE/CATCH point itself at the thrower, so
 
 			// the return bite exists. Per-crescent memo = one strike per crescent; a body under
 

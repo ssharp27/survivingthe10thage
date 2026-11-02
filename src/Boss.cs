@@ -251,9 +251,15 @@ public partial class Boss : Combatant
         if (_miniPhase == 1) // CIRCLE: hold the pinned ring, sweep it, fans aimed AT the party
         {
             Vector2 rel = (dist < 1.0f) ? new Vector2(MINI_STOP_DIST, 0.0f)
-                                         : to.Normalized() * MINI_STOP_DIST; // pin the radius: no drift in or out mid-dance
+                                         : to.Normalized() * MINI_STOP_DIST; // the ring point the swept orbit wants this frame
             float omega = MINI_ORBIT_SPEED / MINI_STOP_DIST; // rad/s that keeps ring travel at MINI_ORBIT_SPEED px/s
-            GlobalPosition = g.WrapNearCamera(target.GlobalPosition - rel.Rotated(_miniSide * omega * delta));
+            Vector2 want = target.GlobalPosition - rel.Rotated(_miniSide * omega * delta);
+            Vector2 drift = g.WrapDelta(GlobalPosition, want); // boss -> ring point, wrap-short way
+            float step = MINI_RUN_SPEED * slow * delta; // user 2026-11-02: RUN to the ring point, never teleport ("if it's already too close, it teleports back to the set distance... have it run there instead"). Cap >= MINI_ORBIT_SPEED so an on-ring sweep still lands exactly on the swept point; only a too-close/seam miss forces a chase
+            if (drift.Length() > step)
+                GlobalPosition = g.WrapNearCamera(GlobalPosition + drift.Normalized() * step);
+            else
+                GlobalPosition = g.WrapNearCamera(want);
             _miniFanClock -= delta;
             if (_miniFanClock <= 0.0f)
             {
