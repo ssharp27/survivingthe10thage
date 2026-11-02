@@ -2575,7 +2575,7 @@ public partial class PartyMember : Godot.Node2D
 				// mid-air, and the pre-fix probe proved it: one Wash-led run logged far more
 				// "(shield-diag) lost prey en route" losses than completed tallies. Now the disc
 				// CHASES THE NEAREST FRESH body from its CURRENT spot (wrap-short, inside the same
-				// rank-grown hop window the bounce picker uses, memo discipline kept) WITHOUT
+				// flat BASE hop window the bounce picker uses (measured from the DISC), memo discipline kept) WITHOUT
 				// spending a bounce - nothing was bitten, so nothing is spent. Only when no fresh
 				// body answers does the chain end where the disc stands (user's own rule).
 				Game pgt = GetParent() as Game;
@@ -2583,7 +2583,7 @@ public partial class PartyMember : Godot.Node2D
 				if (pgt != null)
 				{
 					Godot.Collections.Array<Godot.Node2D> foesT = pgt.GetEnemies();
-						float hopRT = (float)SHIELD_HOP; // fx-feel9 (user: "not even try to bounce if they are too far away"): flat BASE hop, rank never stretches a leg (the long leg was what vanished mid-air)
+						float hopRT = (float)SHIELD_HOP; // fx-feel9 (user: "not even try to bounce if they are too far away"): flat BASE hop, rank never stretches a leg (the long leg was what vanished mid-air); the retarget measures from the DISC (_shldPos), NEVER Wash
 					float nxTb = 1e9f;
 					for (int i = 0; i < foesT.Count; i++)
 					{
@@ -2601,7 +2601,7 @@ public partial class PartyMember : Godot.Node2D
 							continue; // one honest bite per body per throw
 						float dd = pgt.WrapDelta(_shldPos, en.GlobalPosition).Length();
 						if (dd >= nxTb || dd > hopRT)
-							continue; // a mid-air retarget answers within the chain's reach of the DISC
+							continue; // a mid-air retarget measures from the DISC itself (dd anchors on _shldPos, never Wash)
 						nxTb = dd;
 						nxT = en;
 					}
@@ -2647,11 +2647,12 @@ public partial class PartyMember : Godot.Node2D
 						if (_shldLeft > 0)
 						{
 							Godot.Collections.Array<Godot.Node2D> foes = pgs.GetEnemies();
-							// user 2026-11-02 follow-up: a rebound UPGRADE must widen the chain's REACH, not just its
-							// budget - at a flat 160 px hop a second bounce had nowhere to land in sparser crowds (and
-							// the bench never bought the card, so the budget lane never proved either way). +96 px per
-							// extra rank (assistant pick - retunable via gate).
-									float hopR = (float)SHIELD_HOP; // fx-feel9 (user): too-far prey is NEVER picked - flat BASE 160 px hop; the rebound upgrade buys COUNT only (assistant pick: base stays 160 px)
+							// user 2026-11-02 fx-feel9 follow-up: the chain is VICTIM-ANCHORED ALWAYS - every hop searches
+							// within the FLAT BASE SHIELD_HOP of the body this throw has JUST BIT (dd2 below anchors on tgt,
+							// the LIVE victim - never Wash). The old +96 px/rank reach growth is REMOVED: its long legs were
+							// exactly the vanished-mid-air symptom (a leg onto prey that died en route); the rebound upgrade now
+							// buys bounce COUNT only (assistant pick: base stays 160 px).
+									float hopR = (float)SHIELD_HOP; // fx-feel9 (user): too-far prey is NEVER picked - flat BASE 160 px hop; the rebound upgrade buys COUNT only (assistant pick: base stays 160 px); hops measure from the just-bitten victim (dd2/tgt), NEVER Wash
 							float nxDb = 1e9f;
 							for (int i = 0; i < foes.Count; i++)
 							{
@@ -2667,7 +2668,7 @@ public partial class PartyMember : Godot.Node2D
 									continue; // one honest bite per body per throw
 								float dd2 = pgs.WrapDelta(tgt, en.GlobalPosition).Length();
 								if (dd2 >= nxDb || dd2 > hopR)
-									continue; // a bounce only hops within the rank-grown window of the body it just bit
+									continue; // a bounce hops ONLY within the flat BASE window of the body IT just bit (dd2 anchors on the LIVE victim, never Wash: too-far prey is NEVER tried)
 								nxDb = dd2;
 								nxN = en;
 							}
