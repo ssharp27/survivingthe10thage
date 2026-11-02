@@ -208,13 +208,13 @@ public partial class PartyMember : Godot.Node2D
 
 	// release ring still gets exactly one honest bite)
 
-	// Wash's shield HURLS visibly from himself along the bounce chain (user: it appeared mid-air
-
-	// and vanished): the polyline is baked at the commit during the chain walk, _shieldT lerps
-
-	// the disc along it. The damage stays instant - the flight is the visual trail of an
-
-	// 2026-11-02: hurl legs run at CONSTANT SHIELD_HURL_SPEED px/s and the PREY bakes as the first waypoint (user smooth-bounce fix)
+	// Wash's shield HURLS visibly from himself, LIVE (user 2026-11-02 fx-feel6: the throw "goes
+	// through enemies and seems to bounce at their set distance instead of hitting the enemy and
+	// bouncing. It also applies the damage immediately instead of on hit (like it should do similar
+	// to Bruno's)"): NO baked polyline, NO instant-at-commit damage. The commit only speaks for the
+	// prey and looses the disc; the _Process chase homes on LIVE positions, bites ON ARRIVAL (Bruno-
+	// style: the damage lands where the disc actually is) and picks the next hop at the hit itself.
+	// 2026-11-02: hurl legs run at CONSTANT SHIELD_HURL_SPEED px/s (user smooth-bounce fix)
 
 	// NOTE: the bounce ramp is FLAT 75% per hop (user: first body full, second and every body
 
@@ -286,18 +286,21 @@ public partial class PartyMember : Godot.Node2D
 
 	static readonly double CRESCENT_FLIGHT = 0.85; // seconds of blade travel per volley: OUT to reach and BOOMERANG back (assistant pick: the loop path is twice the old half-arc, so travel stays pure motion)
 
-	Godot.Vector2[] _hops = null; // [0] = thrower, then one entry per body the shield bites
-
-	int _hopN = 0; // baked polyline length
-
-	float _shieldT = 0.0f; // hurl flight clock (seconds left)
-
-	float _shieldDur = 0.0f; // total hurl seconds for the current throw (0 = no live hurl)
-	float _shldLen = 0.0f; // baked chain total px the disc must fly this throw
-	int _shldLeg = 0; // leg flown now: _hops[_shldLeg] -> _hops[_shldLeg + 1]
-	float _shldFlown = 0.0f; // px flown so far along the chain (constant-speed clock)
-	float _shldSeg = 0.0f; // px length of the leg being flown now (read off the baked chain)
-	float _shldSegStart = 0.0f; // cumulative px where the current leg begins
+	// 2026-11-02 fx-feel6 (user: the shields "go through enemies and seem to bounce at their set
+	// distance instead of hitting the enemy and bouncing. It also applies the damage immediately
+	// instead of on hit (like it should do similar to Bruno's)"): the BAKED-chain + instant-commit
+	// hurl is GONE - the throw is now a LIVE homing state machine (see _Process): the disc chases
+	// the current victim's LIVE position at SHIELD_HURL_SPEED px/s and bites ON ARRIVAL (Bruno-style
+	// on-hit damage), then hops to the next fresh live body within SHIELD_HOP. Damage only ever lands
+	// on BITTEN bodies - a disc flying past anything still bites nothing.
+	Godot.Node2D _shldTarget = null; // body the disc is homing on now (null = no live hurl)
+	Godot.Vector2 _shldPos = new Godot.Vector2(); // disc world position: drives the art AND the chase
+	Godot.Node2D[] _shldHit = null; // chain-lightning memo: bodies already spoken for this throw
+	int _shldHitN = 0; // memo length
+	int _shldLeft = 0; // bounce budget left after the current victim
+	int _shldBites = 0; // bodies actually bitten this throw (audit print)
+	double _shldRoll = 0.0; // ONE crit/lifesteal roll shared by the whole throw (one object, one bite)
+	float _shldFlown = 0.0f; // px flown this throw: tumbles the disc art by distance, not time
 
 	float _twinLen = 0.0f; // first jab's stab length: the second dagger repeats it
 
@@ -329,7 +332,7 @@ public partial class PartyMember : Godot.Node2D
 
 	public Vector2 twinAim = new Vector2(1.0f, 0.0f); // second dagger repeats the first's direction
 
-	static readonly double TWIN_STAGGER = 0.1; // user 2026-11-02: "add a 0.1 second delay to the second attack... so there's a way to tell it's two attacks"
+	static readonly double TWIN_STAGGER = 0.4; // USER number (2026-11-02: "modify the delay to 0.4"; was 0.1): the counted gap between Brook's twin jabs
 
 	// Yu's familiars (M2, user dictation 2026-10-22): the fuse is the summon's LIFETIME, and
 
@@ -479,6 +482,7 @@ public partial class PartyMember : Godot.Node2D
 	Godot.Sprite2D[] _auraSprites = null;
 
 	float _auraPulse = 0.0f; // seconds of ring flare left from the last pulse
+	Godot.Polygon2D _auraDisc = null; // area disc handle: counter-rotates every frame so the fill stays put (user: the spin made it dizzy)
 
 	public float facing = 0.0f;
 
@@ -1104,7 +1108,7 @@ public partial class PartyMember : Godot.Node2D
 
 					_auraSprites[i2].Scale = new Vector2(0.25f, 0.25f); // user 2026-11-02: 1/4 of the 94x104 art (-> ~24x26 on screen)
 
-					_auraSprites[i2].Modulate = new Color(0.62f, 0.88f, 0.85f, 1.0f); // very light teal-blue (user 2026-11-02: "very light blue, like a teal tint"; exact mix is an assistant pick - retunable via gate)
+					_auraSprites[i2].Modulate = new Color(0.62f, 0.88f, 0.85f, 0.75f); // very light teal-blue, SEMI-TRANSPARENT at 75% alpha (user 2026-11-02: "make the sprite for Alvora's spirit semi-transparent"; alpha is an assistant pick - retunable) (user 2026-11-02: "very light blue, like a teal tint"; exact mix is an assistant pick - retunable via gate)
 
 					_auraSprites[i2].ZIndex = 4; // same layer the greybox motes hold, under the body (5)
 
@@ -1135,6 +1139,7 @@ public partial class PartyMember : Godot.Node2D
 				auraDisc.Polygon = disc;
 
 				_auraPivot.AddChild(auraDisc);
+				_auraDisc = auraDisc; // keep a handle so the disc can hold still while the ring orbits
 
 			}
 
@@ -1955,6 +1960,8 @@ public partial class PartyMember : Godot.Node2D
 			 foreach (Godot.Sprite2D s in _auraSprites)
 
 				 s.Rotation = -_auraPivot.Rotation; // spirit faces stay upright while the ring orbits
+			if (_auraDisc != null)
+				_auraDisc.Rotation = -_auraPivot.Rotation; // the disc holds still: only the motes orbit (user 2026-11-02: the spinning fill read dizzy)
 
 			if (_auraPulse > 0.0f)
 
@@ -2471,40 +2478,96 @@ public partial class PartyMember : Godot.Node2D
 
 		}
 
-		// user 2026-11-01: the shield HURLS visibly from Wash down the bounce chain - the commit
-		// baked the polyline into _hops during the chain walk, this clock lerps the disc along it
-		// so the bounces read end to end instead of a single mid-air flash (damage stays instant:
-		// the flight is the visual trail of an already-resolved throw)
-		// 2026-11-02 follow-up (user: "The shield moves far too quickly so it looks terrible... it
-		// needs to be a smooth bounce between enemies"): the 0.09 s-per-hop lerp was a BLUR. The disc
-		// now flies at CONSTANT SHIELD_HURL_SPEED px/s measured in CUMULATIVE chain px: each leg ends
-		// squarely ON its waypoint, where the disc pivots and homes on the NEXT body = the readable
-		// BOUNCE, and the PREY rides as the first waypoint. PURE MOTION ONLY - the damage model stays
-		// instant-at-commit on exact bodies.
-		if (_shieldFx != null && _shieldDur > 0.0f)
+		// 2026-11-02 fx-feel6 (user: "the shields go through enemies and seem to bounce at their set
+		// distance instead of hitting the enemy and bouncing. It also applies the damage immediately
+		// instead of on hit (like it should do similar to Bruno's)"): the BAKED-chain + instant-commit
+		// hurl is GONE. LIVE homing with ON-ARRIVAL damage: the disc chases the CURRENT victim's LIVE
+		// position at SHIELD_HURL_SPEED px/s and bites the moment it REACHES it (Bruno-style: the
+		// damage lands where the disc actually is), then picks the nearest FRESH live body within
+		// SHIELD_HOP of that hit and chases IT; no next body (or spent budget / dead victim) = the
+		// shield disappears exactly where it landed. Chain-lightning memo kept: no body is ever struck
+		// twice in one throw, and a disc flying PAST anything still bites nothing - only bitten bodies
+		// take damage.
+		if (_shldTarget != null)
 		{
-			_shieldT -= delta;
-			_shldFlown += (float)SHIELD_HURL_SPEED * delta; // px flown along the chain at constant speed
-			// advance whole legs: the moment the disc reaches a waypoint is the visible bounce
-			while (_shldLeg < _hopN - 2 && _shldFlown >= _shldSegStart + _shldSeg)
+			Combatant tc = (Combatant)_shldTarget;
+			if (tc == null || tc.kind == "dead" || tc.hp <= 0.0f)
 			{
-				_shldSegStart += _shldSeg; // the leg just settled: home the clock onto the next one
-				_shldLeg++;
-				_shldSeg = (_hops[_shldLeg + 1] - _hops[_shldLeg]).Length(); // read the next leg px off the baked chain
+				// the victim died mid-chase: the chain ends where the disc stands
+				_shldTarget = null;
 			}
-			Godot.Vector2 hopA = _hops[_shldLeg];
-			Godot.Vector2 hopV = _hops[_shldLeg + 1] - hopA;
-			float fr = _shldSeg > 0.0f ? (_shldFlown - _shldSegStart) / _shldSeg : 1.0f;
-			if (fr > 1.0f)
-				fr = 1.0f;
-			_shieldFx.GlobalPosition = hopA + hopV * fr;
-			_shieldFx.Rotation = (float)System.Math.Atan2((double)hopV.Y, (double)hopV.X) + _shldFlown * 0.045f; // tumbles by distance flown, not by time
-			_shieldFx.Visible = true;
-			if (_shieldT <= 0.0f)
+			else
 			{
-				_shieldT = 0.0f;
-				_shieldDur = 0.0f; // throw done: hide on landing so the decay cannot fight the final placement
-				_shieldFx.Visible = false; // the flight ends the moment it lands
+				Game pgs = GetParent() as Game; // toroidal-safe wrap lanes, same as every aim lane
+				if (pgs == null)
+					_shldTarget = null; // no world handle: end the throw instead of hanging it
+				else
+				{
+					_shldFlown += (float)SHIELD_HURL_SPEED * delta; // px the disc may fly this frame
+					Vector2 tgt = _shldTarget.GlobalPosition; // LIVE position: the prey moves, the disc chases
+					Vector2 dv = pgs.WrapDelta(_shldPos, tgt); // disc -> victim, wrap-short way
+					float step = (float)SHIELD_HURL_SPEED * delta; // constant hurl speed (px/s)
+					if (dv.Length() <= step)
+					{
+						_shldPos = tgt; // land ON the body: the disc strikes it, never flies past it
+						_shldBites++;
+						((Combatant)_shldTarget).TakeDamage(_shldBites == 1 ? _shldRoll : _shldRoll * 0.75); // ONE roll for the whole throw: first bite full, every bounce a flat 75% (user 2026-11-01)
+						// pick the next hop AT THIS INSTANT from live positions: nearest fresh body within SHIELD_HOP
+						// of the hit that this throw has not spoken for yet (chain-lightning memo discipline)
+						Godot.Node2D nxN = null;
+						if (_shldLeft > 0)
+						{
+							Godot.Collections.Array<Godot.Node2D> foes = pgs.GetEnemies();
+							float nxDb = 1e9f;
+							for (int i = 0; i < foes.Count; i++)
+							{
+								Godot.Node2D en = foes[i];
+								Combatant ec = (Combatant)en;
+								if (ec == null || ec.kind == "dead" || ec.hp <= 0.0f)
+									continue; // killed-but-unswept bodies are never hops
+								bool done = false;
+								for (int h = 0; h < _shldHitN; h++)
+									if (_shldHit[h] == en)
+									{ done = true; break; }
+								if (done)
+									continue; // one honest bite per body per throw
+								float dd2 = pgs.WrapDelta(tgt, en.GlobalPosition).Length();
+								if (dd2 >= nxDb || dd2 > (float)SHIELD_HOP)
+									continue; // a bounce only hops within SHIELD_HOP of the body it just bit
+								nxDb = dd2;
+								nxN = en;
+							}
+						}
+						if (nxN != null)
+						{
+							_shldHit[_shldHitN++] = nxN; // the hop is spoken for the moment it is picked
+							_shldTarget = nxN; // the disc takes the next leg off the body IT just bit (user: hit, then bounce to the next)
+							_shldLeft--;
+						}
+						else
+						{
+							// no fresh body to bounce to: the shield disappears where it landed (user)
+							_shldTarget = null;
+						}
+					}
+					else
+						_shldPos = pgs.WrapNearCamera(_shldPos + dv.Normalized() * step); // home on the LIVE body between frames
+					if (_shieldFx != null)
+					{
+						_shieldFx.GlobalPosition = _shldPos;
+						_shieldFx.Rotation = (float)System.Math.Atan2((double)dv.Y, (double)dv.X) + _shldFlown * 0.045f; // tumbles by distance flown, not by time
+						_shieldFx.Visible = true;
+					}
+				}
+			}
+			if (_shldTarget == null)
+			{
+				// the chain ended THIS frame (no next body / dead victim / no world): the disc drops at its
+				// landing spot (user: "if there isn't a next enemy to bounce to, it disappears")
+				if (_shieldFx != null)
+					_shieldFx.Visible = false;
+				if (_shldBites > 1)
+					GD.Print("[10thAge] (shield) " + displayName + " shield bounds " + (_shldBites - 1) + " more bodies");
 			}
 		}
 		ultT -= delta;
@@ -2859,124 +2922,27 @@ public partial class PartyMember : Godot.Node2D
 
 			_atkFlash = 0.08f; // same commit pulse every kit uses, never the red harm lane
 
-			// fx art (user 2026-11-01 rework): the disc HURLS from Wash along the whole bounce chain
-
-			// instead of a mid-air flash - the polyline is baked into _hops during the chain walk
-
-			// below, and the _Process hurl clock lerps the sprite along it (damage stays instant:
-
-			// the flight is the visual trail of an already-resolved throw)
-
+			// 2026-11-02 fx-feel6 (user: the throw "goes through enemies... bounces at their set distance...
+			// applies the damage immediately instead of on hit (like it should do similar to Bruno's)"):
+			// the commit now ONLY speaks for the prey and looses the disc - the _Process chase lands
+			// every bite ON ARRIVAL and picks each hop at the hit itself. No baked polyline, no instant
+			// damage at commit.
 			if (_shieldFx != null)
-
 			{
-
-				if (_hops == null)
-
-					_hops = new Godot.Vector2[8]; // thrower + more bodies than one throw can ever bite
-
-				_hops[0] = p;
-
-				_hopN = 1;
-				_hops[_hopN] = prey.GlobalPosition; // 2026-11-02: FIRST waypoint is the prey itself - the disc visibly strikes the first body before bouncing (the old chain leapt past it)
-				_shldSeg = (prey.GlobalPosition - p).Length(); // leg 0 px (the throw leg) seeds the chain walk
-				_shldLen = _shldSeg; // cumulative baked chain px starts at the throw leg
-				_hopN++;
-
 				_shieldFx.GlobalPosition = p; // starts in his hand: the throw visibly LEAVES the model
-
 				_shieldFx.Visible = true;
-
 			}
-
-			double shdDmg = RollDamage(pg, weaponDamage); // ONE crit/lifesteal roll for the whole throw
-
-			Godot.Node2D[] hit = new Godot.Node2D[1 + shieldBounce]; // memo: no body twice in one throw
-
-			hit[0] = prey; int used = 1;
-
-			((Combatant)prey).TakeDamage(shdDmg);
-
-			Godot.Node2D cur = prey;
-
-			for (int b = 0; b < shieldBounce; b++)
-
-			{
-
-				Godot.Node2D nx = null; float nxDb = 1e9f;
-
-				for (int i = 0; i < enemies.Count; i++)
-
-				{
-
-					Godot.Node2D n = enemies[i]; Combatant nc = (Combatant)n;
-
-					if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
-
-						continue; // killed-but-unswept bodies are not valid hops (chain-lightning discipline)
-
-					bool done = false;
-
-					for (int h = 0; h < used; h++)
-
-						if (hit[h] == n)
-
-						{ done = true; break; }
-
-					if (done)
-
-						continue;
-
-					Vector2 dv = pg.WrapDelta(cur.GlobalPosition, n.GlobalPosition);
-
-					float dd2 = dv.Length();
-
-					if (dd2 >= nxDb || dd2 > (float)SHIELD_HOP)
-
-						continue;
-
-				nxDb = dd2; nx = n;
-
-				}
-
-				if (nx == null)
-
-					break; // the shield found no fresh prey: the throw ends with what it bit
-
-				((Combatant)nx).TakeDamage(shdDmg * 0.75); // user 2026-11-01: every bounce after the first body is FLAT 75% of the roll (not compounding)
-
-				hit[used++] = nx;
-
-				{
-					_shldLen += (nx.GlobalPosition - cur.GlobalPosition).Length(); // bake this bounce-leg px
-					_hops[_hopN++] = nx.GlobalPosition; // bake the bounce leg for the visible hurl
-					cur = nx; // 2026-11-02 BUGFIX (user: "it just shows in a straight line for a set distance and vanishes"): cur advanced BEFORE the bake, so every bounce leg baked 0 px and _shieldDur only ever covered the THROW leg - the disc flew straight at the first victim and hid before it could ride the bounces
-				}
-
-			}
-
-			if (_shieldFx != null && _hops != null && _hopN > 0)
-
-			{
-
-				_shieldDur = _shldLen / (float)SHIELD_HURL_SPEED; // constant-speed hurl: seconds to fly the whole baked chain
-				if (_shieldDur < 0.05f)
-					_shieldDur = 0.05f; // floor so a degenerate chain still reads as a beat
-				_shieldT = _shieldDur;
-				_shldFlown = 0.0f; // px clock for this throw
-				_shldLeg = 0; // chain walk starts at the throw leg
-				_shldSegStart = 0.0f; // cumulative leg clock starts with it
-				_fxT = _shieldDur; // the decay block hides the disc exactly as the flight lands
-
-				_fxT = _shieldDur; // the decay block hides the disc exactly as the flight lands
-
-			}
-
-			if (used > 1)
-
-				GD.Print("[10thAge] (shield) " + displayName + " shield bounds " + (used - 1) + " more bodies");
-
-			return; // the throw owns its whole beat: never fall through to the lane/fan search
+			_shldPos = p; // flight state lives even without art: a greybox Wash still bites on arrival
+			_shldTarget = prey; // the disc HOMES on live positions: no bake, no instant commit
+			_shldRoll = RollDamage(pg, weaponDamage); // ONE crit/lifesteal roll for the whole throw (one object, one bite)
+			_shldLeft = shieldBounce; // bounce budget: extra bites after the first body (ranks grow it)
+			_shldBites = 0; // nothing bitten yet: the FIRST bite lands when the disc arrives
+			_shldFlown = 0.0f; // distance clock for the disc's tumble
+			if (_shldHit == null)
+				_shldHit = new Godot.Node2D[1 + shieldBounce]; // memo fits the prey plus every bounce this throw can ever make
+			_shldHitN = 1;
+			_shldHit[0] = prey; // the prey is spoken for: it can never be a later hop this throw
+			return; // the throw owns its whole beat: damage lands when the disc lands on a body
 
 		}
 

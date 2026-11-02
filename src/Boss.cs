@@ -31,8 +31,10 @@ public partial class Boss : Combatant
 
     // MINI DANCE (user 2026-11-02): the mini-boss fight is choreography, not drift-and-ring.
     // Cycle: run toward the party and stop at MINI_STOP_DIST -> circle around it firing
-    // fans AIMED at it (no rings anymore) -> stand completely still for MINI_STAND_LEN
-    // (the user's 3 s) -> repeat the whole cycle. Getting into position fires NOTHING,
+    // fans AIMED at it (no rings anymore) -> crawl the ring slowly for MINI_STAND_LEN
+    // (2026-11-02 user: "keep them moving slowly after they do their 3 rounds of arrow volleys
+    // instead of standing still") -> repeat the whole cycle. The circle leg looses exactly 3
+    // fans (0.5/1.7/2.9 s into the 4 s leg), so the slow beat lands right after the 3rd volley. Getting into position fires NOTHING,
     // until hp drops below half: then it adds one aimed arrow per MINI_ENRAGE_EVERY while
     // running in. Its bullets ride the arrow fx art (Game.SpawnBulletArrow).
     // ZERO Rng draws: the orbit side swaps deterministically every cycle, so run streams
@@ -47,7 +49,8 @@ public partial class Boss : Combatant
     readonly float MINI_RUN_SPEED = 130.0f;   // run-in charge vs the old 42 drift: user asked FASTER (assistant pick)
     readonly float MINI_ORBIT_SPEED = 120.0f; // px/s along the ring (constant-px/s discipline, assistant pick)
     readonly float MINI_ORBIT_LEN = 4.0f;     // circle-leg length (assistant pick: ~1/3 of a full lap)
-    readonly float MINI_STAND_LEN = 3.0f;     // USER number: the 3-second stand
+    readonly float MINI_STAND_LEN = 3.0f;     // USER number: the 3 s slow beat after the volleys
+    readonly float MINI_STAND_SPEED = 45.0f;  // assistant pick: ring travel px/s during that beat ("move slowly")
     readonly float MINI_FAN_EVERY = 1.2f;     // fan volley cadence while circling (assistant pick)
     readonly int MINI_FAN_N = 5;              // fan width (assistant pick)
     readonly float MINI_FAN_STEP = 0.16f;     // radians between fan spokes (assistant pick)
@@ -243,7 +246,7 @@ public partial class Boss : Combatant
                 if (!_miniSaidDance)
                 {
                     _miniSaidDance = true;
-                    GD.Print("[10thAge] (dance) " + kind + " settled: circling with aimed fans, 3 s stand between cycles");
+                    GD.Print("[10thAge] (dance) " + kind + " settled: circling with aimed fans, slow crawl between cycles");
                 }
             }
             return;
@@ -278,7 +281,19 @@ public partial class Boss : Combatant
             }
             return;
         }
-        // STAND: completely still for the user's 3 seconds, then the whole cycle repeats
+        // SLOW BEAT (2026-11-02 user: "keep them moving slowly after they do their 3 rounds of
+        // arrow volleys instead of standing still"): same pinned-ring sweep as the circle leg,
+        // just at MINI_STAND_SPEED px/s - a crawl, still NO fans - then the cycle repeats
+        Vector2 rel2 = (dist < 1.0f) ? new Vector2(MINI_STOP_DIST, 0.0f)
+                                     : to.Normalized() * MINI_STOP_DIST;
+        float omega2 = MINI_STAND_SPEED / MINI_STOP_DIST; // rad/s that keeps ring travel at the crawl pace
+        Vector2 want2 = target.GlobalPosition - rel2.Rotated(_miniSide * omega2 * delta);
+        Vector2 drift2 = g.WrapDelta(GlobalPosition, want2);
+        float step2 = MINI_RUN_SPEED * slow * delta; // cap > crawl speed: an on-ring sweep lands exactly on the swept point
+        if (drift2.Length() > step2)
+            GlobalPosition = g.WrapNearCamera(GlobalPosition + drift2.Normalized() * step2);
+        else
+            GlobalPosition = g.WrapNearCamera(want2);
         if (_miniClock >= MINI_STAND_LEN)
         {
             _miniPhase = 0;
