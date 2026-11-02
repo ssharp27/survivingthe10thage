@@ -796,6 +796,14 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   pass touches camp). HONEST evidence note: `(shield)` bounce tallies printed **0** in all three runs, but so
   did the baseline runs `smokeFXz444`/`smokeFXz450` — the print only fires on MULTI-body throws, and the lane
   itself demonstrably runs (err-0 = any C# array/flight-clock exception in the new tick would surface there).
+- `smokeFXz456` (default pilot), `smokeFXz457`/`smokeFXz458` (Alvora seat ×2, fresh lotteries) — **Alvora Spirit
+  Guardians art (user 2026-11-02: "alvora_spirit - literally a sprite of Alvora... tint it a kind of spectral blue
+  and shrink it down to about 1/3 of the size")**: **VICTORY, VICTORY, VICTORY**, all `.err` 0 bytes, 17 `stat tag`
+  rows each, camp skipped via `M1_DEV_SKIP=camp` (proven LIVE by the two camp passes just above). `spiritFxArt`
+  export set ONLY on the Alvora node (others keep "" = greybox); seat ×2 guarantees the aura ring is joined +
+  live. Headless renders nothing — honest proof = err-0 (a missing `.import` sidecar or bad `GD.Load` would throw)
+  + human play for the spectral tint / 1-3 size / upright faces.
+
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
@@ -803,6 +811,10 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   `_hops[_hopN++] = ...` sat under `if (_hops != null && _hopN < _hops.Length)` WITHOUT braces; splicing a
   new `_shldLen +=` line above it made the guard cover the new line and left the bake UNGUARDED (array-bounds
   risk). Compiles silently — geometry bugs like this never show in a smoke. Always brace when adding siblings.
+- **When the edit tool flakily misses tab-indented anchors on a huge LF-only C# file, python line-splices
+  are the reliable route**: assert exact byte-line equality + `count==1` per anchor, insert raw `\t`-indented byte
+  lines, census `b'\r' not in data` first, re-join with `b'\n'.join`. (Alvora spirit-motes splices; the same
+  discipline that made the wash-shield splices trustworthy.)
 - **`open(..., newline=None)` + `splitlines(keepends=True)` rewrites bare-CR endings to `\n` on write-back**:
   PartyMember.cs mixes CRLF and bare CR on disk; the sp_wash scripts read universal and wrote `newline=''`,
   so untouched CR lines became LF. Harmless to the compiler/git (index blob is LF), but line-ending census
