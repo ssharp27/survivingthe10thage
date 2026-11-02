@@ -27,6 +27,12 @@ public partial class Director : Godot.Node2D
         // table means there is one marching state, so ask the stage whether it marches.
         if (!g.GetHordeActive())
             return; // CAMPFIRE / DEAD / VICTORY hold the march back
+        // HORDE EVENT (user 2026-11-02): the budget-free bonus swarm. Game arms the schedule at
+        // the FIRST mini-boss kill; it fires ONLY while the horde actually marches (camp + picker
+        // pauses hold it back), and placement lives HERE on the same edge-ray lane as ordinary
+        // spawns - that is the infrastructure the user asked for to reuse hordes on other maps.
+        if (g.GetHordeEventDue() > 0.0 && g.GetRunTime() >= g.GetHordeEventDue())
+            SpawnHordeEvent(g, (float)g.GetHordeScale());
         _spawnTimer -= (float)d * (float)g.GetTimeWarp(); // TEST M1_TIMEWARP: cadence charges on the RUN clock so legs keep their NORMAL spawn budgets at warp speed
         if (_spawnTimer > 0.0f)
             return;
@@ -114,5 +120,47 @@ public partial class Director : Godot.Node2D
         e.GlobalPosition = pos;
         g.RegisterEnemy(e);
         g.AddChild(e);
+    }
+
+    // HORDE EVENT: one bonus swarm, budget-free (user: "these won't count against the maximum
+    // number of enemies that can spawn"). Bodies enter as TIER 1 goblins now - the user's opening
+    // rule - and mixing tier-2/3 at later run points is ONE read of g.GetHordeTier() here, so the
+    // infrastructure is already in place. The count rides the horde-scale chip ("20 enemies (these
+    // scale with the horde scale increases)"). All bodies enter as ONE group on ONE random bearing,
+    // fanned ~70 degrees with a staggered front row so the wave reads as a wave, not 20 bodies at
+    // one pixel; they home to the squad for free (the Enemy class chases the nearest ally itself).
+    // One Rng draw per event shifts the run stream downstream, like every other proc.
+    private void SpawnHordeEvent(Game g, float hordeScale)
+    {
+        int n = (int)(20.0f * hordeScale); // user: 20 bodies, scaling with horde-scale increases
+        Vector2 cen = g.GetCameraCenter();
+        Vector2 half = g.GetVisibleHalfExtents();
+        float a0 = (float)GD.Randf() * (float)(System.Math.PI * 2.0); // random side of the frame
+        for (int i = 0; i < n; i++)
+        {
+            // one group, one fan: ~70 degrees spread, front row staggered so the swarm is
+            // organic rather than 20 bodies at one pixel
+            float frac = n > 1 ? (float)i / (float)(n - 1) : 0.5f;
+            float a = a0 + (frac - 0.5f) * 1.2f;
+            Vector2 unit = new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a));
+            double tx = System.Math.Abs(unit.X) > 0.001 ? half.X / System.Math.Abs(unit.X) : 1e30;
+            double ty = System.Math.Abs(unit.Y) > 0.001 ? half.Y / System.Math.Abs(unit.Y) : 1e30;
+            double reach = System.Math.Min(tx, ty) + 60.0 + 40.0 * (i % 3);
+            Vector2 pos = cen + unit * (float)reach;
+            if (g.GetLeader() != null && pos.DistanceTo(g.GetLeader().GlobalPosition) < 260.0f)
+                continue; // near-party guard, same discipline as Spawn()
+            Enemy e = new Enemy();
+            e.kind = "goblin"; // tier-1 entry point: tier-2/3 mixes later ride g.GetHordeTier() right here
+            e.maxHp = 30.0f * hordeScale; // tier-1 goblin HP, rest chips fatten it like ordinary spawns
+            e.hp = e.maxHp;
+            e.speed = 90.0f;
+            e.contactDamage = 2.0f;
+            e.xpValue = 1.0f; // the user's "chance to gain a lot more XP": 20 clean bodies = a fat purse
+            e.GlobalPosition = pos;
+            g.RegisterHordeBody(e); // budget-free lane: never counted, exactly like the boss nodes
+            g.AddChild(e);
+        }
+        g.AdvanceHordeSchedule();
+        GD.Print("[10thAge] (horde) bonus swarm: " + n + " goblins fan in on one bearing, budget-free (xp per body)");
     }
 }

@@ -273,7 +273,14 @@ public partial class Game : Godot.Node2D
 	// ---------- rest -> horde scaling (long rest costs the party its safety) ----------
 	// Director.cs reads this and densifies spawns; the long-rest risk chip on the
 	// Campfire screen is wired to exactly this.
-	double _hordeScale = 1.0;
+	double _hordeScale = 1.0;
+
+	// ---------- horde EVENT: budget-free bonus swarms (user 2026-11-02: "random horde spawns ... won't count against the maximum number of enemies that can spawn ... 20 enemies (these scale with the horde scale increases) ... all spawn together and move towards the player ... first spawn can happen 30 seconds after the first mini-boss is defeated, then every 2 minutes after") ----------
+	// an event body never takes a budget slot: RegisterHordeBody is the same no-count lane the boss nodes use. TIER 1 goblins ONLY to begin with; mixing tier-2/3 in at later run points rides g.GetHordeTier() at the event spawner (infrastructure lives in Director.cs so other maps can reuse it). Times are the user's INITIAL TEST pacing - retuned with the full M3 pacing pass.
+	readonly double HORDE_EVENT_FIRST_DELAY = 30.0; // run-seconds after the first mini-boss falls
+	readonly double HORDE_EVENT_EVERY = 120.0;      // run-seconds between bonus swarms
+	double _hordeEventDue = 0.0;                    // 0 = schedule unarmed; else run-time deadline
+
 
 	// ---------- ui/ screens (Campfire.tscn + RunSummary.tscn, see ui/INTEGRATION.md) ----------
 	Godot.CanvasLayer _campfire;
@@ -843,7 +850,14 @@ public partial class Game : Godot.Node2D
 			ClearBullets();
 			ReviveAllAtCampfire(false);
 			GD.Print("[10thAge] mini-boss slain ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â camp: the fallen return at 25% hp; the "
-					 + "rest choice decides healing");
+					 + "rest choice decides healing");
+			if (kb == "mini1")
+			{
+				// HORDE EVENT: the user's first-event clock starts at the FIRST mini-boss's death
+				_hordeEventDue = GetRunTime() + HORDE_EVENT_FIRST_DELAY;
+				GD.Print("[10thAge] (horde) first mini-boss down - bonus swarms armed: first 30 s out, every 120 s after");
+			}
+
 		}
 		else if (kb == "boss1")
 		{
@@ -972,7 +986,27 @@ public partial class Game : Godot.Node2D
 		}
 	}
 
-	public void RegisterEnemy(Combatant e)
+		public double GetHordeEventDue()
+	{
+		return _hordeEventDue;
+	}
+
+	// one event's worth forward after each swarm lands (the Director owns placement and calls this)
+	public void AdvanceHordeSchedule()
+	{
+		_hordeEventDue += HORDE_EVENT_EVERY;
+	}
+
+	// HORDE EVENT bodies (user: "won't count against the maximum number of enemies that can spawn"): the
+	// same no-budget lane the boss nodes use - never counted, so ReleaseLiveCount is inert for them on
+	// every exit path and the director's cap keeps seeing only ordinary horde bodies
+	public void RegisterHordeBody(Enemy e)
+	{
+		_enemies.Add(e);
+		e.counted = false;
+	}
+
+public void RegisterEnemy(Combatant e)
 	{
 		_enemies.Add(e);
 		if (!(e is Boss)) // bosses (any of the four) never count toward the horde cap
