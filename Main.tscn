@@ -63,6 +63,7 @@ range = 192.0
 weaponKit = "aura"
 baseArmour = 1.0
 class_ = "Twilight Cleric"
+spiritFxArt = "res://art/fx/alvora_spirit.png"
 
 [node name="Yu" type="Node2D" parent="." unique_id=875256559]
 script = ExtResource("3_pm")

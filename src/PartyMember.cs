@@ -160,6 +160,12 @@ public partial class PartyMember : Godot.Node2D
 
 	[Export] public string shieldFxArt = ""; // Wash: hurl disc caught mid-hurl on the commit
 
+	// Alvora Spirit Guardians art (user 2026-11-02: "alvora_spirit - literally a sprite of Alvora...
+	// tint it a spectral blue and shrink it down to about 1/3 of the size"): set on the ALVORA node in
+	// Main.tscn; the six ring motes then ride that art instead of the twilight-violet ColorRect greybox
+	// (tint + 1/3 scale live at the build below; damage, pulse and ring ranks untouched).
+	[Export] public string spiritFxArt = ""; // Alvora: Spirit Guardians mote art (spectral-blue tinted)
+
 	Godot.Sprite2D _meleeFx = null;
 
 	Godot.Sprite2D _shieldFx = null;
@@ -466,6 +472,11 @@ public partial class PartyMember : Godot.Node2D
 	Godot.Node2D _auraPivot = null;
 
 	Godot.ColorRect[] _auraParts;
+
+	// Art motes when spiritFxArt is set (user 2026-11-02 alvora_spirit pass): same pivot, same ring
+	// spots, so orbit + the "wider ring" rank ride the pivot as ever; faces stay upright via the
+	// counter-rotation in the orbit block
+	Godot.Sprite2D[] _auraSprites = null;
 
 	float _auraPulse = 0.0f; // seconds of ring flare left from the last pulse
 
@@ -1054,6 +1065,54 @@ public partial class PartyMember : Godot.Node2D
 			_auraPivot.AddChild(s);
 
 			_auraParts[i] = s;
+
+		}
+
+		// user 2026-11-02 art pass: the six motes ride the Alvora sprite (art/fx/alvora_spirit.png,
+
+		// 94x104) tinted spectral blue at ~1/3 native size (the user's "shrink it down to about 1/3"),
+
+		// parked on the SAME ring spots as the greybox and parented to the same pivot. PURE ART:
+
+		// hit test, pulse flare timing and ring ranks untouched.
+
+		if (spiritFxArt != "")
+
+		{
+
+			Godot.Texture2D fxT = GD.Load(spiritFxArt) as Godot.Texture2D;
+
+			if (fxT != null)
+
+			{
+
+				_auraSprites = new Godot.Sprite2D[6];
+
+				for (int i2 = 0; i2 < 6; i2++)
+
+				{
+
+					_auraParts[i2].Visible = false; // art owns this mote slot
+
+					_auraSprites[i2] = new Godot.Sprite2D();
+
+					_auraSprites[i2].Texture = fxT;
+
+					_auraSprites[i2].Set("texture_filter", 0);
+
+					_auraSprites[i2].Position = _auraParts[i2].Position; // same authored ring spot as the greybox
+
+					_auraSprites[i2].Scale = new Vector2(0.33f, 0.33f); // user: ~1/3 of the 94x104 art (-> ~31x35 on screen)
+
+					_auraSprites[i2].Modulate = new Color(0.55f, 0.78f, 1.0f, 1.0f); // spectral blue (assistant pick of the user's "spectral blue")
+
+					_auraSprites[i2].ZIndex = 4; // same layer the greybox motes hold, under the body (5)
+
+					_auraPivot.AddChild(_auraSprites[i2]);
+
+				}
+
+			}
 
 		}
 
@@ -1867,6 +1926,12 @@ public partial class PartyMember : Godot.Node2D
 
 			_auraPivot.Rotation += (float)(1.1 * delta);
 
+			if (_auraSprites != null)
+
+			 foreach (Godot.Sprite2D s in _auraSprites)
+
+				 s.Rotation = -_auraPivot.Rotation; // spirit faces stay upright while the ring orbits
+
 			if (_auraPulse > 0.0f)
 
 			{
@@ -1879,6 +1944,14 @@ public partial class PartyMember : Godot.Node2D
 
 				float f = _auraPulse / 0.22f;
 
+
+				// art motes flare on top of the spectral base so the tick still reads
+
+				if (_auraSprites != null)
+
+					foreach (Godot.Sprite2D s in _auraSprites)
+
+						s.Modulate = new Color(0.55f * (1.0f + f * 0.7f), 0.78f, 1.0f * (1.0f + f * 0.4f), 1.0f);
 				foreach (Godot.ColorRect s in _auraParts)
 
 					s.Modulate = new Color(1.0f + f * 0.7f, 1.0f, 1.0f + f * 0.4f);
@@ -1892,6 +1965,15 @@ public partial class PartyMember : Godot.Node2D
 				foreach (Godot.ColorRect s in _auraParts)
 
 					s.Modulate = new Color(1.0f, 1.0f, 1.0f);
+
+				// art motes settle back to the spectral base (build tint would otherwise be
+				// overwritten by the white loop above)
+
+				if (_auraSprites != null)
+
+					foreach (Godot.Sprite2D s in _auraSprites)
+
+						s.Modulate = new Color(0.55f, 0.78f, 1.0f, 1.0f);
 
 			}
 
@@ -3698,4 +3780,3 @@ public partial class PartyMember : Godot.Node2D
 	}
 
 }
-
