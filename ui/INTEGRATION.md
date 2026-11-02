@@ -90,10 +90,13 @@ private void ShowCampfire()
 }
 ```
 
-`state` strings the GDScript reads: `"up" | "down" | "stable" | "out"`; `leader: bool`.
-Shipped (2026-10-31 sync): the helper is `Game.CampfireCards()`, re-sent every frame the camp is up
-(`Game.cs`:4150 area) so a cancel re-offers fresh data. **Open item**: `ui/Campfire.gd` still renders
-`slots = 5` strips — at the 8-PC roster, Stack/Wash/Bruno get no camp strip (cosmetic, queued in `M2_STATUS.md`).
+`state` strings the GDScript reads: `"away" | "out" | "stable" | "down" | "up"`; `leader: bool`.
+Shipped (2026-11-02 camp-UI sync): the helper is `Game.CampfireCards()`, re-sent every frame the camp is up
+(`Game.cs`:4150 area) so a cancel re-offers fresh data. **Closed**: `ui/Campfire.gd` renders `slots = 9` strips
+(the full 9-PC roster), and cards whose state is `"away"` (never recruited) are POPULATED but HIDDEN — the camp
+paints only recruited bodies (user rule 2026-11-02: the dim "not recruited yet" strips spoiled which characters
+existed to find mid-run); visibility re-derives every refresh, so a member joining at THIS
+camp shows up on the next paint.
 
 ### 4. Apply the chosen rest (new Game handler)
 
@@ -190,7 +193,7 @@ Campfire screen (1280x720, 40px safe margins):
    grass/projectiles show through behind the text (every StyleBoxFlat was already alpha 1); the
    grimoire panel sits centered (960x640).
 2. Header: placeholder d20 token (dice flavor), then "THE CAMPFIRE" + "Tanurial Forest - camp between battles".
-3. "THE COMPANY" roster bar, then a 2-column x 3-row grid of member cards (leader marked "LEADER" in gold). Each card: name + class/weapon, HP bar with fill + "N / M hp", and a colored state chip — READY (sage), DOWN - death saving (blood), STABLE - no more rolls (amber), OUT - back at campfire (grey, card dimmed). Empty slots show "empty slot".
+3. "THE COMPANY" roster bar, then a **single column of roster strips in JOIN order** (2026-10-20 layout; 9 slots as of the 2026-11-02 camp-UI pass). Each strip: name + class/weapon (+ gold "LEADER" tag on the leader), HP bar with fill + "N / M hp", and a colored state chip — READY (sage), DOWN - death saving (blood), STABLE - no more rolls (amber), OUT - back at campfire (grey). Members never recruited (state "away") are POPULATED but NOT PAINTED (2026-11-02: the camp shows only recruited bodies), and empty slots show nothing — cards are hidden, never removed, so grid positions never shift.
 4. "CHOOSE YOUR REST" then two cards: SHORT REST (safe, heals +25% max HP) vs LONG REST with a red
    "HORDE SCALING GROWS" risk chip — the required risk/reward copy. **The whole card is the Button**
    (2026-10-19 human-test: the 64 px title strip was the only clickable strip, so clicks on the card

@@ -1,4 +1,4 @@
-# M2 STATUS - **IN PROGRESS** (opened 2026-10-22; roster grew 5→8 PCs — Asper/Alvora/Yu in the M2 pass, then Stack/Wash/Bruno + Bruno leader bonus landed 2026-10-30/31)
+# M2 STATUS - **IN PROGRESS** (opened 2026-10-22; roster grew 5→9 PCs — Asper/Alvora/Yu in the M2 pass, then Stack/Wash/Bruno + Bruno leader bonus landed 2026-10-30/31, Brook as the 9th 2026-10-31; balance/art/fx/ult/leader-bonus passes ran 2026-11-01/02 and the camp-card UI fix landed 2026-11-02 — full trail in `RESUME_NOTES.md`)
 
 M2 = the campaign roster. Scope, locked decisions, and gate trail live here; `M1_STATUS.md` stays the
 authoritative M1 record (passes 1–22, signed off at `f0ca883` + `demo_final.zip` shipped, human test
@@ -6,16 +6,16 @@ PASSED). Tree was clean at M1 sign-off when M2 opened.
 
 ## Scope (`DESIGN.md`:52 — "M2 — the campaign roster")
 
-- All **8 PCs** (DESIGN grew 5→8 as the user dictated more; all landed 2026-10-31) with classes, signature attacks,
+- All **9 PCs** (DESIGN grew 5→9 as the user dictated more; all landed 2026-10-31) with classes, signature attacks,
   and **rank-4 subclass evolutions** (Stormcaller / Viperkiss / …; `DESIGN.md`:17 "3 ranks, then an evolution =
   subclass choice", data-driven — evolutions stay **parked**).
 - **Recruitment wiring** for the whole roster (M1 shipped one join beat: Mosiah).
 - **Meta-progression**: unlock characters, who can be recruited. The starting-party-size knob
   (1→2→3) is **deferred** per the user.
 
-Progress: **8 of 8 roster PCs in play** — Baldrun + Mosiah (M1) + **Asper** + **Alvora** + **Yu** (M2 pass)
-+ **Stack** + **Wash** + **Bruno** (user dictations 2026-10-30/31). The stage **beat loop**, the **9-slot picker**
-(keys `pick_1..pick_9`) and the escort-cage join path carry all eight, and the roster is now complete
+Progress: **9 of 9 roster PCs in play** — Baldrun + Mosiah (M1) + **Asper** + **Alvora** + **Yu** (M2 pass)
++ **Stack** + **Wash** + **Bruno** (user dictations 2026-10-30/31) + **Brook** (user dictation 2026-10-31). The stage
+**beat loop**, the **10-slot picker** (keys `pick_1..pick_10`) and the escort-cage join path carry all nine, and the roster is now complete
 (meta/unlocks and the party-size knob stay deferred).
 
 ## Stage beat loop — user RE-LOCKED 2026-10-23 (second lock: more scaling runway)
@@ -115,25 +115,65 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
   **+10% movement speed** — pure reader multipliers (`LeaderAreaMul()` / `LeaderMoveMul()` asked by
   `EffRange()`, `EffMove()`, the Kaka blast, Alvora's aura pivot and Bruno's own discs), so the `stat tag`
   audit never lies and a seat swap retargets by itself.
+- **Brook** — Rogue (user 2026-10-31: "add Brook as the 9th PC" — twin daggers). **Twin dagger stabs**:
+  ONE beat = TWO same-line stabs at short reach with a small delay between them (assistant knobs: 0.15 s
+  stagger + 0.9 s cooldown; strike 1 re-arms cdTimer, strike 2 closes the beat). Narrow corridor band (14 px
+  × AREA, length `EffRange()`), 170 px reach. **7 dmg per dagger / 60 hp / poison 1 dps × 5 s / 10% total
+  evade are the user's numbers** (base-stat pass authored Brook's evade 0.10—0.05; StatTags BASE is already 5%).
+  Both daggers in one beat SHARE ONE crit/steal/multistrike roll (the twin strike is ONE attack event). Poison
+  = its OWN `Combatant.cs` pair (`poisonDps`/`poisonT` + `Poison()`/`TickPoison()` kept SEPARATE from burn so
+  cinder bloom + the Drink bonus stay STACK-ONLY; dps scales with attack damage at the stamp call). Verb `"dagger"`
+  owns its beat in `PartyMember.cs` (Bruno precedent). Cards rows 35-39 (tables 35—40 wide): damage / attack
+  speed / **venom** (longer poison) / crit chance / **multistrike** (5%/rank deal damage twice inside
+  `PM.RollDamage`, zero Rng draw when 0). Ult **Assassination**: 10 s ALL allies +25% multistrike / +15% crit
+  chance / +25% crit damage (one `assT` clock riding the crit + damage chokes). Leader seat **Inquisitive Mind**:
+  allies +5% evasion (shared `LeaderEvaMul`, later grown to key 2 with Mosiah), +15% collection range (rides the
+  gem bubble), +15% XP. Art `art/brook.png` imported + rigged. **LANDED** (`memberIndex = 8`,
+  `weaponKit = "dagger"`, `class_ = "Rogue"`).
+- **Follow-up passes 2026-11-01/02** (one line each; FULL trail lives in `RESUME_NOTES.md`): Yu spirit-guard
+  seat gate `1958a87` (downed Yu stops kindling; revival RESUMES the 30 s cadence — drain-to-0 pause, not a
+  banked burst); base-stat scene-only pass `9f74abb` (Baldrun/Alvora `baseArmour` 0—1.0, Mosiah `baseEvasion`
+  0—0.05, Brook 0.10—0.05); audit-bug fixes `87c0153` (Stack firebolt card pair de-swap, Bruno
+  `Bleed()` args corrected, all three DoT ticks zero their dps at expiry); five-cards pass `c5589b6` (rows 40-44
+  — Baldrun fire rune / Mosiah deadlier aim / Asper keener aim / Alvora weighty ring / Yu lucky explosions,
+  tables 40—45, new `OPT_FIRE`/`OPT_RING`/`OPT_LUCK` columns); effect-art pass `35618d0` (six procedural
+  `art/fx/` sprites + Yu `stump.png`/`tree.png` minion arts; **Alvora art STILL DEFERRED**); fx-fix `5a7f87f` (Baldrun
+  sweep fills the fan, Mosiah stab streak + spokes zeroed for stab kits, Bruno crescents become TRAVELLING hitboxes,
+  Bruno cooldown 1.0—**2.0** via `Main.tscn` (halves his DPS — honest), Wash shield visibly hurls);
+  boom-fix `f165fbe` (crescent path = out-and-back boomerang loop from the model, `CRESCENT_FLIGHT` 0.55—0.85 s);
+  ult-fix `2f603f2` (spin blades braced under the clock, damage moved INTO the spin tick at each blade's own spot,
+  one honest bite per body per turn, Bruno's normal throws stand down for the ult window — **user-VERIFIED in
+  hand-play 2026-11-01**); leader-bonus/warp `ddb3116` (Yu seat vigil rework: spirits ride the gem magnet lane,
+  delivered vigil heals ALL wounded allies +10, healthy squad never drinks; Wash seat **Inspiring Leader** +15 max
+  HP / +1 armour READER-side; Mosiah seat key 2 +5% evasion; TEST-only bench valve `M1_TIMEWARP=<1..12>` multiplies
+  run clock AND Director cadence — smokes only); Bruno art batch `bef654b` (blade art rides the SAME size
+  factor as hit discs, per-blade launch stagger so extra axes are all visible, arc radius = constant `EffRange()`);
+  and the camp-UI pass (this commit): `ui/Campfire.gd` `slots: int = 9` + away cards HIDDEN on the camp card.
+
 
 - Projectiles, rays, summons and AoEs are all in scope eventually.
 
-## Shared data widths at 8 PCs (verify before touching any table — 2026-10-31)
+## Shared data widths at 9 PCs (verify before touching any table — re-synced 2026-11-02)
 
-- **Card tables are 35 wide** (`OPT_LABEL`/`OPT_MEMBER`/`OPT_CD`/`OPT_RANGE`/`OPT_DMG`/`OPT_PIERCE`/
-  `OPT_SHOTS`/`OPT_VULN`/`OPT_SLOW`/`OPT_CRIT`/`OPT_BURN`/`OPT_CINDER`/`OPT_BOUNCE`/`OPT_CRITD`/
-  `OPT_AXE`/`OPT_SIZE`/`OPT_BLEED`): rows 0-2 Baldrun, 3-5 Mosiah, 6-9 Asper, 10-13 Alvora, 14-17 Yu,
+- **Card tables are 45 wide** (`OPT_LABEL`/`OPT_MEMBER` + ~20 numeric columns incl. `OPT_CD`/`OPT_RANGE`/`OPT_DMG`/`OPT_PIERCE`/`OPT_SHOTS`/`OPT_VULN`/`OPT_SLOW`/`OPT_CRIT`/`OPT_BURN`/`OPT_CINDER`/`OPT_BOUNCE`/`OPT_CRITD`/`OPT_AXE`/`OPT_SIZE`/`OPT_BLEED` and the five-card pass's new `OPT_FIRE`/`OPT_RING`/`OPT_LUCK`): rows 0-2 Baldrun, 3-5 Mosiah, 6-9 Asper, 10-13 Alvora, 14-17 Yu,
   18 Baldrun wild, 19 Mosiah wild, 20-24 Stack, 25-29 Wash, **30-34 Bruno** (heavier axe / quicker throw /
-  extra axes / broader blade / bleeding edge). `PICK_RANK_CAP = 3` per row.
-- **`PICK_SLOTS = 9`** — eight member options + one wild; `pick_9` (keycode 57) entered `project.godot` with Bruno.
-- **`JOIN_W` = one row per PC**: `{3,3,1,1,1,1,1,1}` (stage-1 lottery weights; Wash + Bruno at parity with the rest).
-- **`SEL_ART`/`SEL_BONUS`/`SEL_ULT`/`SEL_LOCKED` are 8 wide** (index = `memberIndex`).
+  extra axes / broader blade / bleeding edge), **35-39 Brook** (damage / attack speed / venom (longer poison) /
+  crit chance / multistrike), **40-44 fifth-slot cards** (Baldrun fire rune / Mosiah deadlier aim / Asper keener
+  aim / Alvora weighty ring / Yu lucky explosions). `PICK_RANK_CAP = 3` per row. Growth history: 35 → 40 with Brook
+  (`b1e5376`) → 45 with the five-cards pass (`c5589b6`). The picker is **`OPT_LABEL.Length`-driven end to end** —
+  widening tables is automatic, no picker/`PICK_SLOTS`/`_pickRank` edit anywhere.
+- **`PICK_SLOTS = 10`** — nine member options + one wild; `pick_10` (keycode 17) entered `project.godot`'s input map
+  with Brook (2026-10-31).
+- **`JOIN_W` = one row per PC**: `{3,3,1,1,1,1,1,1,1}` (stage-1 lottery weights; Wash + Bruno + Brook at parity with the rest).
+- **`SEL_ART`/`SEL_BONUS`/`SEL_ULT`/`SEL_LOCKED` are 9 wide** (index = `memberIndex`).
 - **Ring seats are NOT table-driven** — the follow ring is an **ordinal among live movers** (even 2π/N spacing,
   `Game.cs` ~2155). `RING_SLOT = {0,3,2,4,1,5}` at `Game.cs`:36 is **dead legacy data** (no reads anywhere);
   leave it or ignore it, do not treat it as the seat map.
 - **Audit line prints 17 `stat tag` rows** (the ULT tag joined the registry) — a green trio expects 17, not 16.
-- **Camp menu (`ui/Campfire.gd`) still lists 5 strips** (`var slots: int = 5`) — members 6-8 (Stack/Wash/Bruno)
-  are hidden on the camp card. Cosmetic, unfixed: queued as an open item below.
+- **Camp menu (`ui/Campfire.gd`) SHIPPED at 9 strips** (`var slots: int = 9`, 2026-11-02 camp-UI pass) **and hides
+  "away" cards** — the camp paints ONLY recruited members; unrecruited PCs stay populated-but-hidden so grid slots
+  never shift and a member who joins at the camp re-shows on the next refresh (user rule: the camp must not spoil
+  which characters exist to find).
 
 ## Landed this pass (uncommitted → committed this commit)
 
@@ -340,13 +380,14 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 
 ## M2 backlog / open items
 
-- **Roster complete at 8 PCs** (Asper/Alvora/Yu landed in the M2 pass; Stack, Wash and Bruno landed 2026-10-30/31
+- **Roster complete at 9 PCs** (Asper/Alvora/Yu landed in the M2 pass; Stack, Wash, Bruno and Brook landed 2026-10-30/31
   — see the "Roster dictation (user) — later passes" section and `RESUME_NOTES.md`). What remains roster-wise is
   the **rank-4 evolution shape** (below in "Needs the user's word") — none of the new PCs has a named evolution yet.
-- **Camp card hides members 6-8** (dossier finding 2026-10-31): `ui/Campfire.gd` renders a fixed `slots = 5` of
-  roster strips, so Stack / Wash / Bruno have no HP+state strip at camp even though `CampfireCards()` sends all
-  eight. Cosmetic (the rest math is server-side over `_party`), but it should grow to 8 strips + a taller card
-  block on the next camp-UI pass.
+- ~~Camp card hides members 6-8~~ — **CLOSED by the 2026-11-02 camp-UI pass**: `ui/Campfire.gd` grew to
+  `slots = 9` (9 strips × 32 px + 8 × 14 seps = 400 px fits the 592 px inner frame), and cards whose state is
+  `"away"` (never recruited) are POPULATED but HIDDEN — the camp shows only recruited bodies (user rule 2026-11-02:
+  the dim "not recruited yet" strips spoiled which characters existed to find mid-run), and a member who joins at a
+  camp re-shows on the next refresh. The rest math was always server-side over `_party`.
 - **M1 carry-over, not M2 scope unless the user pulls it**: deferred human-playtest checklist (dash
   feel, escort contact chips, live HUD strip, 25% join-HP floor, picker gating, DPI frame, escort-KILL
   joins), camp alignment round 3, 20-minute run-curve pass (see decision 2 — becomes load-bearing).
@@ -720,6 +761,21 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   as usual. lv/xp drift vs the zx40-42 twins = the known unseeded join-lottery variance.
   REMINDER: gates never prove BALANCE (they only see VICTORY/rows/err) — the feel verdict is the
   user's hand-play.
+
+- `smokeFXz444` (default pilot), `smokeFXz445` (Brook seat), `smokeFXz446` (Wash seat) — **camp-UI pass
+  (Campfire.gd `slots = 9` + away cards HIDDEN), camp path LIVE (no `M1_DEV_SKIP=camp`) so the GDScript
+  card actually executes**: **VICTORY, TPK, VICTORY**, all `.err` 0 bytes, 17 `stat tag` rows each. The
+  two winning trails show BOTH camp beats fully ran (`campfire: the rest card is up` + the pilot's 25 s
+  short-rest default) — direct proof `Campfire.gd` builds + refreshes with zero GDScript errors. `smokeFXz445`
+  Brook-seat TPK retried twice (`smokeFXz447`/`smokeFXz448`, fresh join lotteries): **TPK all three times**,
+  17 rows, 0-byte `.err`, wiped BEFORE any camp beat — a pilot-competence + drift pattern on a seat never
+  gate-proven before (the prior green trio ran default/Bruno/Stack), and a hide-visibility UI fix owns no
+  server state, so nothing in this pass could cause it. Recorded honestly, not hidden.
+- `smokeFXz449` (Bruno seat, camp path live) replaces the Brook leg as the gate trio's third run: **VICTORY**,
+  17 rows, 0-byte `.err`, both camp beats fully ran.
+- **Gate for the camp-UI + docs-sync pass is green**: `smokeFXz444`/`449`/`446` VICTORY (default / Bruno /
+  Wash seats), 17 `stat tag` rows, 0-byte `.err`, camp path LIVE; Brook-seat TPK logged above as a pre-existing
+  pattern.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 

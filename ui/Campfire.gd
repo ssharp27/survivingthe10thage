@@ -68,13 +68,21 @@ func _refresh_bars() -> void:
 		# user 2026-10-20: empty slots must not paint at all; visibility is re-derived
 		# from party_data on every refresh, so a member arriving later shows up
 		# (the card stays in the tree so grid positions never shift)
-		card.visible = i < party_data.size()
+		# user 2026-11-02 (user): hide "away" (never recruited) cards TOO - Game.cs sends the
+		# FULL roster with state "away" for unrecruited PCs, and even the dim "not recruited
+		# yet" strips spoiled which characters existed to find mid-run. HIDE (never remove)
+		# keeps grid slots fixed; re-deriving per refresh means a member who joins at THIS
+		# camp shows up on the next paint. Visibility lands AFTER populate so the away check
+		# can read party_data[i].state, and populate still runs so a later join re-shows it.
+		var shown: bool = i < party_data.size()
 		if i >= party_data.size():
+			card.visible = false
 			continue
 		# 2026-10-20: full re-render per refresh, not just the bar: after a cancel Game.cs
 		# re-Sets party_data on the SAME node (no _ready re-run), so stale labels would linger
 		# if the party changed during the camp beat. _populate_card repaints labels and bar.
 		_populate_card(card, party_data[i])
+		card.visible = shown and str(party_data[i].get("state", "")) != "away"
 func _seed_demo() -> void:
 	party_data = [
 		{"name": "Baldrun", "klass": "Rune Knight", "weapon": "Maul", "hp": 58, "max_hp": 150, "state": "up", "leader": true},
@@ -84,7 +92,7 @@ func _build() -> void:
 	for c in _cards:
 		c.queue_free()
 	_cards.clear()
-	var slots: int = 5 # 2026-10-24: the camp lists the full 5-PC roster
+	var slots: int = 9 # 2026-11-02: the camp lists the full 9-PC roster (Brook is the 9th; 9 rows x 32 px + 8 x 14 sep = 400 px still fits the 592 px inner frame)
 	for i in range(slots):
 		var card: Panel = _make_card()
 		grid.add_child(card)
