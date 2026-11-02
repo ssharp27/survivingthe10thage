@@ -30,8 +30,9 @@ public partial class Boss : Combatant
     float _rigT = 0.0f;
 
     // MINI DANCE (user 2026-11-02): the mini-boss fight is choreography, not drift-and-ring.
-    // Cycle: run toward the party and stop at MINI_STOP_DIST -> circle around it firing
-    // fans AIMED at it (no rings anymore) -> crawl the ring slowly for MINI_STAND_LEN
+    // Cycle: run toward the party and settle at MINI_STOP_DIST -> circle around it at the
+    // LIVE distance (no pinned ring, 2026-11-02 follow-up: melee can get in and it backs off
+    // when they do) firing fans AIMED at it (no rings anywhere) -> crawl slowly for MINI_STAND_LEN
     // (2026-11-02 user: "keep them moving slowly after they do their 3 rounds of arrow volleys
     // instead of standing still") -> repeat the whole cycle. The circle leg looses exactly 3
     // fans (0.5/1.7/2.9 s into the 4 s leg), so the slow beat lands right after the 3rd volley. Getting into position fires NOTHING,
@@ -45,7 +46,9 @@ public partial class Boss : Combatant
     float _miniFanClock = 0.0f;  // fan cadence while circling
     float _miniShotClock = 0.0f; // enrage shot cadence while running in
     int _miniSide = 1;           // orbit direction, flips every cycle
-    readonly float MINI_STOP_DIST = 220.0f;   // assistant pick: rapiers (320) and longbows reach it; Baldrun's 130 swing does NOT - honest, retune via gate
+    readonly float MINI_STOP_DIST = 220.0f;   // MAXIMUM leash only (2026-11-02 follow-up: the pinned ring is gone - see MINI_CLOSE_DIST)
+    readonly float MINI_CLOSE_DIST = 110.0f;  // closest the dance holds: melee swings (Baldrun 130) can actually bite it (assistant pick)
+    readonly float MINI_FAN_DIST = 150.0f;    // fans only loose with ROOM to dodge them (assistant pick): closer than this the mini circles SILENTLY while melee presses it
     readonly float MINI_RUN_SPEED = 130.0f;   // run-in charge vs the old 42 drift: user asked FASTER (assistant pick)
     readonly float MINI_ORBIT_SPEED = 120.0f; // px/s along the ring (constant-px/s discipline, assistant pick)
     readonly float MINI_ORBIT_LEN = 4.0f;     // circle-leg length (assistant pick: ~1/3 of a full lap)
@@ -217,7 +220,7 @@ public partial class Boss : Combatant
         Vector2 to = g.WrapDelta(GlobalPosition, target.GlobalPosition); // boss -> party
         float dist = to.Length();
         _miniClock += delta;
-        if (_miniPhase == 0) // RUN-IN: close in, stop at the set distance
+        if (_miniPhase == 0) // RUN-IN: close in from far away, settle inside the MAXIMUM leash
         {
             if (dist > MINI_STOP_DIST)
             {
@@ -253,9 +256,19 @@ public partial class Boss : Combatant
         }
         if (_miniPhase == 1) // CIRCLE: hold the pinned ring, sweep it, fans aimed AT the party
         {
-            Vector2 rel = (dist < 1.0f) ? new Vector2(MINI_STOP_DIST, 0.0f)
-                                         : to.Normalized() * MINI_STOP_DIST; // the ring point the swept orbit wants this frame
-            float omega = MINI_ORBIT_SPEED / MINI_STOP_DIST; // rad/s that keeps ring travel at MINI_ORBIT_SPEED px/s
+            // 2026-11-02 follow-up (user: "stuck at a set range... remove any static dependencies
+            // so players can get near it before it runs away"): the ring is NOT pinned any more.
+            // The orbit holds the distance it is ACTUALLY at, clamped to [MINI_CLOSE_DIST, MINI_STOP_DIST]:
+            // close the gap and the mini backs AWAY to MINI_CLOSE_DIST (inside Baldrun's 130 swing, so
+            // melee can bite); back off past the leash and it chases. Cycle shape is untouched.
+            float hold = dist;
+            if (hold > MINI_STOP_DIST)
+                hold = MINI_STOP_DIST;
+            if (hold < MINI_CLOSE_DIST)
+                hold = MINI_CLOSE_DIST;
+            Vector2 dir = (dist < 1.0f) ? new Vector2(1.0f, 0.0f) : to.Normalized();
+            Vector2 rel = dir * hold;
+            float omega = MINI_ORBIT_SPEED / hold; // rad/s so ring travel reads at MINI_ORBIT_SPEED px/s at whatever radius it holds
             Vector2 want = target.GlobalPosition - rel.Rotated(_miniSide * omega * delta);
             Vector2 drift = g.WrapDelta(GlobalPosition, want); // boss -> ring point, wrap-short way
             float step = MINI_RUN_SPEED * slow * delta; // user 2026-11-02: RUN to the ring point, never teleport ("if it's already too close, it teleports back to the set distance... have it run there instead"). Cap >= MINI_ORBIT_SPEED so an on-ring sweep still lands exactly on the swept point; only a too-close/seam miss forces a chase
@@ -266,13 +279,18 @@ public partial class Boss : Combatant
             _miniFanClock -= delta;
             if (_miniFanClock <= 0.0f)
             {
-                _miniFanClock = MINI_FAN_EVERY;
-                float aim = (float)System.Math.Atan2(to.Y, to.X); // straight at the party, never a ring
-                for (int i = -(MINI_FAN_N / 2); i <= MINI_FAN_N / 2; i++)
+                _miniFanClock = MINI_FAN_EVERY; // the cadence ticks even while gated: shots resume the moment the party gives room
+                if (dist >= MINI_FAN_DIST) // 2026-11-02 follow-up (assistant pick, retunable): a fan loosed at 110 px had no dodge time and wiped benches; fans wait for ROOM
                 {
-                    float a = aim + (float)i * MINI_FAN_STEP;
-                    g.SpawnBulletArrow(GlobalPosition, new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a)) * MINI_ARROW_SPEED, bulletDamage);
+                    float aim = (float)System.Math.Atan2(to.Y, to.X); // straight at the party, never a ring
+                    for (int i = -(MINI_FAN_N / 2); i <= MINI_FAN_N / 2; i++)
+                    {
+                        float a = aim + (float)i * MINI_FAN_STEP;
+                        g.SpawnBulletArrow(GlobalPosition, new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a)) * MINI_ARROW_SPEED, bulletDamage);
+                    }
                 }
+                // closer than MINI_FAN_DIST: the mini keeps circling SILENTLY while melee presses it (user:
+                // "players can get near to it before it tries to run away and repeat its cycle of shooting")
             }
             if (_miniClock >= MINI_ORBIT_LEN)
             {
@@ -284,9 +302,14 @@ public partial class Boss : Combatant
         // SLOW BEAT (2026-11-02 user: "keep them moving slowly after they do their 3 rounds of
         // arrow volleys instead of standing still"): same pinned-ring sweep as the circle leg,
         // just at MINI_STAND_SPEED px/s - a crawl, still NO fans - then the cycle repeats
-        Vector2 rel2 = (dist < 1.0f) ? new Vector2(MINI_STOP_DIST, 0.0f)
-                                     : to.Normalized() * MINI_STOP_DIST;
-        float omega2 = MINI_STAND_SPEED / MINI_STOP_DIST; // rad/s that keeps ring travel at the crawl pace
+        float hold2 = dist; // same LIVE clamp as the circle leg: the crawl keeps whatever distance it is at
+        if (hold2 > MINI_STOP_DIST)
+            hold2 = MINI_STOP_DIST;
+        if (hold2 < MINI_CLOSE_DIST)
+            hold2 = MINI_CLOSE_DIST;
+        Vector2 dir2 = (dist < 1.0f) ? new Vector2(1.0f, 0.0f) : to.Normalized();
+        Vector2 rel2 = dir2 * hold2;
+        float omega2 = MINI_STAND_SPEED / hold2; // rad/s that keeps ring travel at the crawl pace
         Vector2 want2 = target.GlobalPosition - rel2.Rotated(_miniSide * omega2 * delta);
         Vector2 drift2 = g.WrapDelta(GlobalPosition, want2);
         float step2 = MINI_RUN_SPEED * slow * delta; // cap > crawl speed: an on-ring sweep lands exactly on the swept point

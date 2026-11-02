@@ -114,11 +114,15 @@ public partial class PartyMember : Godot.Node2D
 
 	// to body: base ONE bounce (hits 1, bounces to 1 more - user), extra rebounds card adds +1/rank.
 
-	// Hop range is the assistant pick (160 px, kept tight to the short throw).
+	// Hop range GROWS with the rebound rank now (160 base + 96 px per extra rank, flight lane below):
 
 	public int shieldBounce = 1;      // bounces after the first body (base + extra rebounds ranks)
+	// user 2026-11-02 (Wash leader seat "Inspiring Leader"): ANY max-HP raise must also raise CURRENT
+	// hp to match. The tracked ceiling below rides EffMaxHp() live, so the lane covers the seat
+	// bonus (+15 for ALL allies while Wash leads) AND every grant this class can ever see.
+	float _hpMaxSeen = -1.0f; // highest EffMaxHp seen since the last withdrawal; -1 = not yet seen
 
-	static readonly double SHIELD_HOP = 160.0; // px a bounce may hop to the next nearest fresh body
+	static readonly double SHIELD_HOP = 160.0; // BASE px a bounce may hop; the flight lane widens it 96 px per extra-rebounds rank (user: upgrades must bounce more)
 	// Wash hurl speed (user 2026-11-02: "far too quickly so it looks terrible... smooth bounce between enemies"): px/s of VISIBLE travel; PURE MOTION, damage model untouched
 	static readonly double SHIELD_HURL_SPEED = 340.0; // assistant pick: a 160 px hop ~0.47 s, a 60 px hop ~0.18 s - readable, never the old 0.09 s blur
 
@@ -1108,7 +1112,7 @@ public partial class PartyMember : Godot.Node2D
 
 					_auraSprites[i2].Scale = new Vector2(0.25f, 0.25f); // user 2026-11-02: 1/4 of the 94x104 art (-> ~24x26 on screen)
 
-					_auraSprites[i2].Modulate = new Color(0.62f, 0.88f, 0.85f, 0.75f); // very light teal-blue, SEMI-TRANSPARENT at 75% alpha (user 2026-11-02: "make the sprite for Alvora's spirit semi-transparent"; alpha is an assistant pick - retunable) (user 2026-11-02: "very light blue, like a teal tint"; exact mix is an assistant pick - retunable via gate)
+					_auraSprites[i2].Modulate = new Color(0.62f, 0.88f, 0.85f, 0.35f); // very light teal-blue, MUCH more transparent at 35% alpha (user 2026-11-02 follow-up: "make Alvora's sprites much more transparent"; exact alpha an assistant pick - retunable; the disc under it already sits at ~18%)
 
 					_auraSprites[i2].ZIndex = 4; // same layer the greybox motes hold, under the body (5)
 
@@ -1666,6 +1670,29 @@ public partial class PartyMember : Godot.Node2D
 			return; // picker / join-banner soft pause: nobody swings while a card is up
 
 		float delta = (float)d;
+		// user 2026-11-02: max-HP growth lifts CURRENT hp 1:1 (Wash's Inspiring Leader seat is the
+		// grant today: +15 ceiling for ALL allies while he leads, and everyone sat stuck at the
+		// old cap under it). Track the ceiling: growth pushes hp up by the EXACT amount it grew;
+		// a withdrawn bonus (seat swap away) clamps hp into the new cap. Downed/eliminated pools
+		// never get a free revive. First sight seeds WITHOUT healing: join already paid hp = EffMaxHp.
+		{
+			// scoped: this frame's effective ceiling vs the tracked one
+			float mxEff = (float)EffMaxHp();
+			if (_hpMaxSeen < 0.0f)
+				_hpMaxSeen = mxEff; // seed-time sight: hp already matches its cap
+			else if (mxEff > _hpMaxSeen)
+			{
+				if (hp > 0.0f && !downed && !eliminated)
+					hp += mxEff - _hpMaxSeen; // the raise lifts current hp by the SAME amount (user)
+				_hpMaxSeen = mxEff;
+			}
+			else if (mxEff < _hpMaxSeen)
+			{
+				_hpMaxSeen = mxEff; // bonus withdrawn: track the lower ceiling...
+				if (hp > mxEff)
+					hp = mxEff; // ...and clamp hp down to the new cap
+			}
+		}
 
 		// looping world: fold every body but the Leader into the wrap box around the
 
@@ -2341,9 +2368,9 @@ public partial class PartyMember : Godot.Node2D
 		// user 2026-11-01 + follow-up: BOOMERANG crescent hitboxes - the blade leaves from his OWN
 
 		// hands, swings widest on the prey line at mid-flight, and RETURNS like a boomerang, so
-
-		// the disc bites at ITS OWN position along the out-and-back loop: what is ON SCREEN is what
-
+		// hands, swings widest on the prey line at mid-flight, and RETURNS like a boomerang (art).
+		// HIT MODEL (2026-11-02 follow-up, full-disc): the swept arm bites EVERYTHING inside reach,
+		// one honest bite per blade via the memo below. Same shared roll; print lands when it returns.
 		// hurts. Same shared roll/band disc; the print lands when the blade returns to the throw.
 
 		if (_cresDur > 0.0f && orbitT <= 0.0)
@@ -2404,9 +2431,22 @@ public partial class PartyMember : Godot.Node2D
 
 						continue; // this blade already bit this body: one honest bite per crescent
 
-					if ((en.GlobalPosition - biteP).Length() > _cresBand)
-
-						continue; // disc at the BLADE position: the hitbox the user asked for
+					// user 2026-11-02 follow-up: FULL-DISC bite - max range 130 is a real LEASH, not a set
+					// ring: the SWEPT ARM (its live angle angB) bites anything INSIDE the crescent reach,
+					// one honest bite per blade via the same memo. Window = band depth at the body's own
+					// radius + half a frame of sweep (0.18 rad slack, assistant pick) so the fast arm
+					// never skips a body between tick frames.
+					Godot.Vector2 bv = wpg.WrapDelta(GlobalPosition, en.GlobalPosition); // thrower -> body, wrap-short
+					float rb = bv.Length();
+					if (rb > _cresR || rb < 1.0f)
+						continue; // past his reach: the leash is the whole disc now (user: "attack anything within that")
+					double ab = System.Math.Atan2((double)bv.Y, (double)bv.X); // body bearing
+					double dang = ab - angB; // gap vs the arm's swept angle
+					dang = dang - System.Math.Floor((dang + System.Math.PI) / (System.Math.PI * 2.0)) * System.Math.PI * 2.0; // wrap to [-pi, pi]
+					if (dang < 0.0)
+						dang = -dang;
+					if (dang > _cresBand / rb + 0.18)
+						continue; // outside the swept arm at this radius
 
 					ec.TakeDamage(_cresDmg);
 
@@ -2518,6 +2558,11 @@ public partial class PartyMember : Godot.Node2D
 						if (_shldLeft > 0)
 						{
 							Godot.Collections.Array<Godot.Node2D> foes = pgs.GetEnemies();
+							// user 2026-11-02 follow-up: a rebound UPGRADE must widen the chain's REACH, not just its
+							// budget - at a flat 160 px hop a second bounce had nowhere to land in sparser crowds (and
+							// the bench never bought the card, so the budget lane never proved either way). +96 px per
+							// extra rank (assistant pick - retunable via gate).
+							float hopR = (float)(SHIELD_HOP + 96.0 * System.Math.Max(0.0, (double)shieldBounce - 1.0));
 							float nxDb = 1e9f;
 							for (int i = 0; i < foes.Count; i++)
 							{
@@ -2532,8 +2577,8 @@ public partial class PartyMember : Godot.Node2D
 								if (done)
 									continue; // one honest bite per body per throw
 								float dd2 = pgs.WrapDelta(tgt, en.GlobalPosition).Length();
-								if (dd2 >= nxDb || dd2 > (float)SHIELD_HOP)
-									continue; // a bounce only hops within SHIELD_HOP of the body it just bit
+								if (dd2 >= nxDb || dd2 > hopR)
+									continue; // a bounce only hops within the rank-grown window of the body it just bit
 								nxDb = dd2;
 								nxN = en;
 							}
@@ -2938,8 +2983,11 @@ public partial class PartyMember : Godot.Node2D
 			_shldLeft = shieldBounce; // bounce budget: extra bites after the first body (ranks grow it)
 			_shldBites = 0; // nothing bitten yet: the FIRST bite lands when the disc arrives
 			_shldFlown = 0.0f; // distance clock for the disc's tumble
-			if (_shldHit == null)
-				_shldHit = new Godot.Node2D[1 + shieldBounce]; // memo fits the prey plus every bounce this throw can ever make
+			// memo must fit THIS throw's budget: the old lazy allocation froze capacity at the FIRST
+			// throw's rank, so every later "more rebounds" rank bought wrote past the end (the bench
+			// caught the IndexOutOfRange swarm in the Wash-led smoke, and it is why upgraded shields
+			// die mid-bounce in real play - user 2026-11-02: "doesn't bounce more even with upgrades")
+			_shldHit = new Godot.Node2D[1 + shieldBounce]; // reallocated every throw: ranks bought mid-run resize it live
 			_shldHitN = 1;
 			_shldHit[0] = prey; // the prey is spoken for: it can never be a later hop this throw
 			return; // the throw owns its whole beat: damage lands when the disc lands on a body
@@ -3010,7 +3058,8 @@ public partial class PartyMember : Godot.Node2D
 
 		{
 
-			// second dagger: repeat the STORED line, then the beat is DONE (real cooldown)
+			// second dagger: DYNAMIC re-aim (it re-picks the nearest live prey at its own instant,
+			// see the block below), then the beat is DONE (real cooldown)
 
 			if (twinArm)
 
@@ -3019,6 +3068,33 @@ public partial class PartyMember : Godot.Node2D
 				twinArm = false;
 
 				_atkFlash = 0.08f; // the second jab flashes short like a draw, never the harm lane
+				// user 2026-11-02 follow-up: the SECOND stab is DYNAMIC - it re-picks the nearest prey
+				// AT THIS INSTANT and aims fresh at IT (the stored line almost always missed: bodies
+				// move during the stagger). Only the ROLL stays shared across both daggers; with no
+				// live prey left it falls back to the stored line so the beat still lands.
+				Vector2 aim2 = twinAim; // stored line as the fallback
+				Godot.Node2D prey2 = null;
+				double preyD2 = 1e9;
+				for (int i = 0; i < enemies.Count; i++)
+				{
+					Godot.Node2D n2 = enemies[i];
+					Combatant nc2 = (Combatant)n2;
+					if (nc2 == null || nc2.kind == "dead" || nc2.hp <= 0.0f)
+						continue;
+					Vector2 v2 = pg.WrapDelta(p, n2.GlobalPosition);
+					double dd2 = v2.Length();
+					if (dd2 < preyD2)
+					{
+						preyD2 = dd2;
+						prey2 = n2;
+					}
+				}
+				if (prey2 != null)
+				{
+					Vector2 v2 = pg.WrapDelta(p, prey2.GlobalPosition);
+					if (v2.Length() >= 0.01f)
+						aim2 = v2 / v2.Length(); // aim where the prey IS now
+				}
 
 				float band2 = (float)(14.0 * stat[StatTags.AREA] * LeaderAreaMul()); // corridor half-width, rides attack size
 
@@ -3038,13 +3114,13 @@ public partial class PartyMember : Godot.Node2D
 
 					Vector2 v = pg.WrapDelta(p, n.GlobalPosition);
 
-					double along = v.Dot(twinAim);
+					double along = v.Dot(aim2);
 
 					if (along < 0.0 || along > (double)reach)
 
 						continue; // outside the thrust corridor (segment p -> p + aim * reach)
 
-					if ((v - twinAim * (float)along).Length() > band2)
+					if ((v - aim2 * (float)along).Length() > band2)
 
 						continue; // clear of the blade lane
 
@@ -3058,7 +3134,7 @@ public partial class PartyMember : Godot.Node2D
 
 				if (_twinLen > 0.0f)
 
-					PoseStabFx(p, twinAim, _twinLen); // the second dagger repeats the stored line
+				PoseStabFx(p, aim2, _twinLen); // the second dagger rides the FRESH aim (user 2026-11-02: dynamic)
 
 				GD.Print("[10thAge] (dagger) " + displayName + " second dagger stabs " + hitN2 + " bodies");
 
@@ -3276,8 +3352,9 @@ public partial class PartyMember : Godot.Node2D
 
 			// the blade leaves from his OWN hands (first frame AT the hands, NOT the crowd), swings
 
-			// out to the prey line at mid-flight, and boomerangs back: the sin-bulged loop is the
-
+			// out to the prey line at mid-flight, and boomerangs back: the sin-bulged loop is the ART;
+			// the HIT model (2026-11-02 follow-up) is the swept arm - full-disc bite inside reach.
+			// Same ONE shared roll, band depth per radius, prints on landing. The
 			// hitbox the user asked for. Same ONE shared roll, same band disc, prints on landing. The
 
 			// clock owns these slots, so the flight freezes while spinning and resumes when
