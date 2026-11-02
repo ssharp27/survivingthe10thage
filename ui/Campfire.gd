@@ -92,7 +92,7 @@ func _build() -> void:
 	for c in _cards:
 		c.queue_free()
 	_cards.clear()
-	var slots: int = 9 # 2026-11-02: the camp lists the full 9-PC roster (Brook is the 9th; 9 rows x 32 px + 8 x 14 sep = 400 px still fits the 592 px inner frame)
+	var slots: int = 5 # 2026-11-02: a run is only ever 1 leader + 4 party = 5 bodies, so the card keeps 5 slots — the FULL 9-entry roster still arrives from Game.cs, and unrecruited members ("away") are HIDDEN, not given slots
 	for i in range(slots):
 		var card: Panel = _make_card()
 		grid.add_child(card)

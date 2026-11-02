@@ -148,7 +148,7 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
   HP / +1 armour READER-side; Mosiah seat key 2 +5% evasion; TEST-only bench valve `M1_TIMEWARP=<1..12>` multiplies
   run clock AND Director cadence — smokes only); Bruno art batch `bef654b` (blade art rides the SAME size
   factor as hit discs, per-blade launch stagger so extra axes are all visible, arc radius = constant `EffRange()`);
-  and the camp-UI pass (this commit): `ui/Campfire.gd` `slots: int = 9` + away cards HIDDEN on the camp card.
+  and the camp-UI pass (this commit): `ui/Campfire.gd` keeps `slots: int = 5` (run = 1 leader + 4 party, same-day correction) + away cards HIDDEN on the camp card.
 
 
 - Projectiles, rays, summons and AoEs are all in scope eventually.
@@ -170,7 +170,8 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
   `Game.cs` ~2155). `RING_SLOT = {0,3,2,4,1,5}` at `Game.cs`:36 is **dead legacy data** (no reads anywhere);
   leave it or ignore it, do not treat it as the seat map.
 - **Audit line prints 17 `stat tag` rows** (the ULT tag joined the registry) — a green trio expects 17, not 16.
-- **Camp menu (`ui/Campfire.gd`) SHIPPED at 9 strips** (`var slots: int = 9`, 2026-11-02 camp-UI pass) **and hides
+- **Camp menu (`ui/Campfire.gd`) SHIPPED at 5 strips** (`var slots: int = 5` — a run is only ever 1 leader + 4 party,
+  user correction 2026-11-02; the 2026-11-02 camp-UI pass briefly grew it to 9 then walked it back) **and hides
   "away" cards** — the camp paints ONLY recruited members; unrecruited PCs stay populated-but-hidden so grid slots
   never shift and a member who joins at the camp re-shows on the next refresh (user rule: the camp must not spoil
   which characters exist to find).
@@ -383,8 +384,9 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 - **Roster complete at 9 PCs** (Asper/Alvora/Yu landed in the M2 pass; Stack, Wash, Bruno and Brook landed 2026-10-30/31
   — see the "Roster dictation (user) — later passes" section and `RESUME_NOTES.md`). What remains roster-wise is
   the **rank-4 evolution shape** (below in "Needs the user's word") — none of the new PCs has a named evolution yet.
-- ~~Camp card hides members 6-8~~ — **CLOSED by the 2026-11-02 camp-UI pass**: `ui/Campfire.gd` grew to
-  `slots = 9` (9 strips × 32 px + 8 × 14 seps = 400 px fits the 592 px inner frame), and cards whose state is
+- ~~Camp card hides members 6-8~~ — **CLOSED by the 2026-11-02 camp-UI pass (+ same-day correction)**: `ui/Campfire.gd`
+  stays `slots = 5` (a run is only ever 1 leader + 4 party members — the 9-slot growth was a miscommunication, walked
+  back), and cards whose state is
   `"away"` (never recruited) are POPULATED but HIDDEN — the camp shows only recruited bodies (user rule 2026-11-02:
   the dim "not recruited yet" strips spoiled which characters existed to find mid-run), and a member who joins at a
   camp re-shows on the next refresh. The rest math was always server-side over `_party`.
@@ -776,6 +778,16 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
 - **Gate for the camp-UI + docs-sync pass is green**: `smokeFXz444`/`449`/`446` VICTORY (default / Bruno /
   Wash seats), 17 `stat tag` rows, 0-byte `.err`, camp path LIVE; Brook-seat TPK logged above as a pre-existing
   pattern.
+- `smokeFXz450` (default pilot), `smokeFXz451` (Bruno seat), `smokeFXz452` (Wash seat) — **camp-slot correction
+  (user 2026-11-02 follow-up: "It only ever needs to render 5 slots, as every run is only ever going to be 1
+  leader and 4 party members. It just needed to hide anyone that hadn't already been recruited")**: `slots` walked
+  back `9 → 5` in `ui/Campfire.gd`, the HIDE-away rule kept. Camp path LIVE again (no `M1_DEV_SKIP=camp`):
+  **VICTORY, VICTORY, VICTORY**, all `.err` 0 bytes, 17 `stat tag` rows each, BOTH camp beats fully ran per trail
+  (`campfire: the rest card is up` + pilot's 25 s short-rest default) = the 5-slot card with hidden away entries
+  builds + refreshes error-free. The join-order roster puts the run's ≤5 bodies in slots 0-4, so unrecruited
+  members simply never claim a slot — the same hidden-until-joined behavior the user asked for.
+- **Gate for the camp-slot correction is green**: `smokeFXz450`/`451`/`452` VICTORY, 17 rows, 0-byte `.err`,
+  camp path LIVE.
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
 
