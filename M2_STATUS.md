@@ -788,8 +788,28 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   members simply never claim a slot — the same hidden-until-joined behavior the user asked for.
 - **Gate for the camp-slot correction is green**: `smokeFXz450`/`451`/`452` VICTORY, 17 rows, 0-byte `.err`,
   camp path LIVE.
+- `smokeFXz453` (default pilot), `smokeFXz454`/`smokeFXz455` (Wash seat ×2, fresh lotteries) — **Wash shield-hurl
+  motion rework (user 2026-11-02: "The shield moves far too quickly so it looks terrible... smooth bounce
+  between enemies", follow-up: "damage only on the enemy it actually hits, no damage while flying — merely the
+  smooth animation I want")**: **VICTORY, VICTORY, VICTORY**, all `.err` 0 bytes, 17 `stat tag` rows each,
+  camp skipped via `M1_DEV_SKIP=camp` (proven LIVE green by the two camp passes just above — nothing in this
+  pass touches camp). HONEST evidence note: `(shield)` bounce tallies printed **0** in all three runs, but so
+  did the baseline runs `smokeFXz444`/`smokeFXz450` — the print only fires on MULTI-body throws, and the lane
+  itself demonstrably runs (err-0 = any C# array/flight-clock exception in the new tick would surface there).
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
+
+- **Inserting a PAIR of statements under a one-statement `if` needs braces**: the bounce-bake line
+  `_hops[_hopN++] = ...` sat under `if (_hops != null && _hopN < _hops.Length)` WITHOUT braces; splicing a
+  new `_shldLen +=` line above it made the guard cover the new line and left the bake UNGUARDED (array-bounds
+  risk). Compiles silently — geometry bugs like this never show in a smoke. Always brace when adding siblings.
+- **`open(..., newline=None)` + `splitlines(keepends=True)` rewrites bare-CR endings to `\n` on write-back**:
+  PartyMember.cs mixes CRLF and bare CR on disk; the sp_wash scripts read universal and wrote `newline=''`,
+  so untouched CR lines became LF. Harmless to the compiler/git (index blob is LF), but line-ending census
+  after such a pass is meaningless — re-check CONTENT, not endings.
+- **`(shield)` prints are NOT proof the lane runs**: the tally fires only when a throw bites 2+ bodies
+  (`used > 1`); 0 prints matches pre-change baselines and proves nothing by itself. err-0 (exception capture)
+  plus the seat guarantee (`M1_SELECT=Wash` → the leader throws constantly) is the honest combo.
 
 - **A kit verb that owns its damage must RETURN before the shared dispatch**: the `sumKit` ritual
   block fell through the lane/fan target search and Yu — neither `shotKit` nor `cleaver — landed in
