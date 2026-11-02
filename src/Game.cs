@@ -392,6 +392,12 @@ public partial class Game : Godot.Node2D
 		// because a chain of deaths can pop several corpses on one frame.
 		Godot.Collections.Array<Godot.Node2D> _bursts = new();
 		Godot.Collections.Array<double> _burstLife = new(); // seconds left in the 0.16 s pop window
+		// fx-feel9 chain-bolt pool (see LooseChainBolt + UpdateChainFx): one thin blue streak
+		// segment per hop of Baldrun's leader-bonus chain. life<=0 = free; delay = reveal beat.
+		Godot.Collections.Array<Godot.Node2D> _boltN = new();
+		Godot.Collections.Array<Godot.ColorRect> _boltC = new();
+		Godot.Collections.Array<double> _boltLife = new();
+		Godot.Collections.Array<double> _boltDelay = new();
 		// ---------- party-side summon pool (M2: Yu's occult familiars) ----------
 		// A familiar is NOT a projectile and NOT a Combatant: it runs at the closest prey and
 		// DETONATES - either on contact, or when its fuse burns out (user rule 2026-10-22: "the
@@ -461,7 +467,14 @@ public partial class Game : Godot.Node2D
 		const double CHAIN_CHANCE = 0.05; // Baldrun: 5% proc per landed party hit (user)
 		const int CHAIN_BOUNCES = 4;      // up to 4 bounces (user)
 		const double CHAIN_DMG = 10.0;    // each bounce bites for 10 (user)
-		const double CHAIN_RANGE = 150.0; // hop range: left open by the user, this pick
+		const double CHAIN_RANGE = 150.0; // hop range: left open by the user, this pick		// fx-feel9 bolt ART for the chain (user 2026-11-02: "add a visual to Baldrun's leader bonus
+		// that deals chain lightning ... just a simple blue streak of lightning that chains quickly
+		// between enemies"): each hop draws one streak segment, lit GAP s after the last so the
+		// shape reads as a fast zigzag, alive LIFE s then fading. Pool + timings are the picks.
+		const double CHAIN_BOLT_LIFE = 0.14; // seconds a bolt segment stays drawn (assistant pick)
+		const double CHAIN_BOLT_GAP = 0.05;  // hops light up this far apart: the fast-chain read (assistant pick)
+		const int CHAIN_BOLT_POOL = 24;      // 4 segments/chain, procs can overlap (assistant pick)
+
 		const double REGEN_TICK = 10.0;   // Alvora: allies regen every 10 s (user)
 		const double REGEN_HP = 1.0;      // +1 HP per tick (user)
 		const double INSECT_EVERY = 30.0; // Asper: an insect waits every 30 s (user)
@@ -848,11 +861,18 @@ public partial class Game : Godot.Node2D
 		{
 			_state = StageState.CAMPFIRE;
 			_campWaitT = 0.0;
-			ClearEnemies();
+			// fx-feel9 (user 2026-11-02: "make a change to the campfire. It can despawn projectiles,
+			// but don't despawn any enemies"): the camp sweep NO LONGER clears the horde - the beat
+			// sweeps IN-FLIGHT BULLETS only (the camp-safety gate stays: a player reading the card
+			// cannot be shot mid-decision). Whatever marched into camp keeps marching out of it,
+			// and the escort-recruit beat that used to hide inside the sweep keeps running normally
+			// now that its bodies are never swept here, so there is nothing to rescue.
+			// ClearEnemies(); REMOVED per user (the camp no longer despawns enemies)
 			// user-approved camp-safety gate: the camp beat is a read-the-card moment,
 			// so every in-flight boss bullet is swept before the grimoire goes up - a
 			// player absorbing the rest choice cannot be shot mid-decision.
 			ClearBullets();
+			GD.Print("[10thAge] (camp) the campfire sweeps BULLETS only - horde kept: ", _enemies.Count, " bodies on the field");
 			ReviveAllAtCampfire(false);
 			GD.Print("[10thAge] mini-boss slain ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â camp: the fallen return at 25% hp; the "
 					 + "rest choice decides healing");
@@ -1873,7 +1893,27 @@ public void RegisterEnemy(Combatant e)
 			_bursts.Add(s);
 			_burstLife.Add(0.0);
 		}
-		// Yu's familiars: pooled like the bolts and the gems, so a rank-3 multiattack ritual
+		// fx-feel9 chain-bolt pool: thin streak segments authored electric blue; UpdateChainFx
+		// fades them via Modulate (same pooled pattern as the cinder pops right above).
+		for (int i = 0; i < CHAIN_BOLT_POOL; i++)
+		{
+			Godot.Node2D bn = new Godot.Node2D();
+			Godot.ColorRect bcr = new Godot.ColorRect();
+			bcr.Size = new Vector2(10.0f, 5.0f); // LooseChainBolt stretches it between the two bodies
+			bcr.Position = new Vector2(-5.0f, -2.5f); // centred under the node (Control origin = corner)
+			bcr.Color = new Color(0.45f, 0.7f, 1.0f, 1.0f); // electric blue: the user asked for a "simple blue"
+			bcr.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f); // parked invisible until a hop looses it
+			bcr.ZIndex = 10; // bolts draw over the cinder pops (9) and the bodies (5)
+			bn.AddChild(bcr);
+			bn.GlobalPosition = new Vector2(-9000.0f, -9000.0f); // free-slot sentinel (same as the shots)
+			AddChild(bn);
+			_boltN.Add(bn);
+			_boltC.Add(bcr);
+			_boltLife.Add(0.0);
+			_boltDelay.Add(0.0);
+		}
+		// Yu's familiars: pooled like the bolts and the gems, so a rank-3 multiattack ritual
+
 		// never allocates a node mid-horde. Shell-first so the creature reads as a body; the
 		// detonation re-sizes this SAME rect to the blast it actually made (see DetonateSummon),
 		// which is why SpawnSummon has to put the shell back before every reuse.
@@ -2614,6 +2654,7 @@ public void RegisterEnemy(Combatant e)
 		UpdateBullets(delta);
 		UpdateShots(delta); // the party's own projectiles: mirror pool, opposite faction
 		UpdateSummons(delta); // Yu's familiars: run at prey, detonate on contact OR on the fuse		UpdateCinderFx(delta); // cinder blooms: the pops the last CinderBurst loosed, grow + fade
+		UpdateChainFx(delta); // fx-feel9: chain bolts reveal + fade (Baldrun leader-bonus streaks)
 
 		UpdateHelpers(delta); // leader-bonus lane (user 2026-10-25): Alvora regen, Asper insects, Yu spirits
 		PickerTick(d);
@@ -2695,7 +2736,10 @@ public void RegisterEnemy(Combatant e)
 	// the nearest UNTOUCHED living body within CHAIN_RANGE (the user left the hop range open;
 	// 150 px is the pick) and a body killed but not yet swept by the kill scan (hp <= 0) is
 	// not a valid hop. Visual: each hopped body reads via the shared hurt flash this frame;
-	// a drawn bolt line is a display-pass follow-up.
+	// fx-feel9 (user 2026-11-02: "add a visual to Baldrun's leader bonus that deals chain
+	// lightning ... just a simple blue streak of lightning that chains quickly between enemies"):
+	// LooseChainBolt now DRAWS it - electric blue streak segments, lit GAP s apart per hop.
+
 	public void TryChainLightning(Godot.Node2D struck)
 	{
 		if (LeaderBonusKey() != 1)
@@ -2736,10 +2780,18 @@ public void RegisterEnemy(Combatant e)
 			}
 			if (next == null)
 				break; // the chain dies when no other body stands in hop range
+			// fx-feel9 visual: one streak from the body the bolt left off to the one it lands on,
+			// revealed b * GAP s later so the hops read as a fast zigzag (pure art: damage is live)
+			LooseChainBolt(cur.GlobalPosition, next.GlobalPosition, b * CHAIN_BOLT_GAP);
 			((Combatant)next).TakeDamage(CHAIN_DMG);
 			vis[used++] = next;
 			cur = next;
-		}
+		}
+		// fx-feel9 bench evidence: the streak ART is visual-only, so a "(chain)" row is a proc worth
+		// counting (the audit cannot see the bolts themselves)
+		if (used > 1)
+			GD.Print("[10thAge] (chain) Baldrun leader bonus: bolt hopped ", used - 1, " bodies for ", (int)((used - 1) * CHAIN_DMG), " total");
+
 	}
 	
 	// Mosiah's seat: one extra pierced body for every party attack while he leads. Bends only
@@ -3435,6 +3487,57 @@ private void UpdateSpirits(float delta)
 			bc.Size = new Vector2(g, g);
 			bc.Position = new Vector2(-g * 0.5f, -g * 0.5f); // keep it centred under the node
 			bc.Modulate = new Color(1.0f, 0.85f, 0.6f, 1.0f - t); // ember-warm, fades to nothing
+		}
+	}
+	// fx-feel9: chain bolts - drive the streaks LooseChainBolt loosed: reveal clock first (hops
+	// light up CHAIN_BOLT_GAP apart = the fast-chain read the user asked for), then the fade.
+	// Pure art: no physics, no damage, no budget. Positions are the instant the chain ran - a
+	// bolt is past tense by the time bodies move on, so no tracking / wrap handling is needed
+	// (hops are <= CHAIN_RANGE, too short to read a seam).
+	private void UpdateChainFx(float delta)
+	{
+		for (int i = 0; i < _boltLife.Count; i++)
+		{
+			if (_boltLife[i] <= 0.0)
+				continue; // free slot (parked at the sentinel, alpha 0)
+			if (_boltDelay[i] > 0.0)
+			{
+				_boltDelay[i] -= delta; // reveal beat: the streak stays invisible until its turn
+				continue;
+			}
+			_boltLife[i] -= delta;
+			if (_boltLife[i] <= 0.0)
+			{
+				_boltN[i].GlobalPosition = new Vector2(-9000.0f, -9000.0f); // back to the free-slot sentinel
+				_boltC[i].Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f); // nothing left to draw
+				continue;
+			}
+			float k = (float)(_boltLife[i] / CHAIN_BOLT_LIFE); // 1 at the reveal -> 0 as the window closes
+			_boltC[i].Modulate = new Color(1.0f, 1.0f, 1.0f, k); // white x the authored electric blue
+		}
+	}
+	// fx-feel9 (user: "a simple blue streak of lightning that chains quickly between enemies"):
+	// one bolt segment per chain hop, from the body the bolt left off to the one it lands on,
+	// revealed `gap` seconds later (call site: b * CHAIN_BOLT_GAP) so the shape reads as a fast
+	// zigzag instead of one flash. The damage already landed, so a full pool skips the streak.
+	private void LooseChainBolt(Vector2 from, Vector2 to, double gap)
+	{
+		for (int i = 0; i < _boltLife.Count; i++)
+		{
+			if (_boltLife[i] > 0.0)
+				continue;
+			Godot.Node2D bn = _boltN[i];
+			Godot.ColorRect bcr = _boltC[i];
+			Vector2 dd = to - from;
+			float len = dd.Length();
+			bn.GlobalPosition = (from + to) * 0.5f;
+			bn.Rotation = (float)System.Math.Atan2((double)dd.Y, (double)dd.X);
+			bcr.Size = new Vector2(len + 8.0f, 5.0f); // +8 px: the nubs bite both bodies (assistant pick)
+			bcr.Position = new Vector2(-(len + 8.0f) * 0.5f, -2.5f); // re-centre the stretched rect
+			_boltLife[i] = CHAIN_BOLT_LIFE;
+			_boltDelay[i] = gap; // hidden until its reveal beat
+			bcr.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f); // invisible on the launch frame
+			return;
 		}
 	}
 	public void SpawnShot(Vector2 pos, Vector2 vel, double dmg, double life, double pen = 0.0, double burnDur = 0.0, double burnDps = 0.0, double cinder = 0.0) // pen/burn/cinder stamped at spawn: Asper + Mosiah pierce, Stack firebolt burn + cinder bloom; everyone else keeps the 0 defaults

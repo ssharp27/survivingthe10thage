@@ -122,7 +122,7 @@ public partial class PartyMember : Godot.Node2D
 	// bonus (+15 for ALL allies while Wash leads) AND every grant this class can ever see.
 	float _hpMaxSeen = -1.0f; // highest EffMaxHp seen since the last withdrawal; -1 = not yet seen
 
-	static readonly double SHIELD_HOP = 160.0; // BASE px a bounce may hop; the flight lane widens it 96 px per extra-rebounds rank (user: upgrades must bounce more)
+	static readonly double SHIELD_HOP = 160.0; // BASE px a bounce may hop. fx-feel9 (user: "it should just not even try to bounce if they are too far away"): the flight lane now NEVER widens this with rank - the rebound upgrade buys bounce COUNT only
 	// Wash hurl speed (user 2026-11-02: "far too quickly so it looks terrible... smooth bounce between enemies"): px/s of VISIBLE travel; PURE MOTION, damage model untouched
 	static readonly double SHIELD_HURL_SPEED = 340.0; // assistant pick: a 160 px hop ~0.47 s, a 60 px hop ~0.18 s - readable, never the old 0.09 s blur
 
@@ -1134,7 +1134,7 @@ public partial class PartyMember : Godot.Node2D
 
 					_auraSprites[i2].Scale = new Vector2(0.25f, 0.25f); // user 2026-11-02: 1/4 of the 94x104 art (-> ~24x26 on screen)
 
-					_auraSprites[i2].Modulate = new Color(0.62f, 0.88f, 0.85f, 0.2f); // fx-feel8: 80% transparent per the user; the flare + settle loops rewrite this Modulate every frame, so their alpha matches (both 0.2)
+						_auraSprites[i2].Modulate = new Color(0.62f, 0.88f, 0.85f, 0.6f); // fx-feel9 (user 2026-11-02: "update Alvora's spirit transparency to 40%"): alpha 0.6 = 40% transparent (was 0.2); the flare + settle loops rewrite this Modulate every frame, so their alpha matches (all three 0.6)
 
 					_auraSprites[i2].ZIndex = 4; // same layer the greybox motes hold, under the body (5)
 
@@ -2037,7 +2037,7 @@ public partial class PartyMember : Godot.Node2D
 
 					foreach (Godot.Sprite2D s in _auraSprites)
 
-						s.Modulate = new Color(0.55f * (1.0f + f * 0.7f), 0.78f, 1.0f * (1.0f + f * 0.4f), 0.2f); // fx-feel8 (user: "still look exactly the same, not transparent at all. Make them like 80% transparency"): this loop rewrote alpha 1.0 EVERY frame, which is why the build tint never read; alpha pinned to 0.2, the flare reads via brightness only
+						s.Modulate = new Color(0.55f * (1.0f + f * 0.7f), 0.78f, 1.0f * (1.0f + f * 0.4f), 0.6f); // fx-feel9: flare rides the SAME 40% transparency (0.6), reads via brightness only
 				foreach (Godot.ColorRect s in _auraParts)
 
 					s.Modulate = new Color(1.0f + f * 0.7f, 1.0f, 1.0f + f * 0.4f);
@@ -2059,7 +2059,7 @@ public partial class PartyMember : Godot.Node2D
 
 					foreach (Godot.Sprite2D s in _auraSprites)
 
-						s.Modulate = new Color(0.55f, 0.78f, 1.0f, 0.2f); // fx-feel8: settled motes ride the same 80% transparency
+						s.Modulate = new Color(0.55f, 0.78f, 1.0f, 0.6f); // fx-feel9: settled motes ride the same 40% transparency (0.6)
 
 			}
 
@@ -2474,8 +2474,8 @@ public partial class PartyMember : Godot.Node2D
 					// never skips a body between tick frames.
 					Godot.Vector2 bv = wpg.WrapDelta(GlobalPosition, en.GlobalPosition); // thrower -> body, wrap-short
 					float rb = bv.Length();
-					if (rb > _cresR || rb < 1.0f)
-						continue; // past his reach: the leash is the whole disc now (user: "attack anything within that")
+					if (rb < 1.0f || System.Math.Abs(rb - (double)((float)System.Math.Sin(System.Math.PI * pf) * _cresR)) > _cresBand + (float)(System.Math.PI * _cresR * System.Math.Abs(System.Math.Cos(System.Math.PI * pf)) / CRESCENT_FLIGHT * delta) + 4.0f)
+											continue; // fx-feel9 (user: "hitbox for Bruno's axes are a little bit off... not sure if it's doing damage based on where enemies were when it's thrown"): damage ALWAYS rode LIVE positions, the GEOMETRY missed - the old bite accepted ANY radius along the swept arm (a body beside Bruno bit while the blade art was mid-arc). Now the bite is a RING at the blade's CURRENT arc radius r_pf = _cresR*sin(pi*pf), the exact spot _cresFx draws at, with ring depth = band + half a frame of radial sweep + 4 px of art bleed: art == hitbox, and the full 130-px disc still gets covered because the blade spirals through it (assistant pick: depth slack)
 					double ab = System.Math.Atan2((double)bv.Y, (double)bv.X); // body bearing
 					double dang = ab - angB; // gap vs the arm's swept angle
 					dang = dang - System.Math.Floor((dang + System.Math.PI) / (System.Math.PI * 2.0)) * System.Math.PI * 2.0; // wrap to [-pi, pi]
@@ -2572,59 +2572,59 @@ public partial class PartyMember : Godot.Node2D
 				// fx-feel8 (user 2026-11-02: "the shield vanishes early... the actual object never
 				// reaches anything. I'm suspecting it's just a timeout"): no timeout exists in the
 				// live-homing lane - the DROPOUT was mid-chase victim death ending the throw in
-                // mid-air, and the pre-fix probe proved it: one Wash-led run logged far more
-                // "(shield-diag) lost prey en route" losses than completed tallies. Now the disc
-                // CHASES THE NEAREST FRESH body from its CURRENT spot (wrap-short, inside the same
-                // rank-grown hop window the bounce picker uses, memo discipline kept) WITHOUT
-                // spending a bounce - nothing was bitten, so nothing is spent. Only when no fresh
-                // body answers does the chain end where the disc stands (user's own rule).
-                Game pgt = GetParent() as Game;
-                Godot.Node2D nxT = null;
-                if (pgt != null)
-                {
-                    Godot.Collections.Array<Godot.Node2D> foesT = pgt.GetEnemies();
-                    float hopRT = (float)(SHIELD_HOP + 96.0 * System.Math.Max(0.0, (double)shieldBounce - 1.0));
-                    float nxTb = 1e9f;
-                    for (int i = 0; i < foesT.Count; i++)
-                    {
-                        Godot.Node2D en = foesT[i];
-                        Combatant ec = (Combatant)en;
-                        if (ec == null || ec.kind == "dead" || ec.hp <= 0.0f)
-                            continue; // killed-but-unswept bodies are not chases
-                        bool done = false;
-                        for (int h = 0; h < _shldHitN; h++)
-                        {
-                            if (_shldHit[h] == en)
-                                done = true;
-                        }
-                        if (done)
-                            continue; // one honest bite per body per throw
-                        float dd = pgt.WrapDelta(_shldPos, en.GlobalPosition).Length();
-                        if (dd >= nxTb || dd > hopRT)
-                            continue; // a mid-air retarget answers within the chain's reach of the DISC
-                        nxTb = dd;
-                        nxT = en;
-                    }
-                }
-                if (nxT != null)
-                {
-                    if (_shldHitN >= _shldHit.Length) // memo grows on demand: retargets never spend the bounce budget
-                    {
-                        Godot.Node2D[] bigger = new Godot.Node2D[_shldHit.Length + 4];
-                        for (int h = 0; h < _shldHit.Length; h++)
-                            bigger[h] = _shldHit[h];
-                        _shldHit = bigger;
-                    }
-                    _shldHit[_shldHitN++] = nxT;
-                    _shldTarget = nxT; // the disc keeps flying: the nearest fresh body takes the leg
-                }
-                else
-                {
-                    if (_shldBites == 0)
-                        GD.Print("[10thAge] (shield) " + displayName + " lost prey mid-flight, nothing fresh in reach");
-                    _shldTarget = null; // nothing fresh to chase: the disc drops where it stands
-                }
-            }
+				// mid-air, and the pre-fix probe proved it: one Wash-led run logged far more
+				// "(shield-diag) lost prey en route" losses than completed tallies. Now the disc
+				// CHASES THE NEAREST FRESH body from its CURRENT spot (wrap-short, inside the same
+				// rank-grown hop window the bounce picker uses, memo discipline kept) WITHOUT
+				// spending a bounce - nothing was bitten, so nothing is spent. Only when no fresh
+				// body answers does the chain end where the disc stands (user's own rule).
+				Game pgt = GetParent() as Game;
+				Godot.Node2D nxT = null;
+				if (pgt != null)
+				{
+					Godot.Collections.Array<Godot.Node2D> foesT = pgt.GetEnemies();
+						float hopRT = (float)SHIELD_HOP; // fx-feel9 (user: "not even try to bounce if they are too far away"): flat BASE hop, rank never stretches a leg (the long leg was what vanished mid-air)
+					float nxTb = 1e9f;
+					for (int i = 0; i < foesT.Count; i++)
+					{
+						Godot.Node2D en = foesT[i];
+						Combatant ec = (Combatant)en;
+						if (ec == null || ec.kind == "dead" || ec.hp <= 0.0f)
+							continue; // killed-but-unswept bodies are not chases
+						bool done = false;
+						for (int h = 0; h < _shldHitN; h++)
+						{
+							if (_shldHit[h] == en)
+								done = true;
+						}
+						if (done)
+							continue; // one honest bite per body per throw
+						float dd = pgt.WrapDelta(_shldPos, en.GlobalPosition).Length();
+						if (dd >= nxTb || dd > hopRT)
+							continue; // a mid-air retarget answers within the chain's reach of the DISC
+						nxTb = dd;
+						nxT = en;
+					}
+				}
+				if (nxT != null)
+				{
+					if (_shldHitN >= _shldHit.Length) // memo grows on demand: retargets never spend the bounce budget
+					{
+						Godot.Node2D[] bigger = new Godot.Node2D[_shldHit.Length + 4];
+						for (int h = 0; h < _shldHit.Length; h++)
+							bigger[h] = _shldHit[h];
+						_shldHit = bigger;
+					}
+					_shldHit[_shldHitN++] = nxT;
+					_shldTarget = nxT; // the disc keeps flying: the nearest fresh body takes the leg
+				}
+				else
+				{
+					if (_shldBites == 0)
+						GD.Print("[10thAge] (shield) " + displayName + " lost prey mid-flight, nothing fresh in reach");
+					_shldTarget = null; // nothing fresh to chase: the disc drops where it stands
+				}
+			}
 			else
 			{
 				Game pgs = GetParent() as Game; // toroidal-safe wrap lanes, same as every aim lane
@@ -2651,7 +2651,7 @@ public partial class PartyMember : Godot.Node2D
 							// budget - at a flat 160 px hop a second bounce had nowhere to land in sparser crowds (and
 							// the bench never bought the card, so the budget lane never proved either way). +96 px per
 							// extra rank (assistant pick - retunable via gate).
-							float hopR = (float)(SHIELD_HOP + 96.0 * System.Math.Max(0.0, (double)shieldBounce - 1.0));
+									float hopR = (float)SHIELD_HOP; // fx-feel9 (user): too-far prey is NEVER picked - flat BASE 160 px hop; the rebound upgrade buys COUNT only (assistant pick: base stays 160 px)
 							float nxDb = 1e9f;
 							for (int i = 0; i < foes.Count; i++)
 							{
