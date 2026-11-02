@@ -387,6 +387,11 @@ public partial class Game : Godot.Node2D
 		Godot.Collections.Array<Vector2> _shotVel = new();
 		Godot.Collections.Array<double> _shotDmg = new();
 		Godot.Collections.Array<double> _shotLife = new();
+		// fx-feel8 cinder-bloom POP pool: purely visual. CinderBurst already dealt the damage;
+		// this only draws the pop it made, like Yu's DetonateSummon re-sizes ITS shell. Pooled
+		// because a chain of deaths can pop several corpses on one frame.
+		Godot.Collections.Array<Godot.Node2D> _bursts = new();
+		Godot.Collections.Array<double> _burstLife = new(); // seconds left in the 0.16 s pop window
 		// ---------- party-side summon pool (M2: Yu's occult familiars) ----------
 		// A familiar is NOT a projectile and NOT a Combatant: it runs at the closest prey and
 		// DETONATES - either on contact, or when its fuse burns out (user rule 2026-10-22: "the
@@ -1850,6 +1855,24 @@ public void RegisterEnemy(Combatant e)
 			_shotCinderD.Add(0.0);
 			_shotLast.Add(-1);
 		}
+		// fx-feel8: cinder-bloom pop pool (see CinderBurst + UpdateCinderFx): shell-only, no art on
+		// disk - the SAME grow-to-blast + fade pattern Yu's detonation uses, ember-orange tinted.
+		// 12 slots: deaths are bounded by the horde itself and a pop lives only 0.16 s.
+		for (int i = 0; i < 12; i++)
+		{
+			Godot.Node2D s = new Godot.Node2D();
+			Godot.ColorRect cr = new Godot.ColorRect();
+			cr.Size = new Vector2(10.0f, 10.0f); // small ember core: UpdateCinderFx grows it to the blast it made
+			cr.Position = new Vector2(-5.0f, -5.0f); // Control origin is the rect corner -> centred under the node
+			cr.Color = new Color(0.95f, 0.55f, 0.18f, 1.0f); // ember orange: Stack flame read, not Yu violet
+			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f); // parked invisible until CinderBurst looses a pop
+			cr.ZIndex = 9; // pops draw over the corpse so the burst reads on top
+			s.AddChild(cr);
+			s.GlobalPosition = new Vector2(-9000.0f, -9000.0f); // -8000 sentinel: free slot when parked
+			AddChild(s);
+			_bursts.Add(s);
+			_burstLife.Add(0.0);
+		}
 		// Yu's familiars: pooled like the bolts and the gems, so a rank-3 multiattack ritual
 		// never allocates a node mid-horde. Shell-first so the creature reads as a body; the
 		// detonation re-sizes this SAME rect to the blast it actually made (see DetonateSummon),
@@ -2590,7 +2613,8 @@ public void RegisterEnemy(Combatant e)
 		UpdateGems(delta);
 		UpdateBullets(delta);
 		UpdateShots(delta); // the party's own projectiles: mirror pool, opposite faction
-		UpdateSummons(delta); // Yu's familiars: run at prey, detonate on contact OR on the fuse
+		UpdateSummons(delta); // Yu's familiars: run at prey, detonate on contact OR on the fuse		UpdateCinderFx(delta); // cinder blooms: the pops the last CinderBurst loosed, grow + fade
+
 		UpdateHelpers(delta); // leader-bonus lane (user 2026-10-25): Alvora regen, Asper insects, Yu spirits
 		PickerTick(d);
 		_hud.Text = "Surviving the 10th Age - " + STAGE_NAME + " (stage " + STAGE_NUMBER +
@@ -3370,9 +3394,49 @@ private void UpdateSpirits(float delta)
 			nc.TakeDamage(dmg);
 			hit++;
 		}
+		// fx-feel8 (user 2026-11-02: "need a small animation for burning bodies burst, something
+		// like what you did for Yu's minions explosions"): the corpse POPS whether or not anyone
+		// stood in the blast - visual only, the damage above is the whole story.
+		for (int i = 0; i < _bursts.Count; i++)
+		{
+			Godot.Node2D b = _bursts[i];
+			if (b.GlobalPosition.X >= -8000.0f)
+				continue; // occupied slot (same sentinel as the shot pool)
+			b.GlobalPosition = at;
+			_burstLife[i] = 0.16; // one Yu-detonation beat: grow to the blast, fade to nothing
+			Godot.ColorRect bc = (Godot.ColorRect)b.GetChild(0);
+			bc.Size = new Vector2(10.0f, 10.0f);
+			bc.Position = new Vector2(-5.0f, -5.0f);
+			bc.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.9f); // first frame already readable
+			break;
+		}
 		if (hit > 0)
 			GD.Print("[10thAge] (cinder) burst hit=", hit, " dmg=", (int)dmg);
 	}
+	// cinder blooms: drive the pops CinderBurst loosed - SAME pattern as Yu's DetonateSummon (the
+	// shell reaches the blast it made, then fades to nothing). No physics, no damage, no budget.
+	private void UpdateCinderFx(float delta)
+	{
+		for (int i = 0; i < _bursts.Count; i++)
+		{
+			if (_burstLife[i] <= 0.0)
+				continue;
+			_burstLife[i] -= delta;
+			Godot.Node2D b = _bursts[i];
+			Godot.ColorRect bc = (Godot.ColorRect)b.GetChild(0);
+			if (_burstLife[i] <= 0.0)
+			{
+				b.GlobalPosition = new Vector2(-9000.0f, -9000.0f); // back to the free-slot sentinel
+				bc.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f); // nothing left to draw
+				continue;
+			}
+			float t = 1.0f - (float)(_burstLife[i] / 0.16); // 0 at the pop -> 1 as the window closes
+			float g = 10.0f + (float)(CINDER_R * 2.0) * t; // grows to the blast it actually made
+			bc.Size = new Vector2(g, g);
+			bc.Position = new Vector2(-g * 0.5f, -g * 0.5f); // keep it centred under the node
+			bc.Modulate = new Color(1.0f, 0.85f, 0.6f, 1.0f - t); // ember-warm, fades to nothing
+		}
+	}
 	public void SpawnShot(Vector2 pos, Vector2 vel, double dmg, double life, double pen = 0.0, double burnDur = 0.0, double burnDps = 0.0, double cinder = 0.0) // pen/burn/cinder stamped at spawn: Asper + Mosiah pierce, Stack firebolt burn + cinder bloom; everyone else keeps the 0 defaults
 	{
 		for (int i = 0; i < _shots.Count; i++)

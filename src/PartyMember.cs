@@ -174,7 +174,9 @@ public partial class PartyMember : Godot.Node2D
 
 	Godot.Sprite2D _shieldFx = null;
 
-	Godot.Sprite2D[] _axeFx = null; // 5 blade slots: up to 4 crescents OR up to 5 spin blades, never both
+	Godot.Sprite2D[] _axeFx = null; // 5 SPIN blade slots (fx-feel8: the crescents got their OWN set so the default attack can run WHILE the ult spins - user: "allow him to continue his default attack while his ultimate is up")
+
+	Godot.Sprite2D[] _cresFx = null; // 5 crescent blade slots: their own art set, so the spin and a volley never fight over one frame's placement
 
 	float _fxT = 0.0f; // commit-fx visibility timer: decays with the world clock, hides sprites off-beat
 
@@ -308,7 +310,9 @@ public partial class PartyMember : Godot.Node2D
 
 	float _twinLen = 0.0f; // first jab's stab length: the second dagger repeats it
 
-	// Brook's twin daggers (user 2026-10-31): TWO daggers, 7 damage EACH, thrust at the nearest
+	// Brook's twin daggers (user 2026-10-31; user 2026-11-02 DAMAGE BUMP 7 -> 12 EACH to compensate for no
+
+	// piercing): TWO daggers, thrust at the nearest
 
 	// prey ALONG ONE LINE one right after the other (user: "attacks twice in the same direction,
 
@@ -898,6 +902,24 @@ public partial class PartyMember : Godot.Node2D
 
 				}
 
+				_cresFx = new Godot.Sprite2D[5]; // fx-feel8: the crescents ride their OWN slots so BOTH arts can be on screen at once
+
+				for (int f2 = 0; f2 < 5; f2++)
+
+				{
+
+					_cresFx[f2] = new Godot.Sprite2D();
+
+					_cresFx[f2].Texture = fxT;
+
+					_cresFx[f2].Set("texture_filter", 0);
+
+					_cresFx[f2].Visible = false;
+
+					AddChild(_cresFx[f2]);
+
+				}
+
 			}
 
 		}
@@ -1112,7 +1134,7 @@ public partial class PartyMember : Godot.Node2D
 
 					_auraSprites[i2].Scale = new Vector2(0.25f, 0.25f); // user 2026-11-02: 1/4 of the 94x104 art (-> ~24x26 on screen)
 
-					_auraSprites[i2].Modulate = new Color(0.62f, 0.88f, 0.85f, 0.35f); // very light teal-blue, MUCH more transparent at 35% alpha (user 2026-11-02 follow-up: "make Alvora's sprites much more transparent"; exact alpha an assistant pick - retunable; the disc under it already sits at ~18%)
+					_auraSprites[i2].Modulate = new Color(0.62f, 0.88f, 0.85f, 0.2f); // fx-feel8: 80% transparent per the user; the flare + settle loops rewrite this Modulate every frame, so their alpha matches (both 0.2)
 
 					_auraSprites[i2].ZIndex = 4; // same layer the greybox motes hold, under the body (5)
 
@@ -1674,12 +1696,18 @@ public partial class PartyMember : Godot.Node2D
 		// grant today: +15 ceiling for ALL allies while he leads, and everyone sat stuck at the
 		// old cap under it). Track the ceiling: growth pushes hp up by the EXACT amount it grew;
 		// a withdrawn bonus (seat swap away) clamps hp into the new cap. Downed/eliminated pools
-		// never get a free revive. First sight seeds WITHOUT healing: join already paid hp = EffMaxHp.
+		// never get a free revive. First sight HEALS a whole body up to the RAISED cap: party init and
+		// stranded-recruit spawn pay the BASE maxHp, so under Wash's +15 seat every ally sat at 70/85
+		// from frame one (user 2026-11-02: "They should be full HP").
 		{
 			// scoped: this frame's effective ceiling vs the tracked one
 			float mxEff = (float)EffMaxHp();
 			if (_hpMaxSeen < 0.0f)
-				_hpMaxSeen = mxEff; // seed-time sight: hp already matches its cap
+			{
+				_hpMaxSeen = mxEff; // first sight of the ceiling: seed the tracker...
+				if (hp > 0.0f && !downed && !eliminated && hp < mxEff)
+					hp = mxEff; // ...and a body that spawned WHOLE rides AT the raised cap: run start and joins paid the BASE maxHp, not EffMaxHp, so Wash's Inspiring Leader seat left every ally one tier under glass from the first frame (user: "They should be full HP")
+			}
 			else if (mxEff > _hpMaxSeen)
 			{
 				if (hp > 0.0f && !downed && !eliminated)
@@ -2009,7 +2037,7 @@ public partial class PartyMember : Godot.Node2D
 
 					foreach (Godot.Sprite2D s in _auraSprites)
 
-						s.Modulate = new Color(0.55f * (1.0f + f * 0.7f), 0.78f, 1.0f * (1.0f + f * 0.4f), 1.0f);
+						s.Modulate = new Color(0.55f * (1.0f + f * 0.7f), 0.78f, 1.0f * (1.0f + f * 0.4f), 0.2f); // fx-feel8 (user: "still look exactly the same, not transparent at all. Make them like 80% transparency"): this loop rewrote alpha 1.0 EVERY frame, which is why the build tint never read; alpha pinned to 0.2, the flare reads via brightness only
 				foreach (Godot.ColorRect s in _auraParts)
 
 					s.Modulate = new Color(1.0f + f * 0.7f, 1.0f, 1.0f + f * 0.4f);
@@ -2031,7 +2059,7 @@ public partial class PartyMember : Godot.Node2D
 
 					foreach (Godot.Sprite2D s in _auraSprites)
 
-						s.Modulate = new Color(0.55f, 0.78f, 1.0f, 1.0f);
+						s.Modulate = new Color(0.55f, 0.78f, 1.0f, 0.2f); // fx-feel8: settled motes ride the same 80% transparency
 
 			}
 
@@ -2117,7 +2145,13 @@ public partial class PartyMember : Godot.Node2D
 
 					foreach (Godot.Sprite2D sx in _axeFx)
 
-						sx.Visible = false; // crescent flash done; the spin owns its slots while its clock runs
+						sx.Visible = false; // spin slots keep drawing while the spin clock runs (the spin re-arms _fxT every frame)
+
+						if (_cresFx != null && _cresDur <= 0.0f)
+
+							foreach (Godot.Sprite2D sx in _cresFx)
+
+								sx.Visible = false; // fx-feel8: crescent flash done on its OWN slots; the flight-clock guard keeps a volley mid-spin from being clipped
 
 			}
 
@@ -2201,9 +2235,9 @@ public partial class PartyMember : Godot.Node2D
 
 				// like every single-commit weapon), bite memos clear per circle, print memos clear
 
-				// per cast, and the DEFAULT ATTACK IS OFF while the ult runs (user): a volley
-
-				// already in flight is voided at cast so the crescents never fight the spin slots
+				// per cast. fx-feel8 (user 2026-11-02): the DEFAULT ATTACK STAYS ON while the ult runs - no
+				// early return in the attack decision any more, and a volley already in flight is NOT voided at
+				// cast: the crescents ride their OWN _cresFx slots so both arts stay on screen together
 
 				_spinAct = true;
 
@@ -2223,7 +2257,9 @@ public partial class PartyMember : Godot.Node2D
 
 				_spinA0 = orbitAng;
 
-				_cresDur = 0.0f; // any in-flight volley is voided: the spin owns the beat
+				// fx-feel8 (user 2026-11-02: "allow him to continue his default attack while his ultimate
+				// is up, it feels like a bad limitation"): a volley already in flight is NO LONGER voided at
+				// cast - it keeps flying and biting under the spin, on its own _cresFx slots
 
 			}
 
@@ -2373,7 +2409,7 @@ public partial class PartyMember : Godot.Node2D
 		// one honest bite per blade via the memo below. Same shared roll; print lands when it returns.
 		// hurts. Same shared roll/band disc; the print lands when the blade returns to the throw.
 
-		if (_cresDur > 0.0f && orbitT <= 0.0)
+		if (_cresDur > 0.0f) // fx-feel8 (user): the volley TICKS while the spin runs - the default attack keeps biting under the ult
 
 		{
 
@@ -2399,15 +2435,15 @@ public partial class PartyMember : Godot.Node2D
 
 				Godot.Vector2 biteP = GlobalPosition + new Godot.Vector2((float)System.Math.Cos(angB), (float)System.Math.Sin(angB)) * _cresR * (float)System.Math.Sin(System.Math.PI * pf); // sin bulge: radius 0 AT the hands at both ends, arcR on the prey line at mid-flight (boomerang out AND back)
 
-				if (_axeFx != null && cc < 5)
+				if (_cresFx != null && cc < 5)
 
 				{
 
-					_axeFx[cc].GlobalPosition = biteP;
+					_cresFx[cc].GlobalPosition = biteP;
 
-					_axeFx[cc].Rotation = (float)angB + (float)(sgn * 1.5708) + (float)pf * 18.84f; _axeFx[cc].Scale = new Vector2((float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul(), (float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul()); // user 2026-11-02 (a): blade ART rides the SAME size factor the disc + band use ((1+0.25xsize)xareaMul) | (b): tumble per staggered clock
+					_cresFx[cc].Rotation = (float)angB + (float)(sgn * 1.5708) + (float)pf * 18.84f; _cresFx[cc].Scale = new Vector2((float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul(), (float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul()); // user 2026-11-02 (a): blade ART rides the SAME size factor the disc + band use ((1+0.25xsize)xareaMul) | (b): tumble per staggered clock
 
-					_axeFx[cc].Visible = true;
+					_cresFx[cc].Visible = true; // fx-feel8: volley blades light on their OWN _cresFx slots (art)
 
 				}
 
@@ -2533,9 +2569,62 @@ public partial class PartyMember : Godot.Node2D
 			Combatant tc = (Combatant)_shldTarget;
 			if (tc == null || tc.kind == "dead" || tc.hp <= 0.0f)
 			{
-				// the victim died mid-chase: the chain ends where the disc stands
-				_shldTarget = null;
-			}
+				// fx-feel8 (user 2026-11-02: "the shield vanishes early... the actual object never
+				// reaches anything. I'm suspecting it's just a timeout"): no timeout exists in the
+				// live-homing lane - the DROPOUT was mid-chase victim death ending the throw in
+                // mid-air, and the pre-fix probe proved it: one Wash-led run logged far more
+                // "(shield-diag) lost prey en route" losses than completed tallies. Now the disc
+                // CHASES THE NEAREST FRESH body from its CURRENT spot (wrap-short, inside the same
+                // rank-grown hop window the bounce picker uses, memo discipline kept) WITHOUT
+                // spending a bounce - nothing was bitten, so nothing is spent. Only when no fresh
+                // body answers does the chain end where the disc stands (user's own rule).
+                Game pgt = GetParent() as Game;
+                Godot.Node2D nxT = null;
+                if (pgt != null)
+                {
+                    Godot.Collections.Array<Godot.Node2D> foesT = pgt.GetEnemies();
+                    float hopRT = (float)(SHIELD_HOP + 96.0 * System.Math.Max(0.0, (double)shieldBounce - 1.0));
+                    float nxTb = 1e9f;
+                    for (int i = 0; i < foesT.Count; i++)
+                    {
+                        Godot.Node2D en = foesT[i];
+                        Combatant ec = (Combatant)en;
+                        if (ec == null || ec.kind == "dead" || ec.hp <= 0.0f)
+                            continue; // killed-but-unswept bodies are not chases
+                        bool done = false;
+                        for (int h = 0; h < _shldHitN; h++)
+                        {
+                            if (_shldHit[h] == en)
+                                done = true;
+                        }
+                        if (done)
+                            continue; // one honest bite per body per throw
+                        float dd = pgt.WrapDelta(_shldPos, en.GlobalPosition).Length();
+                        if (dd >= nxTb || dd > hopRT)
+                            continue; // a mid-air retarget answers within the chain's reach of the DISC
+                        nxTb = dd;
+                        nxT = en;
+                    }
+                }
+                if (nxT != null)
+                {
+                    if (_shldHitN >= _shldHit.Length) // memo grows on demand: retargets never spend the bounce budget
+                    {
+                        Godot.Node2D[] bigger = new Godot.Node2D[_shldHit.Length + 4];
+                        for (int h = 0; h < _shldHit.Length; h++)
+                            bigger[h] = _shldHit[h];
+                        _shldHit = bigger;
+                    }
+                    _shldHit[_shldHitN++] = nxT;
+                    _shldTarget = nxT; // the disc keeps flying: the nearest fresh body takes the leg
+                }
+                else
+                {
+                    if (_shldBites == 0)
+                        GD.Print("[10thAge] (shield) " + displayName + " lost prey mid-flight, nothing fresh in reach");
+                    _shldTarget = null; // nothing fresh to chase: the disc drops where it stands
+                }
+            }
 			else
 			{
 				Game pgs = GetParent() as Game; // toroidal-safe wrap lanes, same as every aim lane
@@ -2585,6 +2674,13 @@ public partial class PartyMember : Godot.Node2D
 						}
 						if (nxN != null)
 						{
+								if (_shldHitN >= _shldHit.Length) // fx-feel8: retargets push the memo PAST the per-throw
+								{					// capacity (they never spend the bounce budget), so EVERY write now grows it
+									Godot.Node2D[] bigger2 = new Godot.Node2D[_shldHit.Length + 4];
+									for (int h = 0; h < _shldHit.Length; h++)
+										bigger2[h] = _shldHit[h];
+									_shldHit = bigger2;
+								}
 							_shldHit[_shldHitN++] = nxN; // the hop is spoken for the moment it is picked
 							_shldTarget = nxN; // the disc takes the next leg off the body IT just bit (user: hit, then bounce to the next)
 							_shldLeft--;
@@ -3008,27 +3104,15 @@ public partial class PartyMember : Godot.Node2D
 
 		// honest bite per body per blade per circle, unique-body tally printed when the clock
 
-		// expires). The DEFAULT ATTACK IS OFF while the ult runs (user): this beat only cycles
-
-		// the cd - no crescent commit can fire below this return while spinning, and the cast
-
-		// voided any volley already in flight, so the two lanes never fight over the five slots.)
-
-		if (orbitT > 0.0)
-
-		{
-
-			cdTimer = (float)EffCooldown();
-
-			_atkFlash = 0.08f; // same commit pulse every kit uses, never the red harm lane
-
-			return; // the spin owns its whole beat: the crescents resume when the clock expires
-
-		}
+		// expires). fx-feel8 (user 2026-11-02: "allow him to continue his default attack while his
+		// ultimate is up, it feels like a bad limitation"): the spin NO LONGER owns the beat - the old
+		// early return here froze the default attack for the whole cast and the cast voided any volley
+		// in flight, which made the ult read as a dead stop; now the crescent commit cycles AND bites
+		// on its own cd while the spin ticks, each lane on its own art slots (spin _axeFx, volley _cresFx).
 
 		// ---------- Brook's twin daggers (user 2026-10-31): same-line double jab ----------
 
-		// TWO daggers, 7 damage EACH, thrust at the nearest prey ALONG ONE LINE one right after
+		// TWO daggers, 12 damage EACH (user 2026-11-02 bump from 7 to compensate for no piercing), thrust at the nearest prey ALONG ONE LINE one right after
 
 		// the other (user: "attacks twice in the same direction, one after another with a very
 
@@ -3383,7 +3467,7 @@ public partial class PartyMember : Godot.Node2D
 
 			_fxT = _cresDur + 0.06f; // decay hides the blades the moment the LAST staggered blade lands
 
-			if (_axeFx != null && orbitT <= 0.0)
+			if (_cresFx != null) // fx-feel8: throw frames ride through while the spin runs (each lane owns its slots now)
 
 			{
 
@@ -3391,7 +3475,7 @@ public partial class PartyMember : Godot.Node2D
 
 				{
 
-					_axeFx[c2].Visible = c2 < crescents; // blades light up at the throw start
+					_cresFx[c2].Visible = c2 < crescents; // blades light up at the throw start
 
 					if (c2 < crescents)
 
@@ -3401,9 +3485,9 @@ public partial class PartyMember : Godot.Node2D
 
 						float ca2 = a0 - sa2 * 3.1416f + sa2 * 0.3f; // first sliver at the DEPARTURE side of the loop
 
-						_axeFx[c2].GlobalPosition = p + new Vector2((float)System.Math.Cos(ca2), (float)System.Math.Sin(ca2)) * (arcR * 0.12f); // first frame AT the hands (sin bulge starts at 0); the tick block takes over
+						_cresFx[c2].GlobalPosition = p + new Vector2((float)System.Math.Cos(ca2), (float)System.Math.Sin(ca2)) * (arcR * 0.12f); // first frame AT the hands (sin bulge starts at 0); the tick block takes over
 
-						_axeFx[c2].Rotation = ca2 + sa2 * 1.5708f; _axeFx[c2].Scale = new Vector2((float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul(), (float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul()); // user 2026-11-02 (a): throw start frames ride the size factor too
+						_cresFx[c2].Rotation = ca2 + sa2 * 1.5708f; _cresFx[c2].Scale = new Vector2((float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul(), (float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul()); // user 2026-11-02 (a): throw start frames ride the size factor too
 
 					}
 
