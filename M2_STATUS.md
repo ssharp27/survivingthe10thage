@@ -805,7 +805,11 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
   + human play for the spectral tint / 1-3 size / upright faces.
 
 
+- `smokeFXz459` (default pilot), `smokeFXz460`/`smokeFXz461` (Baldrun seat x2, fresh lotteries) - **horde-event bonus swarms (user 2026-11-02: budget-free 20-goblin waves 30 s after mini1 falls, every 120 s after, 'won't count against the maximum number of enemies that can spawn')**: **VICTORY x3**, all `.err` 0 bytes, 17 `stat tag` rows each, camp skipped via `M1_DEV_SKIP=camp` (proven LIVE by the camp passes above). `(horde)` lane: arm print fires exactly once per run, swarm sizes land 24 (x1.2 long-rest chip) / 28 (x1.4); 6-8 swarm prints per smoke = PILOT run-clock catch-up (`(dev) runT parked on the next mini-boss beat` teleports the clock; a jump past due+120 legitimately refires on consecutive frames - see the pitfall below) and at a real continuous 1x clock events land exactly 120 run-sec apart. Budget-free proof: `live enemies 14` readout while a 24-body swarm is on screen. HONEST: swarms are real combat bodies on the normal kill/XP lane, but their feel needs human play; headless proves wiring only.
+
 ## Pitfalls added this pass (on top of the M1 catalogue)
+
+- **Run-clock event schedules + the PILOT clock-jump = legitimate catch-up doubles**: `M1_PILOT` parks `_runT` forward (`(dev) runT parked on the next mini-boss beat`), so an event armed at due 150 can fire on the frame the clock LANDS at 280 and, with `AdvanceHordeSchedule` stepping +120, fire AGAIN the next frame (270 < 280) - back-to-back `(horde)` swarm prints in smokes are pilot artifacts, not pacing bugs (a human run advances continuously: no jumps, exact cadence). When a scheduled-event lane prints more often in smokes than design predicts, first diff the prints against the clock-park prints in the SAME trail before touching cadence code.
 
 - **Inserting a PAIR of statements under a one-statement `if` needs braces**: the bounce-bake line
   `_hops[_hopN++] = ...` sat under `if (_hops != null && _hopN < _hops.Length)` WITHOUT braces; splicing a
