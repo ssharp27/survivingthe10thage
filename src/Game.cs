@@ -957,6 +957,50 @@ public partial class Game : Godot.Node2D
 				_bulletDmg[i] = dmg;
 				Godot.ColorRect cr = (Godot.ColorRect)b.GetChild(0);
 				cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+				cr.Color = new Color(1.0f, 0.25f, 0.2f, 1.0f); // shell back to drawing: an arrow spawn zeroes its alpha
+				((Godot.Sprite2D)cr.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f); // sink any arrow an earlier volley left riding
+				return;
+			}
+		}
+	}
+
+	public void SpawnBulletArrow(Vector2 pos, Vector2 vel, double dmg)
+	{
+		// Same bullet pool; this variant rides the arrow fx sprite rotated into flight
+		// instead of the red square (2026-11-02 mini dance: user asked for arrow fx on the
+		// mini's fans). BOTH spawn lanes normalise the square/arrow pair on every reuse,
+		// so a recycled slot can never inherit the other lane's look. No art on disk =
+		// the square keeps drawing, exactly like the party-shot lane.
+		for (int i = 0; i < _bullets.Count; i++)
+		{
+			Godot.Node2D b = _bullets[i];
+			if (b.GlobalPosition.X < -8000.0f)
+			{
+				b.GlobalPosition = pos;
+				_bulletVel[i] = vel;
+				_bulletDmg[i] = dmg;
+				Godot.ColorRect cr = (Godot.ColorRect)b.GetChild(0);
+				if (!_fxTried)
+				{
+					_fxTried = true;
+					_fxArrowTex = GD.Load("res://art/fx/arrow.png") as Godot.Texture2D;
+					_fxFlameTex = GD.Load("res://art/fx/firebolt.png") as Godot.Texture2D;
+				}
+				Godot.Sprite2D fxs = (Godot.Sprite2D)cr.GetChild(0);
+				if (_fxArrowTex != null)
+				{
+					fxs.Texture = _fxArrowTex;
+					fxs.Rotation = (float)System.Math.Atan2((double)vel.Y, (double)vel.X); // arrow points where it flies
+					fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+					cr.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f); // shell stops drawing while art rides
+					cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+				}
+				else
+				{
+					cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+					cr.Color = new Color(1.0f, 0.25f, 0.2f, 1.0f);
+					fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+				}
 				return;
 			}
 		}
@@ -1760,6 +1804,14 @@ public void RegisterEnemy(Combatant e)
 			cr.Position = new Vector2(-6.0f, -6.0f);
 			cr.Color = new Color(1.0f, 0.25f, 0.2f, 1.0f);
 			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			// arrow fx child (2026-11-02 mini dance): mirrors the party-shot pool idiom - the
+			// sprite rides INSIDE the shell so both spawn lanes below can swap square <-> arrow
+			// per reuse with a Modulate/Color toggle; 20x8 px art reads fine over the 12 px shell
+			Godot.Sprite2D fxs = new Godot.Sprite2D();
+			fxs.Set("texture_filter", 0); // NEAREST like the painted minis: hard edges
+			fxs.Position = new Vector2(6.0f, 6.0f); // Control origin is the rect corner -> centred
+			fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			cr.AddChild(fxs);
 			b.AddChild(cr);
 			b.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
 			AddChild(b);
