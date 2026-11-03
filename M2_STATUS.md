@@ -18,24 +18,33 @@ Progress: **9 of 9 roster PCs in play** — Baldrun + Mosiah (M1) + **Asper** + 
 **beat loop**, the **10-slot picker** (keys `pick_1..pick_10`) and the escort-cage join path carry all nine, and the roster is now complete
 (meta/unlocks and the party-size knob stay deferred).
 
-## Stage beat loop — user RE-LOCKED 2026-10-23 (second lock: more scaling runway)
+## Stage beat loop — user RE-LOCKED 2026-11-03 (~20-minute run: longer build-up runway)
 
 Still **data on the run clock**, `Game.cs` `BEAT_T` / `BEAT_KIND` / `BEAT_TIER` / `BEAT_BOSS`,
-**10 rows**. The stretch again because the human playtest wiped too often — the party gets more
-levels between fights before every gate:
+**13 rows** (the first lock with a dedicated tier-4 gate row and a SECOND mid boss — `boss2`).
+The user asked for ~20 minutes ("runs are very difficult now without the right upgrades … make it
+around 20 minutes"), so the stage stretched 420 s → **1260 s** and the final sits alone on its own
+beat with a few minutes to play out:
 
-| run s | row | what fires |
+| run s  | row | what fires |
 | --- | --- | --- |
-| 30  | ally I        | **lottery draw 1** joins (escort cage) |
-| 60  | tier-2 gate   | horde tier 2 |
-| 120 | mini-boss I   | `mini1` — its kill opens the camp |
-| 150 | ally II       | **lottery draw 2** joins + **6 tier-1 escorts** |
-| 180 | boss I        | `boss1` — its kill opens the camp (user 2026-11-03) |
-| 210 | ally III      | **lottery draw 3** joins + **6 tier-1 escorts** (tier-3 creatures are defined, but escorts stay tier-1) |
-| 240 | mini-boss II  | `mini2` — its kill opens the camp |
-| 270 | ally IV       | **lottery draw 4** joins + **6 tier-1 escorts** (tier-4 spawns remain a flagged placeholder — **spelling to confirm**) |
-| 360 | final boss    | `final` — its kill opens the camp too; **WRAP-UP** then raises VICTORY |
-| 420 | WRAP-UP       | kind 5: run clock lands on it with a clear arena → **VICTORY** |
+| 30   | ally I          | **lottery draw 1** joins (escort cage) |
+| 60   | tier-2 gate     | horde tier 2 |
+| 180  | mini-boss I     | `mini1` — its kill opens the camp |
+| 240  | ally II         | **lottery draw 2** joins + **6 tier-1 escorts** |
+| 360  | mid-boss I      | `boss1` — its kill opens the camp |
+| 420  | ally III        | **lottery draw 3** joins + **6 tier-1 escorts** (escorts stay tier-1) |
+| 540  | tier-3 gate     | horde tier 3 (wolf riders + goblin mage) |
+| 660  | mini-boss II    | `mini2` — its kill opens the camp |
+| 780  | ally IV         | **lottery draw 4** joins + **6 tier-1 escorts** |
+| 840  | tier-4 gate     | horde tier 4 (flagged: tier-4 bodies are tier-3 stats ×1.3) |
+| 960  | mid-boss II     | `boss2` (new `BossMid2` node, `boss1` mirror) — its kill opens the camp |
+| 1200 | FINAL boss      | `final` — Enter-the-Gungeon-style body; its kill opens the camp |
+| 1260 | WRAP-UP         | kind 5: run clock lands on it with a clear arena → **VICTORY** |
+
+The WRAP-UP sits 60 s after the final beat (assistant pick): the final fight plays out, its camp
+opens, and the run rolls on to VICTORY. Tier gates are now their OWN rows (60 / 540 / 840) instead
+of hiding inside ally beats.
 
 Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 - Times are **run seconds**, so a picker / join / camp pause never burns a beat (pass-22 rule).
@@ -53,7 +62,7 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 - `StageState` collapsed to {`PLAY`, `CAMPFIRE`, `DEAD`, `VICTORY`}; `PLAY1`/`MINIBOSS`/`PLAY2`,
   `RECRUIT_AT`, `TIER2_AT`, `BOSS_AT` are gone — the beat table subsumes them.
 - Kill routing is decided by **boss identity by class** (`c is Boss`), and the **kind string is data**
-  (`mini1`/`boss1`/`mini2`/`final`; legacy `"mini"` still accepted) — **every boss kind → camp**
+  (`mini1`/`boss1`/`mini2`/`boss2`/`final`; legacy `"mini"` still accepted) — **every boss kind → camp**
   (`Game.cs`:520 `OnBossKilled`), and `final`'s camp then runs on to WRAP-UP → VICTORY.
 
 ## Locked decisions (user, 2026-10-22)
@@ -832,6 +841,7 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
 - `smokeFXz509..511` (trio F-quad, `M1_SELECT=Wash/Bruno/Baldrun`, mirrors `copyBP`/`copyBQ`/`copyBR`, rails `gatePAR_FX20.cmd`, camp LIVE) -> **VICTORY x3 / 17 rows x3 / err-0 x3** on the fx-feel10 multi-instance shield build, but the new `(shield) now flies N` stack print never fired — CLAIM-TIME OFF-BY-ONE (`live` counted only the OTHER slots, the count running before the claim assigned its slot), fixed next build. + `smokeFXz512..514` (trio F-quin, mirrors `copyBS`/`copyBT`/`copyBU`, `gatePAR_FX21.cmd`, fixed-print build = THE SHIPPED BUILD after the bench audit scaffold below was stripped) — **fx-feel10 wash-multi-instance + tier3 mage-gate + mage-shot-proof pass (user 2026-11-03: "the shield despawns and he attacks again before it can hit an enemy. The shield should be its own instance" / mage "spawning early... They are a tier 3 enemy" / mage "not attacking at all" + "table of the current timings of everything in runs")**: **TRIO F-quin 512/513/514: VICTORY x3 / 17 rows x3 / err-0 x3 / TPK-0 x3**; 512 Wash `shield bounds` 281 + 28 mage/arrow first-loose proofs, 513 Bruno 12, 514 Baldrun 44; `(rider)` 8/5/17 + `(mage)` 7/3/10 per run = mages now spawn ONLY on tier-3 legs (mage counts track rider legs, never earlier), `(shot) mage loosed its first fireball` fires on EVERY seat = the "not attacking" report disproven (shots fire; the early-mage despawn/pressure illusion was the tier-2 spawn the user saw). Implementation: `PartyMember.cs` per-slot arrays (per-slot disc state + pooled `ShieldArt` sprites + `GrowShieldSlots` +4 guarded growth + flight walk over EVERY live slot + `EndAllThrows`), `Director.cs` `if (hob && tier3)` mage gate, `Enemy.cs` `_firedShot` + first-loose prints, `Game.cs` camp `EndAllThrows()` hook (ASSISTANT pick: discs are per-member flight state, not bullets — flagged for user review). + probe runs `smokeFXz515..517` (trio F-sept on the MAX-AIR bench-scaffold build, same mirrors): 516/517 **VICTORY** (mageshot 12/13, riders 14/16, magein 12/13), `515` Wash **TPK** (pre-tier3 boss1 d20 wipe at t=1480, ZERO tier3 prints) + `smokeFXz519`/`520` Wash re-seats **TPK x2** (same pre-tier3 boss1 failed-d20 pattern, lv/xp pace comparable to the VICTORY 512 seat = pilot save-luck, NOT the new lanes); `airmax=0` on every bench run — the per-frame max audit NEVER grew a 2-disc stack: Wash authored `cooldown = 1.0` >= a throw's ~0.5-1.2 s flight and the pilot rarely buys `quicker hurl (shield cooldown)` ranks, so multi-disc flight is human-speed-build hand-play territory (the per-slot structure makes truncation IMPOSSIBLE regardless); the max-air scaffold was PROBE scaffolding — STRIPPED before shipping so the ship binary is behaviour-identical to the F-quin gate build.
 
 - `smokeFXz521..523` (trio `M1_SELECT=Wash/Bruno/Baldrun` on fresh mirrors `copyBZ1`/`copyBZ2`/`copyBZ3`, `runFX521..523.cmd`, camp LIVE) - **boss-parity + camp batch (user 2026-11-03: both main bosses normalized to the mini-boss "for now and we change the tuning later" / "make the campfire happen after a main boss too" / bow riders must "zig-zag in and out towards and away from the player" / "reduce their attacks... add 1 more second to it" / goblin mages "still do nothing, just slowly walk away and don't attack")**: **VICTORY x3 / 17 `stat tag` rows x3 / 0-byte `.err` x3 / TPK-0 x3**. LIVE: `(camp)` after `mini1`, `boss1`, `mini2` and `final` in all three runs (the final camp then carries on to WRAP-UP -> VICTORY); `boss final 300hp` and `boss boss1` reads confirm the mini profile; `field recruit: ... 6 tier-1 goblins hold still` on the ally beat; `(shot) riderbow loosed its first arrow` + `(shot) mage loosed its first fireball` prove the 4 s arrows and widened mage range are live lanes. Implementation: `Boss.cs` dance routing for all four kinds + mini body; `Main.tscn` boss1/final 300hp/r46/drift42/bullet10; `Enemy.cs` zig-zag shuttle 95-300 px + `RIDER_SHOT_EVERY 4.0` + `MAGE_SHOT_RANGE 640`; `Game.cs` camp for every boss + tier-1 escort spawns (the per-escort elite `Rng.Randf()` draw was removed, so downstream run streams shift versus prior seats). Assistant picks flagged retunable: 300 HP boss parity, zig bounds/side lean, 640 px mage range; USER numbers: +1 s arrow cadence (3 -> 4 s), tier-1 escorts, camp after both main bosses.
+- `smokeFXz530..532` (trio `M1_SELECT=Yu/Bruno/Baldrun` on fresh mirrors `copyCG`/`copyCH`/`copyCI`, `runFX530..532.cmd`, `--quit-after 300000`, **batch dll pre-staged into `.godot\mono\temp\bin\Debug\` + `bin\` before boot**) - **spirit-hop + 20-min beat lock (user 2026-11-03: Yu's friendly familiars "no longer spawn… modify them to slowly hop towards Yu" / "runs are very difficult now without the right upgrades … make it around 20 minutes")**: **VICTORY x3 (Yu lv 27 / Bruno lv 29 / Baldrun lv 27) / 17 `stat tag` rows x3 / 0-byte `.err` x3 / TPK-0 x3**. LIVE in all three seats: the full 13-row new table prints (`beat 180s: mini1` / `beat 360s: boss1` / `beat 540s` + `beat 840s` tier gates on own rows / `beat 960s: boss2 engaged` / `beat 1200s: final`), and `(camp)` after EVERY boss kill including `boss2`; Yu seat prints `(bonus) kindness spirit kindles` x11 — lane alive (the `ae9c21c` bounce pass deleted the `if (_spiritLife[i] <= 0.0)` guard in `UpdateSpirits`, despawning every spirit next frame; guard restored verbatim). **GATE DISCIPLINE UPDATE: headless mirror launches NEVER recompile — the first trio ran the stale mirror dlls (repo `bin/` dll is 10-22; temp dll 11-03 15:53 pre-batch) and printed OLD table timings; proof-of-build = compile the batch dll with the dev-tools SDK (`C:\Users\Steve\dev-tools\dotnet\dotnet.exe`, 8.0.426 — the PATH stub has no SDK) via `dotnet build survivingthe10thage.csproj` (0 Errors, batch literals in the output dll) and overwrite BOTH dll locations per mirror before launching.** Assistant picks flagged retunable: hop 0.28 s / every 0.85 s / 165 px/s (~46 px/hop), WRAP-UP 60 s after the final (1260 s), `boss2` 300 HP boss1 mirror; USER numbers: the 12-row beat schedule to 1200 s, ~20-minute runs, spirits hop towards Yu.
 
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
