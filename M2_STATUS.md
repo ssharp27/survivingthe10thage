@@ -1,4 +1,4 @@
-# M2 STATUS - **IN PROGRESS** (opened 2026-10-22; roster grew 5→9 PCs — Asper/Alvora/Yu in the M2 pass, then Stack/Wash/Bruno + Bruno leader bonus landed 2026-10-30/31, Brook as the 9th 2026-10-31; balance/art/fx/ult/leader-bonus passes ran 2026-11-01/02 and the camp-card UI fix landed 2026-11-02 (later 2026-11-02 passes: wash-shield-hurl + correction, alvora-spirit art, horde events, mini-boss dance, **fx-feel5 five-item batch**) — full trail in `RESUME_NOTES.md`)
+# M2 STATUS - **IN PROGRESS** (opened 2026-10-22; roster grew 5→9 PCs — Asper/Alvora/Yu in the M2 pass, then Stack/Wash/Bruno + Bruno leader bonus landed 2026-10-30/31, Brook as the 9th 2026-10-31; balance/art/fx/ult/leader-bonus passes ran 2026-11-01/02 and the camp-card UI fix landed 2026-11-02 (later 2026-11-02 passes: wash-shield-hurl + correction, alvora-spirit art, horde events, mini-boss dance, **fx-feel5 five-item batch** + **fx-feel10** + **boss-parity + camp batch (2026-11-03)**) — full trail in `RESUME_NOTES.md`)
 
 M2 = the campaign roster. Scope, locked decisions, and gate trail live here; `M1_STATUS.md` stays the
 authoritative M1 record (passes 1–22, signed off at `f0ca883` + `demo_final.zip` shipped, human test
@@ -29,12 +29,12 @@ levels between fights before every gate:
 | 30  | ally I        | **lottery draw 1** joins (escort cage) |
 | 60  | tier-2 gate   | horde tier 2 |
 | 120 | mini-boss I   | `mini1` — its kill opens the camp |
-| 150 | ally II       | **lottery draw 2** joins + **6 tier-2 escorts** |
-| 180 | boss I        | `boss1` (mid boss) — its kill keeps the horde marching |
-| 210 | ally III      | **lottery draw 3** joins + tier-3 escorts ("we can define them now") |
+| 150 | ally II       | **lottery draw 2** joins + **6 tier-1 escorts** |
+| 180 | boss I        | `boss1` — its kill opens the camp (user 2026-11-03) |
+| 210 | ally III      | **lottery draw 3** joins + **6 tier-1 escorts** (tier-3 creatures are defined, but escorts stay tier-1) |
 | 240 | mini-boss II  | `mini2` — its kill opens the camp |
-| 270 | ally IV       | **lottery draw 4** joins + tier-4 spawns — **spelling to confirm** (user wrote "tier-5") |
-| 360 | final boss    | `final` — its kill ALSO keeps the horde marching (no instant VICTORY) |
+| 270 | ally IV       | **lottery draw 4** joins + **6 tier-1 escorts** (tier-4 spawns remain a flagged placeholder — **spelling to confirm**) |
+| 360 | final boss    | `final` — its kill opens the camp too; **WRAP-UP** then raises VICTORY |
 | 420 | WRAP-UP       | kind 5: run clock lands on it with a clear arena → **VICTORY** |
 
 Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
@@ -53,8 +53,8 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 - `StageState` collapsed to {`PLAY`, `CAMPFIRE`, `DEAD`, `VICTORY`}; `PLAY1`/`MINIBOSS`/`PLAY2`,
   `RECRUIT_AT`, `TIER2_AT`, `BOSS_AT` are gone — the beat table subsumes them.
 - Kill routing is decided by **boss identity by class** (`c is Boss`), and the **kind string is data**
-  (`mini1`/`boss1`/`mini2`/`final`; legacy `"mini"` still accepted) — mini → camp, mid boss → keep
-  marching, final → VICTORY (`Game.cs`:520 `OnBossKilled`).
+  (`mini1`/`boss1`/`mini2`/`final`; legacy `"mini"` still accepted) — **every boss kind → camp**
+  (`Game.cs`:520 `OnBossKilled`), and `final`'s camp then runs on to WRAP-UP → VICTORY.
 
 ## Locked decisions (user, 2026-10-22)
 
@@ -306,10 +306,15 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
   rewritten to the beat API (`GetHordeActive` / `GetHordeTier` / `GetBossLive`). `GetTier2At()` and
   `BossAlive(kind)` deleted — dead, and `BossAlive`'s semantics broke once `OnBossKilled` rewrites
   `kind` to `"dead"`.
-- **Boss visuals/engage are kind-aware** (`Boss.cs`); mid boss sized 80 px amber (mini 60 / final 96).
-  Four boss nodes in `Main.tscn`: `mini1` 300hp/r46, `boss1` 520hp/r56, `mini2` 380hp/r46, final.
-- **Escort beats**: escort bodies draw from the horde tier live when the beat fires; 90s ally II brings
-  6 tier-2 bodies. Mid boss sized up from the mini.
+- **Boss visuals/engage are kind-aware** (`Boss.cs`); ALL four bosses run the mini dance and the 60 px mini
+  body/colour (`IsDanceKind()` = `mini1`/`mini2`/`mini`/`boss1`/`final`). Four boss nodes in `Main.tscn`:
+  `mini1` 300hp/r46, `boss1` 300hp/r46, `mini2` 380hp/r46, `final` 300hp/r46. `boss1`/`final` are normalized
+  to the mini profile (300 HP / radius 46 / driftSpeed 42 / bulletDamage 10) per user 2026-11-03 — assistant
+  parity pick flagged for later tuning. Every boss death -> campfire (`Game.OnBossKilled`), and `final`'s camp
+  still leads on to WRAP-UP -> VICTORY.
+- **Escort beats**: recruitment escorts are TIER-1 goblins on EVERY ally beat (30 HP / speed 90 / contact 2 /
+  XP 1 × horde scale), not the live horde tier; the 90 s and 210 s cages read the same. The horde tier still
+  drives the Director marching lanes only.
 - **Grown picker**: `PICK_SLOTS = 5`, one option per member in play (up to 5, keys 1–5). Asper tracks
   are options 6–9 (`heavier arrows` / `quicker draw` / `farther shot` / `multishot`) — all four verified
   present and the fan verified in `PartyMember.cs`. `project.godot` gains `pick_4`/`pick_5`.
@@ -365,9 +370,14 @@ Rules the sequencer enforces (`Game.cs`:760 `AdvanceBeats` / `ParkNextBeat`):
 
 ## Needs the user's word (blocking, not guessed)
 
-- **Tier-3 / tier-4 creatures are undefined in the repo.** The 150 s / 210 s escort beats currently run
-  **tier-2 bodies with an elite HP bump** (×1.3 tier 3, ×1.6 tier 4) — flagged placeholders, no invented
-  creatures. The user must dictate the real ones.
+- **Tier-3 creatures are DEFINED (user 2026-11-03)**: sword wolf rider (HP 100 / speed 110 / contact 4 / XP 5),
+  bow wolf rider (HP 60 / ranged 3 / 4 s arrows / zig-zag 95-300 px — zig bounds are assistant picks), and
+  goblin mage (40 HP / speed 70 / contact 4 / ranged 6 / XP 6, retreating 420-620 px leash, 640 px fire range —
+  range/leash are assistant picks). They spawn in packs (`RIDER_PACK_CH 0.05`, assistant knob) plus 1 mage per
+  2 hobgoblins. **Tier-4 is still a FLAGGED PLACEHOLDER**: tier-3 bodies with an ×1.3 HP bump — the user must
+  dictate the real tier-4 creatures.
+- **Recruitment escort tier rule is CLOSED (user 2026-11-03)**: escorts are tier-1 goblins on every ally beat,
+  regardless of run stage; earlier per-beat tier escorts (tier-2 at 90 s, riders at 210 s) are superseded.
 - **The 210 s beat's spelling**: the user wrote "tier-5 spawns" while 150 s is tier 3 — almost certainly a
   typo for **tier 4** (and the table is built that way), but confirm.
 - **Rank-4 evolution shape**: **parked** (user 2026-10-22: needs more thinking, not deciding yet) — none of
@@ -820,6 +830,8 @@ and the Godot 4.7 pitfall catalogue are unchanged — see `M1_STATUS.md` "Build 
 - `smokeFXz494..496` (trio E `M1_SELECT=Wash/Bruno/Baldrun` on fresh mirrors `copyAZ`/`copyBA`/`copyBB`, rails `gatePAR_FX15.cmd`, camp LIVE so the campfire rule executes) — **fx-feel9 five changes + one NO-change (Alvora "spirit transparency to 40%" (USER number: alpha 0.2 -> 0.6 at all three Modulate write sites) / Wash "not even try to bounce if they are too far away" (bounce pick + mid-air retarget NEVER widen past the FLAT BASE `SHIELD_HOP` 160 px — assistant pick: rank buys bounce COUNT only, base stays 160 px; the rank-widened long legs were the mid-air vanish symptom, and damage was always arrival-only so vanished legs never phantom-bit) / campfire "can despawn projectiles, but don't despawn any enemies" (`ClearEnemies()` REMOVED from the mini->camp transition, `ClearBullets()` KEPT = camp-safety gate stays; escort bodies survive camp so the escort completes normally, the old inside-sweep rescue inert) / Stack cinder pop "perfect" = NO change / Bruno "hitbox... a little bit off... not sure if damage is based on where enemies were when thrown?" = ANSWER: damage ALWAYS rode LIVE positions, the GEOMETRY missed (old bite accepted ANY radius along the swept arm) -> bite now a RING at the blade's CURRENT arc radius `cresR*sin(pi*pf)` + band + half-frame radial sweep + 4 px bleed (assistant pick) = art == hitbox, disc still covered by the spiral / Baldrun leader-bonus chain visual = 24-slot pooled electric-blue ColorRect streak per hop, reveal stagger 0.05 s/hop = fast zigzag read, life 0.14 s fade (ALL assistant picks), `(chain)` bench print)**: **TRIO E 494/495/496: VICTORY x3 / 17 rows x3 / err-0 x3**; 496 = **60 `(chain)` procs** (max 4-hop / 40 dmg), 494 = 269 `(shield)` tallies / ONLY 2 unchased losses, `(camp)` horde-kept 41/73 across all three runs (bullets still swept, enemies NEVER despawned at camp). + `smokeFXz497..499` (trio E-bis `M1_SELECT=Wash/Bruno/Baldrun` on fresh mirrors `copyBC`/`copyBD`/`copyBE`, rails `gatePAR_FX16.cmd`) — **wash-clarification follow-up (`40de318`): user asked whether the bounce computes the next target within range of the JUST-HIT target rather than a flat base at Wash — it ALWAYS did (pick measures from `tgt` = live victim; retarget from `_shldPos` = the disc; NEVER Wash-centered); the stale fx-feel7 +96 px/rank comment block was the misleading text -> SIX comment-only splices, ZERO behavior change; TRIO E-bis 497/498/499 VICTORY x3 / 17 rows x3 / err-0 x3 (497 Wash: 242 `(shield)` tallies / 1 unchased loss, 499 Baldrun: 71 `(chain)` procs)**
 - `smokeFXz500..502` (trio F, `M1_SELECT=Wash/Bruno/Baldrun`, fresh mirrors `copyBF`/`copyBG`/`copyBH`, rails `gatePAR_FX17.cmd`, camp LIVE) -> Wash/chain VICTORY but `501` Bruno **TPK** (wiped under mini2, live-enemies 50, 6 rider packs in), + `smokeFXz503..505` (trio F-bis, mirrors `copyBJ`/`copyBK`/`copyBL`, `gatePAR_FX18.cmd`, PACK_CH halved to 0.08) -> `504` Bruno **TPK again** (bleed past t=1400, live 86), + `smokeFXz506..508` (trio F-ter, mirrors `copyBM`/`copyBN`/`copyBO`, `gatePAR_FX19.cmd`) — **tier3-creatures pass (user 2026-11-03: sword wolf rider HP 100/speed 110/contact 4/XP 5 + bow wolf rider HP 60/ranged 3/arrow every 3 s/circles like the mini-boss, both spawning in small packs, + goblin mage 40 HP/speed 70/ranged 6/XP 6 slow fireball riding a large version of the firebolt FX and retreating, 1 mage per 2 hobgoblin spawns; cadence ours to tune after playtest)**: **TRIO F-ter 506/507/508: VICTORY x3 / 17 rows x3 / err-0 x3 / TPK-0 x3**, camp LIVE, `(rider)` pack prints 11-20 + `(mage)` prints 11-20 per run = both lanes live on every seat. Implementation: `Enemy.cs` `rider`/`riderbow`/`mage` kinds (bow rider = constant-px/s ring-orbit in a 170-300 px band + aimed 3 s arrows at LIVE squad positions = USER cadence; mage = 420/620 px retreat-leash + slow 130 px/s fireballs), `Director.cs` pack roll + `_hobsSinceMage` counter + tier-3 escorts = 50/50 mounted riders (mage excluded from cages), `Game.cs` `SpawnBulletFire` = 3rd bullet lane riding `firebolt.png` 2.4x + ember tint with all-three-lane pool-scale normalization. USER numbers NEVER touched; the TPK-on-the-axe-seat pressure was relieved ONLY by assistant knobs: `RIDER_PACK_CH` 0.16 -> 0.05 + mage cadence 4.0 -> 6.0 s, both flagged retunable.
 - `smokeFXz509..511` (trio F-quad, `M1_SELECT=Wash/Bruno/Baldrun`, mirrors `copyBP`/`copyBQ`/`copyBR`, rails `gatePAR_FX20.cmd`, camp LIVE) -> **VICTORY x3 / 17 rows x3 / err-0 x3** on the fx-feel10 multi-instance shield build, but the new `(shield) now flies N` stack print never fired — CLAIM-TIME OFF-BY-ONE (`live` counted only the OTHER slots, the count running before the claim assigned its slot), fixed next build. + `smokeFXz512..514` (trio F-quin, mirrors `copyBS`/`copyBT`/`copyBU`, `gatePAR_FX21.cmd`, fixed-print build = THE SHIPPED BUILD after the bench audit scaffold below was stripped) — **fx-feel10 wash-multi-instance + tier3 mage-gate + mage-shot-proof pass (user 2026-11-03: "the shield despawns and he attacks again before it can hit an enemy. The shield should be its own instance" / mage "spawning early... They are a tier 3 enemy" / mage "not attacking at all" + "table of the current timings of everything in runs")**: **TRIO F-quin 512/513/514: VICTORY x3 / 17 rows x3 / err-0 x3 / TPK-0 x3**; 512 Wash `shield bounds` 281 + 28 mage/arrow first-loose proofs, 513 Bruno 12, 514 Baldrun 44; `(rider)` 8/5/17 + `(mage)` 7/3/10 per run = mages now spawn ONLY on tier-3 legs (mage counts track rider legs, never earlier), `(shot) mage loosed its first fireball` fires on EVERY seat = the "not attacking" report disproven (shots fire; the early-mage despawn/pressure illusion was the tier-2 spawn the user saw). Implementation: `PartyMember.cs` per-slot arrays (per-slot disc state + pooled `ShieldArt` sprites + `GrowShieldSlots` +4 guarded growth + flight walk over EVERY live slot + `EndAllThrows`), `Director.cs` `if (hob && tier3)` mage gate, `Enemy.cs` `_firedShot` + first-loose prints, `Game.cs` camp `EndAllThrows()` hook (ASSISTANT pick: discs are per-member flight state, not bullets — flagged for user review). + probe runs `smokeFXz515..517` (trio F-sept on the MAX-AIR bench-scaffold build, same mirrors): 516/517 **VICTORY** (mageshot 12/13, riders 14/16, magein 12/13), `515` Wash **TPK** (pre-tier3 boss1 d20 wipe at t=1480, ZERO tier3 prints) + `smokeFXz519`/`520` Wash re-seats **TPK x2** (same pre-tier3 boss1 failed-d20 pattern, lv/xp pace comparable to the VICTORY 512 seat = pilot save-luck, NOT the new lanes); `airmax=0` on every bench run — the per-frame max audit NEVER grew a 2-disc stack: Wash authored `cooldown = 1.0` >= a throw's ~0.5-1.2 s flight and the pilot rarely buys `quicker hurl (shield cooldown)` ranks, so multi-disc flight is human-speed-build hand-play territory (the per-slot structure makes truncation IMPOSSIBLE regardless); the max-air scaffold was PROBE scaffolding — STRIPPED before shipping so the ship binary is behaviour-identical to the F-quin gate build.
+
+- `smokeFXz521..523` (trio `M1_SELECT=Wash/Bruno/Baldrun` on fresh mirrors `copyBZ1`/`copyBZ2`/`copyBZ3`, `runFX521..523.cmd`, camp LIVE) - **boss-parity + camp batch (user 2026-11-03: both main bosses normalized to the mini-boss "for now and we change the tuning later" / "make the campfire happen after a main boss too" / bow riders must "zig-zag in and out towards and away from the player" / "reduce their attacks... add 1 more second to it" / goblin mages "still do nothing, just slowly walk away and don't attack")**: **VICTORY x3 / 17 `stat tag` rows x3 / 0-byte `.err` x3 / TPK-0 x3**. LIVE: `(camp)` after `mini1`, `boss1`, `mini2` and `final` in all three runs (the final camp then carries on to WRAP-UP -> VICTORY); `boss final 300hp` and `boss boss1` reads confirm the mini profile; `field recruit: ... 6 tier-1 goblins hold still` on the ally beat; `(shot) riderbow loosed its first arrow` + `(shot) mage loosed its first fireball` prove the 4 s arrows and widened mage range are live lanes. Implementation: `Boss.cs` dance routing for all four kinds + mini body; `Main.tscn` boss1/final 300hp/r46/drift42/bullet10; `Enemy.cs` zig-zag shuttle 95-300 px + `RIDER_SHOT_EVERY 4.0` + `MAGE_SHOT_RANGE 640`; `Game.cs` camp for every boss + tier-1 escort spawns (the per-escort elite `Rng.Randf()` draw was removed, so downstream run streams shift versus prior seats). Assistant picks flagged retunable: 300 HP boss parity, zig bounds/side lean, 640 px mage range; USER numbers: +1 s arrow cadence (3 -> 4 s), tier-1 escorts, camp after both main bosses.
 
 
 ## Pitfalls added this pass (on top of the M1 catalogue)
