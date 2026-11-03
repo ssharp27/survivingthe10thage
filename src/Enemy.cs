@@ -31,15 +31,20 @@ public partial class Enemy : Combatant
     // fx-feel10 audit: did this body ever loose a shot? first loose prints once,
     // so the bench counts loosed lanes instead of spamming the horde.
     bool _firedShot = false;
-    private readonly float RIDER_MIN = 170.0f;   // closest the bow rider holds (assistant pick)
-    private readonly float RIDER_MAX = 300.0f;   // farther than this it closes back in (assistant pick)
+    // 2026-11-03 user: bow riders must zig-zag IN and OUT instead of holding a perfect
+    // band, so short-range weapons can reach them. The zig bounds are assistant picks.
+    bool _riderIn = true;
+    float _riderSide = 1.0f;
+    private readonly float RIDER_ZIG_MIN = 95.0f;   // closest the bow rider comes (assistant pick, inside Baldrun's 130 px swing)
+    private readonly float RIDER_ZIG_MAX = 300.0f;  // farthest it backs off (assistant pick)
+    private readonly float RIDER_ZIG_SIDE = 0.45f;  // tangential lean per zig: reads as a zig-zag, not a straight shuttle (assistant pick)
     private readonly float RIDER_ARROW_SPEED = 190.0f; // px/s (assistant pick)
-    private readonly float RIDER_SHOT_EVERY = 3.0f; // USER number: arrow every 3 s
+    private readonly float RIDER_SHOT_EVERY = 4.0f; // USER number: 3 s + 1 s = 4 s per arrow
     private readonly float RIDER_SHOT_RANGE = 420.0f; // looses only with reach on a squad body (assistant pick)
     private readonly float MAGE_RETREAT = 420.0f; // backs off inside this (assistant pick)
     private readonly float MAGE_RETURN = 620.0f;  // past this it rejoins the march (assistant pick)
     private readonly float MAGE_FIRE_SPEED = 130.0f; // "slow moving fireball" - px/s is assistant pick
-    private readonly float MAGE_SHOT_RANGE = 560.0f; // fireball range (assistant pick)
+    private readonly float MAGE_SHOT_RANGE = 640.0f; // fireball range: covers the 620 px leash so a settled mage actually fires (assistant pick)
     private readonly float MAGE_SHOT_EVERY = 6.0f; // mage cadence (assistant pick: 4 s fireballs + bow-rider arrows bled the Bruno seat to TPK, so opened up; retunable post-playtest)
 
     Godot.ColorRect _body;
@@ -61,8 +66,13 @@ public partial class Enemy : Combatant
             AddChild(_rig);
             _bobPhase = (GetInstanceId() % 64) * 0.37f; // the horde never bobs in lockstep
         }
-        _shotCd = kind == "riderbow" ? 3.0f : (kind == "mage" ? 4.0f : 0.0f); // first shot never snaps on spawn
+        _shotCd = kind == "riderbow" ? RIDER_SHOT_EVERY : (kind == "mage" ? 4.0f : 0.0f); // first shot never snaps on spawn
         _firedShot = false; // fx-feel10: audit flag lands when the shot clock does
+        if (kind == "riderbow")
+        {
+            _riderIn = (GetInstanceId() % 2 == 0);
+            _riderSide = (GetInstanceId() % 3 == 0) ? 1.0f : -1.0f;
+        }
         if (kind == "reaper")
         {
             // TEST death-state reaper: big red diamond; touching it DOWNs a member
@@ -182,17 +192,17 @@ public partial class Enemy : Combatant
                 Vector2 dir;
                 if (kind == "riderbow")
                 {
-                    // BOW RIDER (user 2026-11-03: "tries to circle around the player similar to
-                    // the mini-boss"): hold the band and slide along it at constant px/s, same
-                    // constant-px/s discipline as the dance; side is instance-stable so a rider
-                    // never jitter-reverses mid-orbit.
-                    if (dist > RIDER_MAX) dir = to.Normalized();
-                    else if (dist < RIDER_MIN) dir = -to.Normalized();
-                    else
-                    {
-                        float side = (GetInstanceId() % 2 == 0) ? 1.0f : -1.0f;
-                        dir = new Vector2(-to.Y, to.X).Normalized() * side;
-                    }
+                    // BOW RIDER (user 2026-11-03 follow-up): no more perfect band. It
+                    // zig-zags IN toward the squad, then OUT away from it, so short-range
+                    // weapons can actually reach it. A small tangential lean keeps the
+                    // path zig-zagging rather than shuttling along the same line.
+                    // _riderIn is instance-stable: reaches the far bound -> commits in;
+                    // reaches the near bound -> commits out; never jitter-reverses.
+                    if (dist > RIDER_ZIG_MAX) _riderIn = true;
+                    else if (dist < RIDER_ZIG_MIN) _riderIn = false;
+                    Vector2 radial = _riderIn ? to.Normalized() : -to.Normalized();
+                    Vector2 side = new Vector2(-to.Y, to.X).Normalized() * _riderSide * RIDER_ZIG_SIDE;
+                    dir = (radial + side).Normalized();
                 }
                 else if (kind == "mage")
                 {

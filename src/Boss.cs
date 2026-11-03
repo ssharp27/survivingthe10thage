@@ -5,9 +5,10 @@ using Godot;
 /// every event is telegraph -> attack -> recovery, composed of ring/fan/spokes primitives.
 /// Swap the pattern blocks for real encounter data later; the engine stays.
 /// kind is inherited from Combatant; the scene author sets the beat it belongs to:
-/// "mini1" / "boss1" / "mini2" / "final" (M2 beat loop). The kind is also what decides
-/// what a death MEANS (Game.OnBossKilled: mini -> camp | mid -> keep marching | final -> win),
-/// and the body's size / colour, so the loop is data in the scene, not four copies of a class.
+/// "mini1" / "boss1" / "mini2" / "final" (M2 beat loop). User 2026-11-03: both the middle
+/// and final bosses are normalized to the mini-boss for now, and EVERY boss death opens a
+/// campfire (Game.OnBossKilled: all boss kinds -> camp). The kind still owns body size /
+/// colour and the beat slot, so the loop stays data in the scene, not four copies of a class.
 /// Legacy "mini" still reads as a mini so an older scene keeps working.
 /// </summary>
 public partial class Boss : Combatant
@@ -29,15 +30,17 @@ public partial class Boss : Combatant
     Godot.Node2D _rig;
     float _rigT = 0.0f;
 
-    // MINI DANCE (user 2026-11-02): the mini-boss fight is choreography, not drift-and-ring.
-    // Cycle: run toward the party and settle at MINI_STOP_DIST -> circle around it at the
-    // LIVE distance (no pinned ring, 2026-11-02 follow-up: melee can get in and it backs off
-    // when they do) firing fans AIMED at it (no rings anywhere) -> crawl slowly for MINI_STAND_LEN
-    // (2026-11-02 user: "keep them moving slowly after they do their 3 rounds of arrow volleys
-    // instead of standing still") -> repeat the whole cycle. The circle leg looses exactly 3
-    // fans (0.5/1.7/2.9 s into the 4 s leg), so the slow beat lands right after the 3rd volley. Getting into position fires NOTHING,
-    // until hp drops below half: then it adds one aimed arrow per MINI_ENRAGE_EVERY while
-    // running in. Its bullets ride the arrow fx art (Game.SpawnBulletArrow).
+    // BOSS DANCE (user 2026-11-02, extended 2026-11-03): every boss runs this choreography,
+    // not the old drift-and-ring engine. Cycle: run toward the party and settle at
+    // MINI_STOP_DIST -> circle around it at the LIVE distance (no pinned ring, 2026-11-02
+    // follow-up: melee can get in and it backs off when they do) firing fans AIMED at it
+    // (no rings anywhere) -> crawl slowly for MINI_STAND_LEN (2026-11-02 user: "keep them
+    // moving slowly after they do their 3 rounds of arrow volleys instead of standing still")
+    // -> repeat the whole cycle. The circle leg looses exactly 3 fans (0.5/1.7/2.9 s into
+    // the 4 s leg), so the slow beat lands right after the 3rd volley. Getting into position
+    // fires NOTHING, until hp drops below half: then it adds one aimed arrow per
+    // MINI_ENRAGE_EVERY while running in. Its bullets ride the arrow fx art
+    // (Game.SpawnBulletArrow).
     // ZERO Rng draws: the orbit side swaps deterministically every cycle, so run streams
     // never diverge on boss behaviour. Every number below but MINI_STAND_LEN is an
     // assistant pick, flagged for the gated retune.
@@ -62,19 +65,23 @@ public partial class Boss : Combatant
     bool _miniSaidDance = false;  // one-time audit prints so the headless bench can see the lanes
     bool _miniSaidEnrage = false;
 
-    // the beat a boss node belongs to is carried in its kind, so the body reads the
-    // schedule: two minis (camp after either), one mid milestone, one stage end
-    private bool IsMiniKind()
+    // the beat a boss node belongs to is carried in its kind. User 2026-11-03 normalized
+    // BOTH non-mini bosses (boss1 / final) to the mini-boss profile, so every boss now
+    // reads the same dance and camp routing; only the scene's beat slot differs.
+    private bool IsDanceKind()
     {
-        return kind == "mini1" || kind == "mini2" || kind == "mini";
+        return kind == "mini1" || kind == "mini2" || kind == "mini"
+            || kind == "boss1" || kind == "final";
     }
 
     public override void _EnterTree()
     {
         hp = maxHp;
         _body = new ColorRect();
-        bool isMini = IsMiniKind();
-        // mid boss sits between the two sizes: bigger than a mini, not the stage's finale
+        bool isMini = IsDanceKind();
+        // user 2026-11-03: boss1 and final are normalized to the mini-boss, so all four
+        // authored bosses use the 60 px mini body. The size/colour branches remain as a
+        // fallback for any future non-dance kind.
         float w = isMini ? 60.0f : (kind == "boss1" ? 80.0f : 96.0f);
         _body.Size = new Vector2(w, w);
         _body.Position = -_body.Size * 0.5f;
@@ -115,7 +122,7 @@ public partial class Boss : Combatant
         // shoved across the table - lateral sway + lean, like the party, scaled up
         _rigT += delta;
         float ph = _rigT * 4.2f;
-        float slid = (float)System.Math.Sin(ph) * (IsMiniKind() ? 3.0f : 4.5f);
+        float slid = (float)System.Math.Sin(ph) * (IsDanceKind() ? 3.0f : 4.5f);
         _rig.Position = new Vector2(slid, 0.0f);
         _rig.Rotation = slid * 0.012f;
 
@@ -127,12 +134,10 @@ public partial class Boss : Combatant
         {
             Vector2 to = g.WrapDelta(GlobalPosition, target.GlobalPosition);
             float dist = to.Length();
-            // close to melee reach: party signature weapons top out ~130px, so the
-            // MID/FINAL bosses must settle inside that or they can never be struck.
-            // Minis ignore this drift lane: the MINI DANCE below owns their movement,
-            // and their 220 px settle keeps them OUT of Baldrun's 130 px swing (honest:
-            // melee-leader seats lean on the ranged joins to strip a dancing mini)
-            if (!IsMiniKind() && dist > 100.0f)
+            // dance bosses ignore this drift lane: the BOSS DANCE below owns movement,
+            // and its LIVE clamp lets melee close in and forces a back-off (user 2026-11-02).
+            // The drift branch remains for a future non-dance kind.
+            if (!IsDanceKind() && dist > 100.0f)
                 GlobalPosition = g.WrapNearCamera(GlobalPosition + to.Normalized() * driftSpeed * delta * (burnT > 0.0 && g.LeaderDrink() ? 0.90f : 1.0f)); // Have a Drink!: a burning boss drifts slower
             if (dist < radius + g.MEMBER_RADIUS && _contactCd <= 0.0f)
             {
@@ -150,10 +155,10 @@ public partial class Boss : Combatant
             g.TakeHit(hitAny, 12.0 * g.DrinkMul(this)); // Have a Drink!: a burning boss hits 10% softer
         }
 
-        // MINIS RUN THE DANCE, NOT the telegraph/ring engine (user 2026-11-02): the
-        // mid milestone and the stage finale keep the old telegraph -> ring/fan/spokes
-        // block below untouched
-        if (IsMiniKind())
+        // EVERY authored boss runs the dance now (user 2026-11-03: boss1 and final are
+        // exactly the mini-boss for now). The telegraph -> ring/fan/spokes block below is
+        // a fallback for a future non-dance kind, not reached by mini1/boss1/mini2/final.
+        if (IsDanceKind())
         {
             MiniDance(g, delta, target);
             return;
@@ -208,7 +213,7 @@ public partial class Boss : Combatant
         }
     }
 
-    // the choreographed mini fight (see MINI DANCE fields up top): run-in -> aimed fans
+    // the choreographed boss fight (see BOSS DANCE fields up top): run-in -> aimed fans
     // on the move -> 3 s stand -> repeat. Toroidal-safe: every reposition wraps through
     // the same WrapNearCamera lane the drift used, and distances measure the wrap-short
     // way, so an orbit across a screen seam still reads as one circle

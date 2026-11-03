@@ -115,9 +115,9 @@ public partial class Game : Godot.Node2D
 	readonly double ESCORT_RING = 520.0;  // escort bodies start this wide of the stranded PC
 	readonly double ESCORT_CRAWL = 0.12;  // creep factor on escort speed: pressure, not a chase
 	const float RECRUIT_JOIN_FLOOR = 0.25f; // floored fraction of max HP the PC joins at
-	// escort bodies run on the tier that is live when the beat fires (user rule: later
-	// beats are guarded by harder enemies), and they scale like the horde does
-	double _hordeTier = 1.0;              // 1 goblins | 2 wolves+hobgoblins | 3/4 M2 gates
+	// user 2026-11-03: recruitment escorts are tier-1 goblins on EVERY ally beat,
+	// regardless of how far the run has advanced. They still scale like the horde does.
+	double _hordeTier = 1.0;              // 1 goblins | 2 wolves+hobgoblins | 3/4 M2 gates (Director only)
 	// stage name/number shown on the ui/ cards AND the HUD (user 2026-10-23: Tanurial Forest
 	// is "stage 1" / "level 1" - many more stages are planned, so every display site reads
 	// the pair instead of a baked string)
@@ -855,12 +855,16 @@ public partial class Game : Godot.Node2D
 		b.GlobalPosition = new Vector2(0.0f, -10000.0f);
 		// the boss a beat engaged decides what its death MEANS. With one PLAY state covering
 		// every fight, the route cannot come from the stage state any more: it comes from the
-		// kind the scene authored (mini -> camp | mid boss -> the horde keeps marching |
-		// final -> VICTORY).
-		if (kb == "mini1" || kb == "mini2")
-		{
-			_state = StageState.CAMPFIRE;
-			_campWaitT = 0.0;
+		// kind the scene authored. User 2026-11-03: every boss kind -> camp (mini1,
+		// mini2, boss1, final); the final-boss camp still leads on to WRAP-UP -> VICTORY.
+		// EVERY boss death opens the camp now. boss1 and final were
+		// normalized to the mini-boss, and the user explicitly asked for campfire after a
+		// main boss too. The final-boss camp still leaves the 420 s WRAP-UP row to raise
+		// VICTORY once the camp clears.
+		if (kb == "mini1" || kb == "mini2" || kb == "boss1" || kb == "final")
+		{
+			_state = StageState.CAMPFIRE;
+			_campWaitT = 0.0;
 			// fx-feel9 (user 2026-11-02: "make a change to the campfire. It can despawn projectiles,
 			// but don't despawn any enemies"): the camp sweep NO LONGER clears the horde - the beat
 			// sweeps IN-FLIGHT BULLETS only (the camp-safety gate stays: a player reading the card
@@ -868,9 +872,9 @@ public partial class Game : Godot.Node2D
 			// and the escort-recruit beat that used to hide inside the sweep keeps running normally
 			// now that its bodies are never swept here, so there is nothing to rescue.
 			// ClearEnemies(); REMOVED per user (the camp no longer despawns enemies)
-			// user-approved camp-safety gate: the camp beat is a read-the-card moment,
-			// so every in-flight boss bullet is swept before the grimoire goes up - a
-			// player absorbing the rest choice cannot be shot mid-decision.
+			// user-approved camp-safety gate: the camp beat is a read-the-card moment,
+			// so every in-flight boss bullet is swept before the grimoire goes up - a
+			// player absorbing the rest choice cannot be shot mid-decision.
 			ClearBullets();
 
 			// fx-feel10: shield discs are per-member flight STATE, not bullets, so the camp
@@ -879,32 +883,13 @@ public partial class Game : Godot.Node2D
 				pm.EndAllThrows();
 			GD.Print("[10thAge] (camp) the campfire sweeps BULLETS only - horde kept: ", _enemies.Count, " bodies on the field");
 			ReviveAllAtCampfire(false);
-			GD.Print("[10thAge] mini-boss slain ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â camp: the fallen return at 25% hp; the "
-					 + "rest choice decides healing");
+			GD.Print("[10thAge] boss slain -> camp: the fallen return at 25% hp; the rest choice decides healing");
 			if (kb == "mini1")
 			{
 				// HORDE EVENT: the user's first-event clock starts at the FIRST mini-boss's death
 				_hordeEventDue = GetRunTime() + HORDE_EVENT_FIRST_DELAY;
 				GD.Print("[10thAge] (horde) first mini-boss down - bonus swarms armed: first 30 s out, every 120 s after");
 			}
-
-		}
-		else if (kb == "boss1")
-		{
-			// user beat loop (2026-10-22): the mid boss is a milestone fight, not the end of
-			// the stage. Its death leaves the horde marching on toward the next beat, and
-			// deliberately does NOT sweep the arena or open a camp (campfires sit after
-			// mini-bosses only).
-			_campWaitT = 0.0;
-			GD.Print("[10thAge] mid boss slain - the stage keeps marching");
-		}
-		else if (kb == "final")
-		{
-			// user rule (2026-10-23): killing the final boss no longer ends the run. The
-			// stage runs on to the WRAP-UP beat (420 s on the current lock) - the user's sandbox window to test
-			// the full roster and horde scaling at strength. The body is already despawned
-			// above; the horde keeps marching like it does after the mid boss.
-			GD.Print("[10thAge] final boss slain - the run keeps rolling to the wrap-up beat");
 		}
 	}
 
@@ -4792,9 +4777,9 @@ private void UpdateSpirits(float delta)
 		double ty = System.Math.Abs(dir.Y) > 0.001 ? half.Y / System.Math.Abs(dir.Y) : 1e30;
 		double reach = System.Math.Max(RECRUIT_DIST, System.Math.Min(tx, ty) + RECRUIT_MARGIN);
 		m.GlobalPosition = cen + dir * (float)reach;
-		GD.Print("[10thAge] field recruit: " + m.displayName + " stranded "
-				 + (int)m.GlobalPosition.DistanceTo(cen) + "px out, off camera | escort "
-				 + ESCORT_COUNT + " tier-" + (int)_hordeTier + " bodies hold still until the party is in sight of the rescue");
+		GD.Print("[10thAge] field recruit: " + m.displayName + " stranded "
+				 + (int)m.GlobalPosition.DistanceTo(cen) + "px out, off camera | escort "
+				 + ESCORT_COUNT + " tier-1 goblins hold still until the party is in sight of the rescue");
 		m.Visible = true;
 		// HELP! floats over the stranded PC
 		_helpLabel = new Godot.Label();
@@ -4818,30 +4803,22 @@ private void UpdateSpirits(float delta)
 		_recruitPending = m;
 		_escortTimeout = 0.0; // the give-up valve counts from the drop, not from run start
 		_escortLeft = 0;
-		// escort bodies run on the tier that is live when the beat fires (user rule: later
-		// beats are guarded by harder enemies), drawn from that tier's pool. The 90s beat is
-		// six wolves / hobgoblins, not six goblins.
-		// TIER 3 IS DESIGNED NOW (user 2026-11-03): escorts on the 210 s beat ride the real
-		// mounted riders (50/50 sword/bow mix = assistant pick). TIER 4 REMAINS A FLAGGED
-		// PLACEHOLDER: tier-3 bodies with an elite HP bump - see HORDE_TIER3_BELOW.
+		// user 2026-11-03: recruitment escorts are TIER-1 goblins on every ally beat,
+		// no matter how far into the run the beat fires. The rescue cage reads the same
+		// at 30 s and at 270 s; the horde tier (_hordeTier) still drives the marching
+		// Director lanes, not the escorts. They still scale with the squad's horde scale.
+		// USER tier-1 numbers: 30 HP, speed 90, contact 2, XP 1.
 
-		for (int i = 0; i < ESCORT_COUNT; i++)
-		{
+		for (int i = 0; i < ESCORT_COUNT; i++)
+		{
 			Enemy e = new Enemy();
-			int tier = (int)_hordeTier;
-			bool eliteBeast = tier >= 2 && Rng.Randf() < 0.5;
-			// tier-3 escorts (2026-11-03): mounted riders cage the 210 s rescue. mages would
-			// break the hold-still cage design (they retreat), so escorts draw sword/bow riders
-			// 50-50 - assistant pick. USER numbers: 100/60 HP, speed 110, contact 4, XP 5.
-			e.kind = tier >= 3 ? (eliteBeast ? "riderbow" : "rider") : (tier >= 2 ? (eliteBeast ? "wolf" : "hobgoblin") : "goblin");
-			float hpBase = tier >= 3 ? (eliteBeast ? 60.0f : 100.0f) : (tier >= 2 ? (eliteBeast ? 70.0f : 60.0f) : 30.0f);
-			float tierBump = tier >= 4 ? 1.3f : 1.0f; // tier-3 legs run base HP now; tier-4 keeps the flagged bump
-			e.maxHp = hpBase * tierBump * (float)GetHordeScale();
+			e.kind = "goblin";
+			e.maxHp = 30.0f * (float)GetHordeScale();
 			e.hp = e.maxHp;
-			e.speed = tier >= 3 ? 110.0f : (tier >= 2 ? 105.0f : 90.0f);
-			e.contactDamage = tier >= 3 ? 4.0f : (tier >= 2 ? 3.0f : 2.0f);
-			e.rangedDamage = tier >= 3 ? (eliteBeast ? 3.0f : 0.0f) : 0.0f; // cage riders never loose: the hold-still branch runs before the shot lane, so this only matters if the cage design ever changes
-			e.xpValue = tier >= 3 ? 5.0f : (tier >= 2 ? 2.0f : 1.0f);
+			e.speed = 90.0f;
+			e.contactDamage = 2.0f;
+			e.rangedDamage = 0.0f;
+			e.xpValue = 1.0f;
 
 			e.escort = true;
 			double ea = 6.2831853 * i / ESCORT_COUNT + 0.3;
