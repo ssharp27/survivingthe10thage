@@ -150,6 +150,15 @@ bulletDamage = 10.0
 maxHp = 300.0
 kind = "boss1"
 
+[node name="BossMid2" type="Node2D" parent="." unique_id=1123581023]
+position = Vector2(0, -980)
+script = ExtResource("4_boss")
+radius = 46.0
+driftSpeed = 42.0
+bulletDamage = 10.0
+maxHp = 300.0
+kind = "boss2"
+
 [node name="BossMini2" type="Node2D" parent="." unique_id=1840666997]
 position = Vector2(0, -740)
 script = ExtResource("4_boss")

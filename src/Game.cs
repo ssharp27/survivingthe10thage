@@ -66,29 +66,34 @@ public partial class Game : Godot.Node2D
 	readonly Color CHIP_SAGE = new Color(0.60f, 0.84f, 0.60f, 1.0f);
 	readonly Color CHIP_GREY = new Color(0.70f, 0.70f, 0.70f, 1.0f);
 
-	// ---------- stage beat loop (M2 schedule, user re-locked 2026-10-23 again) ----------
+	// ---------- stage beat loop (M2 schedule; user re-locked 2026-11-03 to ~20 min) ----------
 	// The stage is a BEAT TABLE on the run clock, not a fixed state chain. Times are
 	// RUN seconds, so a picker / join / camp pause never burns a beat (pass-22 rule).
-	//   30s ally I | 60s tier-2 gate | 120s mini-boss I | 150s ally II | 180s boss I
-	//   210s ally III | 240s mini-boss II | 270s ally IV | 360s final boss | 420s WRAP-UP
-	// Second re-lock same day: the human playtest still wiped too often, so the user stretched
-	// the early legs again (mini I 90 -> 120, boss I 150 -> 180, mini II 210 -> 240, final
-	// 300 -> 360, wrap 400 -> 420) to give the party more scaling runway before each fight.
+	//   30s ally I | 60s tier-2 gate | 180s mini-boss I | 240s ally II | 360s mid-boss I
+	//   420s ally III | 540s tier-3 gate | 660s mini-boss II | 780s ally IV | 840s tier-4
+	//   gate | 960s mid-boss II (the second boss1 body) | 1200s FINAL boss | 1260s WRAP-UP
+	// The 2026-11-03 lock stretches the whole stage from 420 s to 1260 s (user: "runs are
+	// very difficult now without the right upgrades ... make it around 20 minutes"): the party
+	// gets ~20 minutes of build-up runway, then the Enter-the-Gungeon-style final sits on its
+	// own beat with a few minutes to play out. The earlier 420 s lock (and the 2026-10-23 re-locks
+	// before it) survive only as history here - the table below is the truth.
 	// This is the gameplay loop "until times and scaling are changed around" (user rule),
 	// so every number here is data the user can move without touching the sequencer.
-	readonly double[] BEAT_T = { 30.0, 60.0, 120.0, 150.0, 180.0, 210.0, 240.0, 270.0, 360.0, 420.0 };
+	readonly double[] BEAT_T = { 30.0, 60.0, 180.0, 240.0, 360.0, 420.0, 540.0, 660.0, 780.0, 840.0, 960.0, 1200.0, 1260.0 };
 	// 0 = ally join beat, 1 = horde tier gate, 2 = mini-boss (its kill opens the camp),
-	// 3 = mid boss (its kill just lets the horde keep marching), 4 = final boss (its kill
-	// ALSO keeps the horde marching - the run rolls on), 5 = WRAP-UP (run clock lands on it
-	// with a clear arena -> VICTORY; a live `final` holds the row back until it is resolved)
-	readonly int[] BEAT_KIND = { 0, 1, 2, 0, 3, 0, 2, 0, 4, 5 };
+	// 3 = mid boss (its kill ALSO opens the camp now - user 2026-11-03 wants a campfire after
+	// EVERY boss), 4 = final boss (its kill ALSO opens the camp; the run rolls on),
+	// 5 = WRAP-UP (the run clock lands on it with a clear arena -> VICTORY; a live final
+	// holds the row back until it is resolved)
+	readonly int[] BEAT_KIND = { 0, 1, 2, 0, 3, 0, 1, 2, 0, 1, 3, 4, 5 };
 	// the horde tier the stage runs at once that beat lands (0 = leave the tier alone).
-	// Ally III / IV bring the tier-3 / tier-4 escorts the user asked for, so their beats
-	// also advance the horde.
-	readonly int[] BEAT_TIER = { 0, 2, 0, 0, 0, 3, 0, 4, 0, 0 };
+	// This lock puts the tier gates on their OWN rows, so a tier step never hides inside an
+	// ally beat again: tier 2 at 60s, tier 3 at 540s, tier 4 at 840s.
+	readonly int[] BEAT_TIER = { 0, 2, 0, 0, 0, 0, 3, 0, 0, 4, 0, 0, 0 };
 	// boss beats name the Boss node they engage, so a beat is data and the scene owns the
-	// body (four of them now, parked hidden until their beat fires)
-	readonly string[] BEAT_BOSS = { "", "", "mini1", "", "boss1", "", "mini2", "", "final", "" };
+	// body (five of them now: mini1 / boss1 / mini2 / boss2 / final, parked hidden until
+	// their beat fires)
+	readonly string[] BEAT_BOSS = { "", "", "mini1", "", "boss1", "", "", "mini2", "", "", "boss2", "final", "" };
 	// ally beats recruit whatever the per-run JOIN LOTTERY drew for that slot (user 2026-10-23:
 	// runs are dynamic). The lottery is built at boot from the stage-weighted table below,
 	// drawn without replacement and excluding the run's own leader. A -1 slot (pool
@@ -482,6 +487,9 @@ public partial class Game : Godot.Node2D
 		const double INSECT_WAIT = 30.0;  // unclaimed wilts after 30 s: pick, keeps slots free
 		const double SPIRIT_EVERY = 30.0; // Yu: a spirit kindles every 30 s (user)
 		const double SPIRIT_LASTS = 30.0; // unclaimed wilts after 30 s: same pick
+		const float SPIRIT_HOP_EVERY = 0.85f; // one vigil hop cycle: push + rest (assistant pick)
+		const float SPIRIT_HOP_MOVE = 0.28f;  // seconds of that cycle the vigil actually pushes (assistant pick)
+		const float SPIRIT_HOP_SPEED = 165.0f; // px/s during the push: ~46 px a hop, ~54 px/s crawl (assistant pick)
 		const double SPIRIT_HEAL = 10.0;  // a touched spirit heals its patient for 10 HP (user)
 		const double HELPER_PICK = 24.0;  // "getting close": walk-contact reach, pick
 		const double HELPER_RING_MIN = 90.0;  // spawn ring around the leader: picks
@@ -799,7 +807,7 @@ public partial class Game : Godot.Node2D
 
 	public void OnEnemyKilled(Combatant c)
 	{
-		if (c is Boss) // four boss nodes now (mini1 / boss1 / mini2 / final): the class,
+		if (c is Boss) // five boss nodes now (mini1 / boss1 / mini2 / boss2 / final): the class,
 					   // not a kind string, decides a death is a BOSS death
 		{
 			OnBossKilled(c);
@@ -861,7 +869,7 @@ public partial class Game : Godot.Node2D
 		// normalized to the mini-boss, and the user explicitly asked for campfire after a
 		// main boss too. The final-boss camp still leaves the 420 s WRAP-UP row to raise
 		// VICTORY once the camp clears.
-		if (kb == "mini1" || kb == "mini2" || kb == "boss1" || kb == "final")
+		if (kb == "mini1" || kb == "mini2" || kb == "boss1" || kb == "boss2" || kb == "final")
 		{
 			_state = StageState.CAMPFIRE;
 			_campWaitT = 0.0;
@@ -1332,7 +1340,7 @@ public void RegisterEnemy(Combatant e)
 			case 0: return "rescue " + _allyBeatIdx;
 			case 1: return "horde II";
 			case 2: return "MINI-BOSS";
-			case 3: return "BOSS";
+			case 3: return "MID-BOSS";
 			case 4: return "FINAL BOSS";
 			case 5: return "WRAP-UP";
 			default: return "horde";
@@ -3265,6 +3273,23 @@ private void UpdateSpirits(float delta)
 		}
 		if (puller != null)
 			s.GlobalPosition += to.Normalized() * 380.0f * delta; // the same orb ride the gems use
+			// user 2026-11-03: outside anyone's collection bubble the vigil now SLOWLY HOPS toward
+			// the leader seat (user: "his leader passive friendly familiars ... slowly hop towards him").
+			// A frog-hop, not a glide: it pushes for SPIRIT_HOP_MOVE s then rests the rest of the cycle,
+			// and the phase rides the EXISTING life clock (zero new state), same discipline as the bob.
+			// The 380 px/s magnet ride above still owns the fast final approach, so the vigil reads as
+			// kindled -> crawling to Yu -> riding in once he is close enough.
+			if (puller == null && _leader != null && !(_leader.downed || _leader.eliminated))
+			{
+				float hopT = (float)(SPIRIT_LASTS - _spiritLife[i]);
+				float cyc = hopT - (float)(int)(hopT / SPIRIT_HOP_EVERY) * SPIRIT_HOP_EVERY;
+				if (cyc < SPIRIT_HOP_MOVE)
+				{
+					Vector2 hv = WrapDelta(s.GlobalPosition, _leader.GlobalPosition);
+					if (hv.Length() > 2.0f)
+						s.GlobalPosition = WrapNearCamera(s.GlobalPosition + hv.Normalized() * SPIRIT_HOP_SPEED * delta);
+				}
+			}
 		if (puller != null && dist < 14.0f)
 		{
 			PartyMember[] cands = new PartyMember[9]; // roster-wide bound (9 PCs at 2026-11-01; was exact-fit at 8)
@@ -3300,6 +3325,7 @@ private void UpdateSpirits(float delta)
 		float sph = (float)_spiritLife[i] * 7.0f + i * 2.3f; // gentler cycle, slot-staggered (assistant pick)
 		start.Position = new Vector2(6.0f, 6.0f - 5.0f * (float)System.Math.Abs(System.Math.Sin((double)sph))); // 5 px bob (assistant pick)
 		_spiritLife[i] -= delta;
+		if (_spiritLife[i] <= 0.0)
 		{
 			DespawnSpirit(i); // nobody hurt in time: it dims (pick)
 		}

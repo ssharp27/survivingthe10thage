@@ -71,7 +71,7 @@ public partial class Boss : Combatant
     private bool IsDanceKind()
     {
         return kind == "mini1" || kind == "mini2" || kind == "mini"
-            || kind == "boss1" || kind == "final";
+            || kind == "boss1" || kind == "boss2" || kind == "final";
     }
 
     public override void _EnterTree()
