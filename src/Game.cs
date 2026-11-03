@@ -872,6 +872,11 @@ public partial class Game : Godot.Node2D
 			// so every in-flight boss bullet is swept before the grimoire goes up - a
 			// player absorbing the rest choice cannot be shot mid-decision.
 			ClearBullets();
+
+			// fx-feel10: shield discs are per-member flight STATE, not bullets, so the camp
+			// sweep ends live throws here too - nothing keeps flying across the rest beat.
+			foreach (PartyMember pm in _party)
+				pm.EndAllThrows();
 			GD.Print("[10thAge] (camp) the campfire sweeps BULLETS only - horde kept: ", _enemies.Count, " bodies on the field");
 			ReviveAllAtCampfire(false);
 			GD.Print("[10thAge] mini-boss slain ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â camp: the fallen return at 25% hp; the "

@@ -27,6 +27,10 @@ public partial class Enemy : Combatant
     // mage = goblin mage (retreats, lobs slow fireballs; cadence assistant pick).
     public float rangedDamage = 0.0f; // bow 3 / mage 6 = USER numbers (set by Director)
     private float _shotCd = 0.0f;
+
+    // fx-feel10 audit: did this body ever loose a shot? first loose prints once,
+    // so the bench counts loosed lanes instead of spamming the horde.
+    bool _firedShot = false;
     private readonly float RIDER_MIN = 170.0f;   // closest the bow rider holds (assistant pick)
     private readonly float RIDER_MAX = 300.0f;   // farther than this it closes back in (assistant pick)
     private readonly float RIDER_ARROW_SPEED = 190.0f; // px/s (assistant pick)
@@ -58,6 +62,7 @@ public partial class Enemy : Combatant
             _bobPhase = (GetInstanceId() % 64) * 0.37f; // the horde never bobs in lockstep
         }
         _shotCd = kind == "riderbow" ? 3.0f : (kind == "mage" ? 4.0f : 0.0f); // first shot never snaps on spawn
+        _firedShot = false; // fx-feel10: audit flag lands when the shot clock does
         if (kind == "reaper")
         {
             // TEST death-state reaper: big red diamond; touching it DOWNs a member
@@ -225,6 +230,13 @@ public partial class Enemy : Combatant
                             g.SpawnBulletArrow(GlobalPosition, aim * RIDER_ARROW_SPEED, rangedDamage);
                         else
                             g.SpawnBulletFire(GlobalPosition, aim * MAGE_FIRE_SPEED, rangedDamage);
+
+                        if (!_firedShot)
+                        {
+                            // fx-feel10 bench evidence: first loose prints once per ranged body
+                            _firedShot = true;
+                            GD.Print("[10thAge] (shot) " + kind + " loosed its first " + (kind == "mage" ? "fireball" : "arrow"));
+                        }
                     }
                 }
             }

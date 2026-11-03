@@ -172,7 +172,7 @@ public partial class PartyMember : Godot.Node2D
 
 	Godot.Sprite2D _meleeFx = null;
 
-	Godot.Sprite2D _shieldFx = null;
+	// fx-feel10: the single disc sprite is gone - art lives in _shldArt, one per slot.
 
 	Godot.Sprite2D[] _axeFx = null; // 5 SPIN blade slots (fx-feel8: the crescents got their OWN set so the default attack can run WHILE the ult spins - user: "allow him to continue his default attack while his ultimate is up")
 
@@ -299,14 +299,22 @@ public partial class PartyMember : Godot.Node2D
 	// the current victim's LIVE position at SHIELD_HURL_SPEED px/s and bites ON ARRIVAL (Bruno-style
 	// on-hit damage), then hops to the next fresh live body within SHIELD_HOP. Damage only ever lands
 	// on BITTEN bodies - a disc flying past anything still bites nothing.
-	Godot.Node2D _shldTarget = null; // body the disc is homing on now (null = no live hurl)
-	Godot.Vector2 _shldPos = new Godot.Vector2(); // disc world position: drives the art AND the chase
-	Godot.Node2D[] _shldHit = null; // chain-lightning memo: bodies already spoken for this throw
-	int _shldHitN = 0; // memo length
-	int _shldLeft = 0; // bounce budget left after the current victim
-	int _shldBites = 0; // bodies actually bitten this throw (audit print)
-	double _shldRoll = 0.0; // ONE crit/lifesteal roll shared by the whole throw (one object, one bite)
-	float _shldFlown = 0.0f; // px flown this throw: tumbles the disc art by distance, not time
+	// fx-feel10: ALL throw state is parallel per-slot arrays so one hurl can never overwrite
+	// another - several discs may fly at once (user: the shield should be its own instance,
+	// multiple ones bouncing around is fine). Growth is guarded +4 at a write site, like every
+	// other memo in this file: no index is ever touched past the current length.
+	Godot.Node2D[] _shldT = new Godot.Node2D[4]; // body each slot homes on (null = idle slot)
+	Godot.Vector2[] _shldP = new Godot.Vector2[4]; // disc world position per slot: drives art AND chase
+	Godot.Node2D[][] _shldHitM = new Godot.Node2D[4][]; // per-slot chain-lightning memo (per-throw sized)
+	int[] _shldHitNA = new int[4]; // per-slot memo length
+	int[] _shldLeftA = new int[4]; // per-slot bounce budget left after the current victim
+	int[] _shldBitesA = new int[4]; // per-slot bodies actually bitten (audit print)
+	double[] _shldRollA = new double[4]; // per-slot ONE crit/lifesteal roll shared by that whole throw
+	float[] _shldFlownA = new float[4]; // per-slot px flown: tumbles that disc art by distance
+	Godot.Texture2D _shldTex = null; // the kit disc texture; art is pooled per slot on first use
+	Godot.Sprite2D[] _shldArt = new Godot.Sprite2D[4]; // pooled disc sprite per slot (ShieldArt)
+	int _shldStackPrinted = 0; // fx-feel10 audit ONLY: highest disc stack already printed
+	int _shldThrows = 0; // fx-feel10 audit ONLY: committed throws this run
 
 	float _twinLen = 0.0f; // first jab's stab length: the second dagger repeats it
 
@@ -860,15 +868,7 @@ public partial class PartyMember : Godot.Node2D
 
 			{
 
-				_shieldFx = new Godot.Sprite2D();
-
-				_shieldFx.Texture = fxT;
-
-				_shieldFx.Set("texture_filter", 0);
-
-				_shieldFx.Visible = false;
-
-				AddChild(_shieldFx);
+				_shldTex = fxT; // fx-feel10: keep only the texture; ShieldArt(slot) builds a disc per slot on use
 
 			}
 
@@ -2137,9 +2137,12 @@ public partial class PartyMember : Godot.Node2D
 
 					_meleeFx.Visible = false;
 
-				if (_shieldFx != null)
-
-					_shieldFx.Visible = false;
+				for (int sk = 0; sk < _shldT.Length; sk++)
+				{
+					// fx-feel10: only IDLE slots drop their disc art - a live flight keeps its own
+					if (_shldT[sk] == null && ShieldArt(sk) != null)
+						ShieldArt(sk).Visible = false;
+				}
 
 				if (_axeFx != null && orbitT <= 0.0)
 
@@ -2564,9 +2567,15 @@ public partial class PartyMember : Godot.Node2D
 		// shield disappears exactly where it landed. Chain-lightning memo kept: no body is ever struck
 		// twice in one throw, and a disc flying PAST anything still bites nothing - only bitten bodies
 		// take damage.
-		if (_shldTarget != null)
+		// fx-feel10: the flight walk runs OVER EVERY live slot, so several discs chase in the same
+		// frame and a fast beat can never truncate one. Each slot keeps its own memo, budget, roll
+		// and disc art; the behaviour below is unchanged, per slot.
+		for (int sk = 0; sk < _shldT.Length; sk++)
 		{
-			Combatant tc = (Combatant)_shldTarget;
+			if (_shldT[sk] == null)
+				continue; // idle slot: nothing in the air to walk
+
+			Combatant tc = (Combatant)_shldT[sk];
 			if (tc == null || tc.kind == "dead" || tc.hp <= 0.0f)
 			{
 				// fx-feel8 (user 2026-11-02: "the shield vanishes early... the actual object never
@@ -2583,7 +2592,7 @@ public partial class PartyMember : Godot.Node2D
 				if (pgt != null)
 				{
 					Godot.Collections.Array<Godot.Node2D> foesT = pgt.GetEnemies();
-						float hopRT = (float)SHIELD_HOP; // fx-feel9 (user: "not even try to bounce if they are too far away"): flat BASE hop, rank never stretches a leg (the long leg was what vanished mid-air); the retarget measures from the DISC (_shldPos), NEVER Wash
+						float hopRT = (float)SHIELD_HOP; // fx-feel9 (user: "not even try to bounce if they are too far away"): flat BASE hop, rank never stretches a leg (the long leg was what vanished mid-air); the retarget measures from the DISC (_shldP[sk]), NEVER Wash
 					float nxTb = 1e9f;
 					for (int i = 0; i < foesT.Count; i++)
 					{
@@ -2592,59 +2601,59 @@ public partial class PartyMember : Godot.Node2D
 						if (ec == null || ec.kind == "dead" || ec.hp <= 0.0f)
 							continue; // killed-but-unswept bodies are not chases
 						bool done = false;
-						for (int h = 0; h < _shldHitN; h++)
+						for (int h = 0; h < _shldHitNA[sk]; h++)
 						{
-							if (_shldHit[h] == en)
+							if (_shldHitM[sk][h] == en)
 								done = true;
 						}
 						if (done)
 							continue; // one honest bite per body per throw
-						float dd = pgt.WrapDelta(_shldPos, en.GlobalPosition).Length();
+						float dd = pgt.WrapDelta(_shldP[sk], en.GlobalPosition).Length();
 						if (dd >= nxTb || dd > hopRT)
-							continue; // a mid-air retarget measures from the DISC itself (dd anchors on _shldPos, never Wash)
+							continue; // a mid-air retarget measures from the DISC itself (dd anchors on _shldP[sk], never Wash)
 						nxTb = dd;
 						nxT = en;
 					}
 				}
 				if (nxT != null)
 				{
-					if (_shldHitN >= _shldHit.Length) // memo grows on demand: retargets never spend the bounce budget
+					if (_shldHitNA[sk] >= _shldHitM[sk].Length) // memo grows on demand: retargets never spend the bounce budget
 					{
-						Godot.Node2D[] bigger = new Godot.Node2D[_shldHit.Length + 4];
-						for (int h = 0; h < _shldHit.Length; h++)
-							bigger[h] = _shldHit[h];
-						_shldHit = bigger;
+						Godot.Node2D[] bigger = new Godot.Node2D[_shldHitM[sk].Length + 4];
+						for (int h = 0; h < _shldHitM[sk].Length; h++)
+							bigger[h] = _shldHitM[sk][h];
+						_shldHitM[sk] = bigger;
 					}
-					_shldHit[_shldHitN++] = nxT;
-					_shldTarget = nxT; // the disc keeps flying: the nearest fresh body takes the leg
+					_shldHitM[sk][_shldHitNA[sk]++] = nxT;
+					_shldT[sk] = nxT; // the disc keeps flying: the nearest fresh body takes the leg
 				}
 				else
 				{
-					if (_shldBites == 0)
+					if (_shldBitesA[sk] == 0)
 						GD.Print("[10thAge] (shield) " + displayName + " lost prey mid-flight, nothing fresh in reach");
-					_shldTarget = null; // nothing fresh to chase: the disc drops where it stands
+					_shldT[sk] = null; // nothing fresh to chase: the disc drops where it stands
 				}
 			}
 			else
 			{
 				Game pgs = GetParent() as Game; // toroidal-safe wrap lanes, same as every aim lane
 				if (pgs == null)
-					_shldTarget = null; // no world handle: end the throw instead of hanging it
+					_shldT[sk] = null; // no world handle: end the throw instead of hanging it
 				else
 				{
-					_shldFlown += (float)SHIELD_HURL_SPEED * delta; // px the disc may fly this frame
-					Vector2 tgt = _shldTarget.GlobalPosition; // LIVE position: the prey moves, the disc chases
-					Vector2 dv = pgs.WrapDelta(_shldPos, tgt); // disc -> victim, wrap-short way
+					_shldFlownA[sk] += (float)SHIELD_HURL_SPEED * delta; // px the disc may fly this frame
+					Vector2 tgt = _shldT[sk].GlobalPosition; // LIVE position: the prey moves, the disc chases
+					Vector2 dv = pgs.WrapDelta(_shldP[sk], tgt); // disc -> victim, wrap-short way
 					float step = (float)SHIELD_HURL_SPEED * delta; // constant hurl speed (px/s)
 					if (dv.Length() <= step)
 					{
-						_shldPos = tgt; // land ON the body: the disc strikes it, never flies past it
-						_shldBites++;
-						((Combatant)_shldTarget).TakeDamage(_shldBites == 1 ? _shldRoll : _shldRoll * 0.75); // ONE roll for the whole throw: first bite full, every bounce a flat 75% (user 2026-11-01)
+						_shldP[sk] = tgt; // land ON the body: the disc strikes it, never flies past it
+						_shldBitesA[sk]++;
+						((Combatant)_shldT[sk]).TakeDamage(_shldBitesA[sk] == 1 ? _shldRollA[sk] : _shldRollA[sk] * 0.75); // ONE roll for the whole throw: first bite full, every bounce a flat 75% (user 2026-11-01)
 						// pick the next hop AT THIS INSTANT from live positions: nearest fresh body within SHIELD_HOP
 						// of the hit that this throw has not spoken for yet (chain-lightning memo discipline)
 						Godot.Node2D nxN = null;
-						if (_shldLeft > 0)
+						if (_shldLeftA[sk] > 0)
 						{
 							Godot.Collections.Array<Godot.Node2D> foes = pgs.GetEnemies();
 							// user 2026-11-02 fx-feel9 follow-up: the chain is VICTIM-ANCHORED ALWAYS - every hop searches
@@ -2661,8 +2670,8 @@ public partial class PartyMember : Godot.Node2D
 								if (ec == null || ec.kind == "dead" || ec.hp <= 0.0f)
 									continue; // killed-but-unswept bodies are never hops
 								bool done = false;
-								for (int h = 0; h < _shldHitN; h++)
-									if (_shldHit[h] == en)
+								for (int h = 0; h < _shldHitNA[sk]; h++)
+									if (_shldHitM[sk][h] == en)
 									{ done = true; break; }
 								if (done)
 									continue; // one honest bite per body per throw
@@ -2675,42 +2684,43 @@ public partial class PartyMember : Godot.Node2D
 						}
 						if (nxN != null)
 						{
-								if (_shldHitN >= _shldHit.Length) // fx-feel8: retargets push the memo PAST the per-throw
+								if (_shldHitNA[sk] >= _shldHitM[sk].Length) // fx-feel8: retargets push the memo PAST the per-throw
 								{					// capacity (they never spend the bounce budget), so EVERY write now grows it
-									Godot.Node2D[] bigger2 = new Godot.Node2D[_shldHit.Length + 4];
-									for (int h = 0; h < _shldHit.Length; h++)
-										bigger2[h] = _shldHit[h];
-									_shldHit = bigger2;
+									Godot.Node2D[] bigger2 = new Godot.Node2D[_shldHitM[sk].Length + 4];
+									for (int h = 0; h < _shldHitM[sk].Length; h++)
+										bigger2[h] = _shldHitM[sk][h];
+									_shldHitM[sk] = bigger2;
 								}
-							_shldHit[_shldHitN++] = nxN; // the hop is spoken for the moment it is picked
-							_shldTarget = nxN; // the disc takes the next leg off the body IT just bit (user: hit, then bounce to the next)
-							_shldLeft--;
+							_shldHitM[sk][_shldHitNA[sk]++] = nxN; // the hop is spoken for the moment it is picked
+							_shldT[sk] = nxN; // the disc takes the next leg off the body IT just bit (user: hit, then bounce to the next)
+							_shldLeftA[sk]--;
 						}
 						else
 						{
 							// no fresh body to bounce to: the shield disappears where it landed (user)
-							_shldTarget = null;
+							_shldT[sk] = null;
 						}
 					}
 					else
-						_shldPos = pgs.WrapNearCamera(_shldPos + dv.Normalized() * step); // home on the LIVE body between frames
-					if (_shieldFx != null)
+						_shldP[sk] = pgs.WrapNearCamera(_shldP[sk] + dv.Normalized() * step); // home on the LIVE body between frames
+					if (ShieldArt(sk) != null)
 					{
-						_shieldFx.GlobalPosition = _shldPos;
-						_shieldFx.Rotation = (float)System.Math.Atan2((double)dv.Y, (double)dv.X) + _shldFlown * 0.045f; // tumbles by distance flown, not by time
-						_shieldFx.Visible = true;
+						ShieldArt(sk).GlobalPosition = _shldP[sk];
+						ShieldArt(sk).Rotation = (float)System.Math.Atan2((double)dv.Y, (double)dv.X) + _shldFlownA[sk] * 0.045f; // tumbles by distance flown, not by time
+						ShieldArt(sk).Visible = true;
 					}
 				}
 			}
-			if (_shldTarget == null)
+			if (_shldT[sk] == null)
 			{
 				// the chain ended THIS frame (no next body / dead victim / no world): the disc drops at its
 				// landing spot (user: "if there isn't a next enemy to bounce to, it disappears")
-				if (_shieldFx != null)
-					_shieldFx.Visible = false;
-				if (_shldBites > 1)
-					GD.Print("[10thAge] (shield) " + displayName + " shield bounds " + (_shldBites - 1) + " more bodies");
+				if (ShieldArt(sk) != null)
+					ShieldArt(sk).Visible = false;
+				if (_shldBitesA[sk] > 1)
+					GD.Print("[10thAge] (shield) " + displayName + " shield bounds " + (_shldBitesA[sk] - 1) + " more bodies");
 			}
+
 		}
 		ultT -= delta;
 
@@ -3024,71 +3034,85 @@ public partial class PartyMember : Godot.Node2D
 
 		// (it IS the weapon). ONE roll shared across every body - the shield is one object, one bite.
 
+		// fx-feel10 (user 2026-11-03: "the shield despawns and he attacks again before it can
+		// hit an enemy... The shield should be its own instance, doesn't matter if multiple
+		// ones are bouncing around"): each hurl looses its OWN disc. The old lane kept ONE flight
+		// and the next commit OVERWROTE it - and the user's attack-speed instinct was right: the
+		// speed cards push cooldown BELOW the flight time, so the very next hurl despawned a
+		// live disc in mid-air before it could land a bite. Every commit claims a FREE slot
+		// (its own flight state + its own pooled disc sprite): several discs may share the air,
+		// and no fast beat can truncate a live throw. Slot arrays grow +4 at a guard, the same
+		// memo-growth discipline that settled the bounce-rank crash.
 		if (shieldKit)
-
 		{
-
 			Godot.Node2D prey = null;
-
 			float preyD = 1e9f;
-
 			for (int i = 0; i < enemies.Count; i++)
-
 			{
-
 				Godot.Node2D n = enemies[i];
-
 				Combatant nc = (Combatant)n;
-
 				if (nc == null || nc.kind == "dead")
-
 					continue;
-
 				float dd = (n.GlobalPosition - p).Length();
-
 				if (dd >= preyD)
-
 					continue;
-
 				preyD = dd;
-
 				prey = n;
-
 			}
-
 			if (prey == null || preyD > reach)
-
 				return; // nothing in the throw: the beat stays ready, an empty clearing never stalls it
-
-			cdTimer = (float)EffCooldown();
-
-			_atkFlash = 0.08f; // same commit pulse every kit uses, never the red harm lane
-
+			int slot = -1;
+			for (int q = 0; q < _shldT.Length; q++)
+			{
+				if (_shldT[q] == null)
+				{
+					slot = q;
+					break;
+				}
+			}
+			if (slot < 0)
+			{
+				GrowShieldSlots(); // every slot busy: grow all arrays +4, then claim a fresh one
+				slot = _shldT.Length - 4;
+			}
+			int live = 0;
+			for (int q = 0; q < _shldT.Length; q++)
+			{
+				if (_shldT[q] != null)
+					live++;
+			}
+			if (live > _shldStackPrinted && live >= 1)
+			{
+				_shldStackPrinted = live; // fx-feel10 audit: a NEW stack height prints ONCE
+				GD.Print("[10thAge] (shield) " + displayName + " now flies " + (live + 1) + " discs at once");
+			}
+			_shldThrows++; // fx-feel10 audit: committed throws this run (bites vs completions)
 			// 2026-11-02 fx-feel6 (user: the throw "goes through enemies... bounces at their set distance...
 			// applies the damage immediately instead of on hit (like it should do similar to Bruno's)"):
 			// the commit now ONLY speaks for the prey and looses the disc - the _Process chase lands
 			// every bite ON ARRIVAL and picks each hop at the hit itself. No baked polyline, no instant
 			// damage at commit.
-			if (_shieldFx != null)
-			{
-				_shieldFx.GlobalPosition = p; // starts in his hand: the throw visibly LEAVES the model
-				_shieldFx.Visible = true;
-			}
-			_shldPos = p; // flight state lives even without art: a greybox Wash still bites on arrival
-			_shldTarget = prey; // the disc HOMES on live positions: no bake, no instant commit
-			_shldRoll = RollDamage(pg, weaponDamage); // ONE crit/lifesteal roll for the whole throw (one object, one bite)
-			_shldLeft = shieldBounce; // bounce budget: extra bites after the first body (ranks grow it)
-			_shldBites = 0; // nothing bitten yet: the FIRST bite lands when the disc arrives
-			_shldFlown = 0.0f; // distance clock for the disc's tumble
+			_shldP[slot] = p; // flight state lives even without art: a greybox Wash still bites on arrival
+			_shldT[slot] = prey; // the disc HOMES on live positions: no bake, no instant commit
+			_shldRollA[slot] = RollDamage(pg, weaponDamage); // ONE crit/lifesteal roll for the whole throw (one object, one bite)
+			_shldLeftA[slot] = shieldBounce; // bounce budget: extra bites after the first body (ranks grow it)
+			_shldBitesA[slot] = 0; // nothing bitten yet: the FIRST bite lands when the disc arrives
+			_shldFlownA[slot] = 0.0f; // distance clock for that disc's tumble
 			// memo must fit THIS throw's budget: the old lazy allocation froze capacity at the FIRST
 			// throw's rank, so every later "more rebounds" rank bought wrote past the end (the bench
 			// caught the IndexOutOfRange swarm in the Wash-led smoke, and it is why upgraded shields
 			// die mid-bounce in real play - user 2026-11-02: "doesn't bounce more even with upgrades")
-			_shldHit = new Godot.Node2D[1 + shieldBounce]; // reallocated every throw: ranks bought mid-run resize it live
-			_shldHitN = 1;
-			_shldHit[0] = prey; // the prey is spoken for: it can never be a later hop this throw
+			_shldHitM[slot] = new Godot.Node2D[1 + shieldBounce]; // reallocated every throw: ranks bought mid-run resize it live
+			_shldHitNA[slot] = 1;
+			_shldHitM[slot][0] = prey; // the prey is spoken for: it can never be a later hop this throw
+			if (ShieldArt(slot) != null)
+			{
+				ShieldArt(slot).GlobalPosition = p; // starts in his hand: the throw visibly LEAVES the model
+				ShieldArt(slot).Visible = true;
+			}
+			cdTimer = (float)EffCooldown();
+			_atkFlash = 0.08f; // same commit pulse every kit uses, never the red harm lane
 			return; // the throw owns its whole beat: damage lands when the disc lands on a body
-
 		}
 
 		// ---------- Bruno's "Axes Away!" spin (user 2026-10-31): orbiting massive blades ----------
@@ -3932,4 +3956,77 @@ public partial class PartyMember : Godot.Node2D
 
 	}
 
+
+
+	// fx-feel10: pooled disc art - one Sprite2D per throw slot, built on first use so a greybox
+	// Wash (no kit art) simply gets null and the flight still lands its bites.
+	private Godot.Sprite2D ShieldArt(int slot)
+	{
+		if (_shldArt == null || slot < 0 || slot >= _shldArt.Length)
+			return null;
+		if (_shldArt[slot] == null)
+		{
+			if (_shldTex == null)
+				return null; // no kit texture: flight state only, nothing to draw
+			Godot.Sprite2D sx = new Godot.Sprite2D();
+			sx.Texture = _shldTex;
+			sx.Set("texture_filter", 0);
+			sx.Visible = false;
+			AddChild(sx); // same parenting as the old single disc: global placement tracks the party
+			_shldArt[slot] = sx;
+		}
+		return _shldArt[slot];
+	}
+
+	// fx-feel10: every slot busy (rare: cooldown far below flight time): grow all parallel arrays
+	// +4 AT THIS GUARD, copying live state across, so no in-flight disc is ever dropped by growth.
+	private void GrowShieldSlots()
+	{
+		int n = _shldT.Length + 4;
+		Godot.Node2D[] t = new Godot.Node2D[n];
+		Godot.Vector2[] pv = new Godot.Vector2[n];
+		Godot.Node2D[][] hm = new Godot.Node2D[n][];
+		int[] hn = new int[n];
+		int[] la = new int[n];
+		int[] bi = new int[n];
+		double[] rl = new double[n];
+		float[] fl = new float[n];
+		Godot.Sprite2D[] ar = new Godot.Sprite2D[n];
+		for (int q = 0; q < _shldT.Length; q++)
+		{
+			t[q] = _shldT[q];
+			pv[q] = _shldP[q];
+			hm[q] = _shldHitM[q];
+			hn[q] = _shldHitNA[q];
+			la[q] = _shldLeftA[q];
+			bi[q] = _shldBitesA[q];
+			rl[q] = _shldRollA[q];
+			fl[q] = _shldFlownA[q];
+			ar[q] = _shldArt[q];
+		}
+		_shldT = t;
+		_shldP = pv;
+		_shldHitM = hm;
+		_shldHitNA = hn;
+		_shldLeftA = la;
+		_shldBitesA = bi;
+		_shldRollA = rl;
+		_shldFlownA = fl;
+		_shldArt = ar;
+	}
+
+	// fx-feel10: the campfire beat sweeps in-flight bullets; shield discs are per-member STATE, so
+	// the camp ends every live throw here too - nothing keeps flying over the rest beat.
+	public void EndAllThrows()
+	{
+		for (int sk = 0; sk < _shldT.Length; sk++)
+		{
+			if (_shldT[sk] == null)
+				continue;
+			_shldT[sk] = null;
+			_shldBitesA[sk] = 0; // a swept throw never reports bounds: it never finished
+			if (ShieldArt(sk) != null)
+				ShieldArt(sk).Visible = false;
+		}
+	}
 }

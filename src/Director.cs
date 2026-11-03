@@ -129,9 +129,13 @@ public partial class Director : Godot.Node2D
         e.GlobalPosition = pos;
         g.RegisterEnemy(e);
         g.AddChild(e);
-        if (hob)
+        // fx-feel10 (user 2026-11-03: mages spawn early and never attack): hobs run from tier 2,
+        // but the goblin mage is a TIER-3 creature - the user's creature pass locks it to the tier-3
+        // legs (210 s + tier 4), so the mage counter only counts hobs while tier3 is true.
+        if (hob && tier3)
         {
-            // USER RULE: one goblin mage per TWO hobgoblin spawns, anywhere hobs run.
+            // USER RULE: one goblin mage per TWO hobgoblin spawns (fx-feel10 user 2026-11-03 override:
+            // mages are tier 3, so the counter+spawn now run ONLY on tier-3+ legs - never early).
             _hobsSinceMage++;
             if (_hobsSinceMage >= 2)
             {
