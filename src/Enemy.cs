@@ -41,10 +41,10 @@ public partial class Enemy : Combatant
     private readonly float RIDER_ARROW_SPEED = 190.0f; // px/s (assistant pick)
     private readonly float RIDER_SHOT_EVERY = 4.0f; // USER number: 3 s + 1 s = 4 s per arrow
     private readonly float RIDER_SHOT_RANGE = 420.0f; // looses only with reach on a squad body (assistant pick)
-    private readonly float MAGE_RETREAT = 420.0f; // backs off inside this (assistant pick)
-    private readonly float MAGE_RETURN = 620.0f;  // past this it rejoins the march (assistant pick)
+    private readonly float MAGE_CAST = 300.0f;    // CLOSE to this before loosing (user 2026-11-04: "move close enough to cast"; pick)
+    private readonly float MAGE_LOITER = 0.5f;    // the run-away leg rides this fraction of speed (assistant pick)
     private readonly float MAGE_FIRE_SPEED = 130.0f; // "slow moving fireball" - px/s is assistant pick
-    private readonly float MAGE_SHOT_RANGE = 640.0f; // fireball range: covers the 620 px leash so a settled mage actually fires (assistant pick)
+    private readonly float MAGE_SHOT_RANGE = 420.0f; // fireball range: a hair past the cast ring so a fleeing mage still looses (assistant pick)
     private readonly float MAGE_SHOT_EVERY = 6.0f; // mage cadence (assistant pick: 4 s fireballs + bow-rider arrows bled the Bruno seat to TPK, so opened up; retunable post-playtest)
 
     Godot.ColorRect _body;
@@ -206,12 +206,12 @@ public partial class Enemy : Combatant
                 }
                 else if (kind == "mage")
                 {
-                    // GOBLIN MAGE (user: "try to run away from the player"): back off inside the
-                    // retreat radius, hold at its edge, rejoin the march only if it drifted too
-                    // far - wrapping world gives "flee" no walls, so the return leg is the leash.
-                    if (dist < MAGE_RETREAT) dir = -to.Normalized();
-                    else if (dist > MAGE_RETURN) dir = to.Normalized();
-                    else dir = new Vector2(0.0f, 0.0f);
+                    // GOBLIN MAGE (user 2026-11-04: "they spawn, move away and stay far away... move close
+                    // enough to cast their attack, then try to slowly run away"): CLOSE at full
+                    // speed until inside the cast ring, then back off (LOITER scales the leg below).
+                    if (dist > MAGE_CAST) dir = to.Normalized();  // close first
+                    else dir = -to.Normalized();                  // then run away
+                    if (dist <= MAGE_CAST) dir *= MAGE_LOITER;    // the retreat leg is a slow shamble
                 }
                 else
                 {

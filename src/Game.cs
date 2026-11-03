@@ -283,7 +283,7 @@ public partial class Game : Godot.Node2D
 	// ---------- horde EVENT: budget-free bonus swarms (user 2026-11-02: "random horde spawns ... won't count against the maximum number of enemies that can spawn ... 20 enemies (these scale with the horde scale increases) ... all spawn together and move towards the player ... first spawn can happen 30 seconds after the first mini-boss is defeated, then every 2 minutes after") ----------
 	// an event body never takes a budget slot: RegisterHordeBody is the same no-count lane the boss nodes use. TIER 1 goblins ONLY to begin with; mixing tier-2/3 in at later run points rides g.GetHordeTier() at the event spawner (infrastructure lives in Director.cs so other maps can reuse it). Times are the user's INITIAL TEST pacing - retuned with the full M3 pacing pass.
 	readonly double HORDE_EVENT_FIRST_DELAY = 30.0; // run-seconds after the first mini-boss falls
-	readonly double HORDE_EVENT_EVERY = 120.0;      // run-seconds between bonus swarms
+	readonly double HORDE_EVENT_EVERY = 60.0;       // run-seconds between bonus swarms (user 2026-11-04: halved - "hardly saw any"; pick)
 	double _hordeEventDue = 0.0;                    // 0 = schedule unarmed; else run-time deadline
 
 
@@ -490,6 +490,11 @@ public partial class Game : Godot.Node2D
 		const float SPIRIT_HOP_EVERY = 0.85f; // one vigil hop cycle: push + rest (assistant pick)
 		const float SPIRIT_HOP_MOVE = 0.28f;  // seconds of that cycle the vigil actually pushes (assistant pick)
 		const float SPIRIT_HOP_SPEED = 165.0f; // px/s during the push: ~46 px a hop, ~54 px/s crawl (assistant pick)
+
+		// user 2026-11-04: kindness spirits kindle FARTHER from the seat so the slow ride-in
+		// reads on screen (Asper's insects keep the old HELPER_RING)
+		const double SPIRIT_RING_MIN = 170.0;  // spirit spawn ring inner edge (pick)
+		const double SPIRIT_RING_MAX = 280.0;  // outer edge: well inside the camera frame (pick)
 		const double SPIRIT_HEAL = 10.0;  // a touched spirit heals its patient for 10 HP (user)
 		const double HELPER_PICK = 24.0;  // "getting close": walk-contact reach, pick
 		const double HELPER_RING_MIN = 90.0;  // spawn ring around the leader: picks
@@ -2993,7 +2998,7 @@ public void RegisterEnemy(Combatant e)
 			if (!(s.GlobalPosition.X < -8000.0f))
 			continue;
 			double aw = Rng.Randf() * 2.0 * System.Math.PI;
-			double rr = HELPER_RING_MIN + Rng.Randf() * (HELPER_RING_MAX - HELPER_RING_MIN);
+			double rr = SPIRIT_RING_MIN + Rng.Randf() * (SPIRIT_RING_MAX - SPIRIT_RING_MIN);
 			Vector2 lp = _leader.GlobalPosition;
 			s.GlobalPosition = lp + new Vector2((float)System.Math.Cos(aw), (float)System.Math.Sin(aw)) * (float)rr;
 			((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);

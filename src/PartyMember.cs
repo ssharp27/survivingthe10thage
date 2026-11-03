@@ -1994,7 +1994,32 @@ public partial class PartyMember : Godot.Node2D
 
 		if (!joined || downed || eliminated)
 
+			{
+			_fxT = 0.0f; // DEATH-LANE FX CLEANUP (user 2026-11-04: Brook's stab sliver stayed on the
+			// canvas when he died mid double-jab): this early return skipped the _fxT decay AND the
+			// cdTimer tick, so attack art left visible at the moment of death lingered FOREVER -
+			// generic for every kit: stab sliver / crescent / axe slots / shield discs (live flight
+			// art drops too; the bullet itself keeps flying on its own node). twinArm=false forfeits
+			// a stale second dagger so a body revived at camp starts a fresh beat instead.
+			_cresDur = 0.0f;
+			orbitT = 0.0;
+			twinArm = false;
+			if (_meleeFx != null)
+				_meleeFx.Visible = false;
+			if (_cresFx != null)
+				 foreach (Godot.Sprite2D sx in _cresFx)
+					 sx.Visible = false;
+			if (_axeFx != null)
+				 foreach (Godot.Sprite2D sx in _axeFx)
+					 sx.Visible = false;
+			for (int sk = 0; sk < _shldT.Length; sk++)
+			{
+				 Godot.Sprite2D da = ShieldArt(sk);
+				 if (da != null)
+					 da.Visible = false;
+			}
 			return; // a stranded recruit cannot swing: its weapon unlocks ON the join
+		}
 
 		// ---- Spirit Guardians ring: orbit + pulse flare ----
 
