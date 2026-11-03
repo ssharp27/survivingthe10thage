@@ -15,6 +15,9 @@ public partial class Director : Godot.Node2D
     // one hobgoblin per ten goblins spawned (user rule); counts real spawns only,
     // rolls rejected by the near-party guard burn the timer but not this counter
     int _goblinsSinceHob = 0;
+        // TIER-3 spawn cadence (user 2026-11-03 creatures): assistant-picked knobs, tune after playtest.
+        const float RIDER_PACK_CH = 0.05f; // per-spawn-roll chance a sword/bow pack enters on a tier-3+ leg (assistant pick: 0.16 TPKed Bruno, 0.08 still bled; retunable post-playtest)
+        int _hobsSinceMage = 0; // USER RULE: one mage per two hobgoblin spawns
 
     public override void _Process(double d)
     {
@@ -88,19 +91,26 @@ public partial class Director : Godot.Node2D
             return; // an arena clamp may have dragged the spawn into the party: skip, the
                     // timer already burned this roll
         // user tier gate: the horde runs whatever tier the beat table last advanced. Tier 1
-        // goblins | tier 2 wolves + hobgoblins | tiers 3 and 4 are NOT DESIGNED YET - the
-        // user will dictate those creatures, so until they land a tier-3/4 leg draws the
-        // tier-2 bodies with an elite HP bump and says so. Flagged placeholder, not invented
-        // content: nothing here pretends a creature nobody approved exists.
+        // goblins | tier 2 wolves + hobgoblins | TIER 3 NOW DESIGNED (user 2026-11-03: sword +
+        // bow wolf riders and the goblin mage, entering as packs and hob counts). Tier 4 is
+        // still the flagged placeholder: it rides the tier-3 pool with an elite HP bump until
+        // the user dictates its creatures - nothing here pretends a creature nobody approved exists.
         int tier = (int)g.GetHordeTier();
-        bool tier2 = tier >= 2;
-        bool wolf = tier2 && (float)GD.Randf() < 0.30f;
+        bool tier3 = tier >= 3;
+        if (tier3 && (float)GD.Randf() < RIDER_PACK_CH)
+        {
+            // TIER-3 RIDES (user 2026-11-03): "have them spawn in a small pack with bow
+            // wolf riders" - one roll enters TWO sword + TWO bow mounts fanned around the
+            // roll point, never lone riders. The 0.16 CH is the assistant-picked cadence knob.
+            SpawnRiderPack(g, pos, hordeScale, tier);
+            return;
+        }
+        bool wolf = tier >= 2 && (float)GD.Randf() < 0.30f;
         bool hob = false;
         if (!wolf)
         {
-            // user rule: one hobgoblin per ten goblins spawned
             _goblinsSinceHob++;
-            if (tier2 && _goblinsSinceHob >= 10)
+            if (tier >= 2 && _goblinsSinceHob >= 10)
             {
                 hob = true;
                 _goblinsSinceHob = 0;
@@ -108,10 +118,9 @@ public partial class Director : Godot.Node2D
         }
         Enemy e = new Enemy();
         e.kind = wolf ? "wolf" : (hob ? "hobgoblin" : "goblin");
-        // user-approved balance round: goblin 30 / hobgoblin 60 / wolf 70 base HP,
-        // still over a single hit on a packed cleave but a lone target dies in one
-        // clean maul swing (30 dmg) - horde scale only bumps this on a long rest
-        float tierBump = tier >= 4 ? 1.6f : (tier >= 3 ? 1.3f : 1.0f);
+        // real tier-3 bodies landed, so the tier-2 pool holds its base HP on tier-3 legs;
+        // tier 4 keeps the flagged placeholder bump on the pool (assistant pick - retunable).
+        float tierBump = tier >= 4 ? 1.3f : 1.0f;
         e.maxHp = (wolf ? 70.0f : (hob ? 60.0f : 30.0f)) * hordeScale * tierBump;
         e.hp = e.maxHp;
         e.speed = wolf ? 120.0f : (hob ? 100.0f : 90.0f);
@@ -120,16 +129,74 @@ public partial class Director : Godot.Node2D
         e.GlobalPosition = pos;
         g.RegisterEnemy(e);
         g.AddChild(e);
+        if (hob)
+        {
+            // USER RULE: one goblin mage per TWO hobgoblin spawns, anywhere hobs run.
+            _hobsSinceMage++;
+            if (_hobsSinceMage >= 2)
+            {
+                _hobsSinceMage = 0;
+                SpawnMage(g, pos, hordeScale, tier);
+            }
+        }
     }
 
-    // HORDE EVENT: one bonus swarm, budget-free (user: "these won't count against the maximum
-    // number of enemies that can spawn"). Bodies enter as TIER 1 goblins now - the user's opening
-    // rule - and mixing tier-2/3 at later run points is ONE read of g.GetHordeTier() here, so the
-    // infrastructure is already in place. The count rides the horde-scale chip ("20 enemies (these
-    // scale with the horde scale increases)"). All bodies enter as ONE group on ONE random bearing,
-    // fanned ~70 degrees with a staggered front row so the wave reads as a wave, not 20 bodies at
-    // one pixel; they home to the squad for free (the Enemy class chases the nearest ally itself).
-    // One Rng draw per event shifts the run stream downstream, like every other proc.
+    // TIER-3 LANES (user 2026-11-03): the USER numbers are HP/speed/contact/XP per the
+    // dictation above; offsets inside the pack and the "90 px south" mage nudges are
+    // assistant picks. Bodies ride the budget (riders/mages are ordinary spawns, not
+    // bonus-swarm bodies), so the horde cap still binds them.
+    private void SpawnRiderPack(Game g, Vector2 at, float hordeScale, int tier)
+    {
+        float bump = tier >= 4 ? 1.3f : 1.0f; // tier-4 placeholder bump, same discipline as the pool
+        for (int i2 = 0; i2 < 4; i2++)
+        {
+            bool sword = i2 < 2;
+            Vector2 p2 = at + new Vector2((i2 % 2) * 56.0f - 28.0f, (i2 / 2) * 56.0f - 28.0f);
+            if (g.GetLeader() != null && p2.DistanceTo(g.GetLeader().GlobalPosition) < 260.0f)
+                continue; // near-party guard per body, same discipline as Spawn()
+            Enemy e2 = new Enemy();
+            e2.kind = sword ? "rider" : "riderbow";
+            e2.maxHp = (sword ? 100.0f : 60.0f) * hordeScale * bump; // USER numbers
+            e2.hp = e2.maxHp;
+            e2.speed = 110.0f;   // USER number
+            e2.contactDamage = 4.0f; // USER number
+            e2.rangedDamage = sword ? 0.0f : 3.0f; // USER number (bow rider)
+            e2.xpValue = 5.0f;   // USER number
+            e2.GlobalPosition = p2;
+            g.RegisterEnemy(e2);
+            g.AddChild(e2);
+        }
+        GD.Print("[10thAge] (rider) tier-3 pack enters: 2 sword + 2 bow wolf riders on one bearing");
+    }
+
+    private void SpawnMage(Game g, Vector2 at, float hordeScale, int tier)
+    {
+        Vector2 p2 = at + new Vector2(0.0f, 90.0f); // ride just south of the hob that funded it (assistant pick)
+        if (g.GetLeader() != null && p2.DistanceTo(g.GetLeader().GlobalPosition) < 260.0f)
+            return; // near-party guard
+        Enemy e2 = new Enemy();
+        e2.kind = "mage";
+        float bump = tier >= 4 ? 1.3f : 1.0f;
+        e2.maxHp = 40.0f * hordeScale * bump; // USER number
+        e2.hp = e2.maxHp;
+        e2.speed = 70.0f;      // USER number
+        e2.contactDamage = 4.0f; // USER number (if walked into)
+        e2.rangedDamage = 6.0f;  // USER number
+        e2.xpValue = 6.0f;     // USER number
+        e2.GlobalPosition = p2;
+        g.RegisterEnemy(e2);
+        g.AddChild(e2);
+        GD.Print("[10thAge] (mage) goblin mage slips in after the second hobgoblin");
+    }
+
+// HORDE EVENT: one bonus swarm, budget-free (user: "these won't count against the maximum
+// number of enemies that can spawn"). Bodies enter as TIER 1 goblins now - the user's opening
+// rule - and mixing tier-2/3 at later run points is ONE read of g.GetHordeTier() here, so the
+// infrastructure is already in place. The count rides the horde-scale chip ("20 enemies (these
+// scale with the horde scale increases)"). All bodies enter as ONE group on ONE random bearing,
+// fanned ~70 degrees with a staggered front row so the wave reads as a wave, not 20 bodies at
+// one pixel; they home to the squad for free (the Enemy class chases the nearest ally itself).
+// One Rng draw per event shifts the run stream downstream, like every other proc.
     private void SpawnHordeEvent(Game g, float hordeScale)
     {
         int n = (int)(20.0f * hordeScale); // user: 20 bodies, scaling with horde-scale increases

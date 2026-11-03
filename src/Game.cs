@@ -983,7 +983,8 @@ public partial class Game : Godot.Node2D
 				Godot.ColorRect cr = (Godot.ColorRect)b.GetChild(0);
 				cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
 				cr.Color = new Color(1.0f, 0.25f, 0.2f, 1.0f); // shell back to drawing: an arrow spawn zeroes its alpha
-				((Godot.Sprite2D)cr.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f); // sink any arrow an earlier volley left riding
+				((Godot.Sprite2D)cr.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f); // sink any arrow an earlier volley left riding				((Godot.Sprite2D)cr.GetChild(0)).Scale = new Vector2(1.0f, 1.0f); b.Scale = new Vector2(1.0f, 1.0f); // tier-3 fireballs ride this pool scaled up, so every reuse normalises BOTH scales
+
 				return;
 			}
 		}
@@ -1012,6 +1013,7 @@ public partial class Game : Godot.Node2D
 					_fxFlameTex = GD.Load("res://art/fx/firebolt.png") as Godot.Texture2D;
 				}
 				Godot.Sprite2D fxs = (Godot.Sprite2D)cr.GetChild(0);
+				b.Scale = new Vector2(1.0f, 1.0f); fxs.Scale = new Vector2(1.0f, 1.0f); // shed any fireball scale from an earlier mage volley
 				if (_fxArrowTex != null)
 				{
 					fxs.Texture = _fxArrowTex;
@@ -1031,6 +1033,50 @@ public partial class Game : Godot.Node2D
 		}
 	}
 
+	public void SpawnBulletFire(Vector2 pos, Vector2 vel, double dmg)
+		{
+		// same bullet pool; the mage fireball rides Stack's firebolt FX scaled UP
+		// (user 2026-11-03 tier-3 ask: "you can use a large version of the existing fire
+		// bolt FX"). No art on disk = fat orange square, same honest-fallback discipline
+		// as the arrow lane. Motion/hit lanes read the node POSITION, so the scale is
+		// visual-only - the hitbox stays the standard bullet hitbox (assistant pick).
+		for (int i = 0; i < _bullets.Count; i++)
+		{
+		Godot.Node2D b = _bullets[i];
+		if (b.GlobalPosition.X < -8000.0f)
+		{
+		b.GlobalPosition = pos;
+		_bulletVel[i] = vel;
+		_bulletDmg[i] = dmg;
+			if (!_fxTried) // first fireball may precede any arrow: same try-once art discipline
+			{
+				_fxTried = true;
+				_fxArrowTex = GD.Load("res://art/fx/arrow.png") as Godot.Texture2D;
+				_fxFlameTex = GD.Load("res://art/fx/firebolt.png") as Godot.Texture2D;
+			}
+		Godot.ColorRect cr = (Godot.ColorRect)b.GetChild(0);
+		Godot.Sprite2D fxs = (Godot.Sprite2D)cr.GetChild(0);
+		if (_fxFlameTex != null)
+		{
+			fxs.Texture = _fxFlameTex;
+			fxs.Scale = new Vector2(2.4f, 2.4f); // "large" = ~2.4x the bolt (assistant pick - retunable)
+			fxs.Modulate = new Color(1.0f, 0.55f, 0.30f, 1.0f); // ember tint (assistant pick)
+			fxs.Rotation = 0.0f; // a fireball tumbles; it does not point like an arrow
+			cr.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f); // shell stops drawing while art rides
+			b.Scale = new Vector2(1.0f, 1.0f);
+			}
+			else
+			{
+			b.Scale = new Vector2(2.4f, 2.4f); // fat fallback square: motion is manual, scale reads only in the draw
+			cr.Color = new Color(1.0f, 0.4f, 0.15f, 1.0f); // ember orange
+			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+			fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+		}
+		return;
+		}
+		}
+	}
+	
 	public int GetLiveEnemies()
 	{
 		return _liveEnemies;
@@ -4770,22 +4816,28 @@ private void UpdateSpirits(float delta)
 		// escort bodies run on the tier that is live when the beat fires (user rule: later
 		// beats are guarded by harder enemies), drawn from that tier's pool. The 90s beat is
 		// six wolves / hobgoblins, not six goblins.
-		// TIER 3 / TIER 4 CREATURES ARE NOT DESIGNED YET: the user will dictate them, so
-		// until they land those beats escort with the tier-2 bodies plus an elite HP bump.
-		// That is a flagged placeholder, not invented content - see HORDE_TIER3_BELOW.
+		// TIER 3 IS DESIGNED NOW (user 2026-11-03): escorts on the 210 s beat ride the real
+		// mounted riders (50/50 sword/bow mix = assistant pick). TIER 4 REMAINS A FLAGGED
+		// PLACEHOLDER: tier-3 bodies with an elite HP bump - see HORDE_TIER3_BELOW.
+
 		for (int i = 0; i < ESCORT_COUNT; i++)
 		{
 			Enemy e = new Enemy();
 			int tier = (int)_hordeTier;
-			bool eliteBeast = tier >= 2 && Rng.Randf() < 0.5;
-			e.kind = tier >= 2 ? (eliteBeast ? "wolf" : "hobgoblin") : "goblin";
-			float hpBase = tier >= 2 ? (eliteBeast ? 70.0f : 60.0f) : 30.0f;
-			float tierBump = tier >= 4 ? 1.6f : (tier >= 3 ? 1.3f : 1.0f);
+			bool eliteBeast = tier >= 2 && Rng.Randf() < 0.5;
+			// tier-3 escorts (2026-11-03): mounted riders cage the 210 s rescue. mages would
+			// break the hold-still cage design (they retreat), so escorts draw sword/bow riders
+			// 50-50 - assistant pick. USER numbers: 100/60 HP, speed 110, contact 4, XP 5.
+			e.kind = tier >= 3 ? (eliteBeast ? "riderbow" : "rider") : (tier >= 2 ? (eliteBeast ? "wolf" : "hobgoblin") : "goblin");
+			float hpBase = tier >= 3 ? (eliteBeast ? 60.0f : 100.0f) : (tier >= 2 ? (eliteBeast ? 70.0f : 60.0f) : 30.0f);
+			float tierBump = tier >= 4 ? 1.3f : 1.0f; // tier-3 legs run base HP now; tier-4 keeps the flagged bump
 			e.maxHp = hpBase * tierBump * (float)GetHordeScale();
-			e.hp = e.maxHp;
-			e.speed = tier >= 2 ? 105.0f : 90.0f;
-			e.contactDamage = tier >= 2 ? 3.0f : 2.0f;
-			e.xpValue = tier >= 2 ? 2.0f : 1.0f;
+			e.hp = e.maxHp;
+			e.speed = tier >= 3 ? 110.0f : (tier >= 2 ? 105.0f : 90.0f);
+			e.contactDamage = tier >= 3 ? 4.0f : (tier >= 2 ? 3.0f : 2.0f);
+			e.rangedDamage = tier >= 3 ? (eliteBeast ? 3.0f : 0.0f) : 0.0f; // cage riders never loose: the hold-still branch runs before the shot lane, so this only matters if the cage design ever changes
+			e.xpValue = tier >= 3 ? 5.0f : (tier >= 2 ? 2.0f : 1.0f);
+
 			e.escort = true;
 			double ea = 6.2831853 * i / ESCORT_COUNT + 0.3;
 			e.escortHold = m.GlobalPosition;

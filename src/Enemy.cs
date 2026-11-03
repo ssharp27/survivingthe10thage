@@ -20,6 +20,23 @@ public partial class Enemy : Combatant
     // the Leader like the rest of the horde. Killing them all is what recruits the PC.
     public bool escort = false;
     public Vector2 escortHold = new Vector2();
+    // TIER-3 CREATURES (user 2026-11-03: wolf riders + goblin mage). HP/speed/contact/XP
+    // ride the Director like every other body; these AI knobs are assistant picks unless
+    // marked USER. rider = sword rider (chases, contact 4); riderbow = bow rider (holds a
+    // close band, circles the squad like the mini dance, aimed arrow every 3 s = USER);
+    // mage = goblin mage (retreats, lobs slow fireballs; cadence assistant pick).
+    public float rangedDamage = 0.0f; // bow 3 / mage 6 = USER numbers (set by Director)
+    private float _shotCd = 0.0f;
+    private readonly float RIDER_MIN = 170.0f;   // closest the bow rider holds (assistant pick)
+    private readonly float RIDER_MAX = 300.0f;   // farther than this it closes back in (assistant pick)
+    private readonly float RIDER_ARROW_SPEED = 190.0f; // px/s (assistant pick)
+    private readonly float RIDER_SHOT_EVERY = 3.0f; // USER number: arrow every 3 s
+    private readonly float RIDER_SHOT_RANGE = 420.0f; // looses only with reach on a squad body (assistant pick)
+    private readonly float MAGE_RETREAT = 420.0f; // backs off inside this (assistant pick)
+    private readonly float MAGE_RETURN = 620.0f;  // past this it rejoins the march (assistant pick)
+    private readonly float MAGE_FIRE_SPEED = 130.0f; // "slow moving fireball" - px/s is assistant pick
+    private readonly float MAGE_SHOT_RANGE = 560.0f; // fireball range (assistant pick)
+    private readonly float MAGE_SHOT_EVERY = 6.0f; // mage cadence (assistant pick: 4 s fireballs + bow-rider arrows bled the Bruno seat to TPK, so opened up; retunable post-playtest)
 
     Godot.ColorRect _body;
     // mini-style motion rig (user 2026-10-21): enemies do NOT get the party's table
@@ -40,6 +57,7 @@ public partial class Enemy : Combatant
             AddChild(_rig);
             _bobPhase = (GetInstanceId() % 64) * 0.37f; // the horde never bobs in lockstep
         }
+        _shotCd = kind == "riderbow" ? 3.0f : (kind == "mage" ? 4.0f : 0.0f); // first shot never snaps on spawn
         if (kind == "reaper")
         {
             // TEST death-state reaper: big red diamond; touching it DOWNs a member
@@ -52,14 +70,17 @@ public partial class Enemy : Combatant
             _rig.AddChild(_body);
             return;
         }
-        float w = kind == "wolf" ? 34.0f : (kind == "hobgoblin" ? 32.0f : 26.0f);
+        float w = kind == "wolf" ? 34.0f : (kind == "hobgoblin" ? 32.0f : (kind == "rider" || kind == "riderbow" ? 40.0f : 26.0f));
         _body = new ColorRect();
         _body.Size = new Vector2(w, w * 0.8f);
         _body.Position = -_body.Size * 0.5f;
         // hobgoblin: a darker, meaner green than the goblin clump (user art note)
         _body.Color = kind == "wolf" ? new Color(0.55f, 0.58f, 0.62f)
-                      : kind == "hobgoblin" ? new Color(0.13f, 0.26f, 0.12f)
-                                            : new Color(0.30f, 0.48f, 0.23f);
+                              : kind == "hobgoblin" ? new Color(0.13f, 0.26f, 0.12f)
+                                                    : kind == "rider" ? new Color(0.45f, 0.34f, 0.28f) // dusty mount (assistant pick)
+                                                    : kind == "riderbow" ? new Color(0.38f, 0.36f, 0.47f) // steel-tinted saddle (assistant pick)
+                                                    : kind == "mage" ? new Color(0.42f, 0.22f, 0.55f) // robe violet (assistant pick)
+                                                    : new Color(0.30f, 0.48f, 0.23f);
         _rig.AddChild(_body);
     }
 
@@ -153,14 +174,58 @@ public partial class Enemy : Combatant
                 // 100 px away, not the 2300 px the raw coords would read
                 Vector2 to = g.WrapDelta(p, m.GlobalPosition);
                 float dist = to.Length();
-                float wobble = kind == "goblin" ? (float)System.Math.Sin(p.X * 0.05 + p.Y * 0.03) * 26.0f : 0.0f;
-                Vector2 dir = (to + new Vector2(wobble * 0.4f, wobble)).Normalized();
-                GlobalPosition += dir * spd * delta; // draging maul: a dragged body shambles
+                Vector2 dir;
+                if (kind == "riderbow")
+                {
+                    // BOW RIDER (user 2026-11-03: "tries to circle around the player similar to
+                    // the mini-boss"): hold the band and slide along it at constant px/s, same
+                    // constant-px/s discipline as the dance; side is instance-stable so a rider
+                    // never jitter-reverses mid-orbit.
+                    if (dist > RIDER_MAX) dir = to.Normalized();
+                    else if (dist < RIDER_MIN) dir = -to.Normalized();
+                    else
+                    {
+                        float side = (GetInstanceId() % 2 == 0) ? 1.0f : -1.0f;
+                        dir = new Vector2(-to.Y, to.X).Normalized() * side;
+                    }
+                }
+                else if (kind == "mage")
+                {
+                    // GOBLIN MAGE (user: "try to run away from the player"): back off inside the
+                    // retreat radius, hold at its edge, rejoin the march only if it drifted too
+                    // far - wrapping world gives "flee" no walls, so the return leg is the leash.
+                    if (dist < MAGE_RETREAT) dir = -to.Normalized();
+                    else if (dist > MAGE_RETURN) dir = to.Normalized();
+                    else dir = new Vector2(0.0f, 0.0f);
+                }
+                else
+                {
+                    float wobble = kind == "goblin" ? (float)System.Math.Sin(p.X * 0.05 + p.Y * 0.03) * 26.0f : 0.0f;
+                    dir = (to + new Vector2(wobble * 0.4f, wobble)).Normalized();
+                }
+                if (dir.LengthSquared() > 0.0001f)
+                    GlobalPosition += dir * spd * delta; // draging maul: a dragged body shambles
                 GlobalPosition = g.WrapNearCamera(GlobalPosition); // fold instead of walls
                 if (dist < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
                 {
                     _contactCd = 1.0f;
                     g.TakeHit(m, contactDamage * g.DrinkMul(this)); // Have a Drink!: burning bodies hit 10% softer
+                }
+                // TIER-3 ranged lanes fire on their own cadence (rider: USER 3 s; mage: assistant
+                // pick). Aiming rides the LIVE squad position, same discipline as the mini fans.
+                if ((kind == "riderbow" || kind == "mage") && m != null)
+                {
+                    _shotCd -= delta;
+                    bool inReach = kind == "riderbow" ? dist <= RIDER_SHOT_RANGE : dist <= MAGE_SHOT_RANGE;
+                    if (_shotCd <= 0.0f && inReach)
+                    {
+                        _shotCd = kind == "riderbow" ? RIDER_SHOT_EVERY : MAGE_SHOT_EVERY;
+                        Vector2 aim = g.WrapDelta(GlobalPosition, m.GlobalPosition).Normalized();
+                        if (kind == "riderbow")
+                            g.SpawnBulletArrow(GlobalPosition, aim * RIDER_ARROW_SPEED, rangedDamage);
+                        else
+                            g.SpawnBulletFire(GlobalPosition, aim * MAGE_FIRE_SPEED, rangedDamage);
+                    }
                 }
             }
             // downed bodies are still run into even though nobody chases them
