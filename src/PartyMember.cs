@@ -2510,8 +2510,13 @@ public partial class PartyMember : Godot.Node2D
 					// never skips a body between tick frames.
 					Godot.Vector2 bv = wpg.WrapDelta(GlobalPosition, en.GlobalPosition); // thrower -> body, wrap-short
 					float rb = bv.Length();
-					if (rb < 1.0f || System.Math.Abs(rb - (double)((float)System.Math.Sin(System.Math.PI * pf) * _cresR)) > _cresBand + (float)(System.Math.PI * _cresR * System.Math.Abs(System.Math.Cos(System.Math.PI * pf)) / CRESCENT_FLIGHT * delta) + 4.0f)
-											continue; // fx-feel9 (user: "hitbox for Bruno's axes are a little bit off... not sure if it's doing damage based on where enemies were when it's thrown"): damage ALWAYS rode LIVE positions, the GEOMETRY missed - the old bite accepted ANY radius along the swept arm (a body beside Bruno bit while the blade art was mid-arc). Now the bite is a RING at the blade's CURRENT arc radius r_pf = _cresR*sin(pi*pf), the exact spot _cresFx draws at, with ring depth = band + half a frame of radial sweep + 4 px of art bleed: art == hitbox, and the full 130-px disc still gets covered because the blade spirals through it (assistant pick: depth slack)
+					// user 2026-11-06 playtest: Bruno's CLOSE-BODY dead zone GONE - the bite is the whole
+					// ONE-SIDED ARM from the hand out to the blade's live tip radius (the spot _cresFx draws),
+					// NOT the old fx-feel9 RING at that tip: a body hugging Bruno while the art flies wide
+					// still rides the arm and gets raked. Radial depth slack = band + half a frame of tip
+					// sweep + 4 px of art bleed - the same honesty budget the ring test carried at long range.
+					if (rb < 1.0f || rb > System.Math.Sin(System.Math.PI * pf) * _cresR + _cresBand + (System.Math.PI * _cresR * System.Math.Abs(System.Math.Cos(System.Math.PI * pf)) / CRESCENT_FLIGHT * delta) + 4.0f)
+						continue; // beyond the live arm (tip radius plus slack): outside the swept arm at this radius
 					double ab = System.Math.Atan2((double)bv.Y, (double)bv.X); // body bearing
 					double dang = ab - angB; // gap vs the arm's swept angle
 					dang = dang - System.Math.Floor((dang + System.Math.PI) / (System.Math.PI * 2.0)) * System.Math.PI * 2.0; // wrap to [-pi, pi]

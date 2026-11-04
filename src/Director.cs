@@ -21,14 +21,14 @@ public partial class Director : Godot.Node2D
         // TIER-4 OGRE (user 2026-11-05: this map's only tier-4 creature): per-spawn-roll
         // chance an ogre lumbers in on a tier-4+ leg. Budgeted ORDINARY spawn like the
         // rider rolls, so the cap binds it. Assistant-picked cadence knob.
-        const float OGRE_CH = 0.10f;
+        const float OGRE_CH = 0.05f; // user 2026-11-06 playtest: ~1 ogre per 15-20 s of spawn rolls (they stack and the slam chains killed fast)
     // EARLY OGRE LOOK (user 2026-11-06: "spawn an ogre in at the start of the run so I
     // can test how it works much earlier"): the FIRST ordinary spawn of a run is forced
     // to be the ogre, so the telegraph + SLAM are on screen inside the first minute
     // instead of waiting for a tier-4 leg AND an OGRE_CH hit. TEST KNOB, not balance:
     // set false and the tier-4 OGRE_CH roll below owns ogre entry again (the shipped
     // rule). Retunable with the rest of the tier cadence.
-    const bool OGRE_AT_RUN_START = true;
+    const bool OGRE_AT_RUN_START = false; // user 2026-11-06 playtest: "remove the one at boot" - the forced opener is gone, the tier-4 roll owns ogre entry again
     bool _ogreAtStart = OGRE_AT_RUN_START; // consumed by the first ordinary spawn
 
     public override void _Process(double d)
@@ -249,7 +249,11 @@ public partial class Director : Godot.Node2D
 // One Rng draw per event shifts the run stream downstream, like every other proc.
     private void SpawnHordeEvent(Game g, float hordeScale)
     {
-        int n = (int)(20.0f * hordeScale); // user: 20 bodies, scaling with horde-scale increases
+        // user 2026-11-06 playtest: the swarm size rides the SAME party factor the ordinary
+        // cadence uses (GetPartyInPlay()/2), so a solo opener gets ~10 bodies and a 5-PC squad
+        // the full 20+ - the event thickens with the party like every other spawn does.
+        float partyScale = (float)g.GetPartyInPlay() / 2.0f;
+        int n = (int)(20.0f * hordeScale * partyScale);
         Vector2 cen = g.GetCameraCenter();
         Vector2 half = g.GetVisibleHalfExtents();
         float a0 = (float)GD.Randf() * (float)(System.Math.PI * 2.0); // random side of the frame

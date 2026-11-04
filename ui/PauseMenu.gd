@@ -112,7 +112,8 @@ func _members_sig() -> String:
 	# re-derives its own copy without the C# side having to ask it.
 	var s: String = ""
 	for row in members:
-		s += str(row.get("name", "?")) + "|" + str(row.get("picks", "")) + "|" + str(row.get("target_mode", 0)) + ";"
+		# the condensed upgrade block is part of the sig: a fresh rank repaints the card
+		s += str(row.get("name", "?")) + "|" + str(row.get("upgrade_block", "")) + "|" + str(row.get("picks", "")) + "|" + str(row.get("target_mode", 0)) + ";"
 	return s
 
 func _close(reason: String) -> void:
@@ -232,6 +233,19 @@ func _paint_columns() -> void:
 	# one row gets the whole band above the hint; two rows split it with a gap
 	var cell_w: float = 300.0
 	var gap: float = 16.0
+	# user 2026-11-06 playtest: the card's right edge was clipped - 5 columns x 300 px
+	# outran a 1280 window. Size the column FROM the viewport instead, clamped [170, 300].
+	var vp: Vector2 = grid.get_viewport_rect().size
+	if vp.x > 1.0:
+		var avail: float = vp.x - 96.0 - float(wide - 1) * gap
+		# two strip rows split the band vertically, so the width budget is unchanged
+		cell_w = avail / float(wide)
+		if cell_w > 300.0:
+			# a huge window never gets the old oversized cells: 300 is the roomy ceiling
+			cell_w = 300.0
+		# the floor keeps mode buttons clickable; labels wrap inside the column
+		if cell_w < 170.0:
+			cell_w = 170.0
 	var gw: float = wide * cell_w + (wide - 1) * gap
 	var top: float = 168.0
 	var gh: float = 0.0
@@ -331,8 +345,11 @@ func _paint_one(row: Dictionary, ci: int, w: float, h: float, big: bool) -> void
 		if not big:
 			bh = 20.0
 		bb.custom_minimum_size = Vector2(pad, bh)
-		bb.add_theme_stylebox_override("normal", _sb_mode(false))
-		bb.add_theme_stylebox_override("hover", _sb_mode(false))
+		# user 2026-11-06 playtest: the CHOSEN mode wears the highlight box in normal
+		# AND hover states, not only while pressed: the pick reads with the cursor
+		# anywhere on the card (md is the mode Game.cs says this column runs).
+		bb.add_theme_stylebox_override("normal", _sb_mode(m == md))
+		bb.add_theme_stylebox_override("hover", _sb_mode(m == md))
 		bb.add_theme_stylebox_override("pressed", _sb_mode(true))
 		# the nested Buttons stopped firing pressed in the camp card's rounds 1-4, so
 		# _input routes raw clicks too; _apply_mode is idempotent either way
@@ -344,7 +361,14 @@ func _paint_one(row: Dictionary, ci: int, w: float, h: float, big: bool) -> void
 	# ---------- upgrades: the member's own pick line, one row per pick ----------
 	var up_l: Label = Label.new()
 	up_l.name = "Upgrades"
-	up_l.text = _upgrade_block(str(row.get("picks", "")))
+	# user 2026-11-06 playtest: the C# side sends ONE condensed line per taken track
+	# (newlines already in it), so the card must NOT re-split that text.
+	# the raw picks chain stays only as the fallback for a build that sends no block.
+	# GD's own line-up split would mangle the block: its segments carry commas too.
+	var ublock: String = str(row.get("upgrade_block", ""))
+	if ublock == "":
+		ublock = _upgrade_block(str(row.get("picks", "")))
+	up_l.text = ublock
 	up_l.custom_minimum_size = Vector2(pad, 120.0)
 	if not big:
 		up_l.custom_minimum_size = Vector2(pad, 96.0)
@@ -432,6 +456,10 @@ func _apply_mode(ci: int, m: int) -> void:
 		var btns: Array = mode_buttons[ci]
 		for j in range(btns.size()):
 			_tint_mode(btns[j], j == m)
+			# the live box too, not only the tint: the chosen mode reads whether or not
+			# the cursor sits on it, so an idle card still names the logic in play
+			btns[j].add_theme_stylebox_override("normal", _sb_mode(j == m))
+			btns[j].add_theme_stylebox_override("hover", _sb_mode(j == m))
 	print("[10thAge] pause card: column ", ci, " -> mode ", m, " (", MODE_LABEL[m], ")")
 	# the card speaks the ROSTER idx, so a slot that shifted mid-run still lands right
 	target_changed.emit(int(col_idx[ci]), m)

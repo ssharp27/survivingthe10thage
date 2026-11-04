@@ -51,7 +51,7 @@ public partial class Enemy : Combatant
     // a big circle, waits 1 s (USER number), then hits that area for 25 (USER number).
     // Cast ring / blast radius / cadence are assistant picks. The circle LOCKS where it
     // marks (assistant read: the beat is a dodge window, not a homing blast).
-    private readonly float OGRE_CAST = 240.0f;   // marks the slam once this close to a squad body (assistant pick)
+    private readonly float OGRE_CAST = 150.0f;   // user 2026-11-06 playtest: 240 was too far - ogres stacked and chained slams bled the party dead fast
     private readonly float OGRE_SLAM_R = 130.0f; // blast radius (assistant pick: the user's "big circle")
     private readonly float OGRE_SLAM_TELE = 1.0f; // windup seconds (USER number)
     private readonly float OGRE_SLAM_DMG = 25.0f; // blast damage (USER number)
@@ -248,12 +248,22 @@ public partial class Enemy : Combatant
                 }
                 else if (kind == "mage")
                 {
-                    // GOBLIN MAGE (user 2026-11-04: "they spawn, move away and stay far away... move close
-                    // enough to cast their attack, then try to slowly run away"): CLOSE at full
-                    // speed until inside the cast ring, then back off (LOITER scales the leg below).
-                    if (dist > MAGE_CAST) dir = to.Normalized();  // close first
-                    else dir = -to.Normalized();                  // then run away
-                    if (dist <= MAGE_CAST) dir *= MAGE_LOITER;    // the retreat leg is a slow shamble
+                    // GOBLIN MAGE (user 2026-11-04: "move close enough to cast their attack, then
+                    // try to slowly run away"; user 2026-11-06 playtest: "they move close, stand
+                    // there and move away" - the old boundary flip shuttled at the ring: full-speed
+                    // CLOSE outside it, half-speed RETREAT inside, and the separation nudge kept
+                    // re-crossing it, so the body jittered and never settled on a throw stance).
+                    // New lane holds a STAND band at the cast ring: close until inside MAGE_CAST,
+                    // slow back-off only when crowded well inside it, otherwise plant and hurl.
+                    if (dist > MAGE_CAST)
+                        dir = to.Normalized();  // close first
+                    else if (dist < MAGE_CAST - 70.0f)
+                    {
+                        dir = -to.Normalized(); // back off ONLY when well inside the ring
+                        dir *= MAGE_LOITER;     // the retreat leg stays a slow shamble
+                    }
+                    else
+                        dir = new Vector2();    // stand at the ring: the hurl lane owns the pressure
                 }
                 else
                 {
@@ -279,7 +289,7 @@ public partial class Enemy : Combatant
                         _shotCd = kind == "riderbow" ? RIDER_SHOT_EVERY : MAGE_SHOT_EVERY;
                         Vector2 aim = g.WrapDelta(GlobalPosition, m.GlobalPosition).Normalized();
                         if (kind == "riderbow")
-                            g.SpawnBulletArrow(GlobalPosition, aim * RIDER_ARROW_SPEED, rangedDamage);
+                            g.SpawnBulletArrow(GlobalPosition, aim * RIDER_ARROW_SPEED, rangedDamage, true); // user 2026-11-06: rider arrows ride the RED-OUTLINE variant so the volley reads as an enemy projectile at a glance
                         else
                             g.SpawnBulletFire(GlobalPosition, aim * MAGE_FIRE_SPEED, rangedDamage);
 

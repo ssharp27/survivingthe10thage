@@ -279,11 +279,17 @@ public partial class Game : Godot.Node2D
 	// Director.cs reads this and densifies spawns; the long-rest risk chip on the
 	// Campfire screen is wired to exactly this.
 	double _hordeScale = 1.0;
-
-	// ---------- horde EVENT: budget-free bonus swarms (user 2026-11-02: "random horde spawns ... won't count against the maximum number of enemies that can spawn ... 20 enemies (these scale with the horde scale increases) ... all spawn together and move towards the player ... first spawn can happen 30 seconds after the first mini-boss is defeated, then every 2 minutes after") ----------
+	// ---------- horde EVENT: budget-free bonus swarms (user 2026-11-02 rule: "random horde spawns
+	// ... won't count against the maximum number of enemies that can spawn ... 20 enemies (these scale
+	// with the horde scale increases) ... all spawn together and move towards the player"). Pacing then
+	// rode two playtest rounds: user 2026-11-04 halved the cadence, and user 2026-11-06 playtest: "the
+	// first horde spawned at 290s, we should have them start way sooner" - the schedule now ARMS AT BOOT
+	// at an absolute run-time (HORDE_EVENT_FIRST_AT below), and the swarm COUNT rides the ordinary party
+	// scaling inside SpawnHordeEvent (Director.cs) ----------
 	// an event body never takes a budget slot: RegisterHordeBody is the same no-count lane the boss nodes use. TIER 1 goblins ONLY to begin with; mixing tier-2/3 in at later run points rides g.GetHordeTier() at the event spawner (infrastructure lives in Director.cs so other maps can reuse it). Times are the user's INITIAL TEST pacing - retuned with the full M3 pacing pass.
-	readonly double HORDE_EVENT_FIRST_DELAY = 30.0; // run-seconds after the first mini-boss falls
+	readonly double HORDE_EVENT_FIRST_DELAY = 30.0; // legacy after-mini-boss arm (fallback lanes only - boot arms the schedule now)
 	readonly double HORDE_EVENT_EVERY = 60.0;       // run-seconds between bonus swarms (user 2026-11-04: halved - "hardly saw any"; pick)
+	readonly double HORDE_EVENT_FIRST_AT = 90.0;    // user 2026-11-06 playtest: FIRST swarm at this absolute run-time, armed at boot ("start way sooner" than the 290 s the mini-boss clock produced)
 	double _hordeEventDue = 0.0;                    // 0 = schedule unarmed; else run-time deadline
 
 
@@ -956,9 +962,14 @@ public partial class Game : Godot.Node2D
 			GD.Print("[10thAge] boss slain -> camp: the fallen return at 25% hp; the rest choice decides healing");
 			if (kb == "mini1")
 			{
-				// HORDE EVENT: the user's first-event clock starts at the FIRST mini-boss's death
-				_hordeEventDue = GetRunTime() + HORDE_EVENT_FIRST_DELAY;
-				GD.Print("[10thAge] (horde) first mini-boss down - bonus swarms armed: first 30 s out, every 120 s after");
+				// HORDE EVENT: boot now arms the schedule at HORDE_EVENT_FIRST_AT absolute, so this legacy
+				// after-mini-boss lane stays only as a fallback for a future map that does NOT arm at boot -
+				// it must never push an already-armed deadline later
+				if (_hordeEventDue <= 0.0)
+				{
+					_hordeEventDue = GetRunTime() + HORDE_EVENT_FIRST_DELAY;
+					GD.Print("[10thAge] (horde) first mini-boss down - bonus swarms armed: first 30 s out, every 120 s after");
+				}
 			}
 		}
 	}
@@ -1053,6 +1064,11 @@ public partial class Game : Godot.Node2D
 
 	public void SpawnBulletArrow(Vector2 pos, Vector2 vel, double dmg)
 	{
+		SpawnBulletArrow(pos, vel, dmg, false); // the party's mini fans keep the plain lane
+	}
+
+	public void SpawnBulletArrow(Vector2 pos, Vector2 vel, double dmg, bool redOutline)
+	{
 		// Same bullet pool; this variant rides the arrow fx sprite rotated into flight
 		// instead of the red square (2026-11-02 mini dance: user asked for arrow fx on the
 		// mini's fans). BOTH spawn lanes normalise the square/arrow pair on every reuse,
@@ -1075,19 +1091,55 @@ public partial class Game : Godot.Node2D
 				}
 				Godot.Sprite2D fxs = (Godot.Sprite2D)cr.GetChild(0);
 				b.Scale = new Vector2(1.0f, 1.0f); fxs.Scale = new Vector2(1.0f, 1.0f); // shed any fireball scale from an earlier mage volley
+				// OUTLINE COLLAR: a second shell child at RELATIVE z -1 (grown at most once per
+				// pooled slot and normalised on every reuse below). The rider's volley then reads
+				// as an ENEMY projectile at a glance; the party's mini fans keep the plain lane.
+				Godot.Sprite2D outl = null;
+				if (cr.GetChildCount() > 1)
+					outl = (Godot.Sprite2D)cr.GetChild(1);
+				else if (redOutline && _fxArrowTex != null)
+				{
+					outl = new Godot.Sprite2D();
+					outl.Set("texture_filter", 0); // NEAREST like the shaft and the minis
+					outl.Position = new Vector2(6.0f, 6.0f); // Control origin is the rect corner -> centred
+					outl.ZIndex = -1; // relative: behind the shaft, still above the bodies
+				// the collar rides UNDER the shaft: a fatter copy of the SAME arrow art, so
+				// programming (not new art) draws the red edge the playtest asked for
+				// (user 2026-11-06: "the arrows should have a red outline")
+					cr.AddChild(outl);
+				}
 				if (_fxArrowTex != null)
 				{
+					float ang = (float)System.Math.Atan2((double)vel.Y, (double)vel.X); // arrow points where it flies
 					fxs.Texture = _fxArrowTex;
-					fxs.Rotation = (float)System.Math.Atan2((double)vel.Y, (double)vel.X); // arrow points where it flies
+					fxs.Rotation = ang;
 					fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+					// the collar copies the shaft's transform and rides deeper red; the plain
+					// lane hides whatever a rider left in this recycled slot
+					if (outl != null)
+					{
+						if (redOutline)
+						{
+							outl.Texture = _fxArrowTex;
+							outl.Rotation = ang;
+							outl.Scale = new Vector2(1.5f, 2.1f); // fatter than the 20x8 shaft: the edge peeks out
+							outl.Modulate = new Color(0.85f, 0.12f, 0.10f, 1.0f); // deep red: the ENEMY-projectile read
+						}
+						else
+							outl.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f); // plain lane: shed the rider's collar
+					}
 					cr.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f); // shell stops drawing while art rides
 					cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
 				}
 				else
 				{
+					// no art on disk (headless bench): the shell square carries the read,
+					// and a RED shell when the rider lane asked for the outline
 					cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
-					cr.Color = new Color(1.0f, 0.25f, 0.2f, 1.0f);
+					cr.Color = redOutline ? new Color(0.72f, 0.12f, 0.10f, 1.0f) : new Color(1.0f, 0.25f, 0.2f, 1.0f);
 					fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+					if (outl != null)
+						outl.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f); // no art: the shell carries the read
 				}
 				return;
 			}
@@ -1121,17 +1173,29 @@ public partial class Game : Godot.Node2D
 		{
 			fxs.Texture = _fxFlameTex;
 			fxs.Scale = new Vector2(2.4f, 2.4f); // "large" = ~2.4x the bolt (assistant pick - retunable)
-			fxs.Modulate = new Color(1.0f, 0.55f, 0.30f, 1.0f); // ember tint (assistant pick)
+			fxs.Modulate = new Color(0.70f, 0.15f, 0.11f, 1.0f); // dark red: the ENEMY-projectile read (user 2026-11-06)
 			fxs.Rotation = 0.0f; // a fireball tumbles; it does not point like an arrow
 			cr.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f); // shell stops drawing while art rides
 			b.Scale = new Vector2(1.0f, 1.0f);
+			// both spawn lanes normalise the pooled outline child, so a recycled slot never inherits
+			// the other lane's look: a fireball hides whatever collar a rider left in this slot
+			if (cr.GetChildCount() > 1)
+			{
+				Godot.Sprite2D ghost = (Godot.Sprite2D)cr.GetChild(1);
+				ghost.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			}
 			}
 			else
 			{
 			b.Scale = new Vector2(2.4f, 2.4f); // fat fallback square: motion is manual, scale reads only in the draw
-			cr.Color = new Color(1.0f, 0.4f, 0.15f, 1.0f); // ember orange
+			cr.Color = new Color(0.62f, 0.13f, 0.10f, 1.0f); // dark red fallback square: the ENEMY-projectile read (user 2026-11-06)
 			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
 			fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			// a rider's outline collar may ride this recycled slot: hide it when the fire lane reuses it
+			if (cr.GetChildCount() > 1)
+			{
+				((Godot.Sprite2D)cr.GetChild(1)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			}
 		}
 		return;
 		}
@@ -1816,6 +1880,10 @@ public void RegisterEnemy(Combatant e)
 		// human / bench-demo runs roll it in CloseSelect, AFTER the seat swap
 		if (!_selHold)
 				BuildJoinLottery();
+				// HORDE EVENT clock arms AT BOOT (user 2026-11-06 playtest: "the first horde spawned at 290s,
+				// we should have them start way sooner" - the mini-boss-relative arm landed that late, so the
+				// schedule now opens at HORDE_EVENT_FIRST_AT absolute run-seconds inside the opening legs)
+				_hordeEventDue = HORDE_EVENT_FIRST_AT;
 		// the reaper is a pure death/revive TEST BENCH (no balance meaning): human play
 		// left it OFF now that the revive rules work, and M1_REAPER=1 puts it back on
 		// for testing (a pilot smoke with it ON still TPKs often - the Leader-down rule
@@ -5237,11 +5305,134 @@ private void UpdateSpirits(float delta)
 		card["leader"] = m.isLeader;
 		card["picks"] = m.pickHistory == "" ? "no picks yet" : m.pickHistory;
 		card["idx"] = m.memberIndex;
+		card["upgrade_block"] = UpgradeBlock(m); // user 2026-11-06 playtest: ONE condensed line per track, compounded
 		card["target_mode"] = m.targetMode;
 		// the card's mini: art is res://art/<lowercased name>.png; the card skips it if
 		// the load misses, so a kit without a mini still shows its column
 		card["art"] = "res://art/" + m.displayName.ToLower() + ".png";
 		return card;
+	}
+
+	// user 2026-11-06 playtest: the pause card's upgrade row WRAPPED and its right edge got cut
+	// off. The pause card now sends ONE condensed line per taken track with the COMPOUNDED total
+	// at the member's current rank - e.g. "Pulsing Guardians (+57% Attack Speed) (3/3)" - instead
+	// of the raw comma chain, and the weapon prefix is dropped (the row already lives under the
+	// member's own column). Numbers recompute from the SAME stat tables the picks ride so the
+	// card cannot lie about the maths: Attack Speed / Damage / Range / Area compound by rank
+	// POWER (they are multipliers), Slow / crit chance / crit damage ride per-rank POINTS so they
+	// scale linearly, and "+N" tracks (pierce, projectiles, familiars, bounces, seconds of
+	// duration, size) scale N by rank. Blurbs without a leading +/-% stay exactly as written.
+	private string UpgradeBlock(PartyMember m)
+	{
+			string joined = "";
+			for (int o = 0; o < OPT_LABEL.Length; o++)
+			{
+				// one line per track this PC has taken at least one rank of, in table order
+					if (OPT_MEMBER[o] == m.memberIndex && _pickRank[o] > 0)
+					{
+							joined = joined + (joined == "" ? "" : "\n") + CondensePick(OPT_LABEL[o], o, _pickRank[o]);
+					}
+			}
+			// a PC with nothing taken reads the same as the camp card's line
+			return joined == "" ? "no picks yet" : joined;
+	}
+
+	// the label shape is "Name (+16% Range, Pierce +1)": split at the FIRST "(", compound each
+	// comma-separated segment, then stamp "(rank/cap)" so the cap is visible on the card.
+	private string CondensePick(string label, int o, int rank)
+	{
+			int open = label.IndexOf("(");
+			int close = label.LastIndexOf(")");
+			if (open < 0 || close <= open)
+				return label + " (" + rank + "/" + PICK_RANK_CAP + ")"; // blurb-only track: kept as written
+			// the label joins segments with ", "; Split on the comma and Trim each piece
+			string[] segs = label.Substring(open + 1, close - open - 1).Split(',');
+			string kept = label.Substring(0, open).Trim(); // the track NAME: no weapon prefix on the card
+			for (int s = 0; s < segs.Length; s++)
+			{
+					kept = kept + (s == 0 ? " (" : ", ") + CompoundSeg(segs[s].Trim(), o, rank);
+			}
+			return kept + " (" + rank + "/" + PICK_RANK_CAP + ")";
+	}
+
+	// compound one "+X% Stat" segment from the tables: Pct re-emits the label's own word suffix
+	// ("% Range", "s Burning Duration"...) with the compounded total percent.
+	private string CompoundSeg(string seg, int o, int rank)
+	{
+			// static blurbs ("Burning enemies explode for 25%...") carry no leading sign: kept honest
+			if (!(seg.StartsWith("+") || seg.StartsWith("-")))
+				return seg;
+			// Attack Speed: the table stores the COOLDOWN multiplier, so the speed factor is 1/cd per rank
+			if (seg.Contains("Attack Speed") && OPT_CD[o] != 1.0f)
+				return Pct(System.Math.Pow(1.0 / (double)OPT_CD[o], rank), seg);
+			// flat damage compounds; the Burn/Bleed "Damage/sec" DoT tracks are per-rank additions at
+			// the call site, so the guard keeps them linear instead
+			if (seg.Contains("Damage") && !seg.Contains("Damage/sec") && OPT_DMG[o] != 1.0f)
+				return Pct(System.Math.Pow((double)OPT_DMG[o], rank), seg);
+			if ((seg.Contains("Range") || seg.Contains("Area")) && OPT_RANGE[o] != 1.0f)
+				return Pct(System.Math.Pow((double)OPT_RANGE[o], rank), seg);
+			// slow strength, crit chance and crit damage are per-rank POINTS: linear rank-times
+			if (seg.Contains("Slow") && OPT_SLOW[o] > 0.0)
+				return Pct(1.0 + OPT_SLOW[o] * (double)rank, seg);
+			// crit CHANCE before crit damage: the flat-damage lane above only fires when OPT_DMG is set
+			if (seg.Contains("Crit Chance") && OPT_CRIT[o] > 0.0)
+				return Pct(1.0 + OPT_CRIT[o] * (double)rank, seg);
+			if (seg.Contains("Crit Damage") && OPT_CRITD[o] > 0.0)
+				return Pct(1.0 + OPT_CRITD[o] * (double)rank, seg);
+			// "+N" tracks (pierce, projectiles, familiars, bounces, duration seconds, size percent,
+			// multistrike points): the tables are per-rank constants, so N scales by rank
+			return ScaleLabel(seg, rank);
+	}
+
+	// re-emit the segment with the COMPOUNDED factor as a total percent, keeping the sign the
+	// compound result actually has and the label's word suffix untouched.
+	private string Pct(double factor, string seg)
+	{
+			// skip the sign, then walk the digit run: everything from there on is the suffix
+			int p = 0;
+			if (seg.StartsWith("+") || seg.StartsWith("-"))
+				p = 1;
+			int d0 = p; // where the number starts: proves a digit run exists
+			while (p < seg.Length && (int)seg[p] >= 48 && (int)seg[p] <= 57)
+			{
+					p = p + 1;
+			}
+			// no digits after the sign: nothing to compound, keep the segment honest
+			if (p <= d0 || p >= seg.Length)
+				return seg;
+			string suffix = seg.Substring(p); // "% Range", "s Burning Duration", "% Slow for 2.5s"...
+			int whole = (int)System.Math.Round((factor - 1.0) * 100.0);
+			// the sign rides the COMPOUNDED result, not the label
+			string sign = whole >= 0 ? "+" : "-";
+			int mag = whole >= 0 ? whole : -whole;
+			// concat order keeps the LEFT side a string first
+			return sign + "" + mag + suffix;
+	}
+
+	// "+N word" tracks: the tables are per-rank constants, so the label's number scales by rank
+	// and the rest of the label (unit + words) rides verbatim.
+	private string ScaleLabel(string seg, int rank)
+	{
+			int p = 0;
+			if (seg.StartsWith("+") || seg.StartsWith("-"))
+				p = 1;
+			int q = p;
+			while (q < seg.Length && (int)seg[q] >= 48 && (int)seg[q] <= 57)
+			{
+					q = q + 1;
+				// the digit run only: ASCII 48..57 are '0'..'9'
+			}
+			// no number in the segment: keep it exactly as written
+			if (q <= p)
+				return seg;
+			int num = 0;
+			for (int i = p; i < q; i = i + 1)
+			{
+					num = num * 10 + ((int)seg[i] - 48);
+			}
+			string head = seg.Substring(0, p); // the sign
+			string tail = seg.Substring(q); // unit + words
+			return head + "" + (num * rank) + tail;
 	}
 
 	private void ShowPauseCard()
