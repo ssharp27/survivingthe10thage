@@ -22,6 +22,14 @@ public partial class Director : Godot.Node2D
         // chance an ogre lumbers in on a tier-4+ leg. Budgeted ORDINARY spawn like the
         // rider rolls, so the cap binds it. Assistant-picked cadence knob.
         const float OGRE_CH = 0.10f;
+    // EARLY OGRE LOOK (user 2026-11-06: "spawn an ogre in at the start of the run so I
+    // can test how it works much earlier"): the FIRST ordinary spawn of a run is forced
+    // to be the ogre, so the telegraph + SLAM are on screen inside the first minute
+    // instead of waiting for a tier-4 leg AND an OGRE_CH hit. TEST KNOB, not balance:
+    // set false and the tier-4 OGRE_CH roll below owns ogre entry again (the shipped
+    // rule). Retunable with the rest of the tier cadence.
+    const bool OGRE_AT_RUN_START = true;
+    bool _ogreAtStart = OGRE_AT_RUN_START; // consumed by the first ordinary spawn
 
     public override void _Process(double d)
     {
@@ -94,6 +102,15 @@ public partial class Director : Godot.Node2D
         if (g.GetLeader() != null && pos.DistanceTo(g.GetLeader().GlobalPosition) < 260.0f)
             return; // an arena clamp may have dragged the spawn into the party: skip, the
                     // timer already burned this roll
+        if (_ogreAtStart)
+        {
+            // EARLY OGRE LOOK (see the OGRE_AT_RUN_START knob): the forced first body of
+            // the run. Ordinary budgeted spawn on the SAME off-camera edge ray as every
+            // other body, so the ogre simply lumbers in from the frame border.
+            _ogreAtStart = false;
+            SpawnOgre(g, pos, hordeScale);
+            return;
+        }
         // user tier gate: the horde runs whatever tier the beat table last advanced. Tier 1
         // goblins | tier 2 wolves + hobgoblins | TIER 3 NOW DESIGNED (user 2026-11-03: sword +
         // bow wolf riders and the goblin mage, entering as packs and hob counts). Tier 4 is

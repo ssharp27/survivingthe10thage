@@ -2092,7 +2092,7 @@ public void RegisterEnemy(Combatant e)
 		_dashPulse += d;         // free-running clock for the dash-ready flash
 		if (_engageInvulnT > 0.0)
 			_engageInvulnT -= delta; // boss-engage immunity window (set in ActivateBoss)
-		// pause-card rail: only the one-frame ESC handoff is left here. The pilot CLOSE
+		// pause-card rail: only the one-frame ESC/P handoff is left here. The pilot CLOSE
 		// valve had to move ONTO THE CARD: this pause is a TRUE tree pause, so this _process
 		// never ticks again while the card is up (seat 545 froze at beat 1 for the whole
 		// 25-min kill rail with a C#-side valve). The card is PROCESS_MODE_ALWAYS and times
@@ -2100,8 +2100,8 @@ public void RegisterEnemy(Combatant e)
 		// signal. ESC-close arrives through that signal and eats one frame via _pauseJustClosed.
 		if (_pauseJustClosed)
 			_pauseJustClosed = false; // the card closed on that very press: do not reopen it
-		else if (Input.IsActionJustPressed("pause") && !GetWorldPause() && !_campfireWaiting)
-			ShowPauseCard(); // human lane: ESC opens, the card owns the close
+		else if (Input.IsActionJustPressed("pause_menu") && !GetWorldPause() && !_campfireWaiting)
+			ShowPauseCard(); // human lane: ESC/P opens, the card owns the close
 		else if (_pilot && !_pausePilotUsed && _state == StageState.PLAY && !GetWorldPause() && !_campfireWaiting)
 		{
 			// headless proof: open the roster card once per run; the CARD's own
@@ -5188,7 +5188,7 @@ private void UpdateSpirits(float delta)
 		// beat 1 with the valve here); 0.0 on a human seat = the card only closes on ESC
 		_pauseCard.Set("pilot_timeout", _pilot ? PAUSE_PILOT_TIMEOUT : 0.0);
 		_pauseWaitT = 0.0; // retired C# clock: kept so the field stays compile-clean
-		GD.Print("[10thAge] pause: roster card up - ESC closes it");
+		GD.Print("[10thAge] pause: roster card up - ESC/P closes it");
 	}
 
 	private void _OnPauseTarget(int idx, int mode)

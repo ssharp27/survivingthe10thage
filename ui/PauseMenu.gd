@@ -67,14 +67,17 @@ func _ready() -> void:
 func _input(ev: InputEvent) -> void:
 	# a hidden card owns NO input (the Campfire.gd trap: hidden Controls still receive
 	# _input, and a stray click used to leave the tree paused with nothing on screen).
-	# OPENING is Game.cs' "pause" action rail in _process; this rail only CLOSES a card
+	# OPENING is Game.cs' "pause_menu" action rail in _process; this rail only CLOSES a card
 	# that is already up: dismissed fires the C# handler SYNCHRONOUSLY, so visible is
 	# already false when Game._process sees the same physical press - the C# open rail
 	# adds a one-frame just-closed guard for that handoff (see ui/INTEGRATION.md).
 	if not visible:
 		return
-	if ev is InputEventKey and ev.pressed and not ev.echo and ev.keycode == 4194301:
-		_close("esc")
+	# KEYCODE TAX: Escape is 4194305 here (ui_cancel's own keycode, printed by the probe
+	# seat), not 4194301; and P (80) closes alongside it.
+	# the card's OWN closers: ESC and P. dismissed runs the C# handler synchronously.
+	if ev is InputEventKey and ev.pressed and not ev.echo and (ev.keycode == 4194305 or ev.keycode == 80):
+		_close("esc/p")
 	if ev is InputEventMouseButton and ev.pressed and ev.button_index == 1:
 		# the camp card's human-test rounds 1-4 showed nested Buttons NOT firing pressed,
 		# so raw left clicks are routed here too. _apply_mode is idempotent, so a click
@@ -119,7 +122,7 @@ func _close(reason: String) -> void:
 	# (dismissed.emit() runs the Game.cs handler SYNCHRONOUSLY - the Hide + unpause
 	# lands BEFORE this line returns, which is what makes the ESC handoff safe)
 	# ESC is the only card-side closer; the pilot valve closes from C# directly.
-	print("[10thAge] pause card: ESC closed it (", reason, ") - Game.cs hides + resumes")
+	print("[10thAge] pause card: ESC/P closed it (", reason, ") - Game.cs hides + resumes")
 	dismissed.emit()
 
 func _build() -> void:
@@ -256,7 +259,8 @@ func _paint_columns() -> void:
 	if header != null:
 		header.text = "PAUSED  -  " + str(stage_name)
 	if hint != null:
-		hint.text = "ESC closes   -   click a mode to set it"
+		# the user reads the card with keys in hand: name BOTH closers
+		hint.text = "ESC or P closes   -   click a mode to set it"
 
 func _paint_one(row: Dictionary, ci: int, w: float, h: float, big: bool) -> void:
 	# one mockup column: painted mini -> name -> target logic -> upgrades

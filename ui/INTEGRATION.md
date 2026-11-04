@@ -213,13 +213,15 @@ GetTree().Paused = true;
 ```
 
 ### 2. Who opens it
-- **human**: ESC opens via the `pause` input action — `project.godot`'s `[input]` block DID gain a
-  `pause` action on `KEY_ESCAPE` (keycode 4194301); the C# `_Process` rail polls `IsActionJustPressed`
-  guarded by `!GetWorldPause() && !_campfireWaiting`. ESC **close** is the CARD's own `_input`
-  (raw keycode), which emits `dismissed` → `_OnPauseDismissed` (Hide + unpause + `_pauseJustClosed`).
+- **human**: ESC/P opens via the `pause_menu` input action — `project.godot`'s `[input]` block DID gain a
+  `pause_menu` action binding Escape (keycode **4194305** — the probe seat printed `ui_cancel`'s own keycode;
+  the first draft's hand-written 4194301 matched NO key) and P (keycode 80); the C# `_process` rail polls
+  `IsActionJustPressed("pause_menu")` guarded by `!GetWorldPause() && !_campfireWaiting`. ESC/P **close** is
+  the CARD's own `_input` (raw keycodes 4194305 / 80), which emits `dismissed` → `_OnPauseDismissed`
+  (Hide + unpause + `_pauseJustClosed`). NOTE: `pause` is NOT a built-in action either (`has_action` false).
 - **pilot**: the same rail opens ONCE per run (`_pausePilotUsed`, PLAY state, no soft pause); the
   CARD's `PROCESS_MODE_ALWAYS` `_process` then closes it after `pilot_timeout` (5.0 s set by C#),
-  emitting `dismissed` like ESC does.
+  emitting `dismissed` like ESC/P does.
 - **ESC-handoff trap**: `dismissed.emit()` runs the C# handler SYNCHRONOUSLY inside the card's
   `_input`, so `_pauseJustClosed` is already set when the same frame's `Game._process` polls the
   press — the rail eats one frame via that flag and never re-opens on the close press.
