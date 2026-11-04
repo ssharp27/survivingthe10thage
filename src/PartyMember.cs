@@ -2961,35 +2961,13 @@ public partial class PartyMember : Godot.Node2D
 
 		{
 
-			Godot.Node2D prey = null;
+			// the pause card's mode toggle rides the shared picker, same reach gate as before
 
-			float preyD = 1e9f;
+			Godot.Node2D prey = PickPrey(pg, enemies, p, reach, true, false, false, 0.0f, 0.0f);
 
-			for (int i = 0; i < enemies.Count; i++)
+			// preyD answers the chosen body's distance; the empty-clearing guard below stands
 
-			{
-
-				Godot.Node2D n = enemies[i];
-
-				Combatant nc = (Combatant)n;
-
-				if (nc == null || nc.kind == "dead")
-
-					continue;
-
-				Vector2 dv = pg.WrapDelta(p, n.GlobalPosition);
-
-				float dd = dv.Length();
-
-				if (dd >= preyD)
-
-					continue;
-
-				preyD = dd;
-
-				prey = n;
-
-			}
+			float preyD = PickPreyD;
 
 			if (prey == null || preyD > reach)
 
@@ -3070,20 +3048,9 @@ public partial class PartyMember : Godot.Node2D
 		// memo-growth discipline that settled the bounce-rank crash.
 		if (shieldKit)
 		{
-			Godot.Node2D prey = null;
-			float preyD = 1e9f;
-			for (int i = 0; i < enemies.Count; i++)
-			{
-				Godot.Node2D n = enemies[i];
-				Combatant nc = (Combatant)n;
-				if (nc == null || nc.kind == "dead")
-					continue;
-				float dd = (n.GlobalPosition - p).Length();
-				if (dd >= preyD)
-					continue;
-				preyD = dd;
-				prey = n;
-			}
+			// the pause card's mode toggle rides the shared picker, same reach gate as before
+			Godot.Node2D prey = PickPrey(pg, enemies, p, reach, false, false, false, 0.0f, 0.0f);
+			float preyD = PickPreyD;
 			if (prey == null || preyD > reach)
 				return; // nothing in the throw: the beat stays ready, an empty clearing never stalls it
 			int slot = -1;
@@ -3207,22 +3174,9 @@ public partial class PartyMember : Godot.Node2D
 				// move during the stagger). Only the ROLL stays shared across both daggers; with no
 				// live prey left it falls back to the stored line so the beat still lands.
 				Vector2 aim2 = twinAim; // stored line as the fallback
-				Godot.Node2D prey2 = null;
-				double preyD2 = 1e9;
-				for (int i = 0; i < enemies.Count; i++)
-				{
-					Godot.Node2D n2 = enemies[i];
-					Combatant nc2 = (Combatant)n2;
-					if (nc2 == null || nc2.kind == "dead" || nc2.hp <= 0.0f)
-						continue;
-					Vector2 v2 = pg.WrapDelta(p, n2.GlobalPosition);
-					double dd2 = v2.Length();
-					if (dd2 < preyD2)
-					{
-						preyD2 = dd2;
-						prey2 = n2;
-					}
-				}
+				// the second stab re-picks with the SAME mode so both daggers agree
+				Godot.Node2D prey2 = PickPrey(pg, enemies, p, reach, true, true, false, 0.0f, 0.0f);
+				double preyD2 = PickPreyD;
 				if (prey2 != null)
 				{
 					Vector2 v2 = pg.WrapDelta(p, prey2.GlobalPosition);
@@ -3280,37 +3234,15 @@ public partial class PartyMember : Godot.Node2D
 
 			// first dagger: pick the prey, share ONE roll across both jabs
 
-			Godot.Node2D prey = null;
+			// the pause card's mode toggle rides the shared picker; hpGate keeps the
 
-			double preyD = 1e9;
+			// "dying body" rejection this kit already had
 
-			for (int i = 0; i < enemies.Count; i++)
+			Godot.Node2D prey = PickPrey(pg, enemies, p, reach, true, true, false, 0.0f, 0.0f);
 
-			{
+			// preyD answers the chosen body's distance (double: the guard below casts reach)
 
-				Godot.Node2D n = enemies[i];
-
-				Combatant nc = (Combatant)n;
-
-				if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
-
-					continue;
-
-				Vector2 v = pg.WrapDelta(p, n.GlobalPosition);
-
-				double dd = v.Length();
-
-				if (dd < preyD)
-
-				{
-
-					preyD = dd;
-
-					prey = n;
-
-				}
-
-			}
+			double preyD = PickPreyD;
 
 			if (prey == null || preyD > (double)reach)
 
@@ -3412,33 +3344,13 @@ public partial class PartyMember : Godot.Node2D
 
 			// over a seam); an empty clearing never stalls the beat, like every kit
 
-			Godot.Node2D prey = null;
+			// the pause card's mode toggle rides the shared picker, same reach gate as before
 
-			float preyD = 1e9f;
+			Godot.Node2D prey = PickPrey(pg, enemies, p, reach, true, false, false, 0.0f, 0.0f);
 
-			for (int i = 0; i < enemies.Count; i++)
+			// preyD answers the chosen body's distance; the empty-clearing guard below stands
 
-			{
-
-				Godot.Node2D n = enemies[i];
-
-				Combatant nc = (Combatant)n;
-
-				if (nc == null || nc.kind == "dead")
-
-					continue;
-
-				float dd = pg.WrapDelta(p, n.GlobalPosition).Length();
-
-				if (dd >= preyD)
-
-					continue;
-
-				preyD = dd;
-
-				prey = n;
-
-			}
+			float preyD = PickPreyD;
 
 			if (prey == null || preyD > reach)
 
@@ -3549,57 +3461,31 @@ public partial class PartyMember : Godot.Node2D
 
 		}
 
-		Godot.Node2D best = null;
+		// ONE shared picker for every kit (see PickPrey at the foot of the file): the
 
-		float bestD = 1e9f;
+		// rapier LANES-only gate rides laneOnly + facing + arcEff, so a targeting mode the
 
-		for (int i = 0; i < enemies.Count; i++)
+		// arc cannot see still falls back to the closest body the lane actually covers.
 
-		{
+		// Targeting gate is LANES-only (rapier): a lane weapon may only attack what its
 
-			Godot.Node2D n = enemies[i];
+		// facing arc covers (touching enemies always count). The maul Mosiah-aims: it
 
-			Combatant nc = (Combatant)n;
+		// attacks the ABSOLUTE nearest body whatever way the body faces, and the ~150 deg
 
-			if (nc == null || nc.kind == "dead")
+		// arc rides the swing (below), not the walk direction - so a Baldrun walking away
 
-				continue;
+		// from the horde still turns its cleave to the nearest threat instead of whiffing
 
-			Vector2 v = n.GlobalPosition - p;
+		// air. a shooter Mosiah-aims too: the bow picks the nearest body in sight
 
-			float dd = v.Length();
+		// whatever way it faces, so the lane gate stays lane-only.
 
-			if (dd >= bestD)
+		Godot.Node2D best = PickPrey(pg, enemies, p, reach, false, false, isLeader && !cleaver && !shotKit, facing, arcEff);
 
-				continue;
+		// bestD answers the chosen body's distance; the empty-clearing guard below stands
 
-			// Targeting gate is LANES-only (rapier): a lane weapon may only attack
-
-			// what its facing arc covers (touching enemies always count). The maul
-
-			// Mosiah-aims: it attacks the ABSOLUTE nearest body whatever way the
-
-			// body faces, and the ~150 deg arc rides the swing (below), not the
-
-			// walk direction - so a Baldrun walking away from the horde still
-
-			// turns its cleave to the nearest threat instead of whiffing air.
-
-			// a shooter Mosiah-aims too: the bow picks the nearest body in sight whatever way
-
-			// it faces, so the lane gate stays lane-only
-
-			if (isLeader && !cleaver && !shotKit && dd >= 40.0f &&
-
-				System.Math.Abs(angleDiff((float)System.Math.Atan2(v.Y, v.X), facing)) > arcEff)
-
-				continue;
-
-			bestD = dd;
-
-			best = n;
-
-		}
+		float bestD = PickPreyD;
 
 		if (best == null || bestD > reach)
 
@@ -4054,4 +3940,97 @@ public partial class PartyMember : Godot.Node2D
 				ShieldArt(sk).Visible = false;
 		}
 	}
+	// pause-card targeting: every kit asks ONE picker instead of its own nearest loop.
+	// Modes: 0 closest (the default), 1 furthest, 2 highest HP, 3 lowest HP, 4 boss.
+	// A mode with no prey in reach falls back to the closest body in reach - the user's
+	// 'boss selected but out of range' case; ties prefer the nearer body.
+	public int targetMode = 0;
+	public float PickPreyD = 1e9f;
+
+	// The pause card pushes the same mode any number of times: only a CHANGE prints.
+	public void SetTargetMode(int m)
+	{
+		if (m == targetMode)
+			return;
+		targetMode = m;
+		GD.Print("[10thAge] " + displayName + " target logic: " + m);
+	}
+
+	// The shared prey pick. Candidates are reach-gated INSIDE so 'no prey in this mode'
+	// can fall back; PickPreyD answers the chosen body's distance (1e9f when nothing was
+	// found). Flags keep each kit's old rules: wrap = torus delta (the seam-safe pair the
+	// melee kits rode), hpGate = also reject dying bodies, laneOnly = the facing-arc gate
+	// for lane weapons (bodies under 40 always count, exactly as the loop had it).
+	public Godot.Node2D PickPrey(Game pg, Godot.Collections.Array<Godot.Node2D> enemies,
+		Vector2 p, float reach, bool wrap, bool hpGate, bool laneOnly, float facing, float arcEff)
+	{
+		Godot.Node2D got = _PickFor(targetMode, pg, enemies, p, reach, wrap, hpGate, laneOnly, facing, arcEff);
+		if (got == null && targetMode != 0)
+			got = _PickFor(0, pg, enemies, p, reach, wrap, hpGate, laneOnly, facing, arcEff);
+		return got;
+	}
+
+	// One mode's pick; mode 4 only scores bosses, so a horde with no live boss in reach
+	// leaves got null and PickPrey falls back to the closest.
+	private Godot.Node2D _PickFor(int mode, Game pg, Godot.Collections.Array<Godot.Node2D> enemies,
+		Vector2 p, float reach, bool wrap, bool hpGate, bool laneOnly, float facing, float arcEff)
+	{
+		Godot.Node2D got = null;
+		float gotD = 1e9f;
+		float gotHP = 0.0f;
+		for (int i = 0; i < enemies.Count; i++)
+		{
+			Godot.Node2D n = enemies[i];
+			Combatant nc = (Combatant)n;
+			if (nc == null || nc.kind == "dead")
+				continue;
+			if (hpGate && nc.hp <= 0.0f)
+				continue;
+			if (mode == 4 && !(nc is Boss))
+				continue;
+			Vector2 v = wrap ? pg.WrapDelta(p, n.GlobalPosition) : n.GlobalPosition - p;
+			float dd = v.Length();
+			if (dd > reach)
+				continue;
+			if (laneOnly && dd >= 40.0f && System.Math.Abs(angleDiff((float)System.Math.Atan2(v.Y, v.X), facing)) > arcEff)
+				continue;
+			if (mode == 2)
+			{
+				if (got == null || nc.hp > gotHP || (nc.hp == gotHP && dd < gotD))
+				{
+					gotHP = nc.hp;
+					gotD = dd;
+					got = n;
+				}
+				continue;
+			}
+			if (mode == 3)
+			{
+				if (got == null || nc.hp < gotHP || (nc.hp == gotHP && dd < gotD))
+				{
+					gotHP = nc.hp;
+					gotD = dd;
+					got = n;
+				}
+				continue;
+			}
+			if (mode == 1)
+			{
+				if (got == null || dd > gotD)
+				{
+					gotD = dd;
+					got = n;
+				}
+				continue;
+			}
+			if (got == null || dd < gotD)
+			{
+				gotD = dd;
+				got = n;
+			}
+		}
+		PickPreyD = (got == null) ? 1e9f : gotD;
+		return got;
+	}
+
 }

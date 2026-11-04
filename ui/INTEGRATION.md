@@ -1,4 +1,4 @@
-# UI integration spec — Campfire.tscn + RunSummary.tscn
+# UI integration spec — Campfire.tscn + RunSummary.tscn + PauseMenu.tscn
 
 Both scenes are standalone (nothing in Main.tscn, Game.cs, Director.cs or any existing
 file is touched by this change). They are driven by lightweight GDScript controllers
@@ -177,6 +177,84 @@ private void _OnSummaryDismissed()
 `CheckTpk` (Game.cs:916-927) already calls `PrintSummary("TPK - the whole party is down")`, and
 `OnBossKilled` (Game.cs:274-278) calls `PrintSummary("VICTORY — Tanurial Forest cleared")`, so both
 end states flow through the same summary screen without touching those call sites.
+
+## PauseMenu.tscn — wiring into Game.cs (shipped 2026-11-05, pause + targeting pass)
+
+Pause root: `CanvasLayer` named `PauseMenu`, script `PauseMenu.gd`, **layer 4** (camp = 2, summary
+= 3). Files: `res://ui/PauseMenu.tscn` + `res://ui/PauseMenu.gd` + `res://ui/pause_blur.gdshader`.
+
+Signals (declared in PauseMenu.gd):
+- `target_changed(member_index: int, mode: int)` — a member's 5-mode button emitted its new mode
+- `dismissed` — BOTH card-side closers emit it: ESC-close and the card's own pilot-valve timeout.
+  `_OnPauseDismissed` owns the unpause either way
+
+Props (ALL **untyped** — the `Array[Dictionary]` silent-`Set`-no-op pitfall):
+- `members: Array` — camp-card rows (`name`, `klass`, `weapon`, `hp`, `max_hp`, `state`, `leader`,
+  `picks` = `pickHistory`) PLUS `idx` (= `memberIndex`, the signal's roster key), `target_mode`
+  (current toggle) and `art` = `res://art/<lowercased name>.png` (mini; the card skips a missing load)
+- `stage_name: String`, `use_blur: bool` (true default; no GPU = the dark-wash fallback stands alone)
+- `pilot_timeout: float` (0.0 default = humans only close on ESC) — the pilot valve lives ON THE
+  CARD, not in `Game._Process`: the pause is a TRUE tree pause, so `Game._process` never ticks again
+  while the card is up (seat 545 froze at beat 1 for the whole kill rail with a C#-side valve). The
+  card is `PROCESS_MODE_ALWAYS`, so its own `_process` does tick during the freeze: past `pilot_timeout`
+  it runs `_close("pilot")` → emits `dismissed` → the C# handler unpauses. C# sets it via
+  `Set("pilot_timeout", ...)` — a TYPED scalar export is `Set`-able (only typed ARRAY is the trap)
+
+### 1. Instance + connect + populate (shipped: `Game.ShowPauseCard()`, lazy like the summary)
+
+```csharp
+_pauseCard.Set("members", PauseCards());   // Set BEFORE AddChild: the card builds columns in _ready()
+_pauseCard.Set("stage_name", STAGE_NAME);
+AddChild(_pauseCard);
+_pauseCard.Connect("target_changed", new Callable(this, "_OnPauseTarget"));
+_pauseCard.Connect("dismissed", new Callable(this, "_OnPauseDismissed"));
+_pauseCard.Show();
+GetTree().Paused = true;
+```
+
+### 2. Who opens it
+- **human**: ESC opens via the `pause` input action — `project.godot`'s `[input]` block DID gain a
+  `pause` action on `KEY_ESCAPE` (keycode 4194301); the C# `_Process` rail polls `IsActionJustPressed`
+  guarded by `!GetWorldPause() && !_campfireWaiting`. ESC **close** is the CARD's own `_input`
+  (raw keycode), which emits `dismissed` → `_OnPauseDismissed` (Hide + unpause + `_pauseJustClosed`).
+- **pilot**: the same rail opens ONCE per run (`_pausePilotUsed`, PLAY state, no soft pause); the
+  CARD's `PROCESS_MODE_ALWAYS` `_process` then closes it after `pilot_timeout` (5.0 s set by C#),
+  emitting `dismissed` like ESC does.
+- **ESC-handoff trap**: `dismissed.emit()` runs the C# handler SYNCHRONOUSLY inside the card's
+  `_input`, so `_pauseJustClosed` is already set when the same frame's `Game._process` polls the
+  press — the rail eats one frame via that flag and never re-opens on the close press.
+
+### 3. Targeting modes (shared picker in PartyMember.cs)
+`mode` integers ride `PartyMember.targetMode` (`public int`, written ONLY by
+`SetTargetMode(int m)` — one arg; the card sends the roster `idx` separately and Game routes
+via `GetMemberByIndex`). Every kit calls the shared `PickPrey(pg, enemies, p, reach, wrap,
+hpGate, laneOnly, facing, arcEff)`; `PickPreyD` answers the chosen body's distance:
+
+| mode | label | pick |
+| ---- | ----- | ---- |
+| 0 | closest | default — the nearest live body (every prior kit behaviour) |
+| 1 | furthest | the live body in range that sits FARTHEST |
+| 2 | highest hp | the largest CURRENT absolute hp (not a percentage) |
+| 3 | lowest hp | the smallest CURRENT absolute hp |
+| 4 | boss | the C# type test `nc is Boss` (`Combatant.cs` has NO boss field — bosses ARE their own script class) |
+
+**Where the logic isn't available → CLOSEST IN RANGE** (user rule: "defaulting to attacking the
+closest enemy in range if the targeting logic isn't available"). The reach gate lives INSIDE
+`_PickFor`, so an out-of-range boss (or empty mode) yields null and `PickPrey` retries mode 0.
+Boss bodies join `_enemies` only once engaged, so "boss" is inert pre-engage and falls back to
+closest. Ties break nearer. AoE/fan/ring kits aim/anchor on the CHOSEN body while their bands
+still cover everyone. Per-kit pick rules ride the flags: `wrap` = torus delta (Yu/Brook/Bruno),
+`hpGate` = the daggers' dying-body rejection, `laneOnly` = the rapier lane arc (touching <40 px
+always counts).
+
+### 4. Read order (screenshot-style description)
+Backdrop: the field itself, dimmed + blurred (`pause_blur.gdshader`, `set_texture_mode(true)` +
+the real-screen `screen_texture`) so the game visibly reads as paused, then a faint dark wash.
+Five grimoire columns (mockup: 5 dark background columns), each: painted portrait (`art/<pc>.png`,
+the mini art), NAME, **TARGET LOGIC** (five mode buttons, the chosen one gold), UPGRADES (the
+`<weapon> <OPT_LABEL> x<rank>` rows + the `pickHistory` tail). Footer: `ESC` to resume.
+The card is a TRUE pause (`get_tree().paused = true` like `RunSummary.gd`, root
+`PROCESS_MODE_ALWAYS` so ESC still fires).
 
 ## Open questions (for the UX / developer)
 1. ~~Keep `CAMPFIRE_LEN = 8.0` as an auto-short-rest timeout?~~ — **CLOSED (user 2026-10-19, re-locked 2026-10-31)**: campfire is purely player-driven. `CAMPFIRE_LEN` is gone; the only valve is `CAMPFIRE_WAIT_TIMEOUT = 25.0` and it runs **only** under `_pilot` or when the campfire scene is missing (soft-lock guard). A human camp waits for a real rest choice forever.

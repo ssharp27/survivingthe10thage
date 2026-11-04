@@ -294,6 +294,13 @@ public partial class Game : Godot.Node2D
 	string _campfireChoice = "";
 	// run summary retry: one ChangeSceneToFile per run, so a retry can never loop
 	bool _summaryRetried = false;
+	// pause card: persistent card + pilot open-once valve + the ESC-close handoff flag
+	Godot.CanvasLayer _pauseCard = null;
+	bool _pausePilotUsed = false; // headless proof opens the pause card once per run
+	double _pauseWaitT = 0.0; // card clock: drives the pilot's close valve
+	bool _pauseJustClosed = false; // card ate the same ESC press: eat one frame, no reopen
+	readonly double PAUSE_PILOT_TIMEOUT = 5.0; // seconds the pilot holds the card up
+
 
 	// ---------- M1 verification pilot (headless smoke only) ----------
 	// Active only when the env var M1_PILOT is set. The leader then orbits while
@@ -2085,6 +2092,23 @@ public void RegisterEnemy(Combatant e)
 		_dashPulse += d;         // free-running clock for the dash-ready flash
 		if (_engageInvulnT > 0.0)
 			_engageInvulnT -= delta; // boss-engage immunity window (set in ActivateBoss)
+		// pause-card rail: only the one-frame ESC handoff is left here. The pilot CLOSE
+		// valve had to move ONTO THE CARD: this pause is a TRUE tree pause, so this _process
+		// never ticks again while the card is up (seat 545 froze at beat 1 for the whole
+		// 25-min kill rail with a C#-side valve). The card is PROCESS_MODE_ALWAYS and times
+		// PAUSE_PILOT_TIMEOUT itself (pilot_timeout export), closing via the dismissed
+		// signal. ESC-close arrives through that signal and eats one frame via _pauseJustClosed.
+		if (_pauseJustClosed)
+			_pauseJustClosed = false; // the card closed on that very press: do not reopen it
+		else if (Input.IsActionJustPressed("pause") && !GetWorldPause() && !_campfireWaiting)
+			ShowPauseCard(); // human lane: ESC opens, the card owns the close
+		else if (_pilot && !_pausePilotUsed && _state == StageState.PLAY && !GetWorldPause() && !_campfireWaiting)
+		{
+			// headless proof: open the roster card once per run; the CARD's own
+			// PROCESS_MODE_ALWAYS valve closes it (this _process is frozen by the pause)
+			_pausePilotUsed = true;
+			ShowPauseCard();
+		}
 		// run clock drives the beat table; camp is excluded because it is a read-the-card
 		// pause, and the picker / join soft-pauses keep stage beats honest while a human
 		// reads the card. M2: one PLAY state covers horde AND boss fights, so the
@@ -5081,6 +5105,113 @@ private void UpdateSpirits(float delta)
 		return card;
 	}
 
+	// ---------- pause card: roster read + per-member targeting toggle ----------
+	// The card owns ESC-close (dismissed signal); Game owns open, the pilot valve
+	// and the Hide + unpause. Rows reuse the camp-card shape plus idx + target_mode
+	// + art so the card can paint minis and the mode toggle.
+	private Godot.Collections.Array PauseCards()
+	{
+		Godot.Collections.Array rows = new();
+		if (_hpOrder.Count > 0)
+		{
+			// HUD join order, recruited only - the pause card shows who is IN the party
+			for (int i = 0; i < _hpOrder.Count; i++)
+			{
+				PartyMember m = GetMemberByIndex(_hpOrder[i]);
+				if (m != null && m.joined)
+					rows.Add(PauseCard(m));
+			}
+			foreach (PartyMember m in _party)
+			{
+				bool shown = false;
+				for (int i = 0; i < _hpOrder.Count; i++)
+					if (_hpOrder[i] == m.memberIndex)
+						shown = true;
+				if (!shown && m.joined)
+					rows.Add(PauseCard(m));
+			}
+			return rows;
+		}
+		// boot fallback: _hpOrder stays empty until BuildJoinLottery runs.
+		foreach (PartyMember m in _party)
+		{
+			if (m.joined)
+				rows.Add(PauseCard(m));
+		}
+		return rows;
+	}
+
+	private Godot.Collections.Dictionary PauseCard(PartyMember m)
+	{
+		Godot.Collections.Dictionary card = new();
+		card["name"] = m.displayName;
+		card["klass"] = m.class_ == "" ? m.weaponName : m.class_;
+		card["weapon"] = m.weaponName;
+		card["hp"] = (int)m.hp;
+		card["max_hp"] = (int)m.EffMaxHp();
+		card["state"] = !m.joined ? "away" : (m.eliminated ? "out" : (m.stable ? "stable" : (m.downed ? "down" : "up")));
+		card["leader"] = m.isLeader;
+		card["picks"] = m.pickHistory == "" ? "no picks yet" : m.pickHistory;
+		card["idx"] = m.memberIndex;
+		card["target_mode"] = m.targetMode;
+		// the card's mini: art is res://art/<lowercased name>.png; the card skips it if
+		// the load misses, so a kit without a mini still shows its column
+		card["art"] = "res://art/" + m.displayName.ToLower() + ".png";
+		return card;
+	}
+
+	private void ShowPauseCard()
+	{
+		if (_pauseCard == null)
+		{
+			Godot.PackedScene scn = GD.Load("res://ui/PauseMenu.tscn") as Godot.PackedScene;
+			if (scn == null)
+			{
+				GD.Print("[10thAge] WARNING: res://ui/PauseMenu.tscn missing - pause is a no-op");
+				return;
+			}
+			_pauseCard = scn.Instantiate() as Godot.CanvasLayer;
+			// Set lands BEFORE AddChild: the card builds its columns in _ready()
+			_pauseCard.Set("members", PauseCards());
+			_pauseCard.Set("stage_name", STAGE_NAME);
+			AddChild(_pauseCard);
+			// the instantiated scene root IS the "PauseMenu" node the signals live on
+			_pauseCard.Connect("target_changed", new Callable(this, "_OnPauseTarget"));
+			_pauseCard.Connect("dismissed", new Callable(this, "_OnPauseDismissed"));
+		}
+		else
+			_pauseCard.Set("members", PauseCards()); // re-pull roster data on a re-open
+		_pauseCard.Show();
+		GetTree().Paused = true; // true tree pause like RunSummary/Campfire: the world freezes
+		// the pilot CLOSE valve is on the CARD (pilot_timeout export): its PROCESS_MODE_ALWAYS
+		// _process ticks during this freeze while Game._process does not (seat 545 froze at
+		// beat 1 with the valve here); 0.0 on a human seat = the card only closes on ESC
+		_pauseCard.Set("pilot_timeout", _pilot ? PAUSE_PILOT_TIMEOUT : 0.0);
+		_pauseWaitT = 0.0; // retired C# clock: kept so the field stays compile-clean
+		GD.Print("[10thAge] pause: roster card up - ESC closes it");
+	}
+
+	private void _OnPauseTarget(int idx, int mode)
+	{
+		// one column's toggle press: route the mode to that member's shared picker
+		PartyMember m = GetMemberByIndex(idx);
+		if (m == null)
+		{
+			GD.Print("[10thAge] WARNING: pause target for unknown member " + idx);
+			return;
+		}
+		m.SetTargetMode(mode);
+	}
+
+	private void _OnPauseDismissed()
+	{
+		if (_pauseCard != null)
+			_pauseCard.Hide();
+		GetTree().Paused = false;
+		_pauseJustClosed = true; // the card ate the SAME ESC press: eat one frame, no reopen
+		GD.Print("[10thAge] pause: card dismissed - the beat resumes");
+	}
+
 	private Godot.Collections.Array SummaryCards()
 	{
 		Godot.Collections.Array rows = new();
