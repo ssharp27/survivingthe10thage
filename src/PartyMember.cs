@@ -368,6 +368,12 @@ public partial class PartyMember : Godot.Node2D
 
 
 
+	// Temporary HP (user 2026-11-06, Field Medic over-heal): a buffer ABOVE the ceiling that
+	// damage spends FIRST. Deliberately NOT in EffMaxHp - a raised ceiling is Wash's Inspiring
+	// Leader seat, this one only ever holds what the medic pushed past the cap (Game.TEMP_HP_CAP),
+	// and no other heal lane tops it (every other heal still clamps at EffMaxHp).
+	public float tempHp = 0.0f;
+
 	public float hp = 0.0f;
 
 	public bool downed = false;
@@ -402,6 +408,8 @@ public partial class PartyMember : Godot.Node2D
 
 	readonly double ULT_RANGE = 2.0; // reach / hit radius x2 (EffRange)
 
+	readonly double ULT_SPD = 1.5; // user 2026-11-06: Giant's Might ALSO grants +50% attack speed (EffCooldown divisor, all kits)
+
 	// Mosiah "Bardic Inspiration" (user 2026-10-26): insT = bardic seconds left ON THIS
 
 	// body - the ult is PARTY-WIDE so every ally carries its own clock. INS_SPD divides
@@ -422,7 +430,7 @@ public partial class PartyMember : Godot.Node2D
 
 	// AREA tag (ranks keep widening the awakened ring - user asked for exactly that),
 
-	// guardian damage +50% at the RollDamage choke, and Game.OnEnemyKilled tallies awaKills:
+	// guardian damage +25% at the RollDamage choke, and Game.OnEnemyKilled tallies awaKills:
 
 	// every horde kill while awake heals the standing squad +1 hp each. _awaUp guards the
 
@@ -438,7 +446,7 @@ public partial class PartyMember : Godot.Node2D
 
 	readonly double AWA_RANGE = 2.0; // ring reach x2, after the AREA tag (EffRange)
 
-	readonly double AWA_DMG = 1.5; // +50% guardian damage while awake (RollDamage choke)
+	readonly double AWA_DMG = 1.25; // user 2026-11-06: +25% guardian damage while awake (was +50%) (RollDamage choke)
 
 	// Experimental Elixir (user 2026-10-31, Stack's ult): SIX one-shot party buffs, each riding
 
@@ -1285,7 +1293,7 @@ public partial class PartyMember : Godot.Node2D
 
 			GD.Print("[10thAge] (ult) Giant's Might: " + displayName +
 
-				" doubles size and reach (damage x1.5) for " + (int)ULT_LASTS +
+				" doubles size and reach (damage x1.5, attack speed x1.5) for " + (int)ULT_LASTS +
 
 				" s, gate " + (int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
 
@@ -1333,7 +1341,7 @@ public partial class PartyMember : Godot.Node2D
 
 			GD.Print("[10thAge] (ult) Guardian Awakening: " + displayName +
 
-				" doubles ring reach (after ranks) and burns it +50% for " + (int)AWA_LASTS +
+				" doubles ring reach (after ranks) and burns it +25% for " + (int)AWA_LASTS +
 
 				" s; every horde kill while awake heals ALL allies 1 hp, gate " +
 
@@ -1361,7 +1369,7 @@ public partial class PartyMember : Godot.Node2D
 
 			GD.Print("[10thAge] (ult) Swarm of Bees: " + displayName +
 
-				" looses 6 hunters in a circle (10 dmg/s each, 10 s) spread out to hunt, gate " +
+				" looses 6 hunters in a circle (5 dmg/s each, 10 s) spread out to hunt, gate " +
 
 				(int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
 
@@ -1551,7 +1559,7 @@ public partial class PartyMember : Godot.Node2D
 
 	{
 
-		double spd = stat[StatTags.ATTACK_SPEED] * (insT > 0.0 ? INS_SPD : 1.0); // bardic +25%
+		double spd = stat[StatTags.ATTACK_SPEED] * (insT > 0.0 ? INS_SPD : 1.0) * (ultT > 0.0 ? ULT_SPD : 1.0); // bardic +25% | Giant's Might +50% attack speed (user 2026-11-06)
 
 		if (spd < 0.05)
 
@@ -1637,7 +1645,7 @@ public partial class PartyMember : Godot.Node2D
 
 		if (awaT > 0.0)
 
-			amount *= AWA_DMG; // awakening: +50% on Alvora hits while awake
+			amount *= AWA_DMG; // awakening: +25% on Alvora hits while awake (user 2026-11-06: was +50%)
 
 		if (elixBoldT > 0.0)
 
@@ -2211,9 +2219,9 @@ public partial class PartyMember : Godot.Node2D
 
 			GD.Print("[10thAge] (ult) Guardian Awakening settles: " + awaKills +
 
-				" horde slain while awake - the standing squad healed " + awaKills +
+				" horde slain while awake - each kill healed one random ally +1 hp" +
 
-				" hp each (tally via Game.OnEnemyKilled)");
+				" (tally via Game.OnEnemyKilled)");
 
 		}
 

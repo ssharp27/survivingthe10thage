@@ -138,7 +138,7 @@ public partial class Boss : Combatant
             // and its LIVE clamp lets melee close in and forces a back-off (user 2026-11-02).
             // The drift branch remains for a future non-dance kind.
             if (!IsDanceKind() && dist > 100.0f)
-                GlobalPosition = g.WrapNearCamera(GlobalPosition + to.Normalized() * driftSpeed * delta * (burnT > 0.0 && g.LeaderDrink() ? 0.90f : 1.0f)); // Have a Drink!: a burning boss drifts slower
+                GlobalPosition = g.WrapNearCamera(GlobalPosition + to.Normalized() * driftSpeed * delta * (burnT > 0.0 && g.LeaderDrink() ? 0.95f : 1.0f)); // Have a Drink!: a burning boss drifts slower - HALF the effect on bosses (user 2026-11-06)
             if (dist < radius + g.MEMBER_RADIUS && _contactCd <= 0.0f)
             {
                 _contactCd = 0.8f;
@@ -221,7 +221,7 @@ public partial class Boss : Combatant
     {
         if (target == null)
             return; // nobody standing to dance around: the mini holds still
-        float slow = (burnT > 0.0 && g.LeaderDrink()) ? 0.90f : 1.0f; // Have a Drink!: a burning mini dances a beat slower
+        float slow = (burnT > 0.0 && g.LeaderDrink()) ? 0.95f : 1.0f; // Have a Drink!: a burning mini dances a beat slower - HALF the effect on bosses (user 2026-11-06)
         Vector2 to = g.WrapDelta(GlobalPosition, target.GlobalPosition); // boss -> party
         float dist = to.Length();
         _miniClock += delta;

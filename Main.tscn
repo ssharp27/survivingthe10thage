@@ -62,8 +62,8 @@ baseSpeed = 124.0
 range = 192.0
 weaponKit = "aura"
 baseArmour = 1.0
-class_ = "Twilight Cleric"
 spiritFxArt = "res://art/fx/alvora_spirit.png"
+class_ = "Twilight Cleric"
 
 [node name="Yu" type="Node2D" parent="." unique_id=875256559]
 script = ExtResource("3_pm")
@@ -144,18 +144,12 @@ kind = "mini1"
 [node name="BossMid" type="Node2D" parent="." unique_id=1786505761]
 position = Vector2(0, -620)
 script = ExtResource("4_boss")
-radius = 46.0
-driftSpeed = 42.0
-bulletDamage = 10.0
 maxHp = 300.0
 kind = "boss1"
 
 [node name="BossMid2" type="Node2D" parent="." unique_id=1123581023]
 position = Vector2(0, -980)
 script = ExtResource("4_boss")
-radius = 46.0
-driftSpeed = 42.0
-bulletDamage = 10.0
 maxHp = 300.0
 kind = "boss2"
 
@@ -169,8 +163,5 @@ kind = "mini2"
 [node name="BossFinal" type="Node2D" parent="." unique_id=975914059]
 position = Vector2(0, -860)
 script = ExtResource("4_boss")
-radius = 46.0
-driftSpeed = 42.0
-bulletDamage = 10.0
 maxHp = 300.0
 kind = "final"

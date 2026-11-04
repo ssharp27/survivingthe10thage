@@ -8,53 +8,53 @@ public partial class Combatant : Godot.Node2D
 {
 	public float hp = 10.0f;
 	// @export so PackedScene overrides (Main.tscn's kind/maxHp on BossMini/BossFinal) ship
-    // in the PCK; plain-public overrides only apply inside the editor (see PartyMember.cs)
-    [Export] public float maxHp = 10.0f;
-    [Export] public string kind = "goblin";
-    public float contactDamage = 5.0f;
-    public float hurtFlash = 0.0f;
+	// in the PCK; plain-public overrides only apply inside the editor (see PartyMember.cs)
+	[Export] public float maxHp = 10.0f;
+	[Export] public string kind = "goblin";
+	public float contactDamage = 5.0f;
+	public float hurtFlash = 0.0f;
 
-    // guiding light (Alvora ring vulnerability, user 2026-10-23): bodies caught by her
-    // ring take +% damage from ALL sources for a window. Lives on the SHARED surface so
-    // melee, bolts, bullet pools and future verbs mark for free; the stronger mark
-    // overwrites and the window only ever refreshes, so ranks never multiply.
-    public double vulnMul = 0.0;
-    public double vulnT = 0.0;
+	// guiding light (Alvora ring vulnerability, user 2026-10-23): bodies caught by her
+	// ring take +% damage from ALL sources for a window. Lives on the SHARED surface so
+	// melee, bolts, bullet pools and future verbs mark for free; the stronger mark
+	// overwrites and the window only ever refreshes, so ranks never multiply.
+	public double vulnMul = 0.0;
+	public double vulnT = 0.0;
 
-    public void Vulnerable(double mul, double duration)
-    {
-        if (mul > vulnMul)
-            vulnMul = mul;
-        if (duration > vulnT)
-            vulnT = duration; // refresh only: two overlapping marks never stack
-    }
+	public void Vulnerable(double mul, double duration)
+	{
+		if (mul > vulnMul)
+			vulnMul = mul;
+		if (duration > vulnT)
+			vulnT = duration; // refresh only: two overlapping marks never stack
+	}
 
-    public void TickVuln(double delta)
-    {
-        if (vulnT > 0.0)
-        {
-            vulnT -= delta;
-            if (vulnT <= 0.0)
-                vulnMul = 0.0; // the mark decays with the window
-        }
-    }
+	public void TickVuln(double delta)
+	{
+		if (vulnT > 0.0)
+		{
+			vulnT -= delta;
+			if (vulnT <= 0.0)
+				vulnMul = 0.0; // the mark decays with the window
+		}
+	}
 
-    // draging maul (Baldrun 4th card, user 2026-10-24): the maul cleave taxes caught bodies -
-    // body speed -% for a window. A BODY status, not a tag: it lives on the shared surface
-    // so every verb could apply it, and only the maul applier enforces boss immunity. Stronger
-    // mark wins, window refresh only - mirrors guiding light exactly, per user pick (slow
-    // beats stun). Enemy.cs reads the pair at its three movement sites.
-    public double slowMul = 0.0;
-    public double slowT = 0.0;
+	// draging maul (Baldrun 4th card, user 2026-10-24): the maul cleave taxes caught bodies -
+	// body speed -% for a window. A BODY status, not a tag: it lives on the shared surface
+	// so every verb could apply it, and only the maul applier enforces boss immunity. Stronger
+	// mark wins, window refresh only - mirrors guiding light exactly, per user pick (slow
+	// beats stun). Enemy.cs reads the pair at its three movement sites.
+	public double slowMul = 0.0;
+	public double slowT = 0.0;
 
 	// firebolt burn (Stack's firebolt DoT, user 2026-10-30): bodies hit by a burning bolt
 	// run burnDps damage/sec for burnT seconds. Kills still die through the Game's shared
-    // kill scan. burnCinder is the CINDER stamp (cinder bloom rides the stronger flame): a body
-    // that dies while still burning bursts in a small radius and scorches the bodies standing there
-    // (Game.CinderBurst, hooked in the kill scan).
-    public double burnDps = 0.0;
-    public double burnT = 0.0;
-    public double burnCinder = 0.0;
+	// kill scan. burnCinder is the CINDER stamp (cinder bloom rides the stronger flame): a body
+	// that dies while still burning bursts in a small radius and scorches the bodies standing there
+	// (Game.CinderBurst, hooked in the kill scan).
+	public double burnDps = 0.0;
+	public double burnT = 0.0;
+	public double burnCinder = 0.0;
 
 	// Bruno's bleeding edge (user 2026-10-31): its OWN status pair mirroring burn - bodies set
 	// by a bleeding axe run bleedDps damage/sec for bleedT seconds. Deliberately SEPARATE from
