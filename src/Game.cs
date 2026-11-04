@@ -4990,7 +4990,11 @@ private void UpdateSpirits(float delta)
 		m.Visible = true;
 		// HELP! floats over the stranded PC
 		_helpLabel = new Godot.Label();
-		_helpLabel.Text = "HELP!";
+		// user 2026-11-06 (Bruno never appeared as a recruit): he DID - the join lottery draws him
+		// ~34% of runs (57 of 167 bench benches name him in the stage-1 order), and a
+		// human run simply died before its later ally beats. Nothing said WHO the drop
+		// was offering, so a Bruno offer read as anonymous: name it on the label.
+		_helpLabel.Text = "HELP! " + m.displayName;
 		_helpLabel.GlobalPosition = m.GlobalPosition + new Vector2(-26.0f, -62.0f);
 		_helpLabel.ZIndex = 12;
 		AddChild(_helpLabel);

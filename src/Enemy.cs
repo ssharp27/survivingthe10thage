@@ -31,6 +31,11 @@ public partial class Enemy : Combatant
     // fx-feel10 audit: did this body ever loose a shot? first loose prints once,
     // so the bench counts loosed lanes instead of spamming the horde.
     bool _firedShot = false;
+    // user 2026-11-06 playtest ("only ONE mage attack in an entire run"): firsts PROVED
+    // fire (308 mage first-looses across 459 corpus spawns), so the open question is the
+    // REPEAT cadence. Per-body volley counter + a throttled print every 3rd mage shot
+    // counts shots-per-body on the bench without spamming the horde.
+    int _shotsLoosed = 0;
     // 2026-11-03 user: bow riders must zig-zag IN and OUT instead of holding a perfect
     // band, so short-range weapons can reach them. The zig bounds are assistant picks.
     bool _riderIn = true;
@@ -44,8 +49,8 @@ public partial class Enemy : Combatant
     private readonly float MAGE_CAST = 300.0f;    // CLOSE to this before loosing (user 2026-11-04: "move close enough to cast"; pick)
     private readonly float MAGE_LOITER = 0.5f;    // the run-away leg rides this fraction of speed (assistant pick)
     private readonly float MAGE_FIRE_SPEED = 130.0f; // "slow moving fireball" - px/s is assistant pick
-    private readonly float MAGE_SHOT_RANGE = 420.0f; // fireball range: a hair past the cast ring so a fleeing mage still looses (assistant pick)
-    private readonly float MAGE_SHOT_EVERY = 6.0f; // mage cadence (assistant pick: 4 s fireballs + bow-rider arrows bled the Bruno seat to TPK, so opened up; retunable post-playtest)
+    private readonly float MAGE_SHOT_RANGE = 520.0f; // user 2026-11-06 playtest: ONLY one mage shot in a whole run. The lane holds the STAND band, but a mage walks 70 px/s and a kiting party walks 128 px/s, so the ring slips out from under it and the old 420 px gate went cold - 520 px keeps the band honest to the fireball it still throws
+    private readonly float MAGE_SHOT_EVERY = 4.0f; // user 2026-11-06 playtest: 6 s read as "one mage shot a run"; 4 s is the cadence the user asked for, and the retune note above still applies (watch the Bruno seat)
     // TIER-4 OGRE (user 2026-11-05: this map's only tier-4 creature): big, slow, fat HP
     // (those ride the Director). The SLAM is the user lane: inside the cast ring it MARKS
     // a big circle, waits 1 s (USER number), then hits that area for 25 (USER number).
@@ -81,8 +86,9 @@ public partial class Enemy : Combatant
             AddChild(_rig);
             _bobPhase = (GetInstanceId() % 64) * 0.37f; // the horde never bobs in lockstep
         }
-        _shotCd = kind == "riderbow" ? RIDER_SHOT_EVERY : (kind == "mage" ? 4.0f : 0.0f); // first shot never snaps on spawn
+        _shotCd = kind == "riderbow" ? RIDER_SHOT_EVERY : (kind == "mage" ? 2.0f : 0.0f); // user 2026-11-06: fresh mage looses its first ball after 2 s, not a full 4 s cycle - the volley lands while the party is still untangling the new pack
         _firedShot = false; // fx-feel10: audit flag lands when the shot clock does
+        _shotsLoosed = 0; // 2026-11-06: volley counter lands with the clock
         if (kind == "ogre")
         {
             // telegraph disc built ONCE per body (the Alvora aura-disc precedent): a 24-gon
@@ -263,7 +269,14 @@ public partial class Enemy : Combatant
                         dir *= MAGE_LOITER;     // the retreat leg stays a slow shamble
                     }
                     else
-                        dir = new Vector2();    // stand at the ring: the hurl lane owns the pressure
+                    {
+                        // user 2026-11-06 playtest (mage pattern STILL wrong): the frozen
+                        // stance read as a still target loosing one lucky ball - the mage
+                        // now CIRCLES at the cast ring at a shamble (mini-dance discipline,
+                        // MAGE_LOITER fraction), hurling on cadence while it walks, so the
+                        // pattern keeps constant pressure instead of one stand-still volley.
+                        dir = new Vector2(-to.Y, to.X).Normalized() * MAGE_LOITER;
+                    }
                 }
                 else
                 {
@@ -287,6 +300,11 @@ public partial class Enemy : Combatant
                     if (_shotCd <= 0.0f && inReach)
                     {
                         _shotCd = kind == "riderbow" ? RIDER_SHOT_EVERY : MAGE_SHOT_EVERY;
+                        _shotsLoosed++; // 2026-11-06 repeat-fire audit: count this body's volleys
+                        if (_shotsLoosed % 3 == 1 && (kind == "mage" || kind == "riderbow"))
+                            // prints volley 1/4/7/... per body: a body that only ever fires once
+                            // prints ONCE; a body running its cadence prints every 3rd ball
+                            GD.Print("[10thAge] (shot+) " + kind + " loosed volley " + _shotsLoosed);
                         Vector2 aim = g.WrapDelta(GlobalPosition, m.GlobalPosition).Normalized();
                         if (kind == "riderbow")
                             g.SpawnBulletArrow(GlobalPosition, aim * RIDER_ARROW_SPEED, rangedDamage, true); // user 2026-11-06: rider arrows ride the RED-OUTLINE variant so the volley reads as an enemy projectile at a glance

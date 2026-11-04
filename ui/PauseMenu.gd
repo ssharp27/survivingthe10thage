@@ -104,7 +104,14 @@ func _process(_d: float) -> void:
 		return
 	var sig: String = _members_sig()
 	if sig != _sig:
+		# user 2026-11-06 playtest (targeting highlight only refreshed after closing and
+		# re-opening the card): _sig was NEVER reassigned, so this gate was true EVERY
+		# _process frame - _paint_columns() queue_free()d and rebuilt the whole column
+		# strip on every frame, which shredded the live _apply_mode highlight the click
+		# rail had just painted and re-read the stale target_mode Game.cs pushed at open.
+		# Taking the signature fixes the loop: repaint only on a real roster change.
 		_paint_columns()
+		_sig = sig
 
 func _members_sig() -> String:
 	# the repaint trigger: name + upgrade line + current mode, per row Game.cs

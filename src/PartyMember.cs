@@ -238,6 +238,8 @@ public partial class PartyMember : Godot.Node2D
 
 	float _cresBand = 0.0f; // blade disc + band depth: grown by the size card
 
+	float _cresLo = 0.0f; // user 2026-11-06: the loop's FLOOR radius (launch + catch frames) - the art never sits at his feet, and the hitbox is a disc at that art
+
 	double _cresDmg = 0.0; // the volley-wide roll the flying blades bite with
 
 	int _cresNC = 0; // crescents flying this volley (base one + extra-axes ranks)
@@ -290,7 +292,13 @@ public partial class PartyMember : Godot.Node2D
 
 	int[] _spinCounted = null;  // per-body print bits across the whole cast (256 = tallied)
 
+	// user 2026-11-06: the cast's total window, so the spin can measure how far it has run
+	// (the growing blade arm reads off this fraction - orbitT alone only counts down)
+	double _spinDur = 0.0;        // seconds the CURRENT cast was armed for (0 = no cast)
+
 	static readonly double CRESCENT_FLIGHT = 0.85; // seconds of blade travel per volley: OUT to reach and BOOMERANG back (assistant pick: the loop path is twice the old half-arc, so travel stays pure motion)
+
+	static readonly float CRESCENT_FLOOR = 0.34f; // user 2026-11-06: fraction of the arc the loop NEVER comes closer than, so the launch/catch frames draw a real step out of the hands instead of at his feet
 
 	// 2026-11-02 fx-feel6 (user: the shields "go through enemies and seem to bounce at their set
 	// distance instead of hitting the enemy and bouncing. It also applies the damage immediately
@@ -409,6 +417,14 @@ public partial class PartyMember : Godot.Node2D
 	readonly double ULT_RANGE = 2.0; // reach / hit radius x2 (EffRange)
 
 	readonly double ULT_SPD = 1.5; // user 2026-11-06: Giant's Might ALSO grants +50% attack speed (EffCooldown divisor, all kits)
+
+	// user 2026-11-06 (ult felt pointless as the leader: the blades needed enemies hugging
+	// Bruno): the spin blades START wide of the body and the arc WIDENS slowly across the
+	// window. The rake disc rides the blade position (fx-feel9 law kept), so the drawn arc
+	// is the hurt arc at every radius.
+	readonly double SPIN_R0 = 150.0; // blade arm at cast: out past the bodyguard ring (RING_RADIUS 64 + 48 px leash)
+
+	readonly double SPIN_R1 = 330.0; // blade arm as the window runs out: the arc grows instead of orbiting one ring
 
 	// Mosiah "Bardic Inspiration" (user 2026-10-26): insT = bardic seconds left ON THIS
 
@@ -2293,6 +2309,8 @@ public partial class PartyMember : Godot.Node2D
 
 				_spinA0 = orbitAng;
 
+				_spinDur = orbitT; // user 2026-11-06: the seconds this cast was armed for (the growing blade arm reads its fraction off this; orbitT alone only counts down)
+
 				// fx-feel8 (user 2026-11-02: "allow him to continue his default attack while his ultimate
 				// is up, it feels like a bad limitation"): a volley already in flight is NO LONGER voided at
 				// cast - it keeps flying and biting under the spin, on its own _cresFx slots
@@ -2325,7 +2343,7 @@ public partial class PartyMember : Godot.Node2D
 
 			// fx art: spin blades are real sprites riding the same orbit clock and radius the
 
-			// rakes read (arm 70 px = the rake lane's own spin radius, tangent rotation)
+			// rakes read (arm grows SPIN_R0 -> SPIN_R1 across the window, tangent rotation)
 
 			if (_axeFx != null)
 
@@ -2336,6 +2354,17 @@ public partial class PartyMember : Godot.Node2D
 				int bl = 2 + axeN; // rake cadence mirror: base pair + extra-axes ranks
 
 				float spDisc = (float)(40.0 * (1.0 + 0.25 * (double)axeSize) * LeaderAreaMul()); // MASSIVE disc, size rank grows it | Bruno lead +15%
+
+				// user 2026-11-06 (the ult felt pointless as the leader): the blade arm is no longer a
+				// fixed ring hugging Bruno. It STARTS at SPIN_R0, out past the bodyguard ring (64 px +
+				// the 48 px leash), and WIDENS to SPIN_R1 as the window runs out, so the spin walks
+				// outward slowly. The rake disc below rides the _axeFx positions, so the hurt arc IS
+				// the drawn arc at every radius (fx-feel9 law kept).
+				double spinF = _spinDur > 0.0 ? 1.0 - orbitT / _spinDur : 0.0; // 0..1 across the cast
+
+				if (spinF < 0.0) spinF = 0.0; if (spinF > 1.0) spinF = 1.0; // a stale _spinDur never inverts the arm
+
+				float spinArm = (float)(SPIN_R0 + (SPIN_R1 - SPIN_R0) * spinF); // the arm THIS frame: art and rake disc both ride it
 
 				Game spg2 = GetParent() as Game;
 
@@ -2351,7 +2380,7 @@ public partial class PartyMember : Godot.Node2D
 
 						float ba2 = (float)(orbitAng + (double)b2 * System.Math.PI * 2.0 / (double)bl);
 
-						_axeFx[b2].GlobalPosition = GlobalPosition + new Vector2((float)System.Math.Cos(ba2), (float)System.Math.Sin(ba2)) * 70.0f;
+						_axeFx[b2].GlobalPosition = GlobalPosition + new Vector2((float)System.Math.Cos(ba2), (float)System.Math.Sin(ba2)) * spinArm; // user 2026-11-06: art rides the GROWING arm, so what is drawn is what hurts
 
 						_axeFx[b2].Rotation = ba2 + (float)System.Math.PI * 0.5f; _axeFx[b2].Scale = new Vector2(spDisc / 40.0f, spDisc / 40.0f); // user 2026-11-02 (a): spin blade ART rides the SAME size factor the rake disc uses (spDisc / 40 px base)
 
@@ -2469,7 +2498,17 @@ public partial class PartyMember : Godot.Node2D
 
 				double pf = progF - cc * 0.1 / CRESCENT_FLIGHT; if (pf < 0.0) pf = 0.0; if (pf > 1.0) pf = 1.0; double angB = _cresA0 + sgn * System.Math.PI * (2.0 * pf - 1.0); // user 2026-11-02 (b): blade cc runs the SAME full loop ~0.1 s later (launch offset INTO progF, NOT per-blade clocks: one shared volley roll + memo invariant kept); unlaunched blades clamp to 0 = ride at the hands
 
-				Godot.Vector2 biteP = GlobalPosition + new Godot.Vector2((float)System.Math.Cos(angB), (float)System.Math.Sin(angB)) * _cresR * (float)System.Math.Sin(System.Math.PI * pf); // sin bulge: radius 0 AT the hands at both ends, arcR on the prey line at mid-flight (boomerang out AND back)
+				// user 2026-11-06 (the user's art-vs-hitbox report): the sin bulge keeps CRESCENT_FLOOR
+
+				// of the arc at BOTH ends, so no frame ever draws an axe at his feet while a fast
+
+				// cadence stacks volleys, and the loop still swings out to EffRange at mid-flight.
+
+				// The bite below is a disc AT this radius and angle, so art and hitbox finally agree.
+
+				float rMul = (float)(_cresLo + (_cresR - _cresLo) * System.Math.Sin(System.Math.PI * pf));
+
+				Godot.Vector2 biteP = GlobalPosition + new Godot.Vector2((float)System.Math.Cos(angB), (float)System.Math.Sin(angB)) * rMul; // the ART position: what is on screen is what hurts
 
 				if (_cresFx != null && cc < 5)
 
@@ -2503,27 +2542,15 @@ public partial class PartyMember : Godot.Node2D
 
 						continue; // this blade already bit this body: one honest bite per crescent
 
-					// user 2026-11-02 follow-up: FULL-DISC bite - max range 130 is a real LEASH, not a set
-					// ring: the SWEPT ARM (its live angle angB) bites anything INSIDE the crescent reach,
-					// one honest bite per blade via the same memo. Window = band depth at the body's own
-					// radius + half a frame of sweep (0.18 rad slack, assistant pick) so the fast arm
-					// never skips a body between tick frames.
-					Godot.Vector2 bv = wpg.WrapDelta(GlobalPosition, en.GlobalPosition); // thrower -> body, wrap-short
-					float rb = bv.Length();
-					// user 2026-11-06 playtest: Bruno's CLOSE-BODY dead zone GONE - the bite is the whole
-					// ONE-SIDED ARM from the hand out to the blade's live tip radius (the spot _cresFx draws),
-					// NOT the old fx-feel9 RING at that tip: a body hugging Bruno while the art flies wide
-					// still rides the arm and gets raked. Radial depth slack = band + half a frame of tip
-					// sweep + 4 px of art bleed - the same honesty budget the ring test carried at long range.
-					if (rb < 1.0f || rb > System.Math.Sin(System.Math.PI * pf) * _cresR + _cresBand + (System.Math.PI * _cresR * System.Math.Abs(System.Math.Cos(System.Math.PI * pf)) / CRESCENT_FLIGHT * delta) + 4.0f)
-						continue; // beyond the live arm (tip radius plus slack): outside the swept arm at this radius
-					double ab = System.Math.Atan2((double)bv.Y, (double)bv.X); // body bearing
-					double dang = ab - angB; // gap vs the arm's swept angle
-					dang = dang - System.Math.Floor((dang + System.Math.PI) / (System.Math.PI * 2.0)) * System.Math.PI * 2.0; // wrap to [-pi, pi]
-					if (dang < 0.0)
-						dang = -dang;
-					if (dang > _cresBand / rb + 0.18)
-						continue; // outside the swept arm at this radius
+					// user 2026-11-06 (art vs hitbox): the crescent blade is a TRAVELLING DISC at the
+					// exact spot _cresFx draws - the old swept-arm test bit everything from the hand to
+					// the tip. Disc = the grown blade band plus a body's radius (14 px, the same allowance
+					// the spin disc carries), so the axe rakes a LANE along the crescent. One honest
+					// bite per body per crescent needs no window math: the blade travels ~50 px/frame
+					// at the widest arc, far inside the disc, so no body is ever skipped between ticks.
+					Godot.Vector2 bv = wpg.WrapDelta(biteP, en.GlobalPosition); // blade -> body, wrap-short
+					if (bv.Length() > _cresBand + 14.0f)
+						continue; // outside the drawn blade disc this frame
 
 					ec.TakeDamage(_cresDmg);
 
@@ -2567,7 +2594,14 @@ public partial class PartyMember : Godot.Node2D
 
 								continue;
 
-							if ((en.GlobalPosition - GlobalPosition).Length() > _cresBand)
+							// user 2026-11-06 (no axes at the feet): the loop floor is CRESCENT_FLOOR of
+							// the arc, so the CATCH lands at the loop's FLOOR point, where the blade art
+							// actually is on the catch frame - not at the thrower's hands. Same disc law
+							// as the flight test above, so art and hitbox agree on the last frame too.
+							double catchAng = _cresA0 + ((cc % 2) == 0 ? 1.0 : -1.0) * System.Math.PI;
+							Godot.Vector2 catchP = GlobalPosition + new Godot.Vector2((float)System.Math.Cos(catchAng), (float)System.Math.Sin(catchAng)) * _cresLo;
+
+							if (wpg.WrapDelta(catchP, en.GlobalPosition).Length() > _cresBand + 14.0f)
 
 								continue;
 
@@ -3375,11 +3409,13 @@ public partial class PartyMember : Godot.Node2D
 
 			double axDmg = RollDamage(pg, weaponDamage); // ONE crit/steal roll for the whole volley
 
-			// crescent geometry: radius = the PREY distance clamped 40..reach, so the boomerang's
+			// crescent geometry: radius = EffRange outright (user 2026-11-02 (c): a FIXED constant,
 
-			// loop always passes the crowd it spotted (floor: the loop starts a step out of his
+			// not a prey clamp - so the loop always passes the crowd it spotted; floor below):
 
-			// hands, not under his feet; ceiling: the axe is a range weapon). Band = blade disc:
+			// CRESCENT_FLOOR is the loop's floor radius, so the launch/catch frames draw a real
+
+			// step out of the hands instead of at his feet. Band = blade disc:
 
 			// 26 px base grown +25%/rank by the size card, raked on BOTH sides of the swept arc.
 
@@ -3394,6 +3430,14 @@ public partial class PartyMember : Godot.Node2D
 			// bleed: own pair mirroring burn, dps scaled by the damage card at the call site
 
 			// like the burn stamp (dur 4.0 s assistant pick, 1.0 dps baseline like the fire DoT)
+
+			// user 2026-11-06 (art vs hitbox + feet spawn + range): the loop rides EffRange outright
+
+			// (Main.tscn raises Bruno's base range so the crescent covers the bodyguard ring, 64 px
+
+			// + 48 px leash, plus the ground past it) and CRESCENT_FLOOR is the loop's FLOOR radius,
+
+			// so no frame ever draws an axe at his feet while a fast cadence stacks volleys there.
 
 			int crescents = 1 + axeN; // base ONE axe; extra-axes card adds crescents alternating arcs
 
@@ -3423,6 +3467,8 @@ public partial class PartyMember : Godot.Node2D
 			_cresNC = crescents;
 
 			_cresR = arcR;
+
+			_cresLo = arcR * CRESCENT_FLOOR; // user 2026-11-06: the loop's floor radius (the launch/catch frames never hug his feet)
 
 			_cresBand = band;
 
