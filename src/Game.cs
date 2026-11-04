@@ -721,7 +721,7 @@ public partial class Game : Godot.Node2D
 		}
 	}
 
-	public bool OnReaperDown(PartyMember m)
+	// TIER-4 OGRE blast lane (user 2026-11-05): the ogre LOCKED the slam point when it	// marked, a second earlier. Damage rides TakeHit so the defence tags, the down grace	// and the TPK check all behave exactly like a contact hit. Returns how many in-play	// bodies were inside the circle, for the audit print.	public int SlamArea(Vector2 at, float radius, double dmg)	{		int hits = 0;		foreach (PartyMember m in _party)		{			if (m == null || !m.joined || m.eliminated)				continue; // bench or out since camp: the blast can't touch them			if (WrapDelta(m.GlobalPosition, at).LengthSquared() <= radius * radius)			{				TakeHit(m, dmg); // defence tags / down grace / TPK all inside, like contact hits				hits++;			}		}		return hits;	}	public bool OnReaperDown(PartyMember m)
 	{
 		// TEST reaper (user death-state tester): whatever it touches goes DOWN and
 		// starts the d20 death-save cycle ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â this is the revival test bench. Returns

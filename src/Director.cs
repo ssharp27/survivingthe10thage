@@ -18,6 +18,10 @@ public partial class Director : Godot.Node2D
         // TIER-3 spawn cadence (user 2026-11-03 creatures): assistant-picked knobs, tune after playtest.
         const float RIDER_PACK_CH = 0.05f; // per-spawn-roll chance a sword/bow pack enters on a tier-3+ leg (assistant pick: 0.16 TPKed Bruno, 0.08 still bled; retunable post-playtest)
         int _hobsSinceMage = 0; // USER RULE: one mage per two hobgoblin spawns
+        // TIER-4 OGRE (user 2026-11-05: this map's only tier-4 creature): per-spawn-roll
+        // chance an ogre lumbers in on a tier-4+ leg. Budgeted ORDINARY spawn like the
+        // rider rolls, so the cap binds it. Assistant-picked cadence knob.
+        const float OGRE_CH = 0.10f;
 
     public override void _Process(double d)
     {
@@ -93,8 +97,8 @@ public partial class Director : Godot.Node2D
         // user tier gate: the horde runs whatever tier the beat table last advanced. Tier 1
         // goblins | tier 2 wolves + hobgoblins | TIER 3 NOW DESIGNED (user 2026-11-03: sword +
         // bow wolf riders and the goblin mage, entering as packs and hob counts). Tier 4 is
-        // still the flagged placeholder: it rides the tier-3 pool with an elite HP bump until
-        // the user dictates its creatures - nothing here pretends a creature nobody approved exists.
+        // TIER 4 NOW DESIGNED (user 2026-11-05: the ogre is this map's only tier-4 creature,
+        // entering on OGRE_CH rolls below; the pool bump is retired, see tierBump).
         int tier = (int)g.GetHordeTier();
         bool tier3 = tier >= 3;
         if (tier3 && (float)GD.Randf() < RIDER_PACK_CH)
@@ -103,6 +107,13 @@ public partial class Director : Godot.Node2D
             // wolf riders" - one roll enters TWO sword + TWO bow mounts fanned around the
             // roll point, never lone riders. The 0.16 CH is the assistant-picked cadence knob.
             SpawnRiderPack(g, pos, hordeScale, tier);
+            return;
+        }
+        if (tier >= 4 && (float)GD.Randf() < OGRE_CH)
+        {
+            // TIER-4 OGRE roll: ordinary budgeted spawn, so the near-party guard already
+            // burned pos upstream
+            SpawnOgre(g, pos, hordeScale);
             return;
         }
         bool wolf = tier >= 2 && (float)GD.Randf() < 0.30f;
@@ -120,7 +131,7 @@ public partial class Director : Godot.Node2D
         e.kind = wolf ? "wolf" : (hob ? "hobgoblin" : "goblin");
         // real tier-3 bodies landed, so the tier-2 pool holds its base HP on tier-3 legs;
         // tier 4 keeps the flagged placeholder bump on the pool (assistant pick - retunable).
-        float tierBump = tier >= 4 ? 1.3f : 1.0f;
+        float tierBump = 1.0f; // tier-4 placeholder bump retired: real tier-4 bodies entered (the ogre), so pool bodies keep base HP
         e.maxHp = (wolf ? 70.0f : (hob ? 60.0f : 30.0f)) * hordeScale * tierBump;
         e.hp = e.maxHp;
         e.speed = wolf ? 120.0f : (hob ? 100.0f : 90.0f);
@@ -151,7 +162,7 @@ public partial class Director : Godot.Node2D
     // bonus-swarm bodies), so the horde cap still binds them.
     private void SpawnRiderPack(Game g, Vector2 at, float hordeScale, int tier)
     {
-        float bump = tier >= 4 ? 1.3f : 1.0f; // tier-4 placeholder bump, same discipline as the pool
+        float bump = 1.0f; // tier-4 placeholder bump retired (real tier-4 bodies entered)
         for (int i2 = 0; i2 < 4; i2++)
         {
             bool sword = i2 < 2;
@@ -180,7 +191,7 @@ public partial class Director : Godot.Node2D
             return; // near-party guard
         Enemy e2 = new Enemy();
         e2.kind = "mage";
-        float bump = tier >= 4 ? 1.3f : 1.0f;
+        float bump = 1.0f; // tier-4 placeholder bump retired (real tier-4 bodies entered)
         e2.maxHp = 40.0f * hordeScale * bump; // USER number
         e2.hp = e2.maxHp;
         e2.speed = 70.0f;      // USER number
@@ -191,6 +202,24 @@ public partial class Director : Godot.Node2D
         g.RegisterEnemy(e2);
         g.AddChild(e2);
         GD.Print("[10thAge] (mage) goblin mage slips in after the second hobgoblin");
+    }
+
+    // TIER-4 OGRE (user 2026-11-05): "big, slow, and a lot of HP". HP/speed/contact/XP are
+    // assistant picks (the user dictated the SLAM numbers, not the body): HP 220 (x horde
+    // scale like every other body), speed 55 lumber, contact 4 if walked into, XP 10 bounty.
+    private void SpawnOgre(Game g, Vector2 at, float hordeScale)
+    {
+        Enemy e = new Enemy();
+        e.kind = "ogre";
+        e.maxHp = 220.0f * hordeScale; // assistant pick: the map's fattest body
+        e.hp = e.maxHp;
+        e.speed = 55.0f;     // assistant pick: slowest body on the map
+        e.contactDamage = 4.0f; // assistant pick: brute body, but the slam is its threat
+        e.xpValue = 10.0f;   // assistant pick: tier-4 bounty
+        e.GlobalPosition = at;
+        g.RegisterEnemy(e);
+        g.AddChild(e);
+        GD.Print("[10thAge] (ogre) tier-4 ogre lumbers in");
     }
 
 // HORDE EVENT: one bonus swarm, budget-free (user: "these won't count against the maximum

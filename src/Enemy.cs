@@ -46,6 +46,21 @@ public partial class Enemy : Combatant
     private readonly float MAGE_FIRE_SPEED = 130.0f; // "slow moving fireball" - px/s is assistant pick
     private readonly float MAGE_SHOT_RANGE = 420.0f; // fireball range: a hair past the cast ring so a fleeing mage still looses (assistant pick)
     private readonly float MAGE_SHOT_EVERY = 6.0f; // mage cadence (assistant pick: 4 s fireballs + bow-rider arrows bled the Bruno seat to TPK, so opened up; retunable post-playtest)
+    // TIER-4 OGRE (user 2026-11-05: this map's only tier-4 creature): big, slow, fat HP
+    // (those ride the Director). The SLAM is the user lane: inside the cast ring it MARKS
+    // a big circle, waits 1 s (USER number), then hits that area for 25 (USER number).
+    // Cast ring / blast radius / cadence are assistant picks. The circle LOCKS where it
+    // marks (assistant read: the beat is a dodge window, not a homing blast).
+    private readonly float OGRE_CAST = 240.0f;   // marks the slam once this close to a squad body (assistant pick)
+    private readonly float OGRE_SLAM_R = 130.0f; // blast radius (assistant pick: the user's "big circle")
+    private readonly float OGRE_SLAM_TELE = 1.0f; // windup seconds (USER number)
+    private readonly float OGRE_SLAM_DMG = 25.0f; // blast damage (USER number)
+    private readonly float OGRE_SLAM_CD = 6.0f;  // slam cadence (assistant pick: one volley per heal cycle)
+    // slam state: windup countdown, cadence clock, LOCKED slam point, telegraph disc
+    float _slamT = 0.0f;
+    float _slamCd = 0.0f;
+    Vector2 _slamPos = new Vector2();
+    Godot.Polygon2D _slamDisc = null;
 
     Godot.ColorRect _body;
     // mini-style motion rig (user 2026-10-21): enemies do NOT get the party's table
@@ -68,6 +83,22 @@ public partial class Enemy : Combatant
         }
         _shotCd = kind == "riderbow" ? RIDER_SHOT_EVERY : (kind == "mage" ? 4.0f : 0.0f); // first shot never snaps on spawn
         _firedShot = false; // fx-feel10: audit flag lands when the shot clock does
+        if (kind == "ogre")
+        {
+            // telegraph disc built ONCE per body (the Alvora aura-disc precedent): a 24-gon
+            // at blast radius, hidden until a mark, then repositioned per windup. Child of the
+            // ENEMY, not the bobbing rig: the slam area must not walk.
+            _slamDisc = new Godot.Polygon2D();
+            _slamDisc.Name = "SlamDisc";
+            _slamDisc.ZIndex = -1; // under the horde bodies: the fill marks the floor
+            _slamDisc.Set("modulate", new Color(0.85f, 0.15f, 0.12f, 0.12f)); // blood-red telegraph fill
+            Vector2[] disc = new Vector2[24]; // 24-gon: smooth enough at blast scale, zero Rng
+            for (int i5 = 0; i5 < 24; i5++)
+                disc[i5] = new Vector2((float)(System.Math.Cos(System.Math.PI * 2.0 * i5 / 24.0) * OGRE_SLAM_R), (float)(System.Math.Sin(System.Math.PI * 2.0 * i5 / 24.0) * OGRE_SLAM_R));
+            _slamDisc.Polygon = disc;
+            _slamDisc.Visible = false;
+            AddChild(_slamDisc);
+        }
         if (kind == "riderbow")
         {
             _riderIn = (GetInstanceId() % 2 == 0);
@@ -85,7 +116,7 @@ public partial class Enemy : Combatant
             _rig.AddChild(_body);
             return;
         }
-        float w = kind == "wolf" ? 34.0f : (kind == "hobgoblin" ? 32.0f : (kind == "rider" || kind == "riderbow" ? 40.0f : 26.0f));
+        float w = kind == "ogre" ? 64.0f : (kind == "wolf" ? 34.0f : (kind == "hobgoblin" ? 32.0f : (kind == "rider" || kind == "riderbow" ? 40.0f : 26.0f))); // ogre: the map's biggest body (assistant pick)
         _body = new ColorRect();
         _body.Size = new Vector2(w, w * 0.8f);
         _body.Position = -_body.Size * 0.5f;
@@ -95,6 +126,7 @@ public partial class Enemy : Combatant
                                                     : kind == "rider" ? new Color(0.45f, 0.34f, 0.28f) // dusty mount (assistant pick)
                                                     : kind == "riderbow" ? new Color(0.38f, 0.36f, 0.47f) // steel-tinted saddle (assistant pick)
                                                     : kind == "mage" ? new Color(0.42f, 0.22f, 0.55f) // robe violet (assistant pick)
+                                                    : kind == "ogre" ? new Color(0.35f, 0.34f, 0.30f) // bog-brown brute (assistant pick)
                                                     : new Color(0.30f, 0.48f, 0.23f);
         _rig.AddChild(_body);
     }
@@ -204,6 +236,16 @@ public partial class Enemy : Combatant
                     Vector2 side = new Vector2(-to.Y, to.X).Normalized() * _riderSide * RIDER_ZIG_SIDE;
                     dir = (radial + side).Normalized();
                 }
+                else if (kind == "ogre")
+                {
+                    // OGRE walks on like the rest until the slam lane commits it: mid
+                    // windup it STANDS STILL so the marked circle reads as a readable
+                    // telegraph the player can step out of (assistant read of the user's 1 s beat)
+                    if (_slamT > 0.0f)
+                        dir = new Vector2();
+                    else
+                        dir = to.Normalized();
+                }
                 else if (kind == "mage")
                 {
                     // GOBLIN MAGE (user 2026-11-04: "they spawn, move away and stay far away... move close
@@ -248,6 +290,47 @@ public partial class Enemy : Combatant
                             GD.Print("[10thAge] (shot) " + kind + " loosed its first " + (kind == "mage" ? "fireball" : "arrow"));
                         }
                     }
+                }
+            }
+            // TIER-4 OGRE slam lane (user 2026-11-05): inside the cast ring it MARKS the
+            // area on itself - the circle LOCKS where it marks (assistant read: the beat
+            // is a dodge window), stands through the 1 s windup (USER), then lands the
+            // 25 damage (USER) through Game.SlamArea, which rides the TakeHit defence lane.
+            if (kind == "ogre")
+            {
+                _slamCd -= delta;
+                if (_slamT > 0.0f)
+                {
+                    _slamT -= delta;
+                    if (_slamDisc != null)
+                    {
+                        // the disc tracks the LOCKED point fold-relative to THIS body, so
+                        // even a separation nudge across a seam keeps the telegraph in frame
+                        _slamDisc.Position = g.WrapDelta(p, _slamPos);
+                        float frac = 1.0f - _slamT / OGRE_SLAM_TELE; // fill deepens across the windup
+                        _slamDisc.Set("modulate", new Color(0.85f, 0.15f, 0.12f, 0.12f + 0.30f * frac));
+                    }
+                    if (_slamT <= 0.0f)
+                    {
+                        int blasted = g.SlamArea(_slamPos, OGRE_SLAM_R, OGRE_SLAM_DMG);
+                        GD.Print("[10thAge] (slam) ogre slam lands: " + blasted + " bodies in the blast");
+                        _slamCd = OGRE_SLAM_CD;
+                        if (_slamDisc != null)
+                            _slamDisc.Visible = false;
+                    }
+                }
+                else if (_slamCd <= 0.0f && m != null && g.WrapDelta(p, m.GlobalPosition).Length() <= OGRE_CAST)
+                {
+                    // lock on THIS body's wrap fold: the slam point rides the same fold as
+                    // the ogre, so a seam can never park the telegraph off-frame
+                    _slamT = OGRE_SLAM_TELE;
+                    _slamPos = p + g.WrapDelta(p, m.GlobalPosition);
+                    if (_slamDisc != null)
+                    {
+                        _slamDisc.Visible = true;
+                        _slamDisc.Position = g.WrapDelta(p, _slamPos);
+                    }
+                    GD.Print("[10thAge] (slam) ogre winds up: circle marks the slam area");
                 }
             }
             // downed bodies are still run into even though nobody chases them
