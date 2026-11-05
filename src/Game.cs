@@ -1258,6 +1258,11 @@ public partial class Game : Godot.Node2D
 			fxs.Modulate = new Color(0.70f, 0.15f, 0.11f, 1.0f); // dark red: the ENEMY-projectile read (user 2026-11-06)
 			fxs.Rotation = 0.0f; // a fireball tumbles; it does not point like an arrow
 			cr.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f); // shell stops drawing while art rides
+			// user 2026-11-07 (fireball HIT but drew NOTHING): the pool parks its shell Modulate at
+			// alpha 0 (build + DespawnBullet) and modulate CASCADES to the art child - the arrow
+			// lane wakes it on every reuse, the fallback already did below, only this art lane
+			// forgot, so every mage fireball rode an alpha-0 shell. ROOT CAUSE, one line:
+			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f); // wake the shell so the firebolt art draws
 			b.Scale = new Vector2(1.0f, 1.0f);
 			// both spawn lanes normalise the pooled outline child, so a recycled slot never inherits
 			// the other lane's look: a fireball hides whatever collar a rider left in this slot
@@ -4796,6 +4801,10 @@ private void UpdateSpirits(float delta)
 		_stageLayer.Layer = 10; // one rung above the leader card: only one card owns a frame
 		// anyway (this one is parked hidden until the leader card is gone), so this only
 		// decides who paints on the single handoff frame
+		// THE CARD MUST BE ATTACHED: an orphan CanvasLayer draws nothing, and _stageHold
+		// then froze the world behind an invisible card (human playtest 2026-11-05) - the
+		// leader card attaches its layer the same way (AddChild(_selLayer))
+		AddChild(_stageLayer);
 		_stageRoot = new Control();
 		SetRectSel(_stageRoot, 0.0f, 0.0f, 1.0f, 1.0f);
 		_stageLayer.AddChild(_stageRoot);

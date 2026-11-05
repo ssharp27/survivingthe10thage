@@ -2542,15 +2542,22 @@ public partial class PartyMember : Godot.Node2D
 
 						continue; // this blade already bit this body: one honest bite per crescent
 
-					// user 2026-11-06 (art vs hitbox): the crescent blade is a TRAVELLING DISC at the
-					// exact spot _cresFx draws - the old swept-arm test bit everything from the hand to
-					// the tip. Disc = the grown blade band plus a body's radius (14 px, the same allowance
-					// the spin disc carries), so the axe rakes a LANE along the crescent. One honest
-					// bite per body per crescent needs no window math: the blade travels ~50 px/frame
-					// at the widest arc, far inside the disc, so no body is ever skipped between ticks.
+					// user 2026-11-07 (the "only ever attacking at a really far range" report): the sin-bulged
+					// loop is a CARDIOID around Bruno - with the arc at 240 px its floor rode 34 % of the
+					// GROWN arc (82 px) and the forward pass always bulged to EffRange, so bodies INSIDE
+					// the drawn loop were never raked. That 2026-11-06 disc law was the regression: "perfect
+					// a few versions ago" = the swept-arm FULL-DISC bite (ae9c21c's law), restored here.
+					// Arm = the THROW LINE from the loop FLOOR _cresLo (still no axes at his feet) out to
+					// the tip _cresR, raked this frame with the same disc depth (band + 14 px body
+					// allowance) plus half the frame's angular sweep + the proven 0.18 rad slack, so no
+					// body skips between ticks. The art disc at biteP stays unioned in, so what is on
+					// screen still always hurts, and the memo keeps one honest bite per body per crescent.
 					Godot.Vector2 bv = wpg.WrapDelta(biteP, en.GlobalPosition); // blade -> body, wrap-short
-					if (bv.Length() > _cresBand + 14.0f)
-						continue; // outside the drawn blade disc this frame
+					Godot.Vector2 rel = wpg.WrapDelta(GlobalPosition, en.GlobalPosition); // thrower -> body, wrap-short
+					double dR = rel.Length(); // radial distance from the thrower
+					double aOff = System.Math.Atan2((double)rel.Y, (double)rel.X) - angB; if (aOff > System.Math.PI) aOff -= 2.0 * System.Math.PI; if (aOff < -System.Math.PI) aOff += 2.0 * System.Math.PI; // off the arm line, wrap-short
+					if (bv.Length() > _cresBand + 14.0f && (dR < _cresLo - (_cresBand + 14.0) || dR > _cresR + _cresBand + 14.0 || System.Math.Abs(aOff) > System.Math.PI * (double)delta / CRESCENT_FLIGHT + 0.18))
+						continue; // outside BOTH the drawn blade disc AND the raked arm lane this frame
 
 					ec.TakeDamage(_cresDmg);
 
