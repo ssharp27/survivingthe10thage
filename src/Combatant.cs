@@ -39,6 +39,51 @@ public partial class Combatant : Godot.Node2D
 		}
 	}
 
+	// DoT crossfire (user 2026-11-07 QoL: "make DoTs more impactful ... enemies take 5% more
+	// damage based on the number of UNIQUE DoTs on them ... half this effect on bosses so
+	// they don't get too easy"). Every UNIQUE DoT RUNNING on a body marks it +5% vulnerable
+	// to ALL incoming damage - burn, bleed and poison today, and every future DoT pair slots
+	// into UniqueDoTs() below. COUNTED AT THE HIT rather than stacked into vulnMul at apply
+	// time: the Vulnerable() lane is max-mark/refresh-never-stack (guiding light invariant),
+	// so three DoTs could never stack through it - while counting from the LIVE window pairs
+	// gives the free invariants: re-striking the same venom never double-dips and an expired
+	// DoT stops paying for free. Bosses ride the HALF bonus (user rule) via the kind list
+	// that mirrors Game.IsBossKind (private there, and Combatant cannot reach Game).
+	// Multiplies the same TakeDamage rail guiding light rides, so bites, bolts, bullets,
+	// blasts and the DoT TICKS themselves all scale together.
+	// +5% per unique DoT (assistant-carried USER number); bosses x0.5
+	private static readonly double DOT_VULN = 0.05;
+
+	public int UniqueDoTs()
+	{
+		// THE DoT SLOT RAIL: one count per PAIR RUNNING, never per stack. Every NEW DoT
+		// pair on this surface adds its own line below and pays crossfire for free.
+		int n = 0;
+		if (burnT > 0.0)
+			n++;
+		if (bleedT > 0.0)
+			n++;
+		// Future DoT pairs add their own count line here (poison is already live below)
+		// poison lives below in its own pair; count it via the window like burn/bleed
+		if (poisonT > 0.0)
+			n++;
+		return n;
+	}
+
+	// (user rule) mirror of Game.IsBossKind: bosses pay HALF crossfire so they never
+	// get too easy; mini/mid/final all ride this branch.
+	// Combatant cannot reach Game's private helper, so the kind list is mirrored here.
+	private bool IsBossBody()
+	{
+		return kind == "boss1" || kind == "boss2" || kind == "final" ||
+			kind == "mini" || kind == "mini1" || kind == "mini2";
+	}
+
+	// Audit rail ONLY: (crossfire) prints fire on bonus CHANGES (a DoT landing or expiring),
+	// never per hit - application/expiry events are rare even at horde density.
+	// starts at 0.0: a clean body prints nothing, the first live mark on a DoT'd body does.
+	private double _dotVBonus = 0.0;
+
 	// draging maul (Baldrun 4th card, user 2026-10-24): the maul cleave taxes caught bodies -
 	// body speed -% for a window. A BODY status, not a tag: it lives on the shared surface
 	// so every verb could apply it, and only the maul applier enforces boss immunity. Stronger
@@ -163,10 +208,32 @@ public partial class Combatant : Godot.Node2D
 	}
 
 	public virtual void TakeDamage(double amount)
-	{
+{
 		// guiding light: a marked body bites harder against whatever strikes it
 		if (vulnT > 0.0)
 			amount *= (1.0 + vulnMul);
+		// DoT crossfire (user 2026-11-07 QoL): +5% incoming damage per UNIQUE DoT running on this
+		// body, HALF that on bosses so they never get too easy. Counted AT THE HIT from the live
+		// window pairs, so an expired DoT stops paying and re-striking the same venom never
+		// double-dips. The DoT ticks themselves ride this rail too, so a body juggling burn +
+		// bleed + poison takes +15% from everything (bosses +7.5%).
+		int dots = UniqueDoTs();
+		double cb = DOT_VULN * (double)dots;
+		if (IsBossBody())
+			cb *= 0.5; // (user rule) bosses pay half crossfire so they never get too easy
+		amount *= (1.0 + cb);
+		// audit rail: (crossfire) prints on bonus CHANGES (a DoT landing or expiring), never
+		// per hit, so horde density stays quiet.
+		if (cb != _dotVBonus)
+		{
+			bool was = _dotVBonus > 0.0;
+			_dotVBonus = cb;
+			if (cb > 0.0)
+				GD.Print("[10thAge] (crossfire) " + kind + " runs " + dots + " unique DoT(s): +" +
+					(int)(cb * 100.0 + 0.5) + "% incoming");
+			else if (was)
+				GD.Print("[10thAge] (crossfire) " + kind + " DoT crossfire expired");
+		}
 		hp -= (float)amount;
 		Hurt();
 	}

@@ -84,6 +84,20 @@ prints only; it consumes no RNG, so boot trails stay cross-gate aligned.
   (Baldrun's **Giant's Might** only so far: root scale ×2, `EffRange` ×2, `RollDamage`
   ×1.5 for 10 s — duration is the assistant pick, documented on the trail).
 
+## DoT crossfire (body-side, 2026-11-07 QoL — NOT a tag slot)
+
+- The user's DoT QoL rule ("enemies take 5% more damage per UNIQUE DoT on them, half on
+  bosses") rides the VULNERABILITY vocabulary but is **computed at the hit**, not stacked
+  into `vulnMul` at apply time: `Vulnerable()` is max-mark / refresh-never-stack (the
+  guiding-light invariant), so three DoTs could never stack through it. `Combatant.UniqueDoTs()`
+  counts the **live window pairs** (`burnT`/`bleedT`/`poisonT`) — one count per PAIR, never
+  per stack — and `TakeDamage` multiplies `1 + 0.05 * count` onto the SAME rail guiding light
+  rides, so DoT ticks themselves scale too (burn + bleed + poison = +15% from everything).
+- **Bosses pay half** (`DOT_VULN * count * 0.5`) via `Combatant.IsBossBody()`, a mirror of
+  `Game.IsBossKind` (private there, unreachable from `Combatant`).
+- New DoT pairs add one count line in `UniqueDoTs()` and inherit the bonus for free. The
+  tag-15 row keeps its guiding-light meaning unchanged.
+
 ## Deliberately parked (this pass)
 
 - Meta/unlocks/party size/evolutions — the store exists so those systems have stable

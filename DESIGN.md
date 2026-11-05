@@ -16,6 +16,7 @@ battles/chapters we fought at the table.
 - **XP is squad-shared**; each level-up pick **targets one named member** ("Wizard's ray +1", "Paladin: Shieldwall evolution"). **User-approved growth**: every level-up also auto-grants each member +0.5 flat weapon damage — before the card's pick.
 - Upgrade paths: 3 ranks, then an **evolution = subclass choice** (Fighter → Champion / Echo Knight). Data-driven.
 - **Recruitment = narrative join points**: a guarded spot in the stage where "the recruit arrives", tied to the campaign's own story for that battle.
+- **DoT crossfire (locked, 2026-11-07 QoL)**: every **UNIQUE** damage-over-time effect running on an enemy marks it **+5% vulnerable** to ALL incoming damage — burn, bleed and poison today (all three = **+15%**), and **half that on bosses** (mini/mid/final, so they never get too easy). Counted **at the hit** from the live DoT windows, so re-striking the same venom never double-dips and an expired DoT stops paying; every future DoT pair slots into the same rail and pays for free.
 
 ## Stages (replaces the earlier "Ages" concept)
 
