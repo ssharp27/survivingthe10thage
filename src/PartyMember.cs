@@ -298,7 +298,7 @@ public partial class PartyMember : Godot.Node2D
 
 	static readonly double CRESCENT_FLIGHT = 0.85; // seconds of blade travel per volley: OUT to reach and BOOMERANG back (assistant pick: the loop path is twice the old half-arc, so travel stays pure motion)
 
-	static readonly float CRESCENT_FLOOR = 0.34f; // user 2026-11-06: fraction of the arc the loop NEVER comes closer than, so the launch/catch frames draw a real step out of the hands instead of at his feet
+	static readonly float CRESCENT_FLOOR = 0.34f; // user 2026-11-07 SUPERSEDED: the loop floor is back at the hands (zero minimum range) - kept as history only; no code reads this now
 
 	// 2026-11-02 fx-feel6 (user: the shields "go through enemies and seem to bounce at their set
 	// distance instead of hitting the enemy and bouncing. It also applies the damage immediately
@@ -2498,13 +2498,13 @@ public partial class PartyMember : Godot.Node2D
 
 				double pf = progF - cc * 0.1 / CRESCENT_FLIGHT; if (pf < 0.0) pf = 0.0; if (pf > 1.0) pf = 1.0; double angB = _cresA0 + sgn * System.Math.PI * (2.0 * pf - 1.0); // user 2026-11-02 (b): blade cc runs the SAME full loop ~0.1 s later (launch offset INTO progF, NOT per-blade clocks: one shared volley roll + memo invariant kept); unlaunched blades clamp to 0 = ride at the hands
 
-				// user 2026-11-06 (the user's art-vs-hitbox report): the sin bulge keeps CRESCENT_FLOOR
+				// user 2026-11-07 (converge-on-prey law): the blade SPINS OUT OF HIS HANDS (floor at zero -
 
-				// of the arc at BOTH ends, so no frame ever draws an axe at his feet while a fast
+				// no minimum-range deadzone), swings to MEET AT THE TARGETED PREY'S SPOT at mid-flight
 
-				// cadence stacks volleys, and the loop still swings out to EffRange at mid-flight.
+				// (_cresR rode the prey's actual distance at the commit) and boomerangs home. The bite
 
-				// The bite below is a disc AT this radius and angle, so art and hitbox finally agree.
+				// below is the disc AT this frame's art point, so what is drawn is exactly what hurts.
 
 				float rMul = (float)(_cresLo + (_cresR - _cresLo) * System.Math.Sin(System.Math.PI * pf));
 
@@ -2542,22 +2542,13 @@ public partial class PartyMember : Godot.Node2D
 
 						continue; // this blade already bit this body: one honest bite per crescent
 
-					// user 2026-11-07 (the "only ever attacking at a really far range" report): the sin-bulged
-					// loop is a CARDIOID around Bruno - with the arc at 240 px its floor rode 34 % of the
-					// GROWN arc (82 px) and the forward pass always bulged to EffRange, so bodies INSIDE
-					// the drawn loop were never raked. That 2026-11-06 disc law was the regression: "perfect
-					// a few versions ago" = the swept-arm FULL-DISC bite (ae9c21c's law), restored here.
-					// Arm = the THROW LINE from the loop FLOOR _cresLo (still no axes at his feet) out to
-					// the tip _cresR, raked this frame with the same disc depth (band + 14 px body
-					// allowance) plus half the frame's angular sweep + the proven 0.18 rad slack, so no
-					// body skips between ticks. The art disc at biteP stays unioned in, so what is on
-					// screen still always hurts, and the memo keeps one honest bite per body per crescent.
+					// user 2026-11-07 (converge + ART HONESTY): the ARM LANE IS GONE - the user wants the hitbox
+					// exactly the crescent AS DRAWN ("it should be the axes he actually throws"), no raking of
+					// prey no blade touched. Only the blade disc at this frame's art point bites (+14 px body
+					// allowance); convergence lives in _cresR (the prey's real distance) + _cresLo = 0 above.
 					Godot.Vector2 bv = wpg.WrapDelta(biteP, en.GlobalPosition); // blade -> body, wrap-short
-					Godot.Vector2 rel = wpg.WrapDelta(GlobalPosition, en.GlobalPosition); // thrower -> body, wrap-short
-					double dR = rel.Length(); // radial distance from the thrower
-					double aOff = System.Math.Atan2((double)rel.Y, (double)rel.X) - angB; if (aOff > System.Math.PI) aOff -= 2.0 * System.Math.PI; if (aOff < -System.Math.PI) aOff += 2.0 * System.Math.PI; // off the arm line, wrap-short
-					if (bv.Length() > _cresBand + 14.0f && (dR < _cresLo - (_cresBand + 14.0) || dR > _cresR + _cresBand + 14.0 || System.Math.Abs(aOff) > System.Math.PI * (double)delta / CRESCENT_FLIGHT + 0.18))
-						continue; // outside BOTH the drawn blade disc AND the raked arm lane this frame
+					if (bv.Length() > _cresBand + 14.0f)
+						continue; // outside the drawn blade disc this frame (what is painted is what hurts)
 
 					ec.TakeDamage(_cresDmg);
 
@@ -2601,10 +2592,9 @@ public partial class PartyMember : Godot.Node2D
 
 								continue;
 
-							// user 2026-11-06 (no axes at the feet): the loop floor is CRESCENT_FLOOR of
-							// the arc, so the CATCH lands at the loop's FLOOR point, where the blade art
-							// actually is on the catch frame - not at the thrower's hands. Same disc law
-							// as the flight test above, so art and hitbox agree on the last frame too.
+							// user 2026-11-07: floor is BACK AT THE HANDS (_cresLo = 0) - the CATCH lands on the
+							// thrower's own spot again (the boomerang comes HOME) and bites prey that walked
+							// up to melee. Same disc law as the flight test above: the drawn blade is what hurts.
 							double catchAng = _cresA0 + ((cc % 2) == 0 ? 1.0 : -1.0) * System.Math.PI;
 							Godot.Vector2 catchP = GlobalPosition + new Godot.Vector2((float)System.Math.Cos(catchAng), (float)System.Math.Sin(catchAng)) * _cresLo;
 
@@ -3416,13 +3406,11 @@ public partial class PartyMember : Godot.Node2D
 
 			double axDmg = RollDamage(pg, weaponDamage); // ONE crit/steal roll for the whole volley
 
-			// crescent geometry: radius = EffRange outright (user 2026-11-02 (c): a FIXED constant,
+			// crescent geometry: radius = preyD outright (user 2026-11-07 CONVERGE law: the loop MEETS AT THE
 
-			// not a prey clamp - so the loop always passes the crowd it spotted; floor below):
+			// TARGETED PREY'S SPOT - the shared picker (PickPrey/PickPreyD) picked the body, reach only
 
-			// CRESCENT_FLOOR is the loop's floor radius, so the launch/catch frames draw a real
-
-			// step out of the hands instead of at his feet. Band = blade disc:
+			// gates the commit; floor is at the hands, zero minimum range). Band = blade disc:
 
 			// 26 px base grown +25%/rank by the size card, raked on BOTH sides of the swept arc.
 
@@ -3438,17 +3426,15 @@ public partial class PartyMember : Godot.Node2D
 
 			// like the burn stamp (dur 4.0 s assistant pick, 1.0 dps baseline like the fire DoT)
 
-			// user 2026-11-06 (art vs hitbox + feet spawn + range): the loop rides EffRange outright
+			// user 2026-11-07 SUPERSEDED: that fixed-loop law is what made Bruno far-range-only. His RAISED
 
-			// (Main.tscn raises Bruno's base range so the crescent covers the bodyguard ring, 64 px
+			// range (Main.tscn 240 px + growth) now ONLY gates the commit; the loop converges on the
 
-			// + 48 px leash, plus the ground past it) and CRESCENT_FLOOR is the loop's FLOOR radius,
-
-			// so no frame ever draws an axe at his feet while a fast cadence stacks volleys there.
+			// prey's real distance (arcR = preyD) and the floor is back at the hands (_cresLo = 0).
 
 			int crescents = 1 + axeN; // base ONE axe; extra-axes card adds crescents alternating arcs
 
-			float arcR = reach; // user 2026-11-02 (c): FIXED constant radius under EffRange() (reach IS EffRange at the beat top) - art, hitbox and telegraph all key off this ONE constant so every throw reads the same
+			float arcR = preyD; // user 2026-11-07 (converge-on-prey law): the loop MEETS AT THE TARGETED PREY'S SPOT - meet radius rides the prey's ACTUAL distance (the targeting logic already picked the body; reach only GATES the commit) so axes aimed at a body 30 px away meet 30 px out and boomerang home. Supersedes 2026-11-02 (c)'s FIXED-constant pick: "his axes should be able to meet at any range or else he can't actually hit anything next to him". His RAISED range (240 px + growth, Main.tscn) stays the attack gate.
 
 			float band = (float)(26.0 * (1.0 + 0.25 * (double)axeSize) * LeaderAreaMul()); // blade disc + band depth: Bruno lead widens the crescent band too
 
@@ -3463,7 +3449,7 @@ public partial class PartyMember : Godot.Node2D
 			// the blade leaves from his OWN hands (first frame AT the hands, NOT the crowd), swings
 
 			// out to the prey line at mid-flight, and boomerangs back: the sin-bulged loop is the ART;
-			// the HIT model (2026-11-02 follow-up) is the swept arm - full-disc bite inside reach.
+			// the HIT model (user 2026-11-07): EXACTLY the drawn blade disc - no arm widening.
 			// Same ONE shared roll, band depth per radius, prints on landing. The
 			// hitbox the user asked for. Same ONE shared roll, same band disc, prints on landing. The
 
@@ -3475,7 +3461,7 @@ public partial class PartyMember : Godot.Node2D
 
 			_cresR = arcR;
 
-			_cresLo = arcR * CRESCENT_FLOOR; // user 2026-11-06: the loop's floor radius (the launch/catch frames never hug his feet)
+			_cresLo = 0.0f; // user 2026-11-07: floor BACK AT THE HANDS - the step-out WAS the minimum-range deadzone the user called "a minimum range to screw him over"; the intended look is axes spinning OUT of his hands. The catch bite lands on his own spot again.
 
 			_cresBand = band;
 
