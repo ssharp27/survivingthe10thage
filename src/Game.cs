@@ -126,18 +126,57 @@ public partial class Game : Godot.Node2D
 	// stage name/number shown on the ui/ cards AND the HUD (user 2026-10-23: Tanurial Forest
 	// is "stage 1" / "level 1" - many more stages are planned, so every display site reads
 	// the pair instead of a baked string)
-	private const string STAGE_NAME = "Tanurial Forest";
-	private const int STAGE_NUMBER = 1;
+	// ---------- STAGE REGISTRY (one entry per stage the launch can open) ----------
+	// user 2026-11-08: the stage is now SELECTABLE (Character Select > Stage Select), so the
+	// pair every display site reads (HUD, camp card, summary, pause card) became runtime data.
+	// A new stage = a row here + its JOIN_W row (row = registry index) +, later, its own beat
+	// rows. Entry 0 is stage 1: a seat that asks for nothing keeps the shipped run untouched.
+	// STAGE_NUMBER 0 marks a PSEUDO-stage: the Enemy Test Room is a practice yard, so it must
+	// never read as "stage 2"; every display site reads the label, and only a real stage prints
+	// "(stage N)".
+	// STAGE_TEST flips the ENEMY TEST ROOM door the M1_TEST_ROOM=1 bench valve already boots, so
+	// hand-picking the room from an ordinary launch lands on the very same lane.
+	// STAGE_LOCKED keeps the card's "(locked)" tag honest when a future stage parks a slot.
+	private static readonly string[] STAGE_ID = { "stage1", "testroom" };
+	private static readonly string[] STAGE_LABEL = { "Tanurial Forest", "Enemy Test Room" };
+	private static readonly int[] STAGE_NUMBER = { 1, 0 };      // 0 = pseudo-stage (see above)
+	private static readonly bool[] STAGE_TEST = { false, true };
+	private static readonly bool[] STAGE_LOCKED = { false, false };
+	// one-line identity per plate: what standing in the stage means. The full readout (schedule,
+	// density, recruits, xp) is composed off the LIVE data in ShowStageSheet so the card cannot
+	// lie about the run; these are the short tags the plates carry.
+	private static readonly string[] STAGE_BLURB = {
+		"The shipped stage: the full beat schedule - ally rescues, horde tier gates, the mini / mid / final bosses and a campfire between the battles.",
+		"The practice yard: one body every 15-20 s cycling the whole stage-1 roster, and the training ring at the squad start (+1 xp/sec while you stand in it). No ally joins, no bosses, no camp, no victory - down / revive / TPK and the gems stay exactly as shipped." };
+	private int _stage = 0;                    // which registry entry this run plays (0 = stage 1: the bench default)
+	// display helpers: the label, the number and the HUD badge for the stage this run plays
+	private string StageName()
+	{
+		return STAGE_LABEL[_stage];
+	}
+	private int StageNumber()
+	{
+		return STAGE_NUMBER[_stage];
+	}
+	private string StageBadge() // "Tanurial Forest (stage 1)" | "Enemy Test Room (test room)"
+	{
+		int n = StageNumber();
+		if (n <= 0)
+			{ return STAGE_LABEL[_stage] + " (test room)"; }
+		return STAGE_LABEL[_stage] + " (stage " + n + ")";
+	}
 	// ---------- roster join lottery (user 2026-10-23: dynamic runs) ----------
 	// WHICH roster PCs can be recruited this run and in WHICH order: one weighted,
 	// without-replacement draw per ally beat, taken at boot. The run's own leader never
 	// rolls onto its own pool (it CAN show up on runs where it is not the leader).
-	// Row = STAGE_NUMBER - 1; columns are memberIndex order
-	// (0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash | 7 Bruno | 8 Brook). Weight 0 = cannot appear
-	// on that stage. Stage 1 per the user: Baldrun + Mosiah more likely than the rest.
+	// Row = registry index (BuildJoinLottery reads _stage): columns are memberIndex order
+	// (0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash | 7 Bruno | 8 Brook).
+	// Weight 0 = cannot appear on that stage. Stage 1 per the user: Baldrun + Mosiah more likely
+	// than the rest. The Enemy Test Room row is ALL ZERO on purpose: the room runs no ally beats,
+	// so the exhausted pool is a logged no-op and nothing can recruit there.
 	// Sanity numbers - the user will add rows/weights per future stage.
 	// the new-style initializer: Godot's C# build trips CS0623 on nested old-style braces
-	private static readonly int[][] JOIN_W = { new int[] { 3, 3, 1, 1, 1, 1, 1, 1, 1 } };   // row 0 = stage 1: Baldrun + Mosiah heavy, Wash + Bruno + Brook parity with the rest
+	private static readonly int[][] JOIN_W = { new int[] { 3, 3, 1, 1, 1, 1, 1, 1, 1 }, new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0 } };   // row 0 = stage 1: Baldrun + Mosiah heavy, Wash + Bruno + Brook parity with the rest | row 1 = the test room: no recruits
 	private int[] _joinOrder = new int[0]; // ally slot k -> memberIndex drawn for it
 	private Godot.Collections.Array<int> _hpOrder = new(); // HUD strip slot -> memberIndex: the join order (see BuildJoinLottery)
 	private Godot.RandomNumberGenerator _joinRng; // UNSEEDED on purpose: a fresh process re-rolls
@@ -157,12 +196,13 @@ public partial class Game : Godot.Node2D
 	// add a circle section that gives constant XP at 1 per second that we can sit in to level up
 	// so I'm not testing only with level 1 characters") ----------
 	// M1_TEST_ROOM=1 boots the room INSIDE this scene: Director.cs owns the rotation lane, the
-	// training ring below is the XP faucet. The stage-select card that makes the room hand-picked
-	// from an ordinary launch is the NEXT pass, so today a human dev launch prefixes the env var
-	// exactly like the bench seats do. Only the STAGE SCHEDULE is held back (no ally joins, bosses,
-	// camp, victory, horde events or rest scaling): death saves, revive, TPK and gem drops stay
-	// exactly as the shipped game routes them.
-	bool _testRoom = false;     // boot door, read from M1_TEST_ROOM at the env-switch rail
+	// training ring below is the XP faucet. LIVE since this pass: the stage-select card offers the
+	// room as a plate, so a human picks it from an ordinary launch and lands on the SAME lane a
+	// bench seat reaches by prefixing M1_TEST_ROOM=1 (either switch sets _testRoom; the card also
+	// arms the ring's floor read after the pick, see CloseStage). Only the STAGE SCHEDULE is held
+	// back (no ally joins, bosses, camp, victory, horde events or rest scaling): death saves, revive,
+	// TPK and gem drops stay exactly as the shipped game routes them.
+	bool _testRoom = false;     // the room switch: M1_TEST_ROOM at the env rail, OR the stage card's pick
 	// The ring sits on the squad's start point (Main.tscn parks the roster at (0,0)), so a pilot
 	// bench stands inside it with zero steering and the faucet prints on their own.
 	Vector2 _testRingAt = new Vector2(0.0f, 0.0f);
@@ -383,6 +423,27 @@ public partial class Game : Godot.Node2D
 		Control _selPartyBack = null;     // dark plate behind the party box
 		Control _selConfirm = null;       // CONFIRM button plate (bottom of the card)
 		Control _selConfirmLabel = null;  // button face copy (set locally at build: Control field)
+		// ---------- STAGE SELECT card fields (the leader card above is the template) ----------
+		// same shape: hold rail + pilot clock valves + browse/CONFIRM, one registry entry per
+		// plate. A seat that never sets M1_STAGE keeps _stageHold false and plays stage 1.
+		bool _stageHold = false;           // card up: the _Process rail waits, _Input owns the mouse
+		bool _stageDemo = false;           // bench door up: M1_STAGE=<id> under pilot
+		string _stageWant = "";            // bench's wanted stage id (resolved on the pilot clock)
+		double _stageWait = 0.0;           // card clock: feeds ONLY the pilot auto door
+		int _stageBrowse = -1;             // registry entry the card reads (-1 = nothing yet)
+		Godot.CanvasLayer _stageLayer = null;
+		Control _stageRoot = null;         // full-rect anchor parent for every piece
+		ColorRect _stageBack = null;       // full-rect cover: the card hides the world frame
+		Control _stagePage = null;          // the board window the build draws AND the click maps into
+		ColorRect _stageFrame = null;       // gold ring: anchors jump to the browsed plate
+		Label _stagePanel = null;           // right-hand readout, rebuilt on every browse
+		Control _stageSheet = null;         // dark plate behind the readout
+		Label _stageHint = null;            // click-grammar reminder on the card
+		Control[] _stageTile = new Control[0];  // one plate per registry entry
+		Label[] _stageName = new Label[0];   // plate name label (stage label + locked tag)
+		Label[] _stageBlurb = new Label[0];  // plate identity line: what the stage means
+		Control _stageConfirm = null;      // CONFIRM button plate
+		Control _stageConfirmLabel = null; // button face copy
 	bool _summaryPrinted = false;
 
 	Godot.Camera2D _camera;
@@ -1444,7 +1505,7 @@ public void RegisterEnemy(Combatant e)
 				// holds the row back, it only lands once `final` is truly slain, so "cleared"
 				// stays honest even if the boss was still alive at the wrap time.
 				_state = StageState.VICTORY;
-				PrintSummary("VICTORY ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â " + STAGE_NAME + " (stage " + STAGE_NUMBER + ") cleared");
+				PrintSummary("VICTORY ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â " + StageBadge() + " cleared");
 			}
 			else
 			{
@@ -1524,12 +1585,14 @@ public void RegisterEnemy(Combatant e)
 		return _pickerActive;
 	}
 
-	// world freeze = the picker card OR the join-banner card: both are read-the-card soft
-	// pauses (the arena is drawn, nothing acts, nothing takes damage). The join banner got
-	// this treatment instead of a tree pause so its CLICK gate keeps receiving input.
+	// world freeze = the picker card OR the join-banner card OR a pre-run card: all are read-the-
+	// card soft pauses (the arena is drawn, nothing acts, nothing takes damage). The join banner
+	// got this treatment instead of a tree pause so its CLICK gate keeps receiving input, and the
+	// stage card rides it so the Director's march never spawns a body while a human reads the
+	// plates (the run clock waits on the _Process rail below anyway).
 	public bool GetWorldPause()
 	{
-		return _pickerActive || _joinWaiting || _selHold;
+		return _pickerActive || _joinWaiting || _selHold || _stageHold;
 	}
 
 	// Experimental Elixir (user 2026-10-31, Stack's ult): the ONLY randomness of the cast lives
@@ -1903,20 +1966,43 @@ public void RegisterEnemy(Combatant e)
 			BuildSelectScreen();
 			GD.Print("[10thAge] (select) open: click a portrait to select, click CONFIRM at the bottom to seat the Leader");
 		}
+		// ---------- STAGE SELECT: the card opens AFTER the character card ----------
+		// the flow the user locked is Main Menu > Character Select > Stage Select; there is no
+		// main menu yet, so the game opens at character select and the stage card follows it.
+		// Same grammar as the leader card: click a stage plate to browse it (the gold ring rides
+		// it), click CONFIRM to start. Bench valve M1_STAGE=<id> mirrors M1_SELECT: a seat that
+		// asks for nothing keeps the card DOWN and plays stage 1, so every headless gate already
+		// running stays byte-identical. The second plate is the ENEMY TEST ROOM the M1_TEST_ROOM=1
+		// dev door boots - picking it from the card is the same switch, so the room is now enterable
+		// from an ordinary launch.
+		_stageDemo = (OS.GetEnvironment("M1_STAGE") == null ? "" : OS.GetEnvironment("M1_STAGE")) != "";
+		_stageWant = OS.GetEnvironment("M1_STAGE") == null ? "" : OS.GetEnvironment("M1_STAGE");
+		if (!_pilot || _stageDemo)
+		{
+			_stageHold = true;
+			BuildStageScreen();
+			GD.Print("[10thAge] (stage) open: click a stage plate to select, click CONFIRM to start the run");
+		}
 		string roster = "";
 		foreach (PartyMember pm2 in _party)
 			roster += (roster == "" ? "" : " + ") + pm2.displayName + " (" + pm2.weaponName + ")";
 		GD.Print("[10thAge] squad: " + roster + " | leader: " +
 				 (_leader != null ? _leader.displayName : "none"));
 		// the join lottery rolls at boot so the pilot / escort paths never have to re-decide
-		// which PC a beat owns (the print keeps the smoke trails honest about who lands when)
-		// human / bench-demo runs roll it in CloseSelect, AFTER the seat swap
-		if (!_selHold)
-				BuildJoinLottery();
-				// HORDE EVENT clock arms AT BOOT (user 2026-11-06 playtest: "the first horde spawned at 290s,
-				// we should have them start way sooner" - the mini-boss-relative arm landed that late, so the
-				// schedule now opens at HORDE_EVENT_FIRST_AT absolute run-seconds inside the opening legs)
-				_hordeEventDue = _testRoom ? 0.0 : HORDE_EVENT_FIRST_AT; // TEST ROOM: bonus swarms disarmed - the rotation is the ONLY body lane, so one kind is testable at a time
+		// which PC a beat owns (the print keeps the smoke trails honest about who lands when).
+		// It waits while EITHER pre-run card is up: the row it reads rides the STAGE (JOIN_W row =
+		// registry index) and the seat swap must precede it, so a card-up launch rolls it in Close
+		// Stage (the demoted Leader waits for its join beat like any other recruit; _hpOrder just
+		// builds later on such a run, which the camp-card fallback already survives).
+		// HORDE EVENT clock arms AT BOOT (user 2026-11-06 playtest: "the first horde spawned at 290s,
+		// we should have them start way sooner" - the mini-boss-relative arm landed that late, so the
+		// schedule now opens at HORDE_EVENT_FIRST_AT absolute run-seconds inside the opening legs).
+		// Arming is unconditional now: it used to sit inside the no-card branch, which left a human
+		// run on the legacy mini-boss arm. CloseStage re-arms it after a pick (the room disarms it).
+		ArmHordeClock();
+		BuildTrainingRing(); // guarded: the card re-arms it once the pick lands on the room
+		if (!_selHold && !_stageHold)
+			BuildJoinLottery(); // a card-up run rolls it AFTER the stage pick instead
 		// the reaper is a pure death/revive TEST BENCH (no balance meaning): human play
 		// left it OFF now that the revive rules work, and M1_REAPER=1 puts it back on
 		// for testing (a pilot smoke with it ON still TPKs often - the Leader-down rule
@@ -1990,39 +2076,11 @@ public void RegisterEnemy(Combatant e)
 			_floorPatches.Add(p); // folded per frame like every other entity: the ground
 								  // cover scrolls AND loops, so the wrap reads seamless
 		}
-		// ENEMY TEST ROOM: the training ring's floor READ. sage disc + hand-closed rim + tag, all at
-		// the faucet's center/radius, so what the eye judges is what the hit test actually uses.
+		// ENEMY TEST ROOM: the training ring's floor READ lives in BuildTrainingRing() below, so
+		// the stage-select card can arm it AFTER a pick lands on the room. Arming here still covers
+		// the M1_TEST_ROOM=1 bench door (and any launch that never opens the card).
 		if (_testRoom)
-		{
-			_testRingDisc = new Polygon2D();
-			_testRingDisc.Name = "TrainingRing";
-			_testRingDisc.ZIndex = -12; // above the floor patches (-15), under every body
-			_testRingDisc.Modulate = new Color(0.42f, 0.66f, 0.45f, 0.14f); // sage fill, faint so bodies stay legible
-			_testRingDisc.Position = _testRingAt;
-			Vector2[] disc = new Vector2[48]; // 48-gon: smooth enough at ring scale, zero Rng
-			for (int ir = 0; ir < 48; ir++)
-				disc[ir] = new Vector2((float)System.Math.Cos(System.Math.PI * 2.0 * ir / 48.0) * _testRingR, (float)System.Math.Sin(System.Math.PI * 2.0 * ir / 48.0) * _testRingR);
-			_testRingDisc.Polygon = disc;
-			AddChild(_testRingDisc);
-			_testRingRim = new Line2D();
-			_testRingRim.Name = "TrainingRingRim";
-			_testRingRim.ZIndex = -11; // the edge reads over its own fill
-			_testRingRim.Width = 3.0f;
-			_testRingRim.Modulate = new Color(0.55f, 0.85f, 0.6f, 0.6f);
-			_testRingRim.Position = _testRingAt;
-			Vector2[] rim = new Vector2[49]; // closed by hand: the 49th point = the 1st
-			for (int ir2 = 0; ir2 < 49; ir2++)
-				rim[ir2] = new Vector2((float)System.Math.Cos(System.Math.PI * 2.0 * (ir2 % 48) / 48.0) * _testRingR, (float)System.Math.Sin(System.Math.PI * 2.0 * (ir2 % 48) / 48.0) * _testRingR);
-			_testRingRim.Points = rim;
-			AddChild(_testRingRim);
-			_testRingTag = new Label();
-			_testRingTag.Name = "TrainingRingTag";
-			_testRingTag.ZIndex = -10; // over the fill + rim, still under the bodies (5)
-			_testRingTag.Modulate = new Color(0.65f, 0.9f, 0.68f, 0.8f);
-			_testRingTag.Text = "TRAINING RING - +1 xp/sec while you stand here";
-			_testRingTag.Position = _testRingAt + new Vector2(-150.0f, -10.0f); // beside the center, clear of the rim
-			AddChild(_testRingTag);
-		}
+			BuildTrainingRing();
 		// walls are retired with the wrap (user fix 2026-10-20): there is no edge to
 		// bump into anymore, and a painted border would fight the invisible fold box
 		_camera = GetNode("Camera2D") as Godot.Camera2D;
@@ -2273,6 +2331,11 @@ public void RegisterEnemy(Combatant e)
 		{
 			PollSelect(delta); // boot card: the whole run loop waits so no beat burns while a
 									   // human reads; even the pilot demo door rides this rail
+			return;
+		}
+		if (_stageHold)
+		{
+			PollStage(delta); // stage card: the whole run loop waits so no beat burns while a human reads the plates
 			return;
 		}
 		// the camp card's own clock: it holds during read-the-card soft pauses, which is
@@ -2948,7 +3011,7 @@ public void RegisterEnemy(Combatant e)
 
 		UpdateHelpers(delta); // leader-bonus lane (user 2026-10-25): Alvora regen, Asper insects, Yu spirits
 		PickerTick(d);
-		_hud.Text = "Surviving the 10th Age - " + STAGE_NAME + " (stage " + STAGE_NUMBER +
+		_hud.Text = "Surviving the 10th Age - " + StageBadge() +
 					") | Lv " + _level +
 					" | xp " + (int)_xp + "/" + (int)_xpNext +
 					" | " + StateName(_state) + " t=" + (int)GetRunTime() + " | enemies " + _liveEnemies +
@@ -4679,7 +4742,405 @@ private void UpdateSpirits(float delta)
 			_selTile[k] = null;
 			_selName[k] = null;
 		}
+		// the flow the user locked is Main Menu > Character Select > Stage Select: with the
+		// leader card down, the stage card (parked hidden at boot) comes up and its own rails
+		// own the mouse and the pilot clock. The lottery then waits for CloseStage: the JOIN_W
+		// row and the _testRoom switch both RIDE the stage, so neither can roll before the pick.
+		// A launch that never opens the stage card (pilot benches that do not ask M1_STAGE)
+		// rolls it here, so every existing headless gate stays byte-identical.
+		OpenStageCard();
+		if (!_stageHold)
+			BuildJoinLottery();
+	}
+	// ---------- STAGE SELECT card (the leader card above is the template) ----------
+	// Same grammar, same discipline: one board page, one plate per registry entry, the gold
+	// ring rides the browsed plate, CONFIRM at the card bottom starts the run. The right-hand
+	// sheet is composed OFF THE LIVE DATA (beat census, JOIN_W row, ring faucet) so the card
+	// cannot lie about what the run will do; STAGE_BLURB is only the plate's short tag.
+	// Board slot rects as anchor fractions of the page window: plate i -> L,T,R,B (two plates
+	// side by side: the shipped stage left, the practice yard right). Geometry drafted for
+	// this card off the leader card's page.
+	// STG_CONFIRM rides root-local fractions (the click tests CONFIRM FIRST so a near-miss
+	// on the button never re-browses, same rule as the leader card)
+	static readonly float[] STG_PAGE = { 0.05f, 0.14f, 0.63f, 0.92f };
+	static readonly float[] STG_GRID = { 0.01f, 0.06f, 0.48f, 0.92f, 0.52f, 0.06f, 0.99f, 0.92f };
+	// STG_CONFIRM rides root-local fractions; STG_PAGE/STG_GRID ride the page (see above)
+	static readonly float[] STG_CONFIRM = { 0.30f, 0.90f, 0.60f, 0.97f };
+	// the stage plate colour: forest moss for the shipped stage, cold slate for the yard,
+	// a paler grey for a parked plate (greybox like every other PLACEHOLDER frame here)
+	private Color StagePlate(int k)
+	{
+		if (STAGE_LOCKED[k])
+		{ return new Color(0.10f, 0.09f, 0.12f, 1.0f); } // parked plate
+		if (STAGE_TEST[k])
+		{ return new Color(0.13f, 0.15f, 0.19f, 1.0f); } // practice-yard slate
+		// forest moss: the shipped stage reads like the floor patches it plays on
+		{ return new Color(0.12f, 0.19f, 0.13f, 1.0f); }
+	}
+	// the card comes up when the leader card closes: it is built at boot but PARKED HIDDEN
+	// while the leader card owns the frame (CanvasItem visibility is inherited, so hiding the
+	// root hides every plate, sheet and button), and one OpenStageCard call hands the frame
+	// over. A launch with no leader card shows it at boot instead: BuildStageScreen's own
+	// gate at the bottom of the build.
+	private void OpenStageCard()
+	{
+		// the card may not exist at all: a seat that never asks M1_STAGE keeps it down and
+		// plays stage 1, so the handoff has nothing to raise
+		// the card comes up: the root was parked hidden under the leader card
+		if (_stageHold && _stageRoot != null)
+			_stageRoot.Visible = true;
+	}
+	public void BuildStageScreen()
+	{
+		_stageLayer = new CanvasLayer();
+		_stageLayer.Layer = 10; // one rung above the leader card: only one card owns a frame
+		// anyway (this one is parked hidden until the leader card is gone), so this only
+		// decides who paints on the single handoff frame
+		_stageRoot = new Control();
+		SetRectSel(_stageRoot, 0.0f, 0.0f, 1.0f, 1.0f);
+		_stageLayer.AddChild(_stageRoot);
+		_stageBack = new ColorRect();
+		_stageBack.Color = new Color(0.07f, 0.06f, 0.09f, 0.98f); // grimoire-dark board cover
+		SetRectSel(_stageBack, 0.0f, 0.0f, 1.0f, 1.0f);
+		_stageRoot.AddChild(_stageBack);
+		_stagePage = new Control();
+		SetRectSel(_stagePage, STG_PAGE[0], STG_PAGE[1], STG_PAGE[2], STG_PAGE[3]); // the ONE board window
+		_stageRoot.AddChild(_stagePage);
+		_stageFrame = new ColorRect();
+		_stageFrame.Color = new Color(0.83f, 0.64f, 0.24f, 0.95f); // grimoire-gold RING
+		_stagePage.AddChild(_stageFrame);
+		_stageTile = new Control[STAGE_ID.Length];
+		_stageName = new Label[STAGE_ID.Length];
+		_stageBlurb = new Label[STAGE_ID.Length];
+		// one plate per registry entry: the stage's own colour + name plate + identity line.
+		// No art yet: the plates are greybox like every other PLACEHOLDER frame here.
+		// (the leader card's painted minis are the art pass the user gathers)
+		for (int k = 0; k < STAGE_ID.Length; k++)
+		{
+			ColorRect plate = new ColorRect();
+			plate.Color = StagePlate(k);
+			SetRectSel(plate, STG_GRID[k * 4], STG_GRID[k * 4 + 1], STG_GRID[k * 4 + 2], STG_GRID[k * 4 + 3]);
+			_stageTile[k] = plate;
+			_stageName[k] = new Label();
+			SetRectSel(_stageName[k], 0.03f, 0.04f, 0.97f, 0.18f);
+			_stageName[k].Text = STAGE_LABEL[k] + (STAGE_LOCKED[k] ? " (locked)" : "");
+			_stageName[k].Set("horizontal_alignment", 1); // CENTER (string key: binding-safe)
+			_stageTile[k].AddChild(_stageName[k]);
+			_stageBlurb[k] = new Label();
+			SetRectSel(_stageBlurb[k], 0.04f, 0.24f, 0.96f, 0.94f);
+			_stageBlurb[k].Set("autowrap_mode", 2); // WORD wrap to the plate rect
+			_stageBlurb[k].Text = STAGE_BLURB[k];
+			_stageTile[k].AddChild(_stageBlurb[k]);
+			_stagePage.AddChild(_stageTile[k]); // parent the plate: an orphan Control leaks at exit
+		}
+		// the sheet plate: the readout rides it (the leader card's sheet block, one slot
+		// instead of the two the roster needs)
+		ColorRect shp = new ColorRect();
+		shp.Color = new Color(0.13f, 0.11f, 0.17f, 1.0f); // dark slate sheet plate
+		SetRectSel(shp, 0.66f, 0.10f, 0.99f, 0.72f);
+		_stageSheet = shp;
+		_stageRoot.AddChild(_stageSheet);
+		// the sheet text over its plate
+		_stagePanel = new Label();
+		SetRectSel(_stagePanel, 0.68f, 0.12f, 0.98f, 0.70f);
+		_stagePanel.Set("autowrap_mode", 2); // WORD wrap to the sheet rect
+		_stageRoot.AddChild(_stagePanel);
+		// the CONFIRM plate at the card bottom (root-local anchors)
+		ColorRect btn = new ColorRect();
+		btn.Color = new Color(0.28f, 0.20f, 0.08f, 1.0f); // dark bronze CONFIRM plate
+		SetRectSel(btn, STG_CONFIRM[0], STG_CONFIRM[1], STG_CONFIRM[2], STG_CONFIRM[3]);
+		_stageConfirm = btn;
+		_stageRoot.AddChild(_stageConfirm);
+		// the button face: "CONFIRM" centered on the plate
+		Label face = new Label();
+		SetRectSel(face, STG_CONFIRM[0] + 0.01f, STG_CONFIRM[1] + 0.01f, STG_CONFIRM[2] - 0.01f, STG_CONFIRM[3] - 0.01f);
+		face.Text = "CONFIRM"; // set locally at build: the field is a Control type
+		_stageConfirmLabel = face;
+		_stageRoot.AddChild(_stageConfirmLabel);
+		// title strip: the click grammar the user locked (click a plate, then CONFIRM)
+		_stageHint = new Label();
+		_stageHint.Text = "STAGE SELECT - click a plate to browse it, then click CONFIRM to start";
+		_stageRoot.AddChild(_stageHint);
+		// humans open boxed on the shipped stage (a bench seat parks the card on nothing: the
+		// FIRST press only browses, so an accidental key can never start a run)
+		_stageBrowse = _stageDemo ? -1 : 0;
+		// the sheet + ring open on the browsed plate
+		ShowStageSheet(_stageBrowse);
+		ShowStagePage();
+		// the leader card owns the frame while it is up: park THIS card hidden until Close
+		// Select hands over (a pilot bench that never opened the leader card shows it now)
+		_stageRoot.Visible = !_selHold;
+	}
+	// one board, one page: the gold ring rides the browsed plate (its rect grown +/- 0.02
+	// so the edge reads as a frame AROUND the plate); nothing browsed parks it hidden (the
+	// leader card's page-parking rule: a bench seat opens on nothing).
+	// all plates stand: the registry's plates always fit the one page
+	private void ShowStagePage()
+	{
+		// nothing selected yet: the ring stays away
+		for (int k = 0; k < _stageTile.Length; k++)
+			_stageTile[k].Visible = true;
+		if (_stageBrowse < 0 || _stageBrowse >= _stageTile.Length)
+		{
+			_stageFrame.Visible = false;
+			return;
+		}
+		// the ring rides the browsed plate
+		SetRectSel(_stageFrame, STG_GRID[_stageBrowse * 4] - 0.02f, STG_GRID[_stageBrowse * 4 + 1] - 0.02f,
+				STG_GRID[_stageBrowse * 4 + 2] + 0.02f, STG_GRID[_stageBrowse * 4 + 3] + 0.02f);
+		_stageFrame.Visible = true;
+	}
+	// the sheet for the BROWSED plate: composed off the LIVE data so the card cannot lie
+	// about the run - the schedule census counts the real beat table, the recruit row reads
+	// the real JOIN_W weights, the ring rate reads the faucet's own constant. The rotation
+	// cadence is the one line of display copy that mirrors Director.cs' TEST_EVERY_LO/HI
+	// (the Director is a separate node this class cannot read; the same switch boots both
+	// the bench lane and the card lane, so the numbers cannot drift apart here).
+	// (beat kinds as BeatLabel reads them: 0 ally | 1 horde | 2 mini | 3 mid | 4 final |
+	// 5 wrap-up)
+	private void ShowStageSheet(int k)
+	{
+		// nothing browsed: the sheet stays empty rather than guessing a stage
+		if (_stagePanel == null || k < 0 || k >= STAGE_ID.Length)
+			return;
+		// beat census straight off the live table
+		int allies = 0;
+		int bosses = 0;
+		for (int i = 0; i < BEAT_KIND.Length; i++)
+		{
+			if (BEAT_KIND[i] == 0)
+				allies++;
+			else if (BEAT_KIND[i] >= 2 && BEAT_KIND[i] <= 4)
+				bosses++;
+		}
+		// how many roster seats CAN join this stage (weight 0 = cannot appear): row = registry
+		// index, the same row BuildJoinLottery reads after the pick
+		int joinable = 0;
+		for (int w = 0; w < JOIN_W[k].Length; w++)
+			if (JOIN_W[k][w] > 0)
+				joinable++;
+		// STAGE_NUMBER 0 marks a PSEUDO-stage: the yard must never read "stage 0"
+		string txt = STAGE_LABEL[k] + (STAGE_NUMBER[k] > 0 ? " (stage " + STAGE_NUMBER[k] + ")" : " (test room)");
+		// the plate's identity line (the registry's short tag)
+		txt += "\n" + STAGE_BLURB[k];
+		if (STAGE_TEST[k])
+		{
+			// the room: the whole table is held back, so say what the rotation lane actually is
+			txt += "\nRotation: one body every 15-20 s, cycling the full stage-1 roster";
+			// (the xp rate is the faucet's own constant, so the card and the tap agree)
+			txt += "\nTraining ring: +" + (int)_testXpPerSec + " xp/sec while a member stands in it";
+			// the death-save lane is identical everywhere: the room only trades the schedule
+			txt += "\nDown / revive / TPK / gem drops run exactly as shipped";
+		}
+		else
+		{
+			// the shipped stage: the beat table drives it, so count the LIVE rows
+			txt += "\nBeats: " + allies + " recruit joins | " + bosses + " boss rows | " + joinable + " roster seats can join";
+			// the death-save lane is identical everywhere: the room only trades the schedule
+			txt += "\nDown / revive / TPK / gem drops run exactly as shipped";
+		}
+		// a parked plate says so on the sheet as well as on the plate
+		if (STAGE_LOCKED[k])
+			txt += " | locked: the plate stays parked";
+		_stagePanel.Text = txt;
+	}
+	// card polling: only carries the pilot clock rails: the bench auto-browse (M1_STAGE=<id>) one beat
+	// after the card comes up and the auto-confirm one beat later, both printing their gate
+	// lines verbatim. Humans hold here forever until StageClick browses or CONFIRM starts the
+	// run (the picker's no-timeout rule, same as the leader card's human lane).
+	private void PollStage(double d)
+	{
+		_stageWait += d; // the card clock feeds ONLY the pilot auto door below
+		// bench auto door: resolve M1_STAGE=<id> to its registry entry (pilot clock)
+		if (_pilot && _stageBrowse < 0 && _stageWait >= 1.2)
+		{
+			// the id, not the label: the env valve carries the registry key
+			int wanted = -1;
+			for (int k = 0; k < STAGE_ID.Length; k++)
+				if (STAGE_ID[k] == _stageWant)
+					wanted = k;
+			if (wanted < 0)
+			{
+				GD.Print("[10thAge] (stage) bench asked an unknown stage: " + _stageWant + " - shipped stage stands");
+				CloseStage(false); // drop the card: the shipped stage stands, lottery rolls
+				return;
+			}
+			GD.Print("[10thAge] (stage) pilot auto-browse plate for: " + STAGE_LABEL[wanted]);
+			_stageBrowse = wanted;
+			ShowStagePage();
+			ShowStageSheet(wanted);
+			return; // auto-browse once; the rail below confirms on the NEXT tick
+		}
+		// pilot confirm rail: one beat after the auto-browse, start on the browsed plate
+		if (_pilot && _stageBrowse >= 0 && _stageWait >= 2.4)
+		{
+			ShowStagePage();
+			ShowStageSheet(_stageBrowse);
+			GD.Print("[10thAge] (stage) pilot confirm on browsed: " + STAGE_LABEL[_stageBrowse]);
+			CloseStage(true);
+			return;
+		}
+		// human card: waits for a real click forever (no timeout)
+		return;
+	}
+	// human rail: a click maps window px -> the card's anchor fractions (CONFIRM tested FIRST so
+	// a near-miss on the button never re-browses). The card spans the measured window, so
+	// fractions ride _visHalf (double the half-extents, same guard as the leader card); plates
+	// convert into the PAGE rect's own anchors (STG_PAGE, the rect the build drew).
+	// (headless gates have no pointer: only the pilot clock rails above walk the bench
+	// stage -> confirm -> lottery wiring)
+	private void StageClick(Vector2 pos)
+	{
+		float fw = _visHalf.X * 2.0f;
+		float fh = _visHalf.Y * 2.0f;
+		if (fw < 64.0f || fh < 64.0f)
+			return; // window not measured yet: garbage fractions beat a bad stage
+		float fx = pos.X / fw;
+		float fy = pos.Y / fh;
+		// CONFIRM plate first (root-local fractions)
+		if (fx >= STG_CONFIRM[0] && fx <= STG_CONFIRM[2] && fy >= STG_CONFIRM[1] && fy <= STG_CONFIRM[3])
+		{
+			if (_stageBrowse >= 0)
+			{
+				GD.Print("[10thAge] (stage) confirm click: " + STAGE_LABEL[_stageBrowse]);
+				CloseStage(true); // the shared door seats the browsed plate
+			}
+			else
+			{
+				// with nothing browsed the human has to pick a plate first: the CONFIRM line is a no-op
+				// reminder here (unlike the leader card there is no default stage to fall back to - a
+				// stage is a real choice, so the card stays up and waits). Humans actually open boxed on
+				// plate 0, so this line only happens on a bench seat that parks the card on nothing.
+				GD.Print("[10thAge] (stage) confirm click with nothing browsed: pick a plate first");
+				return;
+			}
+			return;
+		}
+		// plates next (page-local fractions)
+		float px = (fx - STG_PAGE[0]) / (STG_PAGE[2] - STG_PAGE[0]);
+		float py = (fy - STG_PAGE[1]) / (STG_PAGE[3] - STG_PAGE[1]);
+		for (int k = 0; k < _stageTile.Length; k++)
+		{
+			if (px < STG_GRID[k * 4] || px > STG_GRID[k * 4 + 2] ||
+				py < STG_GRID[k * 4 + 1] || py > STG_GRID[k * 4 + 3])
+				continue;
+			if (STAGE_LOCKED[k])
+			{
+				GD.Print("[10thAge] (stage) click on a locked plate: " + STAGE_LABEL[k]);
+				return; // the (locked) tags stay honest (a future stage parks a plate)
+			}
+			if (k == _stageBrowse)
+			{
+				GD.Print("[10thAge] (stage) re-click on the browsed plate: use CONFIRM to start");
+				return; // browsing again is a no-op: CONFIRM is the stage door
+			}
+			// the room plate and the shipped stage share ONE door: CloseStage reads the browsed entry
+			// and flips _testRoom when the registry says so
+			_stageBrowse = k;
+			ShowStagePage();
+			ShowStageSheet(_stageBrowse);
+			GD.Print("[10thAge] (stage) browse: " + STAGE_LABEL[_stageBrowse]);
+			return;
+		}
+		GD.Print("[10thAge] (stage) click landed on bare board: nothing changes");
+	}
+	// the card closes: the PICKED stage is the run's stage, and the pieces that RIDE it (the
+	// ring's floor read, the horde clock, the join lottery) all land AFTER the pick - ORDER
+	// IS THE RULE: _stage lands before all three. The demoted-Leader / _hpOrder note from the
+	// leader card still applies: a card-up run builds _hpOrder late, which the camp-card
+	// fallback already survives.
+	private void CloseStage(bool confirmed)
+	{
+		bool fromBench = _testRoom; // the boot valve already booted the room: do not reprint the line
+		// a pick lands on its registry entry; nothing picked (the unknown-stage valve) keeps the
+		// shipped stage, same default as a seat that never opens the card
+		_stage = (_stageBrowse >= 0 && _stageBrowse < STAGE_ID.Length) ? _stageBrowse : 0;
+		// the room plate lands on the SAME lane the M1_TEST_ROOM=1 bench valve boots
+		_testRoom = _testRoom || STAGE_TEST[_stage];
+		_stageHold = false; // the card is gone: the world starts on the next frame (the run clock never burned while
+		// the card was up, so the beat table and the horde clock still read t=0)
+		if (_stageLayer != null)
+			_stageLayer.QueueFree(); // the whole card is gone in one cut: no RID/ODB leftovers at exit
+		// C# discipline: a field holding a Godot node keeps it alive past the native free, so
+		// every card field must go null or the textures stay "in use" at exit and Godot prints
+		// leak warnings on the smoke gate
+		_stageLayer = null;
+		_stageRoot = null;
+		_stageBack = null;
+		_stagePage = null;
+		_stageFrame = null;
+		_stagePanel = null;
+		_stageSheet = null;
+		_stageHint = null;
+		_stageConfirm = null;
+		_stageConfirmLabel = null;
+		for (int k = 0; k < _stageTile.Length; k++)
+		{
+			_stageTile[k] = null;
+			_stageName[k] = null;
+			_stageBlurb[k] = null;
+		}
+		// the stage lands BEFORE the pieces that read it, so this print is the gate anchor
+		GD.Print("[10thAge] (stage) stage seated: " + StageBadge());
+		// the room's faucet: guarded, so a launch that armed it at boot is a no-op here
+		BuildTrainingRing();
+		// the horde clock re-arms off the seated stage (the room disarms bonus swarms)
+		ArmHordeClock();
 		BuildJoinLottery();
+		if (_testRoom && !fromBench)
+		{
+			// the room is now hand-picked from an ordinary launch: say what is live (the same lane the
+			// bench valve boots, so a card-picked room matches the seat-805 evidence)
+			GD.Print("[10thAge] (test) ENEMY TEST ROOM live: one body every 15-20 s cycling the stage-1 roster, beats held back, training ring +1 xp/sec at (0,0)");
+			}
+	}
+	// the HORDE EVENT schedule arms for every launch now: the mini-boss-relative fallback arm
+	// (HORDE_EVENT_FIRST_DELAY, the legacy lane) only covers legs that never armed one. Arming
+	// sat inside the no-card branch before this pass, which left a HUMAN run on the legacy arm
+	// - the first swarm landed at ~290 s instead of the 90 s the user asked for. Because
+	// _testRoom rides the stage pick, CloseStage re-arms AFTER the pick; the boot call covers
+	// a launch that never opens the card.
+	private void ArmHordeClock()
+	{
+		_hordeEventDue = _testRoom ? 0.0 : HORDE_EVENT_FIRST_AT; // TEST ROOM: bonus swarms disarmed - the rotation is the ONLY body lane, so one kind is testable at a time
+	}
+	// the ring's floor read lives here so BOTH doors arm it: the M1_TEST_ROOM=1 bench valve at
+	// boot, and CloseStage once a card pick lands on the room. Guarded so the two switches can
+	// never build a second copy of the disc.
+	private void BuildTrainingRing()
+	{
+		// guarded: the env valve at boot and the stage card both call this, so the disc exists
+		// after the first one
+		if (!_testRoom || _testRingDisc != null)
+			return;
+		_testRingDisc = new Polygon2D();
+		_testRingDisc.Name = "TrainingRing";
+		_testRingDisc.ZIndex = -12; // above the floor patches (-15), under every body
+		_testRingDisc.Modulate = new Color(0.42f, 0.66f, 0.45f, 0.14f); // sage fill, faint so bodies stay legible
+		_testRingDisc.Position = _testRingAt;
+		Vector2[] disc = new Vector2[48]; // 48-gon: smooth enough at ring scale, zero Rng
+		for (int ir = 0; ir < 48; ir++)
+			disc[ir] = new Vector2((float)System.Math.Cos(System.Math.PI * 2.0 * ir / 48.0) * _testRingR, (float)System.Math.Sin(System.Math.PI * 2.0 * ir / 48.0) * _testRingR);
+		_testRingDisc.Polygon = disc;
+		AddChild(_testRingDisc);
+		_testRingRim = new Line2D();
+		_testRingRim.Name = "TrainingRingRim";
+		_testRingRim.ZIndex = -11; // the edge reads over its own fill
+		_testRingRim.Width = 3.0f;
+		_testRingRim.Modulate = new Color(0.55f, 0.85f, 0.6f, 0.6f);
+		_testRingRim.Position = _testRingAt;
+		Vector2[] rim = new Vector2[49]; // closed by hand: the 49th point = the 1st
+		for (int ir2 = 0; ir2 < 49; ir2++)
+			rim[ir2] = new Vector2((float)System.Math.Cos(System.Math.PI * 2.0 * (ir2 % 48) / 48.0) * _testRingR, (float)System.Math.Sin(System.Math.PI * 2.0 * (ir2 % 48) / 48.0) * _testRingR);
+		_testRingRim.Points = rim;
+		AddChild(_testRingRim);
+		_testRingTag = new Label();
+		_testRingTag.Name = "TrainingRingTag";
+		_testRingTag.ZIndex = -10; // over the fill + rim, still under the bodies (5)
+		_testRingTag.Modulate = new Color(0.65f, 0.9f, 0.68f, 0.8f);
+		_testRingTag.Text = "TRAINING RING - +1 xp/sec while you stand here";
+		_testRingTag.Position = _testRingAt + new Vector2(-150.0f, -10.0f); // beside the center, clear of the rim
+		AddChild(_testRingTag);
 	}
 	// one shared swap rule (bench valve + select door): promote seat, demote the old
 	// Leader - it waits for its join beat like any other recruit - and carry the arena
@@ -4709,7 +5170,7 @@ private void UpdateSpirits(float delta)
 	}
 	private void BuildJoinLottery()
 	{
-		int row = STAGE_NUMBER - 1;
+		int row = _stage; // row = registry index: the stage pick lands BEFORE this (see CloseStage / the boot gate)
 		if (row < 0)
 			row = 0;
 		if (row >= JOIN_W.Length)
@@ -4762,7 +5223,7 @@ private void UpdateSpirits(float delta)
 			PartyMember pm2 = GetMemberByIndex(_joinOrder[s]);
 			names += (names == "" ? "" : " > ") + (pm2 != null ? pm2.displayName : "?");
 		}
-		GD.Print("[10thAge] join lottery (stage " + STAGE_NUMBER + "): " +
+		GD.Print("[10thAge] join lottery for " + StageBadge() + ": " +
 				 (names == "" ? "no recruits - the leader owns the whole roster" : names));
 		// HUD strip order = JOIN order (user 2026-10-24): the leader owns the top strip and
 		// each recruit appends the next one, so a Yu-first draw no longer paints Yu on its
@@ -4947,7 +5408,7 @@ private void UpdateSpirits(float delta)
 			_campfire = scn.Instantiate() as Godot.CanvasLayer;
 			// party_data must land BEFORE AddChild: the screen builds its cards in _ready()
 			_campfire.Set("party_data", CampfireCards());
-			_campfire.Set("stage_name", STAGE_NAME);
+			_campfire.Set("stage_name", StageName());
 			AddChild(_campfire);
 			// the instantiated scene root IS the "Campfire" node the signals live on
 			_campfire.Connect("rest_chosen", new Callable(this, "_OnCampfireChosen"));
@@ -5217,6 +5678,11 @@ private void UpdateSpirits(float delta)
 				SelectClick(mb.Position); // the card owns the mouse: fractions decide
 				return;
 			}
+			if (_stageHold)
+			{
+				StageClick(mb.Position); // the stage card owns the mouse the same way (parked hidden under the leader card until CloseSelect hands over)
+				return;
+			}
 			if (_joinWaiting)
 				ClearJoinBanner("click");
 		}
@@ -5257,7 +5723,7 @@ private void UpdateSpirits(float delta)
 			}
 			_summary = scn.Instantiate() as Godot.CanvasLayer;
 			_summary.Set("result", s.Contains("VICTORY") ? "victory" : "tpk");
-			_summary.Set("stage_name", STAGE_NAME);
+			_summary.Set("stage_name", StageName());
 			_summary.Set("level", _level);
 			_summary.Set("xp_total", (int)_xpTotal);
 			_summary.Set("members", SummaryCards());
@@ -5537,7 +6003,7 @@ private void UpdateSpirits(float delta)
 			_pauseCard = scn.Instantiate() as Godot.CanvasLayer;
 			// Set lands BEFORE AddChild: the card builds its columns in _ready()
 			_pauseCard.Set("members", PauseCards());
-			_pauseCard.Set("stage_name", STAGE_NAME);
+			_pauseCard.Set("stage_name", StageName());
 			AddChild(_pauseCard);
 			// the instantiated scene root IS the "PauseMenu" node the signals live on
 			_pauseCard.Connect("target_changed", new Callable(this, "_OnPauseTarget"));

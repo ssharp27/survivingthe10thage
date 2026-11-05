@@ -34,9 +34,10 @@ public partial class Director : Godot.Node2D
     // ---------- ENEMY TEST ROOM (user 2026-11-07: "let's build the enemy test room.
     // Functionally ... spawn an enemy every 15-20 seconds ... rotate through every enemy
     // for stage 1 at the moment for testing") ----------
-    // M1_TEST_ROOM=1 is the dev door today: the stage select card that makes the room
-    // hand-picked from an ordinary launch is the NEXT pass, so a human dev launch
-    // prefixes M1_TEST_ROOM=1 exactly like the bench seats do. In the room the budget
+    // The room is NOW hand-picked from an ordinary launch: the stage select card seats it
+    // (CloseStage flips _testRoom off the registry), so a human never has to prefix an env
+    // valve. M1_TEST_ROOM=1 stays as the bench/dev door so headless gates skip the card.
+    // In the room the budget
     // curve / tier gates / escort hordes / horde EVENTS all stay OUT: one body every
     // 15-20 s cycles the FULL stage-1 roster (TEST_KINDS) at base stats, so every AI
     // lane gets a turn on the shortest honest clock. Budgeted ordinary spawns (one
