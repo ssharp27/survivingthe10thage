@@ -31,6 +31,22 @@ public partial class Director : Godot.Node2D
     const bool OGRE_AT_RUN_START = false; // user 2026-11-06 playtest: "remove the one at boot" - the forced opener is gone, the tier-4 roll owns ogre entry again
     bool _ogreAtStart = OGRE_AT_RUN_START; // consumed by the first ordinary spawn
 
+    // ---------- ENEMY TEST ROOM (user 2026-11-07: "let's build the enemy test room.
+    // Functionally ... spawn an enemy every 15-20 seconds ... rotate through every enemy
+    // for stage 1 at the moment for testing") ----------
+    // M1_TEST_ROOM=1 is the dev door today: the stage select card that makes the room
+    // hand-picked from an ordinary launch is the NEXT pass, so a human dev launch
+    // prefixes M1_TEST_ROOM=1 exactly like the bench seats do. In the room the budget
+    // curve / tier gates / escort hordes / horde EVENTS all stay OUT: one body every
+    // 15-20 s cycles the FULL stage-1 roster (TEST_KINDS) at base stats, so every AI
+    // lane gets a turn on the shortest honest clock. Budgeted ordinary spawns (one
+    // body vs cap 40: the cap never binds here).
+    float _testTimer = 2.0f; // first body lands ~2 s in so the room reads alive immediately
+    int _testIdx = 0;        // rotation cursor: one cycle = the whole stage-1 ladder
+    static readonly string[] TEST_KINDS = { "goblin", "wolf", "hobgoblin", "rider", "riderbow", "mage", "ogre" }; // every stage-1 body: the two rider kinds and the mage ride as LONE test bodies (no packs) so each AI lane gets a clean turn
+    const float TEST_EVERY_LO = 15.0f; // USER cadence: "every 15-20 seconds"
+    const float TEST_EVERY_HI = 20.0f;
+
     public override void _Process(double d)
     {
         Game g = GetParent() as Game;
@@ -38,6 +54,14 @@ public partial class Director : Godot.Node2D
             return;
         if (g.GetWorldPause())
             return; // picker / join-banner soft pause: the horde holds its march while a card is up
+        // ENEMY TEST ROOM: the rotation lane owns the whole march - the budget curve, tier gates,
+        // escort hordes, packs and horde events never run, so each stage-1 kind gets one clean
+        // turn on the shortest honest clock.
+        if (g.GetTestRoom())
+        {
+            TestRotation(g, (float)d);
+            return;
+        }
         // M1 read the stage as raw ints and hand-picked which states spawned; the beat
         // table means there is one marching state, so ask the stage whether it marches.
         if (!g.GetHordeActive())
@@ -283,5 +307,59 @@ public partial class Director : Godot.Node2D
         }
         g.AdvanceHordeSchedule();
         GD.Print("[10thAge] (horde) bonus swarm: " + n + " goblins fan in on one bearing, budget-free (xp per body)");
+    }
+
+    // ENEMY TEST ROOM rotation (user 2026-11-07): one body every 15-20 s (USER cadence), cycling
+    // TEST_KINDS so EVERY stage-1 creature gets a turn. Placement rides the same off-camera edge
+    // ray as ordinary spawns. A near-party guard RE-ROLLS on the same kind (_testTimer = 1 s)
+    // without eating the cursor, so the ladder still walks the whole roster.
+    private void TestRotation(Game g, float d)
+    {
+        _testTimer -= d * (float)g.GetTimeWarp(); // warp speed charges the cadence like every other leg
+        if (_testTimer > 0.0f)
+            return;
+        Vector2 cen = g.GetCameraCenter();
+        Vector2 half = g.GetVisibleHalfExtents();
+        float a = (float)GD.Randf() * (float)(System.Math.PI * 2.0);
+        Vector2 unit = new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a));
+        double tx = System.Math.Abs(unit.X) > 0.001 ? half.X / System.Math.Abs(unit.X) : 1e30;
+        double ty = System.Math.Abs(unit.Y) > 0.001 ? half.Y / System.Math.Abs(unit.Y) : 1e30;
+        double reach = System.Math.Min(tx, ty) + 60.0;
+        Vector2 pos = cen + unit * (float)reach;
+        if (g.GetLeader() != null && pos.DistanceTo(g.GetLeader().GlobalPosition) < 260.0f)
+        {
+            _testTimer = 1.0f; // retry NEXT clock on the same kind: the rotation never skips a body
+            return;
+        }
+        string kind = TEST_KINDS[_testIdx % TEST_KINDS.Length];
+        _testIdx++;
+        SpawnTestBody(g, pos, kind, (float)g.GetHordeScale());
+        _testTimer = TEST_EVERY_LO + (float)GD.Randf() * (TEST_EVERY_HI - TEST_EVERY_LO);
+        GD.Print("[10thAge] (test) rotation " + _testIdx + ": " + kind + " enters (15-20 s cadence, full stage-1 roster)");
+    }
+
+    // Test bodies ride the SAME numbers as the ordinary tier lane (USER HP/speed/contact/ranged/XP
+    // per kind), so what the user watches in the room is what the stage does. hordeScale is 1.0 in
+    // the room (no rest scaling) but the read keeps the math identical to Spawn()/SpawnOgre().
+    private void SpawnTestBody(Game g, Vector2 at, string kind, float hordeScale)
+    {
+        Enemy e = new Enemy();
+        e.kind = kind;
+        float hp = 30.0f, spd = 90.0f, contact = 2.0f, ranged = 0.0f, xp = 1.0f;
+        if (kind == "wolf") { hp = 70.0f; spd = 120.0f; contact = 3.0f; xp = 2.0f; }
+        else if (kind == "hobgoblin") { hp = 60.0f; spd = 100.0f; contact = 3.0f; xp = 3.0f; }
+        else if (kind == "rider") { hp = 100.0f; spd = 110.0f; contact = 4.0f; xp = 5.0f; }
+        else if (kind == "riderbow") { hp = 60.0f; spd = 110.0f; contact = 4.0f; ranged = 3.0f; xp = 5.0f; }
+        else if (kind == "mage") { hp = 40.0f; spd = 70.0f; contact = 4.0f; ranged = 6.0f; xp = 6.0f; }
+        else if (kind == "ogre") { hp = 220.0f; spd = 55.0f; contact = 4.0f; xp = 10.0f; }
+        e.maxHp = hp * hordeScale;
+        e.hp = e.maxHp;
+        e.speed = spd;
+        e.contactDamage = contact;
+        e.rangedDamage = ranged;
+        e.xpValue = xp;
+        e.GlobalPosition = at;
+        g.RegisterEnemy(e);
+        g.AddChild(e);
     }
 }

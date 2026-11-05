@@ -152,6 +152,27 @@ public partial class Game : Godot.Node2D
 	bool _reaperSpawned = false;
 	bool _reaperEnabled = false; // TEST BENCH default OFF; M1_REAPER=1 re-enables it
 
+	// ---------- ENEMY TEST ROOM (user 2026-11-07: "let's build the enemy test room ... spawn an
+	// enemy every 15-20 seconds ... rotate through every enemy for stage 1 at the moment ... also
+	// add a circle section that gives constant XP at 1 per second that we can sit in to level up
+	// so I'm not testing only with level 1 characters") ----------
+	// M1_TEST_ROOM=1 boots the room INSIDE this scene: Director.cs owns the rotation lane, the
+	// training ring below is the XP faucet. The stage-select card that makes the room hand-picked
+	// from an ordinary launch is the NEXT pass, so today a human dev launch prefixes the env var
+	// exactly like the bench seats do. Only the STAGE SCHEDULE is held back (no ally joins, bosses,
+	// camp, victory, horde events or rest scaling): death saves, revive, TPK and gem drops stay
+	// exactly as the shipped game routes them.
+	bool _testRoom = false;     // boot door, read from M1_TEST_ROOM at the env-switch rail
+	// The ring sits on the squad's start point (Main.tscn parks the roster at (0,0)), so a pilot
+	// bench stands inside it with zero steering and the faucet prints on their own.
+	Vector2 _testRingAt = new Vector2(0.0f, 0.0f);
+	float _testRingR = 240.0f; // assistant pick: outside the party's leash, walkable out of
+	double _testXpPerSec = 1.0; // USER rate: "constant XP at 1 per second"
+	double _testXpAccru = 0.0;  // sub-second drip; whole points feed the REAL AddXp -> picker lane
+	Godot.Polygon2D _testRingDisc = null; // sage fill: the ring READS as an area, not a lone outline
+	Godot.Line2D _testRingRim = null;     // rim so the edge sits exactly where the hit test does
+	Godot.Label _testRingTag = null;      // tag over the center: what standing in it does
+
 	// ---------- xp / level ----------
 	double _xp = 0.0;
 	double _xpTotal = 0.0;
@@ -1460,6 +1481,8 @@ public void RegisterEnemy(Combatant e)
 	// schedule instead of M1's fixed five-state chain
 	private string BeatLabel()
 	{
+		if (_testRoom)
+			return "TEST ROOM"; // the room runs no beat table: say what is live instead of a leg
 		if (_beatIdx < 0)
 			return "horde I";
 		switch (BEAT_KIND[_beatIdx])
@@ -1845,6 +1868,16 @@ public void RegisterEnemy(Combatant e)
 		}
 		_pilot = OS.GetEnvironment("M1_PILOT") != null && OS.GetEnvironment("M1_PILOT") != "";
 		_devSkip = OS.GetEnvironment("M1_DEV_SKIP") == null ? "" : OS.GetEnvironment("M1_DEV_SKIP");
+		// ENEMY TEST ROOM (user 2026-11-07): M1_TEST_ROOM=1 boots the dev room INSIDE this scene,
+		// like every other bench door (M1_PILOT / M1_DEV_SKIP / M1_REAPER). Director.cs then owns
+		// the spawn lane - one body every 15-20 s cycling the FULL stage-1 roster - and the stage
+		// SCHEDULE is held back (no ally joins, no bosses, no camp, no victory, no horde events,
+		// no rest scaling), while death saves, revive, TPK and gem drops stay exactly as shipped.
+		// The stage-select card that lets a human pick the room from an ordinary launch is the
+		// NEXT pass, so today the launch line prefixes M1_TEST_ROOM=1.
+		_testRoom = OS.GetEnvironment("M1_TEST_ROOM") != null && OS.GetEnvironment("M1_TEST_ROOM") != "";
+		if (_testRoom)
+			GD.Print("[10thAge] (test) ENEMY TEST ROOM live: one body every 15-20 s cycling the stage-1 roster, beats held back, training ring +1 xp/sec at (0,0)");
 		// TEST BENCH only (same discipline as M1_PILOT / M1_DEV_SKIP / M1_REAPER): M1_LEADER=<name>
 		// moves the leader seat to another roster PC at boot so a smoke run can stand under a
 		// given leader bonus; human play never sets it and keeps the Main.tscn export (Baldrun).
@@ -1883,7 +1916,7 @@ public void RegisterEnemy(Combatant e)
 				// HORDE EVENT clock arms AT BOOT (user 2026-11-06 playtest: "the first horde spawned at 290s,
 				// we should have them start way sooner" - the mini-boss-relative arm landed that late, so the
 				// schedule now opens at HORDE_EVENT_FIRST_AT absolute run-seconds inside the opening legs)
-				_hordeEventDue = HORDE_EVENT_FIRST_AT;
+				_hordeEventDue = _testRoom ? 0.0 : HORDE_EVENT_FIRST_AT; // TEST ROOM: bonus swarms disarmed - the rotation is the ONLY body lane, so one kind is testable at a time
 		// the reaper is a pure death/revive TEST BENCH (no balance meaning): human play
 		// left it OFF now that the revive rules work, and M1_REAPER=1 puts it back on
 		// for testing (a pilot smoke with it ON still TPKs often - the Leader-down rule
@@ -1956,6 +1989,39 @@ public void RegisterEnemy(Combatant e)
 			AddChild(p);
 			_floorPatches.Add(p); // folded per frame like every other entity: the ground
 								  // cover scrolls AND loops, so the wrap reads seamless
+		}
+		// ENEMY TEST ROOM: the training ring's floor READ. sage disc + hand-closed rim + tag, all at
+		// the faucet's center/radius, so what the eye judges is what the hit test actually uses.
+		if (_testRoom)
+		{
+			_testRingDisc = new Polygon2D();
+			_testRingDisc.Name = "TrainingRing";
+			_testRingDisc.ZIndex = -12; // above the floor patches (-15), under every body
+			_testRingDisc.Modulate = new Color(0.42f, 0.66f, 0.45f, 0.14f); // sage fill, faint so bodies stay legible
+			_testRingDisc.Position = _testRingAt;
+			Vector2[] disc = new Vector2[48]; // 48-gon: smooth enough at ring scale, zero Rng
+			for (int ir = 0; ir < 48; ir++)
+				disc[ir] = new Vector2((float)System.Math.Cos(System.Math.PI * 2.0 * ir / 48.0) * _testRingR, (float)System.Math.Sin(System.Math.PI * 2.0 * ir / 48.0) * _testRingR);
+			_testRingDisc.Polygon = disc;
+			AddChild(_testRingDisc);
+			_testRingRim = new Line2D();
+			_testRingRim.Name = "TrainingRingRim";
+			_testRingRim.ZIndex = -11; // the edge reads over its own fill
+			_testRingRim.Width = 3.0f;
+			_testRingRim.Modulate = new Color(0.55f, 0.85f, 0.6f, 0.6f);
+			_testRingRim.Position = _testRingAt;
+			Vector2[] rim = new Vector2[49]; // closed by hand: the 49th point = the 1st
+			for (int ir2 = 0; ir2 < 49; ir2++)
+				rim[ir2] = new Vector2((float)System.Math.Cos(System.Math.PI * 2.0 * (ir2 % 48) / 48.0) * _testRingR, (float)System.Math.Sin(System.Math.PI * 2.0 * (ir2 % 48) / 48.0) * _testRingR);
+			_testRingRim.Points = rim;
+			AddChild(_testRingRim);
+			_testRingTag = new Label();
+			_testRingTag.Name = "TrainingRingTag";
+			_testRingTag.ZIndex = -10; // over the fill + rim, still under the bodies (5)
+			_testRingTag.Modulate = new Color(0.65f, 0.9f, 0.68f, 0.8f);
+			_testRingTag.Text = "TRAINING RING - +1 xp/sec while you stand here";
+			_testRingTag.Position = _testRingAt + new Vector2(-150.0f, -10.0f); // beside the center, clear of the rim
+			AddChild(_testRingTag);
 		}
 		// walls are retired with the wrap (user fix 2026-10-20): there is no edge to
 		// bump into anymore, and a painted border would fight the invisible fold box
@@ -2248,6 +2314,22 @@ public void RegisterEnemy(Combatant e)
 		if (!_pickerActive && !_joinWaiting && _state == StageState.PLAY)
 		{
 			_runT += d * _timeWarp; // TEST warp valve (1.0 = real-time: no M1_TIMEWARP = zero change)
+			// ENEMY TEST ROOM XP faucet (user: "a circle section that gives constant XP at 1 per
+			// second that we can sit in to level up so I'm not testing only with level 1
+			// characters"). The rate is the flat squad pool like kills feed it, so the level-up
+			// picker card opens exactly as it does mid-run. Riding the run-clock gate above means
+			// a picker / join card or a non-PLAY state never burns faucet xp.
+			if (_testRoom && TestRingStood() > 0)
+			{
+				_testXpAccru += d * _timeWarp * _testXpPerSec;
+				if (_testXpAccru >= 1.0)
+				{
+					int drip = (int)_testXpAccru;
+					_testXpAccru -= drip;
+					AddXp(drip); // the REAL xp lane: whole points only, so the picker rail sees normal steps
+					GD.Print("[10thAge] (xp) training ring: +" + drip + " xp (" + TestRingStood() + " members stood in the ring)");
+				}
+			}
 			if (_recruitPending != null)
 				_escortTimeout += d; // an abandoned cage still ends: the stage must keep moving
 		}
@@ -2356,7 +2438,10 @@ public void RegisterEnemy(Combatant e)
 					+ "s - " + _recruitPending.displayName + " joins at the floored HP");
 				JoinRecruit();
 			}
-			AdvanceBeats();
+			if (!_testRoom)
+				AdvanceBeats(); // ENEMY TEST ROOM: the whole beat table is held back - no ally
+				// joins, no mini/mid/final bosses, no campfire, no VICTORY. The room tests BODIES,
+				// not the stage, so nothing can end the run except a real TPK.
 			break;
 			case StageState.CAMPFIRE:
 				// player-driven rest beat: the ui/Campfire screen emits rest_chosen and
@@ -5533,6 +5618,29 @@ private void UpdateSpirits(float delta)
 		PrintSummary("TPK - the whole party is down");
 	}
 
+
+	// ENEMY TEST ROOM door: Director.cs's rotation lane consumes this. Ordinary launches never set
+	// M1_TEST_ROOM, so the budget curve / tier gates / escort hordes / packs run untouched.
+	public bool GetTestRoom()
+	{
+		return _testRoom;
+	}
+
+	// how many JOINED members stand inside the training ring right now. Wrap-aware like every
+	// other distance test in the looping world, so walking out past the fold pauses the faucet
+	// instead of silently re-entering it on the far side.
+	private int TestRingStood()
+	{
+		int n = 0;
+		foreach (PartyMember pm in _party)
+		{
+			if (!pm.joined || pm.eliminated)
+				continue; // a PC that never joined (or is out until camp) cannot stand in the ring
+			if (WrapDelta(pm.GlobalPosition, _testRingAt).LengthSquared() <= _testRingR * _testRingR)
+				n++;
+		}
+		return n;
+	}
 
 	private static string StateName(StageState s)
 	{
