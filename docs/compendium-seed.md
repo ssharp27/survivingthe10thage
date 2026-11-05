@@ -18,6 +18,26 @@ Card copy must instead be honest that bonuses COMPOUND per rank.
 - KIND 1 (points): additive on the BASE (crit chance 5% seed, crit damage 1.5 seed, hp on authored maxHp).
 - KIND 2 (count): additive strikes/familiars (multishot +1 bolt per rank).
 
+## DoT crossfire — verified math (locked 2026-11-07, source: src/Combatant.cs DOT_VULN / UniqueDoTs / TakeDamage)
+
+The user's DoT QoL rule: enemies take **+5% more incoming damage per UNIQUE DoT running on them**,
+HALF that on bosses so they don't get too easy. Copy must say **per unique DoT**, never "per hit".
+
+- Counted **at the hit** from the LIVE window pairs — `burnT > 0` / `bleedT > 0` / `poisonT > 0`
+  — one count per PAIR, never per stack. Re-striking the same venom never double-dips, and an
+  expired DoT stops paying. Three DoTs live at once = **+15%** (bosses **+7.5%**).
+- Boss branch = kinds `boss1 / boss2 / final / mini / mini1 / mini2` (`Combatant.IsBossBody()`,
+  a mirror of `Game.IsBossKind`).
+- It multiplies the SAME rail guiding light rides (`amount *= (1 + vulnMul)` then `*= (1 + cb)`),
+  so the two VULNERABILITY sources **COMPOUND** exactly as the locked compounding decision wants:
+  guiding light +30% + two DoTs live = `1.30 x 1.10` = **+43% incoming**.
+- The DoT TICKS themselves call `TakeDamage`, so they ride the bonus too — a body already
+  poisoned by Brook and burning from Stack has its poison tick boosted by the crossfire as well.
+- **NOT a tag slot**: tag 15 `vulnerability` stays the guiding-light surface (`Combatant.vulnMul`)
+  only, because `Vulnerable()` is max-mark / refresh-never-stack and three DoTs could never
+  stack through it. Every FUTURE DoT pair adds one count line to `UniqueDoTs()` and inherits
+  the bonus for free — the compendium must re-read that rail, not hardcode "three DoTs".
+
 ## Level-up cards — verified percentage tables (2026-11-04, from OPT_* tables Game.cs 176-254)
 
 Attack-speed cards read as SPEED GAIN (1/0.86 = +16%, 1/0.85 = +18%).
@@ -117,3 +137,8 @@ Counts stay counts. All ranks cap at 3/3 (rank 4 = evolution, M2 parked content)
    ShowBreakdown stats sheet (Game.cs 4307-4320), StatTags NAMES (StatTags.cs 62-68),
    camp pair (ui/Campfire.tscn static text + ui/Campfire.gd _rest_summary 309/310),
    summary + pause cards (ui/RunSummary.tscn/.gd, ui/PauseMenu.gd 45/260/263/319).
+5. Crossfire copy must name the **UNIQUE DoT** rule and the **HALF on bosses** branch: it is a
+   body-wide incoming-damage bonus computed at the hit, so it never reads as a card bonus, it
+   disappears when the DoT window expires, and it COMPOUNDS with guiding light (see the section
+   above). Keep it separate from the DoT duration trap — burn 5 s / bleed 4 s / poison 5 s windows
+   are baked at the call sites, and only their LIVE state feeds the count.
