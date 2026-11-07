@@ -123,6 +123,27 @@ above keeps field drops out of the additive meta pool.
   they take the deepest mark, and it COMPOUNDS with crossfire per the section above.
 - Field lifetime `LIFE_D = 18 s`, walk-over pick radius `PICK_R = 18 px`: reaching it is a choice, not free.
 
+## Motion language — walking without sprite frames (assistant-picked knobs, 2026-11-08, source: src/Enemy.cs GAIT_* + src/PartyMember.cs rig)
+
+NO sprite animation anywhere: every creature and PC is ONE static pose, and all of its life comes
+from the transform rig. Compendium copy describes motion, it never promises frames. There are TWO
+distinct motion languages, so copy must not describe them alike:
+
+- **THE PARTY = a table slide** — lateral sway + dip + lean trailing the push (`PartyMember.cs`
+  ~1922). They are minis on a board, and that is the point of the contrast.
+- **CREATURES = a two-beat gait** (`Enemy.cs`): `abs(sin)` heel, so the TROUGHS plant like footsteps
+  instead of floating. Cadence is one step per `GAIT_STRIDE = 26` px of REAL travel, which means the
+  step rate tracks speed AND THE GAIT DIES when the body stops — a coiled, loitering, winding-up or
+  plain-stopped body stands LEVEL (user pick: no idle breath). Stride energy is `px/s / GAIT_REF 120`
+  and scales lift (`4.2` hob / `3.2` wolf / `3.0` px else), squash (wide-flat at the plant, tall-narrow
+  at the apex, `6%` — ogre `10%`) and the `0.075` rad lean INTO travel.
+- The gait reads the body's OWN wrap-aware displacement (one frame of lag), so no movement lane has
+  to hand a velocity to the visuals, and all of it is visuals-only: the hitbox is the ENEMY node and
+  the ogre telegraph disc is its CHILD, so squash + lean cannot nudge anything.
+
+
+
+
 ## Level-up cards — verified percentage tables (2026-11-04, from OPT_* tables Game.cs 176-254)
 
 Attack-speed cards read as SPEED GAIN (1/0.86 = +16%, 1/0.85 = +18%).
@@ -231,3 +252,9 @@ Counts stay counts. All ranks cap at 3/3 (rank 4 = evolution, M2 parked content)
    bubble for a window (it is not an XP injection and it never pays XP by itself), and that the rage
    vial is an incoming-damage MARK on the body — max-mark / refresh-never-stack like guiding light, so
    copy must never read "stacks" or "+20% per vial".
+
+
+7. Motion copy must NEVER say "animated" or "sprite frames" — the art is one pose and every step is
+   procedural. Keep the two languages distinct (party = table slide, creatures = two-beat gait), and
+   never quote a step height, stride length or lean angle in copy: they are assistant-picked knobs the
+   user retunes by feel.
