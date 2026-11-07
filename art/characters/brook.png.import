@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://y8i2yom81atk"
-path="res://.godot/imported/alvora.png-0d7d96f16ab62bdf0e79975cb2232eb0.ctex"
+uid="uid://b8uotfxqt4jie"
+path="res://.godot/imported/brook.png-f00a3cfc7a8f615aecab4cab20afce0c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/alvora.png"
-dest_files=["res://.godot/imported/alvora.png-0d7d96f16ab62bdf0e79975cb2232eb0.ctex"]
+source_file="res://art/characters/brook.png"
+dest_files=["res://.godot/imported/brook.png-f00a3cfc7a8f615aecab4cab20afce0c.ctex"]
 
 [params]
 

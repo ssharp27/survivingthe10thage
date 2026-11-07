@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ptrlm1gnxlgv"
-path="res://.godot/imported/baldrun.png-2daf751cc35296c2e5cc6b36ae71b2af.ctex"
+uid="uid://cmcr8nq1yeuuv"
+path="res://.godot/imported/yu.png-e4acb73580e26817787179d5ecae105d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/baldrun.png"
-dest_files=["res://.godot/imported/baldrun.png-2daf751cc35296c2e5cc6b36ae71b2af.ctex"]
+source_file="res://art/characters/yu.png"
+dest_files=["res://.godot/imported/yu.png-e4acb73580e26817787179d5ecae105d.ctex"]
 
 [params]
 

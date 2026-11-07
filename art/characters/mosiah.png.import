@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://blmaq77yd7x1f"
-path="res://.godot/imported/bruno.png-c8357b68a5956ecc6be9e5df173cfec3.ctex"
+uid="uid://cbo35kpw6lae2"
+path="res://.godot/imported/mosiah.png-098d2fc5ef7fe12b7f2707f77d0f2438.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/bruno.png"
-dest_files=["res://.godot/imported/bruno.png-c8357b68a5956ecc6be9e5df173cfec3.ctex"]
+source_file="res://art/characters/mosiah.png"
+dest_files=["res://.godot/imported/mosiah.png-098d2fc5ef7fe12b7f2707f77d0f2438.ctex"]
 
 [params]
 

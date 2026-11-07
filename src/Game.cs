@@ -4441,7 +4441,9 @@ private void UpdateSpirits(float delta)
 	static readonly bool[] SEL_LOCKED = { false, false, false, false, false, false, false, false, false, };
 	static readonly float[] SEL_CONFIRM = { 0.32f, 0.88f, 0.58f, 0.96f };
 	// painted mini art per roster seat (index = memberIndex: 0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash | 7 Bruno | 8 Brook)
-		static readonly string[] SEL_ART = { "res://art/baldrun.png", "res://art/mosiah.png", "res://art/asper.png", "res://art/alvora.png", "res://art/yu.png", "res://art/stack.png", "res://art/wash.png", "res://art/bruno.png", "res://art/brook.png" };
+		// art reorganised 2026-11-08 (user: "move all the current characters into the character folder")
+		// - portraits now live under res://art/characters/ alongside the art/enemies/ tree
+		static readonly string[] SEL_ART = { "res://art/characters/baldrun.png", "res://art/characters/mosiah.png", "res://art/characters/asper.png", "res://art/characters/alvora.png", "res://art/characters/yu.png", "res://art/characters/stack.png", "res://art/characters/wash.png", "res://art/characters/bruno.png", "res://art/characters/brook.png" };
 		static readonly string[] SEL_BONUS = {
 		"Leader Bonus: Chain Lightning - All attacks have a 5% chance to unleash lightning on 5 targets for 10 damage.",
 		"Leader Bonus: Pierce - All attacks gain +1 Pierce and all allies gain +5% Evasion.",
@@ -5871,9 +5873,9 @@ private void UpdateSpirits(float delta)
 		card["idx"] = m.memberIndex;
 		card["upgrade_block"] = UpgradeBlock(m); // user 2026-11-06 playtest: ONE condensed line per track, compounded
 		card["target_mode"] = m.targetMode;
-		// the card's mini: art is res://art/<lowercased name>.png; the card skips it if
-		// the load misses, so a kit without a mini still shows its column
-		card["art"] = "res://art/" + m.displayName.ToLower() + ".png";
+		// the card's mini: art is res://art/characters/<lowercased name>.png (2026-11-08 art
+		// reorg); the card skips it if the load misses, so a kit without a mini still shows its column
+		card["art"] = "res://art/characters/" + m.displayName.ToLower() + ".png";
 		return card;
 	}
 

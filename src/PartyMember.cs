@@ -502,11 +502,9 @@ public partial class PartyMember : Godot.Node2D
 
 	public double assT = 0.0;
 
-	Godot.Node2D _telePivot; // telegraph armature (pure nodes: C# _draw is dead in 4.7)
-
-	Godot.ColorRect[] _teleParts;
-
-	float _teleHold = 0.0f; // telegraph visibility timer, set on each swing
+	// telegraph spoke armature REMOVED 2026-11-08 (user request): the _telePivot /
+	// _teleParts / _teleHold trio and every use-site (construction, idle gate, fade
+	// decay, swing site) are gone; melee kits read their swing from fx art only.
 
 	// Spirit Guardians armature: motes orbiting under ONE pivot, so a single Scale change carries
 
@@ -736,23 +734,23 @@ public partial class PartyMember : Godot.Node2D
 
 		if (displayName == "Baldrun")
 
-			miniPath = "res://art/baldrun.png";
+			miniPath = "res://art/characters/baldrun.png";
 
 		else if (displayName == "Mosiah")
 
-			miniPath = "res://art/mosiah.png";
+			miniPath = "res://art/characters/mosiah.png";
 
 		else if (displayName == "Asper")
 
 			// 152-163 region: name -> art lookup (Asper art audit-passed, rim/scale carry over)
 
-			miniPath = "res://art/asper.png";
+			miniPath = "res://art/characters/asper.png";
 
 		else if (displayName == "Alvora")
 
 			// Alvora art audit-passed the same class 2026-10-23 - rim/scale carry over
 
-			miniPath = "res://art/alvora.png";
+			miniPath = "res://art/characters/alvora.png";
 
 		else if (displayName == "Yu")
 
@@ -766,7 +764,7 @@ public partial class PartyMember : Godot.Node2D
 
 			// 17.5 px up from the canvas edge - so the rim pin is MEASURED, not carried over
 
-			miniPath = "res://art/yu.png";
+			miniPath = "res://art/characters/yu.png";
 
 			miniRim = 17.5f;   // rig origin pinned to the base ellipse centre (topple + dash plate)
 
@@ -778,7 +776,7 @@ public partial class PartyMember : Godot.Node2D
 
 			// colours, 1-2 px margins, cx_delta 0.0) - margins match the class, so scale/rim carry
 
-			miniPath = "res://art/stack.png";
+			miniPath = "res://art/characters/stack.png";
 
 		else if (displayName == "Wash")
 
@@ -788,7 +786,7 @@ public partial class PartyMember : Godot.Node2D
 
 			// at the canvas edge like the class, so scale/rim carry over
 
-			miniPath = "res://art/wash.png";
+			miniPath = "res://art/characters/wash.png";
 
 		else if (displayName == "Bruno")
 
@@ -800,7 +798,7 @@ public partial class PartyMember : Godot.Node2D
 
 			// 			// scale/rim carry over; the wider cx_delta is his two-handed axe stance, honest
 
-			miniPath = "res://art/bruno.png";
+			miniPath = "res://art/characters/bruno.png";
 
 		else if (displayName == "Brook")
 
@@ -812,7 +810,7 @@ public partial class PartyMember : Godot.Node2D
 
 			// scale/rim carry over; his cx_delta sits centred like the class
 
-			miniPath = "res://art/brook.png";
+			miniPath = "res://art/characters/brook.png";
 
 		if (miniPath != "")
 
@@ -1028,55 +1026,8 @@ public partial class PartyMember : Godot.Node2D
 
 		AddChild(_chanFill);
 
-		// telegraph: a pivot + thin ColorRect "spokes" radiating along facing. The
-
-		// maul is a ~150 deg ARC CLEAVE (human-test locked): spokes show the fan
-
-		// edges + middle; the rapier stays one solid stab line. Pure nodes because
-
-		// both the C# _draw hook and drawing outside _draw are dead ends in 4.7.
-
-		_telePivot = new Godot.Node2D();
-
-		_telePivot.Name = "Telegraph";
-
-		AddChild(_telePivot);
-
-		bool maul = arcHalf > 0.5f; // maul kit: arc cleave, full damage per body (user 2026-10-23)
-
-		bool circle = arcHalf > 3.0f; // only a deliberate 360 deg kit gets a dial
-
-		int spokes = circle ? 12 : (maul ? 3 : 1);
-
-		float w = circle ? 4.0f : (maul ? 5.0f : 7.0f);
-
-		Color col = circle || maul ? new Color(1.0f, 0.55f, 0.2f, 0.45f)
-
-								   : new Color(0.5f, 1.0f, 1.0f, 0.55f);
-
-		_teleParts = new Godot.ColorRect[spokes];
-
-		for (int i = 0; i < spokes; i++)
-
-		{
-
-			Godot.ColorRect s = new Godot.ColorRect();
-
-			s.Size = new Vector2(range, w);
-
-			s.Position = new Vector2(0.0f, -w * 0.5f);
-
-			s.Rotation = circle ? (float)(System.Math.PI * 2.0 * i / 12.0)
-
-								: (spokes == 1 ? 0.0f : (float)(-arcHalf + 2.0 * arcHalf * i / (spokes - 1)));
-
-			s.Color = col;
-
-			_telePivot.AddChild(s);
-
-			_teleParts[i] = s;
-
-		}
+	// (telegraph spoke armature construction REMOVED 2026-11-08: temporary attack lines
+	// cut from the two melee members on the user request; nothing builds the pivot now.)
 
 		// Spirit Guardians ring (Alvora): six motes orbiting at the ring radius under one pivot.
 
@@ -1819,18 +1770,6 @@ public partial class PartyMember : Godot.Node2D
 		if (_mini != null)
 
 			_mini.Visible = !hidden; // same gate: campfire un-hides art and square alike
-
-		// the telegraph armature is a MELEE property: a bow shows its bolt in flight and the
-
-		// cleric shows orbiting guardians, so neither carries a fan of ground spokes. (The commit
-
-		// site already gated the swing; this is the IDLE frame, where the spokes would otherwise
-
-		// sit at their authored alpha forever on a member that never swings.)
-
-		if (_telePivot != null)
-
-			_telePivot.Visible = !hidden && weaponKit == "melee";
 
 		if (_ds != null)
 
@@ -2817,20 +2756,6 @@ public partial class PartyMember : Godot.Node2D
 
 		}
 
-		if (_teleHold > 0.0f)
-
-		{
-
-			_teleHold -= delta;
-
-			float a = _teleHold <= 0.0f ? 0.0f : _teleHold / 0.18f;
-
-			foreach (Godot.ColorRect s in _teleParts)
-
-				s.Modulate = new Color(a, a, a, a);
-
-		}
-
 		if (invuln > 0.0f)
 
 		{
@@ -3761,57 +3686,13 @@ public partial class PartyMember : Godot.Node2D
 
 		_atkFlash = shotKit ? 0.08f : 0.12f; // a shooter flashes a shorter draw, never red
 
-		// the telegraph armature is a MELEE property: a bow shows its bolt in flight, not a
+	// telegraph SPOKE armature removed 2026-11-08 (user: "remove the temporary attack lines
+	// for Baldrun and Mosiah") - the only members that still drew them (weaponKit melee);
+	// melee commits now read from their fx ART alone (sweep arc / lunge sliver).
 
-		// fan of spokes on the ground (that would read as a swing that never happened)
+	if (!shotKit)
 
-		if (!shotKit)
-
-		{
-
-			_telePivot.Rotation = facing;
-
-			_telePivot.Scale = new Vector2((float)stat[StatTags.AREA], (float)stat[StatTags.AREA]);
-
-			// rebuild the spokes for the LIVE arc: ranks open the maul fan, and the
-
-			// rotations baked at load time only knew the base arcHalf
-
-			if (_teleParts != null && _teleParts.Length > 1 && arcHalf <= 3.0f)
-
-			{
-
-				int nsp = _teleParts.Length;
-
-				for (int i = 0; i < nsp; i++)
-
-					_teleParts[i].Rotation = (float)(-arcEff + 2.0 * arcEff * i / (nsp - 1));
-
-			}
-
-			if (_meleeFx != null && !cleaver)
-
-			{
-
-				// user 2026-11-01: on the rapier the stab ART replaces the telegraph line (the
-
-				// user saw line + sliver drawn at once). Zero the spoke alpha outright: the
-
-				// decay only fades while _teleHold is live, so a dead hold alone would linger
-
-				_teleHold = 0.0f;
-
-				if (_teleParts != null)
-
-					foreach (Godot.ColorRect s in _teleParts)
-
-						s.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
-
-			}
-
-			else
-
-				_teleHold = 0.18f; // the maul keeps its ~150 deg fan spokes as the swing's telegraph
+	{
 
 			// fx art (user 2026-11-01 fix): the art FILLS the swing - the maul arc is authored
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ml7ye6l2xd0h"
-path="res://.godot/imported/stack.png-65cb00df22539a0b6383525ce7d8b5e8.ctex"
+uid="uid://f0vwsef2pr0s"
+path="res://.godot/imported/wash.png-25e180b12997084d312dee3dd25b7373.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/stack.png"
-dest_files=["res://.godot/imported/stack.png-65cb00df22539a0b6383525ce7d8b5e8.ctex"]
+source_file="res://art/characters/wash.png"
+dest_files=["res://.godot/imported/wash.png-25e180b12997084d312dee3dd25b7373.ctex"]
 
 [params]
 
