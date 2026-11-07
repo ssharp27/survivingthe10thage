@@ -146,6 +146,12 @@ func _init() -> void:
 	#   var jobs: Array = [
 	#       ["res://art/fx/shield_v5.jpg", "res://art/fx/shield.png", 48, 48],
 	#   ]
+	# Shipped handaxe batch (2026-11-08: axe_v1 chunky handaxe 32x32 box -> 13x32; user hand-edited
+	#   the PNG at the same 13x32 canvas (colours/bits only); axeFxArt untouched in both lanes):
+	#   var jobs: Array = [
+	#       ["res://art/fx/axe_v1.jpg", "res://art/fx/axe.png", 32, 32],
+	#   ]
+	# No live batch - edit THIS list for the next one.
 	var jobs: Array = []
 	for j in jobs:
 		prep(String(j[0]), String(j[1]), int(j[2]), int(j[3]))
