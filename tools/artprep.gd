@@ -132,17 +132,18 @@ func _row_back(data: PackedByteArray, w: int, h: int, y: int, corners: Array, bp
 
 func _init() -> void:
 	# JOBS = one row per generated sprite: [src, out, box_w, box_h]. EDIT THIS LIST each batch.
-	# Prior shipped batch (2026-11-08 fx + pickups; sources DELETED after conversion, outputs committed:
-	#   bee 48x48 box -> 39x48 | stinger 48x24 -> 46x24 | mage_fireball 40x40 -> 40x26 |
-	#   heart 40x40 -> 40x38 | orb 40x40 -> 39x40 | rage_flame 40x40 -> 28x40):
-	# Shipped 2026-11-08 re-roll batch (sources DELETED after conversion, outputs committed:
+	# Shipped re-roll batch (2026-11-08, sources DELETED after conversion, outputs committed:
 	#   bee_v2 48x48 box -> 48x41 | mage_fireball_v3 40x40 -> 40x15 | potion 40x40 -> 28x40):
 	#   var jobs: Array = [
 	#       ["res://art/fx/bee_v2.jpg", "res://art/fx/bee.png", 48, 48],
 	#       ["res://art/fx/mage_fireball_v3.jpg", "res://art/fx/mage_fireball.png", 40, 40],
 	#       ["res://art/pickups/potion.jpg", "res://art/pickups/potion.png", 40, 40],
 	#   ]
-	var jobs: Array = []
+	# Current batch (2026-11-08 Wash shield v4 from the user's reference photo, 32x32 box;
+	# v2 and v3 were letterboxed - black bars to the corners - and rejected per SOURCE LAW):
+	var jobs: Array = [
+		["res://art/fx/shield_v5.jpg", "res://art/fx/shield.png", 48, 48],
+	]
 	for j in jobs:
 		prep(String(j[0]), String(j[1]), int(j[2]), int(j[3]))
 	quit()
