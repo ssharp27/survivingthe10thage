@@ -151,6 +151,14 @@ func _init() -> void:
 	#   var jobs: Array = [
 	#       ["res://art/fx/axe_v1.jpg", "res://art/fx/axe.png", 32, 32],
 	#   ]
+	# Shipped dagger batch (2026-11-08: dagger_v1 thrust MOTION wedge + tip star, NO blade;
+	#   64x16 box rejected on the spot - 20x shrink of the 838x330 source mashed all detail (user:
+	#   "condensed down it loses all detail. Any way we can keep it?"), re-converted SAME source
+	#   at 128x32 box -> 81x32 (Y is the detail carrier: PoseStabFx keeps authored height,
+	#   X-stretches len/texW); user then hand-fixed pixels at the same 81x32 canvas):
+	#   var jobs: Array = [
+	#       ["res://art/fx/dagger_v1.jpg", "res://art/fx/dagger.png", 128, 32],
+	#   ]
 	# No live batch - edit THIS list for the next one.
 	var jobs: Array = []
 	for j in jobs:
