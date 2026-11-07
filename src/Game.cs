@@ -632,6 +632,8 @@ public partial class Game : Godot.Node2D
 		const double BEE_FIND = 240.0; // pick: hunting reach: nearest body in range latches
 		const double BEE_LATCH = 16.0; // pick: bite range: the bee rides the body
 		const float BEE_ART_S = 0.32f; // pick: 39x48 bee art -> ~13 px beside the 10 px shell (assistant knob, retunable)
+		const double BEE_HEAD_LIFT = 20.0; // riding anchor floats this many px ABOVE the victim center: near that character's head (user 2026-11-08: "floating near that character's head"); assistant knob
+		const double BEE_BOB_PX = 1.6;    // px of gentle vertical bob on riding bees: "floating", not glued; assistant knob
 		// The Kaka (Yu ult, user 2026-10-26): six EMPOWERED copies of the ritual familiars -
 		// same pool, steering, fuse and no-split blast, only doubled reach and bite. The x2
 		// multiplies AFTER the rank scaling: the member passes already-scaled kit numbers and
@@ -2375,6 +2377,7 @@ public void RegisterEnemy(Combatant e)
 			cr.AddChild(bsp);
 			s.AddChild(cr);
 			s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+			s.Set("z_index", 20); // bees draw ON TOP of every character (user 2026-11-08): the scene sets no z anywhere, so 20 outranks every sibling; set ONCE at pool build
 			AddChild(s);
 			_bees.Add(s);
 			_beeLife.Add(0.0);
@@ -3576,7 +3579,13 @@ public void RegisterEnemy(Combatant e)
 			}
 			if (prey != null)
 			{
-				Vector2 off = WrapDelta(s.GlobalPosition, prey.GlobalPosition);
+				// latched anchor (user 2026-11-08: the bee floats near the HOST's HEAD, not the side): re-anchored EVERY
+				// frame to head lift + per-bee bob phase (flight clock + spawn bearing: world time, no real-time leak),
+				// so a moving host carries its passenger AND the approach walks to THE HEAD - never a body-side park
+				// plus a jump: the walk and the ride speak the SAME anchor
+				float bt = (float)(BEE_LASTS - _beeLife[i]); // seconds flown: bob phase per bee
+				Vector2 anchor = prey.GlobalPosition + new Vector2((float)System.Math.Sin(bt * 2.1 + _beeRay[i]) * 0.8f, -(float)BEE_HEAD_LIFT + (float)System.Math.Sin(bt * 6.0 + _beeRay[i]) * (float)BEE_BOB_PX);
+				Vector2 off = WrapDelta(s.GlobalPosition, anchor);
 				if (off.X * off.X + off.Y * off.Y > BEE_LATCH * BEE_LATCH)
 				{
 					s.GlobalPosition = WrapNearCamera(s.GlobalPosition + off.Normalized() * (float)(BEE_SPEED * delta));
@@ -3584,6 +3593,7 @@ public void RegisterEnemy(Combatant e)
 				}
 				else
 				{
+					s.GlobalPosition = WrapNearCamera(anchor); // riding: snap EXACTLY onto the head anchor this frame (the bob moves the anchor, so this is the float)
 					_beeBite[i] -= delta;
 					if (_beeBite[i] <= 0.0)
 					{
