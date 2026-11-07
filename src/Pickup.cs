@@ -23,7 +23,7 @@ public partial class Pickup : Godot.Node2D
     private double _life = 0.0;
     private float _bobT = 0.0f;
     Godot.ColorRect _orb;
-    // 2026-11-08 art pass (user-approved sprites): heart / arcane orb / rage flame per flavour;
+    // 2026-11-08 art pass (user-approved sprites): healing potion / arcane orb / rage flame per flavour;
     // the ColorRect shell stays as the null-safe fallback, same discipline as Enemy.cs
     static Godot.Texture2D _artHeal = null;
     static Godot.Texture2D _artOrb = null;
@@ -49,7 +49,7 @@ public partial class Pickup : Godot.Node2D
         if (!_artTried)
         {
             _artTried = true;
-            _artHeal = GD.Load("res://art/pickups/heart.png") as Godot.Texture2D;
+            _artHeal = GD.Load("res://art/pickups/potion.png") as Godot.Texture2D; // red flask (user swapped the heart concept)
             _artOrb = GD.Load("res://art/pickups/orb.png") as Godot.Texture2D;
             _artRage = GD.Load("res://art/pickups/rage_flame.png") as Godot.Texture2D;
         }

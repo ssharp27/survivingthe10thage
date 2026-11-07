@@ -10,6 +10,11 @@
 #   - Image.create(w, h, false, 5) is 4-arg in 4.7 - the 5-arg test form fails; format int 5 = RGBA
 #   - FileAccess write_text(path, 3) takes the NUMERIC mode in this binding
 #   - no ++ / -- operators
+# SOURCE LAW (read this before filing a bug): generated sources MUST be flat white to EVERY canvas
+# edge. The trim and the matte are both seeded from the four CORNER COLOURS, so a letterboxed /
+# black-barred or vignetted source poisons the whole run - black corners mean the white field is
+# never eaten and the saved PNG comes back opaque with bars in it. If a DONE row shows the source
+# pixel size instead of a trimmed one, the source background is the bug, not this tool.
 # Law: edge-trim background matching the four corners (tolerance 31/255), nearest-neighbour
 # scale into the box, flood-fill matte near-background blobs connected to ALL four corners
 # (tolerance 0.12) to transparent, save PNG. Sources of truth: generated JPGs stay UNTIL conversion lands;
@@ -127,9 +132,16 @@ func _row_back(data: PackedByteArray, w: int, h: int, y: int, corners: Array, bp
 
 func _init() -> void:
 	# JOBS = one row per generated sprite: [src, out, box_w, box_h]. EDIT THIS LIST each batch.
-	# Last shipped batch (2026-11-08 fx + pickups; sources DELETED after conversion, outputs committed:
+	# Prior shipped batch (2026-11-08 fx + pickups; sources DELETED after conversion, outputs committed:
 	#   bee 48x48 box -> 39x48 | stinger 48x24 -> 46x24 | mage_fireball 40x40 -> 40x26 |
 	#   heart 40x40 -> 40x38 | orb 40x40 -> 39x40 | rage_flame 40x40 -> 28x40):
+	# Shipped 2026-11-08 re-roll batch (sources DELETED after conversion, outputs committed:
+	#   bee_v2 48x48 box -> 48x41 | mage_fireball_v3 40x40 -> 40x15 | potion 40x40 -> 28x40):
+	#   var jobs: Array = [
+	#       ["res://art/fx/bee_v2.jpg", "res://art/fx/bee.png", 48, 48],
+	#       ["res://art/fx/mage_fireball_v3.jpg", "res://art/fx/mage_fireball.png", 40, 40],
+	#       ["res://art/pickups/potion.jpg", "res://art/pickups/potion.png", 40, 40],
+	#   ]
 	var jobs: Array = []
 	for j in jobs:
 		prep(String(j[0]), String(j[1]), int(j[2]), int(j[3]))
