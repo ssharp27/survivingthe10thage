@@ -66,8 +66,31 @@ public partial class Enemy : Combatant
     float _slamCd = 0.0f;
     Vector2 _slamPos = new Vector2();
     Godot.Polygon2D _slamDisc = null;
+    // TIER VARIETY CREATURES (user 2026-11-07): GOBLIN 2 is a pure clump flavour (its stats
+    // ride the Director; it walks the goblin lane, no new AI). FAST GOBLIN owns a rush/pause/
+    // LUNGE lane: "rapidly approach the player, pause, then lunge in a straight line over a
+    // set distance" (USER behaviour) with a JUMP animation on the visual rig (the user's
+    // "maybe you can work out a jump animation for these?"). HP/speed/contact/XP are USER
+    // numbers on the Director; trigger ring / pause length / lunge reach+speed / breath and
+    // the hop geometry are assistant picks, retunable with the rest of the creature knobs.
+    private int _fgState = 0;     // 0 rush | 1 pause (coil) | 2 lunge (spring)
+    private float _fgT = 0.0f;    // pause countdown / lunge timer
+    private float _fgCd = 0.0f;   // breath between lunges
+    private float _fgDone = 0.0f; // px travelled along the locked line this spring
+    private Vector2 _fgDir = new Vector2(); // the LOCKED straight-line bearing (USER)
+    private bool _fgLeaped = false; // one print per body: first spring (bench audit)
+    private readonly float FG_TRIGGER = 260.0f; // the pause/coil begins inside this ring (assistant pick)
+    private readonly float FG_PAUSE = 0.6f;     // the pause beat (assistant length)
+    private readonly float FG_LUNGE_DIST = 220.0f; // the set straight-line distance (assistant pick)
+    private readonly float FG_LUNGE_SPD = 330.0f;  // spring px/s over the line (assistant pick)
+    private readonly float FG_LUNGE_CD = 1.2f;     // breath after landing before the next rush (assistant pick)
+    private readonly float FG_HOP = 16.0f;         // hop arc height px (visual rig only, never the hitbox)
 
     Godot.ColorRect _body;
+    // painted creature art (user 2026-11-07 stage-1 enemy assignments): when the GD.Load
+    // lands, the Sprite2D rides the bob rig and the greybox ColorRect hides (a MISSING
+    // load keeps the placeholder - the art/enemies/ tree is the user's WIP, untracked)
+    Godot.Sprite2D _spr = null;
     // mini-style motion rig (user 2026-10-21): enemies do NOT get the party's table
     // slide (they are creatures, not minis) - they get a walk bob on this pivot so
     // the theme contrasts; art/placeholder swap reparents here
@@ -122,7 +145,7 @@ public partial class Enemy : Combatant
             _rig.AddChild(_body);
             return;
         }
-        float w = kind == "ogre" ? 64.0f : (kind == "wolf" ? 34.0f : (kind == "hobgoblin" ? 32.0f : (kind == "rider" || kind == "riderbow" ? 40.0f : 26.0f))); // ogre: the map's biggest body (assistant pick)
+        float w = kind == "ogre" ? 64.0f : (kind == "wolf" ? 34.0f : (kind == "hobgoblin" ? 32.0f : (kind == "rider" || kind == "riderbow" ? 40.0f : (kind == "fastgoblin" ? 28.0f : 26.0f)))); // ogre: the map's biggest body (assistant pick)
         _body = new ColorRect();
         _body.Size = new Vector2(w, w * 0.8f);
         _body.Position = -_body.Size * 0.5f;
@@ -133,8 +156,37 @@ public partial class Enemy : Combatant
                                                     : kind == "riderbow" ? new Color(0.38f, 0.36f, 0.47f) // steel-tinted saddle (assistant pick)
                                                     : kind == "mage" ? new Color(0.42f, 0.22f, 0.55f) // robe violet (assistant pick)
                                                     : kind == "ogre" ? new Color(0.35f, 0.34f, 0.30f) // bog-brown brute (assistant pick)
+                                                    : kind == "goblin2" ? new Color(0.18f, 0.44f, 0.40f) // teal dune clump variant (assistant pick)
+                                                    : kind == "fastgoblin" ? new Color(0.62f, 0.72f, 0.20f) // acid-green sprinter (assistant pick)
                                                     : new Color(0.30f, 0.48f, 0.23f);
         _rig.AddChild(_body);
+        // PAINTED CREATURE ART (user 2026-11-07 stage-1 assignments): goblin1 -> the clump
+        // goblin, goblin2 -> Goblin 2, goblin3 -> Fast Goblin, hobgoblin -> Hobgoblin, all in
+        // res://art/enemies/stage1/. GD.Load by path string only (same rail as the portraits);
+        // a MISSING load keeps the greybox - the art/enemies/ tree is the user's WIP, untracked.
+        string artPath = kind == "goblin" ? "res://art/enemies/stage1/goblin1.png"
+                       : kind == "goblin2" ? "res://art/enemies/stage1/goblin2.png"
+                         : kind == "fastgoblin" ? "res://art/enemies/stage1/goblin3.png"
+                           : kind == "hobgoblin" ? "res://art/enemies/stage1/hobgoblin.png" : "";
+        if (artPath != "" && _spr == null)
+        {
+            Godot.Texture2D tex = GD.Load(artPath) as Godot.Texture2D;
+            if (tex != null)
+            {
+                _spr = new Godot.Sprite2D();
+                _spr.Texture = tex;
+                _spr.Name = "Art";
+                float th = kind == "hobgoblin" ? 52.0f : 46.0f; // target height px (assistant pick)
+                float texH = (float)tex.GetHeight();
+                if (texH > 0.0f)
+                {
+                    float sc = th / texH;
+                    _spr.Scale = new Vector2(sc, sc);
+                }
+                _rig.AddChild(_spr);
+                _body.Visible = false; // greybox stands only while the art is missing
+            }
+        }
     }
 
     public override void _Process(double d)
@@ -228,6 +280,7 @@ public partial class Enemy : Combatant
                 Vector2 to = g.WrapDelta(p, m.GlobalPosition);
                 float dist = to.Length();
                 Vector2 dir;
+                float moveSpd = spd; // FAST GOBLIN rewrites this on its spring leg; everyone else runs at spd
                 if (kind == "riderbow")
                 {
                     // BOW RIDER (user 2026-11-03 follow-up): no more perfect band. It
@@ -278,13 +331,64 @@ public partial class Enemy : Combatant
                         dir = new Vector2(-to.Y, to.X).Normalized() * MAGE_LOITER;
                     }
                 }
+                else if (kind == "fastgoblin")
+                {
+                    // FAST GOBLIN lane (USER behaviour: "rapidly approach the player, pause,
+                    // then lunge in a straight line over a set distance"): rush with a sin
+                    // prowl wobble inside FG_TRIGGER it COILS (the pause beat, assistant 0.6 s),
+                    // locking the straight-line bearing at that moment (USER "straight line");
+                    // then it SPRINGS FG_LUNGE_DIST px along the locked line at FG_LUNGE_SPD
+                    // (assistant picks), with a JUMP arc on the visual rig only ("maybe you can
+                    // work out a jump animation"), hitbox stays on the floor. Landing re-arms
+                    // the rush with a FG_LUNGE_CD breath before the next coil.
+                    if (_fgState == 0)
+                    {
+                        float fwob = (float)System.Math.Sin(p.X * 0.04 + p.Y * 0.06) * 18.0f; // prowl wobble (assistant pick)
+                        dir = (to + new Vector2(fwob * 0.5f, fwob)).Normalized();
+                        _fgCd -= delta; // the breath clock only drains while running
+                        if (dist <= FG_TRIGGER && _fgCd <= 0.0f)
+                        {
+                            _fgState = 1;
+                            _fgT = FG_PAUSE;
+                            _fgDir = to.Normalized(); // LOCKED at the coil: the lunge never re-aims
+                        }
+                    }
+                    else if (_fgState == 1)
+                    {
+                        dir = new Vector2(); // the pause beat: feet planted, spring loading
+                        _fgT -= delta;
+                        if (_fgT <= 0.0f)
+                        {
+                            _fgState = 2;
+                            _fgDone = 0.0f;
+                            if (!_fgLeaped)
+                            {
+                                _fgLeaped = true;
+                                GD.Print("[10thAge] (fastgoblin) springs its first straight-line lunge"); // bench audit
+                            }
+                        }
+                    }
+                    else
+                    {
+                        dir = _fgDir; // the locked bearing, straight over the set distance
+                        moveSpd = FG_LUNGE_SPD;
+                        _fgDone += FG_LUNGE_SPD * delta;
+                        if (_rig != null) // JUMP animation: visual rig only, never the hitbox
+                            _rig.Position = new Vector2(0.0f, -(float)System.Math.Sin(System.Math.PI * (_fgDone / FG_LUNGE_DIST)) * FG_HOP);
+                        if (_fgDone >= FG_LUNGE_DIST)
+                        {
+                            _fgState = 0;
+                            _fgCd = FG_LUNGE_CD; // breath between springs
+                        }
+                    }
+                }
                 else
                 {
-                    float wobble = kind == "goblin" ? (float)System.Math.Sin(p.X * 0.05 + p.Y * 0.03) * 26.0f : 0.0f;
+                    float wobble = (kind == "goblin" || kind == "goblin2") ? (float)System.Math.Sin(p.X * 0.05 + p.Y * 0.03) * 26.0f : 0.0f; // Goblin 2 prowls the clump too
                     dir = (to + new Vector2(wobble * 0.4f, wobble)).Normalized();
                 }
                 if (dir.LengthSquared() > 0.0001f)
-                    GlobalPosition += dir * spd * delta; // draging maul: a dragged body shambles
+                    GlobalPosition += dir * moveSpd * delta; // draging maul: a dragged body shambles
                 GlobalPosition = g.WrapNearCamera(GlobalPosition); // fold instead of walls
                 if (dist < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
                 {
@@ -383,8 +487,13 @@ public partial class Enemy : Combatant
         if (hurtFlash > 0.0f)
         {
             hurtFlash -= delta;
-            _body.Modulate = new Color(2.2f, 1.4f, 1.4f);
+            if (_spr != null)
+                _spr.Modulate = new Color(2.2f, 1.4f, 1.4f); // painted art flashes too
+            else
+                _body.Modulate = new Color(2.2f, 1.4f, 1.4f);
         }
+        else if (_spr != null)
+            _spr.Modulate = new Color(1.0f, 1.0f, 1.0f);
         else
             _body.Modulate = new Color(1.0f, 1.0f, 1.0f);
     }

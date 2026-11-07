@@ -22,6 +22,10 @@ public partial class Director : Godot.Node2D
         // chance an ogre lumbers in on a tier-4+ leg. Budgeted ORDINARY spawn like the
         // rider rolls, so the cap binds it. Assistant-picked cadence knob.
         const float OGRE_CH = 0.05f; // user 2026-11-06 playtest: ~1 ogre per 15-20 s of spawn rolls (they stack and the slam chains killed fast)
+        // TIER VARIETY (user 2026-11-07 creatures): tier-1 GOBLIN 2 clump flavour + tier-2
+        // FAST GOBLIN with the rush/pause/lunge lane. Entry odds are assistant-picked knobs.
+        const float G2_CH = 0.5f;  // per plain-goblin slot: chance the body enters as Goblin 2
+        const float FAST_CH = 0.2f; // per-spawn roll on a tier-2+ leg: a fast goblin enters
     // EARLY OGRE LOOK (user 2026-11-06: "spawn an ogre in at the start of the run so I
     // can test how it works much earlier"): the FIRST ordinary spawn of a run is forced
     // to be the ogre, so the telegraph + SLAM are on screen inside the first minute
@@ -44,7 +48,7 @@ public partial class Director : Godot.Node2D
     // body vs cap 40: the cap never binds here).
     float _testTimer = 2.0f; // first body lands ~2 s in so the room reads alive immediately
     int _testIdx = 0;        // rotation cursor: one cycle = the whole stage-1 ladder
-    static readonly string[] TEST_KINDS = { "goblin", "wolf", "hobgoblin", "rider", "riderbow", "mage", "ogre" }; // every stage-1 body: the two rider kinds and the mage ride as LONE test bodies (no packs) so each AI lane gets a clean turn
+    static readonly string[] TEST_KINDS = { "goblin", "goblin2", "wolf", "fastgoblin", "hobgoblin", "rider", "riderbow", "mage", "ogre" }; // every stage-1 body: the two rider kinds and the mage ride as LONE test bodies (no packs) so each AI lane gets a clean turn
     const float TEST_EVERY_LO = 15.0f; // USER cadence: "every 15-20 seconds"
     const float TEST_EVERY_HI = 20.0f;
 
@@ -159,6 +163,24 @@ public partial class Director : Godot.Node2D
             return;
         }
         bool wolf = tier >= 2 && (float)GD.Randf() < 0.30f;
+        // TIER-2 FAST GOBLIN (user 2026-11-07): own roll between the wolf and goblin lanes;
+        // ordinary budgeted spawn like the rider rolls (the near-party guard already burned
+        // pos upstream). NOT counted by the hob counter: "one hob per ten goblins" counts the
+        // goblin family (goblin/goblin2), not the fast variant.
+        if (!wolf && tier >= 2 && (float)GD.Randf() < FAST_CH)
+        {
+            Enemy fe = new Enemy();
+            fe.kind = "fastgoblin";
+            fe.maxHp = 40.0f * hordeScale; // USER number
+            fe.hp = fe.maxHp;
+            fe.speed = 110.0f;       // USER number
+            fe.contactDamage = 3.0f; // USER number
+            fe.xpValue = 2.0f;       // USER number
+            fe.GlobalPosition = pos;
+            g.RegisterEnemy(fe);
+            g.AddChild(fe);
+            return;
+        }
         bool hob = false;
         if (!wolf)
         {
@@ -170,15 +192,18 @@ public partial class Director : Godot.Node2D
             }
         }
         Enemy e = new Enemy();
-        e.kind = wolf ? "wolf" : (hob ? "hobgoblin" : "goblin");
+        // TIER-1 VARIETY (user 2026-11-07): half the plain-goblin slots enter as Goblin 2
+        // (25 hp / 100 speed / contact 2 / 1 xp = USER numbers) - pure clump flavour.
+        bool g2 = !wolf && !hob && (float)GD.Randf() < G2_CH;
+        e.kind = wolf ? "wolf" : (hob ? "hobgoblin" : (g2 ? "goblin2" : "goblin"));
         // real tier-3 bodies landed, so the tier-2 pool holds its base HP on tier-3 legs;
         // tier 4 keeps the flagged placeholder bump on the pool (assistant pick - retunable).
         float tierBump = 1.0f; // tier-4 placeholder bump retired: real tier-4 bodies entered (the ogre), so pool bodies keep base HP
-        e.maxHp = (wolf ? 70.0f : (hob ? 60.0f : 30.0f)) * hordeScale * tierBump;
+        e.maxHp = (wolf ? 70.0f : (hob ? 60.0f : (g2 ? 25.0f : 30.0f))) * hordeScale * tierBump;
         e.hp = e.maxHp;
-        e.speed = wolf ? 120.0f : (hob ? 100.0f : 90.0f);
-        e.contactDamage = wolf ? 3.0f : (hob ? 3.0f : 2.0f);
-        e.xpValue = wolf ? 2.0f : (hob ? 3.0f : 1.0f);
+        e.speed = wolf ? 120.0f : (hob ? 100.0f : (g2 ? 100.0f : 90.0f));
+        e.contactDamage = wolf ? 3.0f : (hob ? 3.0f : 2.0f); // Goblin 2 chips 2 like the clump (USER)
+        e.xpValue = wolf ? 2.0f : (hob ? 3.0f : 1.0f); // Goblin 2 carries the same 1 xp gem (USER)
         e.GlobalPosition = pos;
         g.RegisterEnemy(e);
         g.AddChild(e);
@@ -348,6 +373,8 @@ public partial class Director : Godot.Node2D
         e.kind = kind;
         float hp = 30.0f, spd = 90.0f, contact = 2.0f, ranged = 0.0f, xp = 1.0f;
         if (kind == "wolf") { hp = 70.0f; spd = 120.0f; contact = 3.0f; xp = 2.0f; }
+        else if (kind == "goblin2") { hp = 25.0f; spd = 100.0f; contact = 2.0f; xp = 1.0f; }
+        else if (kind == "fastgoblin") { hp = 40.0f; spd = 110.0f; contact = 3.0f; xp = 2.0f; }
         else if (kind == "hobgoblin") { hp = 60.0f; spd = 100.0f; contact = 3.0f; xp = 3.0f; }
         else if (kind == "rider") { hp = 100.0f; spd = 110.0f; contact = 4.0f; xp = 5.0f; }
         else if (kind == "riderbow") { hp = 60.0f; spd = 110.0f; contact = 4.0f; ranged = 3.0f; xp = 5.0f; }
