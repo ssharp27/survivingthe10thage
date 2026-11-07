@@ -191,7 +191,7 @@ Signals (declared in PauseMenu.gd):
 Props (ALL **untyped** — the `Array[Dictionary]` silent-`Set`-no-op pitfall):
 - `members: Array` — camp-card rows (`name`, `klass`, `weapon`, `hp`, `max_hp`, `state`, `leader`,
   `picks` = `pickHistory`) PLUS `idx` (= `memberIndex`, the signal's roster key), `target_mode`
-  (current toggle) and `art` = `res://art/<lowercased name>.png` (mini; the card skips a missing load)
+  (current toggle) and `art` = `res://art/characters/<lowercased name>.png` (mini; the card skips a missing load)
 - `stage_name: String`, `use_blur: bool` (true default; no GPU = the dark-wash fallback stands alone)
 - `pilot_timeout: float` (0.0 default = humans only close on ESC) — the pilot valve lives ON THE
   CARD, not in `Game._Process`: the pause is a TRUE tree pause, so `Game._process` never ticks again
@@ -252,7 +252,7 @@ always counts).
 ### 4. Read order (screenshot-style description)
 Backdrop: the field itself, dimmed + blurred (`pause_blur.gdshader`, `set_texture_mode(true)` +
 the real-screen `screen_texture`) so the game visibly reads as paused, then a faint dark wash.
-Five grimoire columns (mockup: 5 dark background columns), each: painted portrait (`art/<pc>.png`,
+Five grimoire columns (mockup: 5 dark background columns), each: painted portrait (`art/characters/<pc>.png`,
 the mini art), NAME, **TARGET LOGIC** (five mode buttons, the chosen one gold), UPGRADES (the
 `<weapon> <OPT_LABEL> x<rank>` rows + the `pickHistory` tail). Footer: `ESC` to resume.
 The card is a TRUE pause (`get_tree().paused = true` like `RunSummary.gd`, root

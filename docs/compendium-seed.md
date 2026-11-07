@@ -10,6 +10,71 @@ The user **likes compounding**. Keep the multiplicative stacking exactly as code
 do NOT rework damage/reach/speed tags into additive points for copy's sake.
 Card copy must instead be honest that bonuses COMPOUND per rank.
 
+## Meta vs in-run (user 2026-11-08)
+
+**All meta progression and character upgrades are ADDITIVE. Only IN-RUN upgrades
+use the compounding option.** The stacking rule below (and the verified card tables)
+describes the IN-RUN surface: level-up cards, short-rest gifts. Any future meta-progression
+or permanent character-upgrade screens must promise flat, additive numbers, and the
+compendium copy must keep the two surfaces visibly separate so players never read a
+meta "+10%" as a compounding rank.
+
+## Stage flow — verified player-facing breakdown (2026-11-08, source: Game.cs beat tables + Director.cs)
+
+Stage copy truth: the plate one-liners are `STAGE_BLURB` (`src/Game.cs` ~148), rendered at
+`_stageBlurb[k].Text` and prepended by `ShowStageSheet()`; the full card readout (schedule /
+density / recruits / xp) is composed OFF LIVE beat-table data, so it self-updates with data edits.
+The table below is that live data, verified this pass — the compendium must mirror it, not re-derive it.
+
+### Beat table (run seconds — picker/join/camp pauses never burn a beat)
+
+| Beat | Event |
+| --- | --- |
+| 30 | Ally I (escort join) |
+| 60 | Tier-2 gate |
+| 180 | Mini-boss I (300 hp) |
+| 240 | Ally II |
+| 360 | Boss I |
+| 420 | Ally III |
+| 540 | Tier-3 gate |
+| 660 | Mini-boss II |
+| 780 | Ally IV |
+| 840 | Tier-4 gate |
+| 960 | Boss II (second boss1 body) |
+| 1200 | FINAL boss |
+| 1260 | Wrap / victory |
+
+A campfire sits after EVERY boss kill (mini, mid, and final alike).
+
+### Spawn cap and cadence
+
+- Live cap = `40` (`Director.MAX_LIVE`) × horde scale × (party in play / 2).
+- Cadence = `max(0.35, 1.1 − 0.6 × legFrac)` within a tier leg, × 2 (slower) while a boss is
+  live, then divided by (horde scale × party scale) — more party/horde pressure = faster spawns.
+- Horde EVENT swarms are BUDGET-FREE: never counted against the cap.
+
+### Tier composition
+
+| Tier | Enters | Bodies (hp, xp) |
+| --- | --- | --- |
+| 1 | goblins only | goblin (30 hp, 1 xp) |
+| 2 | 30% rolls wolves | wolf (70 hp, 2 xp); 1 hobgoblin per 10 goblins (60 hp, 3 xp) |
+| 3 | rider packs on 5% per-spawn rolls: 2 sword + 2 bow on one bearing | rider (100 hp) / riderbow (60 hp), 5 xp; mage 1 per 2 hobs (40 hp, 6 xp) |
+| 4 | ogre on 5% per-spawn rolls | ogre (220 hp, 10 xp) |
+
+### Horde events (bonus swarms)
+
+Boot-armed: first swarm at 90 s run time, then every 60 s. Each swarm is 20 × horde scale ×
+party scale tier-1 goblins, budget-free, 1 xp per body.
+
+### Rests, escorts, joins
+
+- LONG rest: whole squad revived to FULL hp, no free rank; horde scaling × 1.20.
+- SHORT rest: +25% max-HP heal PLUS one free upgrade rank, offered as a 3-of-6 gift picker;
+  also × 1.20 horde scaling.
+- Escorts: each ally beat drops 6 tier-1 goblins as the escort pack (they scale with horde);
+  the PC lands ~300 px past the camera (+90 margin) and joins at its ≥25% HP floor.
+
 ## The stacking rule (source: src/StatTags.cs KIND + src/Game.cs ApplyUpgrade ~line 4672)
 
 - KIND 0 (multiplier): each rank multiplies the live stat. 3 ranks = (per-rank)^3.
