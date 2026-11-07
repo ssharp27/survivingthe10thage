@@ -139,11 +139,14 @@ func _init() -> void:
 	#       ["res://art/fx/mage_fireball_v3.jpg", "res://art/fx/mage_fireball.png", 40, 40],
 	#       ["res://art/pickups/potion.jpg", "res://art/pickups/potion.png", 40, 40],
 	#   ]
-	# Current batch (2026-11-08 Wash shield v4 from the user's reference photo, 32x32 box;
-	# v2 and v3 were letterboxed - black bars to the corners - and rejected per SOURCE LAW):
-	var jobs: Array = [
-		["res://art/fx/shield_v5.jpg", "res://art/fx/shield.png", 48, 48],
-	]
+	# Shipped shield batch (2026-11-08: v2/v3 letterboxed - black bars to the corners - rejected
+	#   per SOURCE LAW, v4 painterly too muddy at game scale, v5 chunky 32-px-style roll used;
+	#   shield_v5 48x48 box -> 27x48; user then hand-fixed the PNG at the same 27x48 canvas;
+	#   Main.tscn shieldFxArt + PartyMember.cs ShieldArt flight untouched, zero code change):
+	#   var jobs: Array = [
+	#       ["res://art/fx/shield_v5.jpg", "res://art/fx/shield.png", 48, 48],
+	#   ]
+	var jobs: Array = []
 	for j in jobs:
 		prep(String(j[0]), String(j[1]), int(j[2]), int(j[3]))
 	quit()
