@@ -103,6 +103,26 @@ HALF that on bosses so they don't get too easy. Copy must say **per unique DoT**
   stack through it. Every FUTURE DoT pair adds one count line to `UniqueDoTs()` and inherits
   the bonus for free — the compendium must re-read that rail, not hardcode "three DoTs".
 
+## Field pickups — rare kill drops (assistant-picked knobs, 2026-11-08, source: src/Game.cs PICKUP_CH + src/Pickup.cs)
+
+The user's CONCEPT (2026-11-08): "small random pickups, such as a healing orb, an XP magnet, or short
+damage buffs to help runs". Every number here is an assistant pick and stays retunable; the magnet
+behaviour was the user's choice (pull dropped gems, never inject XP). **IN-RUN ONLY** — the meta law
+above keeps field drops out of the additive meta pool.
+
+- Drop roll `PICKUP_CH = 0.02` per ORDINARY enemy kill (stage 1 only); escort kills NEVER drop — those
+  bodies are the rescue meter, not a loot source. Flavour weights 40 heal / 30 magnet / 30 rage.
+- HEAL ORB `HEAL_AMT = 15` **FLAT** hp on the picker, clamped at own `EffMaxHp` — flat, not a max-HP
+  fraction, so an early run cannot chain a bar. It is the only HP recovery that does NOT pay the ×1.20
+  rest/horde tax, which is why the roll stays scarce.
+- XP MAGNET `MAGNET_T = 6 s`: the gem collection bubble becomes WHOLE-FIELD, the vacuum itself is
+  untouched (the 380 px/s ride + the picker's own XP_PCT math at pickup). It pulls DROPPED GEMS.
+- RAGE VIAL `RAGE_MUL = 0.2` for `RAGE_T = 8 s` on LIVE enemies (the same live census the prey
+  pickers run — the enemy registry keeps dead entries), riding the guiding-light `Vulnerable()`
+  **max-mark / refresh-never-stack** rail: two vials, or a vial beside guiding light, never stack —
+  they take the deepest mark, and it COMPOUNDS with crossfire per the section above.
+- Field lifetime `LIFE_D = 18 s`, walk-over pick radius `PICK_R = 18 px`: reaching it is a choice, not free.
+
 ## Level-up cards — verified percentage tables (2026-11-04, from OPT_* tables Game.cs 176-254)
 
 Attack-speed cards read as SPEED GAIN (1/0.86 = +16%, 1/0.85 = +18%).
@@ -207,3 +227,7 @@ Counts stay counts. All ranks cap at 3/3 (rank 4 = evolution, M2 parked content)
    disappears when the DoT window expires, and it COMPOUNDS with guiding light (see the section
    above). Keep it separate from the DoT duration trap — burn 5 s / bleed 4 s / poison 5 s windows
    are baked at the call sites, and only their LIVE state feeds the count.
+6. Pickup copy must say **IN-RUN ONLY** (never a meta unlock), that the magnet WIDENS the collection
+   bubble for a window (it is not an XP injection and it never pays XP by itself), and that the rage
+   vial is an incoming-damage MARK on the body — max-mark / refresh-never-stack like guiding light, so
+   copy must never read "stacks" or "+20% per vial".
