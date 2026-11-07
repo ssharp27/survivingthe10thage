@@ -57,8 +57,8 @@ A campfire sits after EVERY boss kill (mini, mid, and final alike).
 
 | Tier | Enters | Bodies (hp, xp) |
 | --- | --- | --- |
-| 1 | goblins only | goblin (30 hp, 1 xp) |
-| 2 | 30% rolls wolves | wolf (70 hp, 2 xp); 1 hobgoblin per 10 goblins (60 hp, 3 xp) |
+| 1 | goblins only; 50% of plain slots enter as Goblin 2 (G2_CH) | goblin (30 hp, 1 xp) / goblin2 (25 hp, 1 xp, speed 100) |
+| 2 | 30% rolls wolves; fast goblins on 20% per-spawn rolls (FAST_CH); 1 hob per 10 goblins | wolf (70 hp, 2 xp); fastgoblin (40 hp, 2 xp: rush → pause → straight-line lunge); hobgoblin (60 hp, 3 xp) |
 | 3 | rider packs on 5% per-spawn rolls: 2 sword + 2 bow on one bearing | rider (100 hp) / riderbow (60 hp), 5 xp; mage 1 per 2 hobs (40 hp, 6 xp) |
 | 4 | ogre on 5% per-spawn rolls | ogre (220 hp, 10 xp) |
 
