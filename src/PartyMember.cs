@@ -125,6 +125,7 @@ public partial class PartyMember : Godot.Node2D
 	static readonly double SHIELD_HOP = 160.0; // BASE px a bounce may hop. fx-feel9 (user: "it should just not even try to bounce if they are too far away"): the flight lane now NEVER widens this with rank - the rebound upgrade buys bounce COUNT only
 	// Wash hurl speed (user 2026-11-02: "far too quickly so it looks terrible... smooth bounce between enemies"): px/s of VISIBLE travel; PURE MOTION, damage model untouched
 	static readonly double SHIELD_HURL_SPEED = 340.0; // assistant pick: a 160 px hop ~0.47 s, a 60 px hop ~0.18 s - readable, never the old 0.09 s blur
+	static readonly double SHIELD_BOUNCE_SPIN = 0.10; // EXTRA rad/px a disc tumbles on BOUNCE legs (after its first bite): the base 0.045 drift keeps the first throw readable, every bounce DRUMROLLS (user 2026-11-08: "make the shield spin when it bounces off an enemy to another"); assistant knob
 
 	// authored armour base (Wash 1 armour, user 2026-10-31): the ARMOUR tag seeds at BASE then adds
 
@@ -323,6 +324,7 @@ public partial class PartyMember : Godot.Node2D
 	int[] _shldBitesA = new int[4]; // per-slot bodies actually bitten (audit print)
 	double[] _shldRollA = new double[4]; // per-slot ONE crit/lifesteal roll shared by that whole throw
 	float[] _shldFlownA = new float[4]; // per-slot px flown: tumbles that disc art by distance
+	float[] _shldSpinA = new float[4]; // per-slot EXTRA twist rad accumulated on bounce legs: drumroll term (continuous, so retargets never POP the disc)
 	Godot.Texture2D _shldTex = null; // the kit disc texture; art is pooled per slot on first use
 	Godot.Sprite2D[] _shldArt = new Godot.Sprite2D[4]; // pooled disc sprite per slot (ShieldArt)
 	int _shldStackPrinted = 0; // fx-feel10 audit ONLY: highest disc stack already printed
@@ -2745,10 +2747,12 @@ public partial class PartyMember : Godot.Node2D
 					}
 					else
 						_shldP[sk] = pgs.WrapNearCamera(_shldP[sk] + dv.Normalized() * step); // home on the LIVE body between frames
+					if (_shldBitesA[sk] > 0)
+						_shldSpinA[sk] += (dv.Length() < step ? dv.Length() : step) * (float)SHIELD_BOUNCE_SPIN; // drumroll ONLY on bounce legs: px ACTUALLY moved this frame (the arrival frame is partial), assistant knob 0.10 rad/px on top of the 0.045 drift
 					if (ShieldArt(sk) != null)
 					{
 						ShieldArt(sk).GlobalPosition = _shldP[sk];
-						ShieldArt(sk).Rotation = (float)System.Math.Atan2((double)dv.Y, (double)dv.X) + _shldFlownA[sk] * 0.045f; // tumbles by distance flown, not by time
+						ShieldArt(sk).Rotation = (float)System.Math.Atan2((double)dv.Y, (double)dv.X) + _shldFlownA[sk] * 0.045f + _shldSpinA[sk]; // tumbles by distance flown, not by time: base drift PER px plus the bounce-leg drumroll term, accumulated so direction changes never snap the disc
 						ShieldArt(sk).Visible = true;
 					}
 				}
@@ -3093,6 +3097,7 @@ public partial class PartyMember : Godot.Node2D
 			_shldLeftA[slot] = shieldBounce; // bounce budget: extra bites after the first body (ranks grow it)
 			_shldBitesA[slot] = 0; // nothing bitten yet: the FIRST bite lands when the disc arrives
 			_shldFlownA[slot] = 0.0f; // distance clock for that disc's tumble
+			_shldSpinA[slot] = 0.0f; // fresh disc: drumroll starts clean
 			// memo must fit THIS throw's budget: the old lazy allocation froze capacity at the FIRST
 			// throw's rank, so every later "more rebounds" rank bought wrote past the end (the bench
 			// caught the IndexOutOfRange swarm in the Wash-led smoke, and it is why upgraded shields
@@ -3103,6 +3108,7 @@ public partial class PartyMember : Godot.Node2D
 			if (ShieldArt(slot) != null)
 			{
 				ShieldArt(slot).GlobalPosition = p; // starts in his hand: the throw visibly LEAVES the model
+				ShieldArt(slot).Rotation = (float)System.Math.Atan2((double)(prey.GlobalPosition - p).Y, (double)(prey.GlobalPosition - p).X); // faces the prey on release: the drumroll starts from the heading, never last throw's stale angle
 				ShieldArt(slot).Visible = true;
 			}
 			cdTimer = (float)EffCooldown();
@@ -3891,6 +3897,7 @@ public partial class PartyMember : Godot.Node2D
 		int[] bi = new int[n];
 		double[] rl = new double[n];
 		float[] fl = new float[n];
+		float[] sn = new float[n];
 		Godot.Sprite2D[] ar = new Godot.Sprite2D[n];
 		for (int q = 0; q < _shldT.Length; q++)
 		{
@@ -3902,6 +3909,7 @@ public partial class PartyMember : Godot.Node2D
 			bi[q] = _shldBitesA[q];
 			rl[q] = _shldRollA[q];
 			fl[q] = _shldFlownA[q];
+			sn[q] = _shldSpinA[q];
 			ar[q] = _shldArt[q];
 		}
 		_shldT = t;
@@ -3912,6 +3920,7 @@ public partial class PartyMember : Godot.Node2D
 		_shldBitesA = bi;
 		_shldRollA = rl;
 		_shldFlownA = fl;
+		_shldSpinA = sn;
 		_shldArt = ar;
 	}
 
