@@ -542,6 +542,11 @@ public partial class Game : Godot.Node2D
 		// art never imports, the greybox shell keeps drawing (the smoke contract never depends on art)
 		Godot.Texture2D _fxArrowTex = null;
 		Godot.Texture2D _fxFlameTex = null;
+		// 2026-11-08 fx-art pass (user-approved sprites): Asper's stinger on the party-bolt lane,
+		// the goblin mage's OWN fireball (firebolt stays Stack's burn read), and the bee swarm art
+		Godot.Texture2D _fxStingerTex = null;
+		Godot.Texture2D _fxMageTex = null;
+		Godot.Texture2D _fxBeeTex = null;
 		bool _fxTried = false;
 		// ---------- leader-bonus helper pools (user 2026-10-25): Asper's insects, Yu's spirits ----------
 		// Pooled exactly like the summons: fixed slots, parallel arrays, parked past -9000.
@@ -626,6 +631,7 @@ public partial class Game : Godot.Node2D
 		const double BEE_R = 48.0;     // pick: spawn-ring radius around Asper
 		const double BEE_FIND = 240.0; // pick: hunting reach: nearest body in range latches
 		const double BEE_LATCH = 16.0; // pick: bite range: the bee rides the body
+		const float BEE_ART_S = 0.32f; // pick: 39x48 bee art -> ~13 px beside the 10 px shell (assistant knob, retunable)
 		// The Kaka (Yu ult, user 2026-10-26): six EMPOWERED copies of the ritual familiars -
 		// same pool, steering, fuse and no-split blast, only doubled reach and bite. The x2
 		// multiplies AFTER the rank scaling: the member passes already-scaled kit numbers and
@@ -1283,14 +1289,17 @@ public partial class Game : Godot.Node2D
 				_fxTried = true;
 				_fxArrowTex = GD.Load("res://art/fx/arrow.png") as Godot.Texture2D;
 				_fxFlameTex = GD.Load("res://art/fx/firebolt.png") as Godot.Texture2D;
+				_fxMageTex = GD.Load("res://art/fx/mage_fireball.png") as Godot.Texture2D;
 			}
 		Godot.ColorRect cr = (Godot.ColorRect)b.GetChild(0);
 		Godot.Sprite2D fxs = (Godot.Sprite2D)cr.GetChild(0);
-		if (_fxFlameTex != null)
+		Godot.Texture2D mfx = _fxMageTex != null ? _fxMageTex : _fxFlameTex; // 2026-11-08 art pass: the goblin mage rides its OWN fireball art; the big firebolt stays the fallback read
+		if (mfx != null)
 		{
-			fxs.Texture = _fxFlameTex;
-			fxs.Scale = new Vector2(2.4f, 2.4f); // "large" = ~2.4x the bolt (assistant pick - retunable)
-			fxs.Modulate = new Color(0.70f, 0.15f, 0.11f, 1.0f); // dark red: the ENEMY-projectile read (user 2026-11-06)
+			fxs.Texture = mfx;
+			float ms = _fxMageTex != null ? 1.5f : 2.4f; // ~1.5x: the 40 px fireball art over the bullet body (assistant pick - retunable)
+			fxs.Scale = new Vector2(ms, ms);
+			fxs.Modulate = _fxMageTex != null ? new Color(1.0f, 1.0f, 1.0f, 1.0f) : new Color(0.70f, 0.15f, 0.11f, 1.0f); // new art carries its own hues; fallback keeps the dark-red ENEMY read
 			fxs.Rotation = 0.0f; // a fireball tumbles; it does not point like an arrow
 			cr.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f); // shell stops drawing while art rides
 			// user 2026-11-07 (fireball HIT but drew NOTHING): the pool parks its shell Modulate at
@@ -2344,6 +2353,7 @@ public void RegisterEnemy(Combatant e)
 		}
 		// Swarm of Bees pool (Asper ult, user 2026-10-26): six slots like the cast, parked
 		// at -9000; casts reuse them, UpdateBees owns the leash.
+		_fxBeeTex = GD.Load("res://art/fx/bee.png") as Godot.Texture2D; // 2026-11-08 art pass: one load at pool build, null-safe like the other lanes
 		for (int i = 0; i < 6; i++)
 		{
 			Godot.Node2D s = new Node2D();
@@ -2352,6 +2362,17 @@ public void RegisterEnemy(Combatant e)
 			cr.Position = new Vector2(-5.0f, -5.0f);
 			cr.Color = new Color(0.86f, 0.72f, 0.18f, 1.0f); // honey amber: off every horde hue AND the insect lane's chitin so a friendly bee never reads as prey
 			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			// the sprite child rides UNDER the shell: the pool Modulate cascade hides/shows both together
+			Godot.Sprite2D bsp = new Godot.Sprite2D();
+			bsp.Set("texture_filter", 0); // NEAREST like the shaft and the minis
+			bsp.Texture = _fxBeeTex;
+			if (_fxBeeTex != null)
+			{
+				bsp.Scale = new Vector2(BEE_ART_S, BEE_ART_S);
+				bsp.Position = new Vector2(5.0f - (float)_fxBeeTex.GetWidth() * BEE_ART_S * 0.5f, 5.0f - (float)_fxBeeTex.GetHeight() * BEE_ART_S * 0.5f);
+				cr.Color = new Color(0.86f, 0.72f, 0.18f, 0.0f); // art rides: the amber square stops drawing
+			}
+			cr.AddChild(bsp);
 			s.AddChild(cr);
 			s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
 			AddChild(s);
@@ -3998,12 +4019,15 @@ private void UpdateSpirits(float delta)
 				_fxTried = true;
 				_fxArrowTex = GD.Load("res://art/fx/arrow.png") as Godot.Texture2D;
 				_fxFlameTex = GD.Load("res://art/fx/firebolt.png") as Godot.Texture2D;
+				_fxStingerTex = GD.Load("res://art/fx/stinger.png") as Godot.Texture2D;
 			}
-			Godot.Texture2D tx = burnDps > 0.0 ? _fxFlameTex : _fxArrowTex;
+			Godot.Texture2D tx = burnDps > 0.0 ? _fxFlameTex : _fxStingerTex; // 2026-11-08 art pass: party bolts are Asper's longbow lane — the curved stinger replaces the borrowed arrow shaft (user: "stinger as its attack instead of an arrow"); the ENEMY bullet lane keeps the arrow
 			if (tx != null)
 			{
 				Godot.Sprite2D fxs = (Godot.Sprite2D)shell.GetChild(0);
 				fxs.Texture = tx;
+				float tsx = burnDps > 0.0 ? 1.0f : 0.72f; // 46x24 stinger art near the old 20x8 shaft footprint (assistant pick - retunable)
+				fxs.Scale = new Vector2(tsx, tsx);
 				fxs.Rotation = (float)System.Math.Atan2((double)vel.Y, (double)vel.X);
 				fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
 				shell.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f); // shell stops drawing while art rides

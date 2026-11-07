@@ -23,6 +23,13 @@ public partial class Pickup : Godot.Node2D
     private double _life = 0.0;
     private float _bobT = 0.0f;
     Godot.ColorRect _orb;
+    // 2026-11-08 art pass (user-approved sprites): heart / arcane orb / rage flame per flavour;
+    // the ColorRect shell stays as the null-safe fallback, same discipline as Enemy.cs
+    static Godot.Texture2D _artHeal = null;
+    static Godot.Texture2D _artOrb = null;
+    static Godot.Texture2D _artRage = null;
+    static bool _artTried = false;
+    static readonly float PICKUP_ART_S = 0.42f; // 40 px art -> ~16 px: a touch over the 12 px shell (assistant pick)
     // assistant-picked knobs (hand-test retunes)
     static readonly float HEAL_AMT = 15.0f; // flat hp on the picker (assistant pick)
     static readonly float MAGNET_T = 6.0f; // whole-field gem vacuum window (assistant pick)
@@ -39,6 +46,24 @@ public partial class Pickup : Godot.Node2D
         _orb.Color = pk == 0 ? new Color(0.25f, 0.85f, 0.35f) // heal orb green
                        : pk == 1 ? new Color(0.95f, 0.75f, 0.25f) // magnet gold
                        : new Color(0.90f, 0.20f, 0.20f); // rage vial red
+        if (!_artTried)
+        {
+            _artTried = true;
+            _artHeal = GD.Load("res://art/pickups/heart.png") as Godot.Texture2D;
+            _artOrb = GD.Load("res://art/pickups/orb.png") as Godot.Texture2D;
+            _artRage = GD.Load("res://art/pickups/rage_flame.png") as Godot.Texture2D;
+        }
+        Godot.Texture2D atx = pk == 0 ? _artHeal : pk == 1 ? _artOrb : _artRage;
+        if (atx != null)
+        {
+            Godot.Sprite2D asp = new Godot.Sprite2D();
+            asp.Set("texture_filter", 0); // NEAREST like the other art lanes
+            asp.Texture = atx;
+            asp.Scale = new Vector2(PICKUP_ART_S, PICKUP_ART_S);
+            asp.Position = new Vector2(6.0f - (float)atx.GetWidth() * PICKUP_ART_S * 0.5f, 6.0f - (float)atx.GetHeight() * PICKUP_ART_S * 0.5f);
+            _orb.AddChild(asp);
+            _orb.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f); // art rides: the flavour shell stops drawing
+        }
         AddChild(_orb);
         _life = LIFE_D;
     }
