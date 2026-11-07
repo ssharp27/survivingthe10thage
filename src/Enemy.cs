@@ -85,6 +85,15 @@ public partial class Enemy : Combatant
     private readonly float FG_LUNGE_SPD = 330.0f;  // spring px/s over the line (assistant pick)
     private readonly float FG_LUNGE_CD = 1.2f;     // breath after landing before the next rush (assistant pick)
     private readonly float FG_HOP = 16.0f;         // hop arc height px (visual rig only, never the hitbox)
+    // GAIT rig (user 2026-11-07: enemies read "a bit too static while moving", and no
+    // sprite animation is wanted): stride geometry + body feel for the walk below. STRIDE
+    // sets CADENCE as one planted step per GAIT_STRIDE px of REAL travel, so the gait dies
+    // when the body stops instead of bouncing in place; REF is the px/s that counts as full
+    // stride energy, and LEAN is the max lean into travel in radians. All assistant picks,
+    // retunable with the rest of the creature knobs - the USER's call is the feel.
+    private readonly float GAIT_STRIDE = 26.0f; // px of travel per planted step (assistant pick)
+    private readonly float GAIT_REF = 120.0f;   // px/s that reads as a full-length stride (assistant pick)
+    private readonly float GAIT_LEAN = 0.075f;  // max lean into travel, radians (assistant pick)
 
     Godot.ColorRect _body;
     // painted creature art (user 2026-11-07 stage-1 enemy assignments): when the GD.Load
@@ -97,6 +106,10 @@ public partial class Enemy : Combatant
     Godot.Node2D _rig;
     float _bobT = 0.0f;
     float _bobPhase = 0.0f;
+    float _gaitSpd = 0.0f;  // px/s odometer: what the body ACTUALLY moved (drives the gait)
+    Vector2 _gaitFrom = new Vector2(0.0f, 0.0f); // last odometer checkpoint
+    bool _gaitPrimed = false;                    // the first frame has no previous checkpoint
+    float _lean = 0.0f;                          // eased lean into travel (visuals only)
 
     // Visuals are built after spawn parameters land (Director sets kind/hp/speed post-new()),
     // so this runs on demand rather than in _EnterTree.
@@ -108,6 +121,8 @@ public partial class Enemy : Combatant
             _rig.Name = "Rig";
             AddChild(_rig);
             _bobPhase = (GetInstanceId() % 64) * 0.37f; // the horde never bobs in lockstep
+            _gaitFrom = GlobalPosition; // the odometer starts at the spawn, not at the origin
+            _gaitPrimed = true;
         }
         _shotCd = kind == "riderbow" ? RIDER_SHOT_EVERY : (kind == "mage" ? 2.0f : 0.0f); // user 2026-11-06: fresh mage looses its first ball after 2 s, not a full 4 s cycle - the volley lands while the party is still untangling the new pack
         _firedShot = false; // fx-feel10: audit flag lands when the shot clock does
@@ -212,10 +227,36 @@ public partial class Enemy : Combatant
         // step bob instead of the party's table slide, phase per spawn so the horde
         // never reads as one marching block; visuals only, never the hitbox
         if (_rig != null)
+        // gait rig (user 2026-11-07: enemies looked "a bit too static while moving"): the old
+        // rail was a free-running 1.4..2.2 px sine, which read as HOVERING and kept bouncing
+        // when a body stood still. Same pivot, but now driven by what the body ACTUALLY moved
+        // (a wrap-aware odometer with one frame of lag, so no lane has to hand a velocity):
+        //   * abs(sin) = two-beat heel, the TROUGHS plant like footsteps instead of floating
+        //   * cadence from stride length, so the step rate tracks the speed of the walk
+        //   * lift, squash and lean scale with stride energy; a coiled, loitering, winding-up
+        //     or stopped body settles LEVEL (user pick: no idle breath)
+        // Visuals only: the hitbox is the ENEMY node and the ogre telegraph disc is its child,
+        // so squash + lean cannot nudge anything. Every number an assistant pick.
+        if (_rig != null)
         {
-            _bobT += delta;
-            float amp = kind == "hobgoblin" ? 2.2f : kind == "wolf" ? 1.8f : 1.4f;
-            _rig.Position = new Vector2(0.0f, (float)System.Math.Sin(_bobT * 8.0f + _bobPhase) * amp);
+            float dt = delta < 0.0001f ? 0.0001f : delta;
+            Vector2 step = _gaitPrimed ? g.WrapDelta(_gaitFrom, GlobalPosition) : new Vector2();
+            float moved = step.Length();
+            _gaitFrom = GlobalPosition;
+            _gaitPrimed = true;
+            _gaitSpd = _gaitSpd * 0.75f + (moved / dt) * 0.25f; // short trail: a stop settles, no snap
+            float gait = _gaitSpd / GAIT_REF;                   // 0..1 stride energy
+            if (gait > 1.0f)
+                gait = 1.0f;
+            _bobT += (float)System.Math.PI * (_gaitSpd / GAIT_STRIDE); // one heel per planted stride
+            float heel = (float)System.Math.Abs(System.Math.Sin(_bobT + _bobPhase));
+            float lift = (kind == "hobgoblin" ? 4.2f : kind == "wolf" ? 3.2f : 3.0f) * gait; // per-kind step lift px
+            float def = (1.0f - 2.0f * heel) * (kind == "ogre" ? 0.10f : 0.06f) * gait;      // trough wide/flat, apex tall/narrow
+            _rig.Position = new Vector2(0.0f, -lift * heel); // -y is up: the body lifts off the planted foot
+            _rig.Scale = new Vector2(1.0f + def, 1.0f - def);
+            float target = moved > 1.0f ? (step.X / moved) * GAIT_LEAN * gait : 0.0f; // lean INTO travel
+            _lean = _lean * 0.8f + target * 0.2f;
+            _rig.Rotation = _lean;
         }
         Vector2 p = GlobalPosition;
         if (kind == "reaper")
@@ -498,3 +539,4 @@ public partial class Enemy : Combatant
             _body.Modulate = new Color(1.0f, 1.0f, 1.0f);
     }
 }
+
