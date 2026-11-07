@@ -91,6 +91,7 @@ projSpeed = 420.0
 projLife = 1.6
 burnDps = 1.0
 burnDur = 5.0
+vialFxArt = "res://art/fx/vial.png"
 class_ = "Artificer"
 
 [node name="Wash" type="Node2D" parent="." unique_id=904465949]

@@ -164,6 +164,8 @@ public partial class PartyMember : Godot.Node2D
 
 	[Export] public string shieldFxArt = ""; // Wash: hurl disc caught mid-hurl on the commit
 
+	[Export] public string vialFxArt = ""; // Stack (chef): hot-sauce vial poured at the throw commit — the firebolt leaves the vial's mouth, the bottle itself never flies
+
 	// Alvora Spirit Guardians art (user 2026-11-02: "alvora_spirit - literally a sprite of Alvora...
 	// tint it a spectral blue and shrink it down to about 1/3 of the size"): set on the ALVORA node in
 	// Main.tscn; the six ring motes then ride that art instead of the twilight-violet ColorRect greybox
@@ -171,6 +173,8 @@ public partial class PartyMember : Godot.Node2D
 	[Export] public string spiritFxArt = ""; // Alvora: Spirit Guardians mote art (spectral-blue tinted)
 
 	Godot.Sprite2D _meleeFx = null;
+
+	Godot.Sprite2D _vialFx = null; // Stack: one vial slot, posed at the shot commit (mirrors _meleeFx)
 
 	// fx-feel10: the single disc sprite is gone - art lives in _shldArt, one per slot.
 
@@ -891,6 +895,30 @@ public partial class PartyMember : Godot.Node2D
 			{
 
 				_shldTex = fxT; // fx-feel10: keep only the texture; ShieldArt(slot) builds a disc per slot on use
+
+			}
+
+		}
+
+		if (vialFxArt != "")
+
+		{
+
+			Godot.Texture2D fxT = GD.Load(vialFxArt) as Godot.Texture2D;
+
+			if (fxT != null)
+
+			{
+
+				_vialFx = new Godot.Sprite2D();
+
+				_vialFx.Texture = fxT;
+
+				_vialFx.Set("texture_filter", 0); // NEAREST like the painted minis: hard edges
+
+				_vialFx.Visible = false;
+
+				AddChild(_vialFx);
 
 			}
 
@@ -1969,6 +1997,8 @@ public partial class PartyMember : Godot.Node2D
 			twinArm = false;
 			if (_meleeFx != null)
 				_meleeFx.Visible = false;
+			if (_vialFx != null)
+				_vialFx.Visible = false; // generic death drop: a vial caught mid-pour never lingers
 			if (_cresFx != null)
 				 foreach (Godot.Sprite2D sx in _cresFx)
 					 sx.Visible = false;
@@ -2124,6 +2154,10 @@ public partial class PartyMember : Godot.Node2D
 				if (_meleeFx != null)
 
 					_meleeFx.Visible = false;
+
+				if (_vialFx != null)
+
+					_vialFx.Visible = false; // commit-flash decay: the vial drops on the same beat as the melee slivers
 
 				for (int sk = 0; sk < _shldT.Length; sk++)
 				{
@@ -3511,6 +3545,28 @@ public partial class PartyMember : Godot.Node2D
 				Vector2 dir = new Vector2((float)System.Math.Cos(a2), (float)System.Math.Sin(a2));
 
 				pg.SpawnShot(p + dir * 18.0f, dir * projSpeed, dmg, projLife, pierce, burnDur, burnDps * (float)stat[StatTags.ATTACK_DAMAGE], cinderRank > 0 ? dmg * 0.25 * (double)(cinderRank > 3 ? 3 : cinderRank) : 0.0); // firebolt: DoT + cinder-burst dmg ride the damage roll (dmg), not crits
+
+			}
+
+			// vial commit flash (2026-11-08 chef split art): the bottle POSES at the throw -
+
+			// neck tipped toward the prey so the firebolt reads as poured off the mouth; the
+
+			// bottle itself never flies (only the flame comet rides the shot pool)
+
+			if (_vialFx != null)
+
+			{
+
+				float vpx = (float)System.Math.Cos(ang), vpy = (float)System.Math.Sin(ang);
+
+				_vialFx.GlobalPosition = p + new Vector2(vpx, vpy) * 10.0f; // in the outstretched hand, just ahead of the body
+
+				_vialFx.Rotation = ang + (float)System.Math.PI * 0.5f; // upright art: neck tips toward the prey
+
+				_vialFx.Visible = true;
+
+				_fxT = 0.16f; // same commit-flash beat the melee slivers use
 
 			}
 

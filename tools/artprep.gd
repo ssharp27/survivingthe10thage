@@ -169,8 +169,18 @@ func _init() -> void:
 	#       ["res://art/fx/sweep_v3.jpg", "res://art/fx/sweep.png", 128, 128],
 	#       ["res://art/fx/lunge_v4.jpg", "res://art/fx/lunge.png", 96, 16],
 	#   ]
+	# Current batch (2026-11-08 Stack chef split art: firebolt_v3 head-trailing + hollow-core
+	# reject, firebolt_v4 SOLID-core comet head-forward 64x32 box; vial_v1 upright corked
+	# hot-sauce bottle 24x36 box -> art/fx/vial.png rides the throw rig):
+	#   var jobs: Array = [
+	#       ["res://art/fx/firebolt_v4.jpg", "res://art/fx/firebolt.png", 64, 32],
+	#       ["res://art/fx/vial_v1.jpg", "res://art/fx/vial.png", 24, 36],
+	#   ]
 	# No live batch - edit THIS list for the next one.
-	var jobs: Array = []
+	var jobs: Array = [
+		["res://art/fx/firebolt_v4.jpg", "res://art/fx/firebolt.png", 64, 32],
+		["res://art/fx/vial_v1.jpg", "res://art/fx/vial.png", 24, 36],
+	]
 	for j in jobs:
 		prep(String(j[0]), String(j[1]), int(j[2]), int(j[3]))
 	quit()
