@@ -123,21 +123,26 @@ above keeps field drops out of the additive meta pool.
   they take the deepest mark, and it COMPOUNDS with crossfire per the section above.
 - Field lifetime `LIFE_D = 18 s`, walk-over pick radius `PICK_R = 18 px`: reaching it is a choice, not free.
 
-## Motion language — walking without sprite frames (assistant-picked knobs, 2026-11-08, source: src/Enemy.cs GAIT_* + src/PartyMember.cs rig)
+## Motion language — walking without sprite frames (assistant-picked knobs, 2026-11-08, source: src/Enemy.cs SWAY_* + src/PartyMember.cs rig)
 
 NO sprite animation anywhere: every creature and PC is ONE static pose, and all of its life comes
-from the transform rig. Compendium copy describes motion, it never promises frames. There are TWO
-distinct motion languages, so copy must not describe them alike:
+from the transform rig. Compendium copy describes motion, it never promises frames. There are TWO rigs,
+ONE language (the table slide) run at two speeds, so copy must not describe them alike:
 
 - **THE PARTY = a table slide** — lateral sway + dip + lean trailing the push (`PartyMember.cs`
   ~1922). They are minis on a board, and that is the point of the contrast.
-- **CREATURES = a two-beat gait** (`Enemy.cs`): `abs(sin)` heel, so the TROUGHS plant like footsteps
-  instead of floating. Cadence is one step per `GAIT_STRIDE = 26` px of REAL travel, which means the
-  step rate tracks speed AND THE GAIT DIES when the body stops — a coiled, loitering, winding-up or
-  plain-stopped body stands LEVEL (user pick: no idle breath). Stride energy is `px/s / GAIT_REF 120`
-  and scales lift (`4.2` hob / `3.2` wolf / `3.0` px else), squash (wide-flat at the plant, tall-narrow
-  at the apex, `6%` — ogre `10%`) and the `0.075` rad lean INTO travel.
-- The gait reads the body's OWN wrap-aware displacement (one frame of lag), so no movement lane has
+- **CREATURES = the SAME party slide, run FASTER** (`Enemy.cs` MONSTER SWAY, copied from `PartyMember.cs`
+  1910–1936): an odometer of the body's REAL travel (`WrapDelta`, one frame of lag) feeds an eased px/s;
+  cadence is that speed times `SWAY_RATE = 12` rad/s (the party's is 7.2 — monsters swing quicker),
+  amplitude `SWAY_AMP = 3.4` px lateral (party 3.0), with the party's half-rate dip and a lean that trails
+  the sway (`sw * 0.017`, the party constant). A body that stops EASES its last swing back level — a set-
+  down, never a jolt — and below `SWAY_MIN = 30` px/s it simply stands. Per-kind amp: hobgoblin 1.25 / wolf 0.9.
+- THE TWO-BEAT HEEL GAIT (abs(sin) step plant + squash) was BUILT and then SCRAPPED the same day — user
+  hand-play called it "the head is vibrating rapidly, really difficult to look at". Do not resurrect it;
+  compendium copy must not describe a foot-step plant either.
+- Both rigs read the body's OWN wrap-aware displacement, so no movement lane has to hand a velocity to the
+  visuals, and all of it is visuals-only: the hitbox is the ENEMY node and the ogre SlamDisc is its CHILD,
+  so sway cannot nudge anything.
   to hand a velocity to the visuals, and all of it is visuals-only: the hitbox is the ENEMY node and
   the ogre telegraph disc is its CHILD, so squash + lean cannot nudge anything.
 
@@ -255,6 +260,7 @@ Counts stay counts. All ranks cap at 3/3 (rank 4 = evolution, M2 parked content)
 
 
 7. Motion copy must NEVER say "animated" or "sprite frames" — the art is one pose and every step is
-   procedural. Keep the two languages distinct (party = table slide, creatures = two-beat gait), and
-   never quote a step height, stride length or lean angle in copy: they are assistant-picked knobs the
-   user retunes by feel.
+   procedural. There are now TWO names for ONE language (party = table slide, creatures = the same slide
+   run FASTER); never describe creatures as heel-stepping, planting, squashing or bobbing — that gait was
+   scrapped. Never quote a sway amplitude, cadence or lean angle in copy: they are assistant-picked knobs
+   the user retunes by feel.
