@@ -159,6 +159,16 @@ func _init() -> void:
 	#   var jobs: Array = [
 	#       ["res://art/fx/dagger_v1.jpg", "res://art/fx/dagger.png", 128, 32],
 	#   ]
+	# Shipped sweep+lunge batch (2026-11-08: sweep_v1 slab + v2 jagged fan rejected by user;
+	#   sweep_v3 crescent SLASH BAND (maul edge swept over an area, not a fan) 128x128 box ->
+	#   102x128 (band bbox near-square so texture center = pivot, rim reaches full reach, NO
+	#   vertex-pad needed that round); lunge_v1 letterboxed SOURCE LAW reject, v3 diagonal reject,
+	#   v4 approved AFTER a component pass cleared the 12-px tail-dash chunk (on-axis spark kept)
+	#   then 80x16 cropped to 80x12; user hand-fixed both PNGs at the same canvases):
+	#   var jobs: Array = [
+	#       ["res://art/fx/sweep_v3.jpg", "res://art/fx/sweep.png", 128, 128],
+	#       ["res://art/fx/lunge_v4.jpg", "res://art/fx/lunge.png", 96, 16],
+	#   ]
 	# No live batch - edit THIS list for the next one.
 	var jobs: Array = []
 	for j in jobs:
