@@ -85,15 +85,17 @@ public partial class Enemy : Combatant
     private readonly float FG_LUNGE_SPD = 330.0f;  // spring px/s over the line (assistant pick)
     private readonly float FG_LUNGE_CD = 1.2f;     // breath after landing before the next rush (assistant pick)
     private readonly float FG_HOP = 16.0f;         // hop arc height px (visual rig only, never the hitbox)
-    // GAIT rig (user 2026-11-07: enemies read "a bit too static while moving", and no
-    // sprite animation is wanted): stride geometry + body feel for the walk below. STRIDE
-    // sets CADENCE as one planted step per GAIT_STRIDE px of REAL travel, so the gait dies
-    // when the body stops instead of bouncing in place; REF is the px/s that counts as full
-    // stride energy, and LEAN is the max lean into travel in radians. All assistant picks,
-    // retunable with the rest of the creature knobs - the USER's call is the feel.
-    private readonly float GAIT_STRIDE = 26.0f; // px of travel per planted step (assistant pick)
-    private readonly float GAIT_REF = 120.0f;   // px/s that reads as a full-length stride (assistant pick)
-    private readonly float GAIT_LEAN = 0.075f;  // max lean into travel, radians (assistant pick)
+    // MONSTER SWAY (user 2026-11-08 hand-play: the two-beat gait pass below made the head
+    // vibrate and was SCRAPPED the same day - see the superseded note in RESUME_NOTES). Monsters
+    // now ride the PARTY slide language (src/PartyMember.cs 1910-1936): bounce SIDE TO SIDE,
+    // just FASTER because they are creatures, and the same set-down when they stop. AMP is the
+    // lateral px per beat (the party sways 3.0), RATE the cadence in rad/s at full stride (the
+    // party is 7.2), REF the px/s that reads as a full stride (the party 130), MIN the px/s below
+    // which a body is standing. Assistant picks, retunable by feel - the USER owns the feel.
+    private readonly float SWAY_AMP = 3.4f;
+    private readonly float SWAY_RATE = 12.0f;
+    private readonly float SWAY_REF = 130.0f;
+    private readonly float SWAY_MIN = 30.0f;
 
     Godot.ColorRect _body;
     // painted creature art (user 2026-11-07 stage-1 enemy assignments): when the GD.Load
@@ -106,10 +108,9 @@ public partial class Enemy : Combatant
     Godot.Node2D _rig;
     float _bobT = 0.0f;
     float _bobPhase = 0.0f;
-    float _gaitSpd = 0.0f;  // px/s odometer: what the body ACTUALLY moved (drives the gait)
-    Vector2 _gaitFrom = new Vector2(0.0f, 0.0f); // last odometer checkpoint
-    bool _gaitPrimed = false;                    // the first frame has no previous checkpoint
-    float _lean = 0.0f;                          // eased lean into travel (visuals only)
+    Vector2 _lastMovePos = new Vector2(); // odometer: where the body stood last frame
+    bool _movePrimed = false;             // the first frame has no previous checkpoint
+    float _moveSpd = 0.0f;                // eased px/s: drives cadence + amplitude
 
     // Visuals are built after spawn parameters land (Director sets kind/hp/speed post-new()),
     // so this runs on demand rather than in _EnterTree.
@@ -121,8 +122,8 @@ public partial class Enemy : Combatant
             _rig.Name = "Rig";
             AddChild(_rig);
             _bobPhase = (GetInstanceId() % 64) * 0.37f; // the horde never bobs in lockstep
-            _gaitFrom = GlobalPosition; // the odometer starts at the spawn, not at the origin
-            _gaitPrimed = true;
+            _lastMovePos = GlobalPosition; // the odometer starts at the spawn, not at the origin
+            _movePrimed = true;
         }
         _shotCd = kind == "riderbow" ? RIDER_SHOT_EVERY : (kind == "mage" ? 2.0f : 0.0f); // user 2026-11-06: fresh mage looses its first ball after 2 s, not a full 4 s cycle - the volley lands while the party is still untangling the new pack
         _firedShot = false; // fx-feel10: audit flag lands when the shot clock does
@@ -223,40 +224,40 @@ public partial class Enemy : Combatant
                     // without this guard a dead reaper would walk back into the arena
         if (g.GetWorldPause())
             return; // picker / join-banner soft pause: the horde holds still while the card is read
-        // creature walk bob (user 2026-10-21): enemies are creatures, not minis - vertical
-        // step bob instead of the party's table slide, phase per spawn so the horde
-        // never reads as one marching block; visuals only, never the hitbox
-        if (_rig != null)
-        // gait rig (user 2026-11-07: enemies looked "a bit too static while moving"): the old
-        // rail was a free-running 1.4..2.2 px sine, which read as HOVERING and kept bouncing
-        // when a body stood still. Same pivot, but now driven by what the body ACTUALLY moved
-        // (a wrap-aware odometer with one frame of lag, so no lane has to hand a velocity):
-        //   * abs(sin) = two-beat heel, the TROUGHS plant like footsteps instead of floating
-        //   * cadence from stride length, so the step rate tracks the speed of the walk
-        //   * lift, squash and lean scale with stride energy; a coiled, loitering, winding-up
-        //     or stopped body settles LEVEL (user pick: no idle breath)
-        // Visuals only: the hitbox is the ENEMY node and the ogre telegraph disc is its child,
-        // so squash + lean cannot nudge anything. Every number an assistant pick.
+        // monster sway (user 2026-11-08 hand-play: the gait pass that made heads vibrate was
+        // SCRAPPED the same day; the user asked for the PLAYER-character language instead).
+        // This is the party rig law copied across from src/PartyMember.cs 1910-1936 - an
+        // odometer of what the body ACTUALLY moved, an eased px/s, cadence scaled by that speed,
+        // lateral sway + a half-rate dip + lean that trails the sway - with a FASTER cadence,
+        // because creatures are not minis being pushed across a table. A body that stops swings
+        // its last sway back LEVEL (a set-down, never a jolt). Visuals only: the hitbox is the
+        // ENEMY node and the ogre telegraph disc is its child, so the sway cannot nudge anything.
+        Vector2 gp = GlobalPosition;
+        float moved = _movePrimed ? g.WrapDelta(_lastMovePos, gp).Length() : 0.0f;
+        _lastMovePos = gp;
+        _movePrimed = true;
+        if (moved > 400.0f)
+            moved = 0.0f; // wrap-fold frame, not motion (the party guard)
+        float inst = delta > 0.001f ? moved / delta : _moveSpd;
+        _moveSpd += (inst - _moveSpd) * (1.0f - (float)System.Math.Exp(-8.0 * delta));
         if (_rig != null)
         {
-            float dt = delta < 0.0001f ? 0.0001f : delta;
-            Vector2 step = _gaitPrimed ? g.WrapDelta(_gaitFrom, GlobalPosition) : new Vector2();
-            float moved = step.Length();
-            _gaitFrom = GlobalPosition;
-            _gaitPrimed = true;
-            _gaitSpd = _gaitSpd * 0.75f + (moved / dt) * 0.25f; // short trail: a stop settles, no snap
-            float gait = _gaitSpd / GAIT_REF;                   // 0..1 stride energy
-            if (gait > 1.0f)
-                gait = 1.0f;
-            _bobT += (float)System.Math.PI * (_gaitSpd / GAIT_STRIDE); // one heel per planted stride
-            float heel = (float)System.Math.Abs(System.Math.Sin(_bobT + _bobPhase));
-            float lift = (kind == "hobgoblin" ? 4.2f : kind == "wolf" ? 3.2f : 3.0f) * gait; // per-kind step lift px
-            float def = (1.0f - 2.0f * heel) * (kind == "ogre" ? 0.10f : 0.06f) * gait;      // trough wide/flat, apex tall/narrow
-            _rig.Position = new Vector2(0.0f, -lift * heel); // -y is up: the body lifts off the planted foot
-            _rig.Scale = new Vector2(1.0f + def, 1.0f - def);
-            float target = moved > 1.0f ? (step.X / moved) * GAIT_LEAN * gait : 0.0f; // lean INTO travel
-            _lean = _lean * 0.8f + target * 0.2f;
-            _rig.Rotation = _lean;
+            if (_moveSpd > SWAY_MIN) // striding
+            {
+                float ratio = _moveSpd / SWAY_REF;
+                ratio = ratio < 0.35f ? 0.35f : (ratio > 1.4f ? 1.4f : ratio);
+                _bobT += delta * SWAY_RATE * ratio; // faster than the party 7.2 (assistant pick)
+                float ph = _bobT + _bobPhase;       // the horde never sways in lockstep
+                float sw = (float)System.Math.Sin(ph) * SWAY_AMP * (kind == "hobgoblin" ? 1.25f : kind == "wolf" ? 0.9f : 1.0f);
+                _rig.Position = new Vector2(sw, -(float)System.Math.Abs((float)System.Math.Sin(ph * 0.5)) * 1.2f); // side to side + half-rate dip
+                _rig.Rotation = sw * 0.017f;        // the lean trails the sway (party constant)
+            }
+            else
+            {
+                float ease = 1.0f - (float)System.Math.Exp(-9.0 * delta);
+                _rig.Position += -_rig.Position * ease;   // set-down, not a jolt (party law)
+                _rig.Rotation += -_rig.Rotation * ease;
+            }
         }
         Vector2 p = GlobalPosition;
         if (kind == "reaper")
