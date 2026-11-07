@@ -465,6 +465,12 @@ public partial class Game : Godot.Node2D
 	PartyMember _leader = null;
 	Godot.Collections.Array<Godot.Node2D> _gems = new();
 	Godot.Collections.Array<double> _gemVals = new();
+	// ---------- field pickups (user 2026-11-08: small random drops to help runs) ----------
+	// One rare roll per ORDINARY enemy kill (the kill rail calls MaybeDropPickup while the body
+	// is still live); flavour numbers live in Pickup.cs. Assistant-picked odds, hand-test retunes.
+	// IN-RUN only: the compendium meta law keeps the additive meta pool clean of field drops.
+	const double PICKUP_CH = 0.02;  // per-ordinary-kill drop roll (assistant pick)
+	public double _magnetT = 0.0;   // XP magnet clock: >0 widens UpdateGems' bubble to whole-field
 	// looping-world decor: the flat floor rect rides the camera (solid color, so pinning
 	// it is seam-invisible) while the scattered patches fold like every other entity,
 	// which keeps them scrolling AND looping as the motion readout
@@ -994,6 +1000,7 @@ public partial class Game : Godot.Node2D
 			}
 		}
 		SpawnGem(c.GlobalPosition, ((Enemy)c).xpValue);
+		MaybeDropPickup(c); // rare kill drop, before the body leaves the registry
 		c.kind = "dead"; // drop the registry entry in the kill scan
 		ReleaseLiveCount((Enemy)c); // ownership-flagged: never double-decrements
 		c.QueueFree();
@@ -1123,6 +1130,34 @@ public partial class Game : Godot.Node2D
 		}
 	}
 
+	// ---------- field pickups: the drop rail (user 2026-11-08) ----------
+	// RARE KILL DROPS on the shipped stage only: PICKUP_CH rolls once per ordinary enemy kill,
+	// then a weighted flavour pick. Escort kills NEVER drop: those bodies ARE the rescue meter,
+	// and a loot cage at the rescue site would clutter the beat the escort beat already pressures.
+	public void MaybeDropPickup(Combatant c)
+	{
+		if (_stage != 0)
+			return; // stage 1 only: the test room and any future plate stay clean
+		if (((Enemy)c).escort)
+			return; // escort bodies run the rescue meter, never a loot drop
+		if (Rng.Randf() >= (float)PICKUP_CH)
+			return; // the rare roll: the same rail the creature lanes use (assistant pick)
+		double roll = Rng.Randf() * 100.0; // weighted flavour pick (assistant pick)
+		int pk = roll < 40.0 ? 0 : (roll < 70.0 ? 1 : 2); // 0 heal orb | 1 xp magnet | 2 rage vial
+		SpawnPickup(c.GlobalPosition, pk);
+	}
+	
+	public void SpawnPickup(Vector2 pos, int pk)
+	{
+		Pickup p = new Pickup(); // allocated per drop, like a horde body: pickups are rare
+		p.pk = pk;
+		AddChild(p);
+		p.GlobalPosition = pos; // drops where the body died; Pickup.cs folds it like the gems
+		p.InitVisuals();
+		string label = pk == 0 ? "heal orb" : (pk == 1 ? "xp magnet" : "rage vial");
+		GD.Print("[10thAge] (pickup) " + label + " drops on the field");
+	}
+	
 	public void SpawnBullet(Vector2 pos, Vector2 vel, double dmg)
 	{
 		for (int i = 0; i < _bullets.Count; i++)
@@ -3662,6 +3697,11 @@ private void UpdateSpirits(float delta)
 
 	private void UpdateGems(float delta)
 	{
+		// XP magnet (rare kill drop): the clock drains once per frame here, and the bubble test
+		// below widens to whole-field while it runs. The vacuum itself is UNCHANGED: gems still
+		// ride the 380 px/s stream and pay their own XP_PCT math at pickup.
+		if (_magnetT > 0.0)
+			_magnetT -= delta;
 		for (int i = 0; i < _gems.Count; i++)
 		{
 			Godot.Node2D gem = _gems[i];
@@ -3682,7 +3722,7 @@ private void UpdateSpirits(float delta)
 					continue; // downed/eliminated bodies + stranded recruits: no bubble
 				Vector2 mt = mm.GlobalPosition - gem.GlobalPosition;
 				float md = mt.Length();
-				if (md < 110.0f * (float)mm.stat[StatTags.COLLECTION_RANGE] * (mm.elixMagT > 0.0 ? 1.10f : 1.0f) * (float)LeaderCollectMul() && md < dist) // Magnetism elixir: bubble +10% | Inquisitive Mind: bubble +15% while Brook leads
+				if ((md < 110.0f * (float)mm.stat[StatTags.COLLECTION_RANGE] * (mm.elixMagT > 0.0 ? 1.10f : 1.0f) * (float)LeaderCollectMul() || _magnetT > 0.0) && md < dist) // Magnetism elixir: bubble +10% | Inquisitive Mind: bubble +15% while Brook leads | XP magnet (rare kill drop): whole-field while the clock runs
 				{
 					puller = mm;
 					dist = md;
