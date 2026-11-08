@@ -85,6 +85,18 @@ public partial class Enemy : Combatant
     private readonly float FG_LUNGE_SPD = 330.0f;  // spring px/s over the line (assistant pick)
     private readonly float FG_LUNGE_CD = 1.2f;     // breath after landing before the next rush (assistant pick)
     private readonly float FG_HOP = 16.0f;         // hop arc height px (visual rig only, never the hitbox)
+    // WOLF-2 LONG-SIGHT CHARGE (user 2026-11-09): "similar to that goblin jumper ... but it
+    // will charge from a long distance ... they will see players from a fairly long distance
+    // away, pause, then dash in a straight line exactly at where the player is when they dash
+    // ... they can go a fair distance passed the player too, like a long lunge" (USER). Same
+    // coil-and-spring machine as the fastgoblin (shares the _fg* state), but a much wider
+    // trigger ring, a longer coil, a much longer OVERSHOOTING spring, and NO hop - the mount
+    // stays on the floor. Ring / beat / distance / speed / breath are assistant picks.
+    private readonly float W2_TRIGGER = 520.0f;   // long-sight ring (assistant pick)
+    private readonly float W2_PAUSE = 0.8f;       // the coil beat (assistant pick)
+    private readonly float W2_DASH_DIST = 430.0f; // long lunge: full overshoot past the party (assistant pick)
+    private readonly float W2_DASH_SPD = 360.0f;  // dash px/s (assistant pick)
+    private readonly float W2_DASH_CD = 1.5f;     // breath between dashes (assistant pick)
     // MONSTER SWAY (user 2026-11-08 hand-play: the two-beat gait pass below made the head
     // vibrate and was SCRAPPED the same day - see the superseded note in RESUME_NOTES). Monsters
     // now ride the PARTY slide language (src/PartyMember.cs 1910-1936): bounce SIDE TO SIDE,
@@ -163,12 +175,12 @@ public partial class Enemy : Combatant
             _rig.AddChild(_body);
             return;
         }
-        float w = kind == "ogre" ? 64.0f : (kind == "wolf" ? 34.0f : (kind == "hobgoblin" ? 32.0f : (kind == "rider" || kind == "riderbow" ? 40.0f : (kind == "fastgoblin" ? 28.0f : 26.0f)))); // ogre: the map's biggest body (assistant pick)
+        float w = kind == "ogre" ? 64.0f : (kind == "wolf3" ? 40.0f : (kind == "wolf" || kind == "wolf2" ? 34.0f : (kind == "hobgoblin" ? 32.0f : (kind == "rider" || kind == "riderbow" ? 40.0f : (kind == "fastgoblin" ? 28.0f : 26.0f))))); // wolf3: the tankier wolf (assistant pick); ogre: the map's biggest body (assistant pick)
         _body = new ColorRect();
         _body.Size = new Vector2(w, w * 0.8f);
         _body.Position = -_body.Size * 0.5f;
         // hobgoblin: a darker, meaner green than the goblin clump (user art note)
-        _body.Color = kind == "wolf" ? new Color(0.55f, 0.58f, 0.62f)
+        _body.Color = (kind == "wolf" || kind == "wolf2" || kind == "wolf3") ? new Color(0.55f, 0.58f, 0.62f)
                               : kind == "hobgoblin" ? new Color(0.13f, 0.26f, 0.12f)
                                                     : kind == "rider" ? new Color(0.45f, 0.34f, 0.28f) // dusty mount (assistant pick)
                                                     : kind == "riderbow" ? new Color(0.38f, 0.36f, 0.47f) // steel-tinted saddle (assistant pick)
@@ -185,7 +197,10 @@ public partial class Enemy : Combatant
         string artPath = kind == "goblin" ? "res://art/enemies/stage1/goblin1.png"
                        : kind == "goblin2" ? "res://art/enemies/stage1/goblin2.png"
                          : kind == "fastgoblin" ? "res://art/enemies/stage1/goblin3.png"
-                           : kind == "hobgoblin" ? "res://art/enemies/stage1/hobgoblin.png" : "";
+                           : kind == "hobgoblin" ? "res://art/enemies/stage1/hobgoblin.png"
+                              : kind == "wolf" ? "res://art/enemies/stage1/wolf1.png"
+                                : kind == "wolf2" ? "res://art/enemies/stage1/wolf2.png"
+                                  : kind == "wolf3" ? "res://art/enemies/stage1/wolf3.png" : "";
         if (artPath != "" && _spr == null)
         {
             Godot.Texture2D tex = GD.Load(artPath) as Godot.Texture2D;
@@ -194,7 +209,7 @@ public partial class Enemy : Combatant
                 _spr = new Godot.Sprite2D();
                 _spr.Texture = tex;
                 _spr.Name = "Art";
-                float th = kind == "hobgoblin" ? 52.0f : 46.0f; // target height px (assistant pick)
+                float th = kind == "hobgoblin" ? 52.0f : ((kind == "wolf" || kind == "wolf2" || kind == "wolf3") ? 38.0f : 46.0f); // wolves ride their OWN height: the ~120x80 landscape canvases would draw ~69 px wide at the 46 px humanoid target against the 34 px body (assistant pick - retunable)
                 float texH = (float)tex.GetHeight();
                 if (texH > 0.0f)
                 {
@@ -250,7 +265,7 @@ public partial class Enemy : Combatant
                 ratio = ratio < 0.35f ? 0.35f : (ratio > 1.4f ? 1.4f : ratio);
                 _bobT += delta * SWAY_RATE * ratio; // faster than the party 7.2 (assistant pick)
                 float ph = _bobT + _bobPhase;       // the horde never sways in lockstep
-                float sw = (float)System.Math.Sin(ph) * SWAY_AMP * (kind == "hobgoblin" ? 1.25f : kind == "wolf" ? 0.9f : 1.0f);
+                float sw = (float)System.Math.Sin(ph) * SWAY_AMP * (kind == "hobgoblin" ? 1.25f : kind == "wolf" || kind == "wolf2" ? 0.9f : kind == "wolf3" ? 0.75f : 1.0f);
                 _rig.Position = new Vector2(sw, -(float)System.Math.Abs((float)System.Math.Sin(ph * 0.5)) * 1.2f); // side to side + half-rate dip
                 _rig.Rotation = sw * 0.017f;        // the lean trails the sway (party constant)
                 // grit on the plant (user 2026-11-09 hand-play: "give monsters a very small dirt-cloud
@@ -399,8 +414,17 @@ public partial class Enemy : Combatant
                         dir = new Vector2(-to.Y, to.X).Normalized() * MAGE_LOITER;
                     }
                 }
-                else if (kind == "fastgoblin")
+                else if (kind == "fastgoblin" || kind == "wolf2")
                 {
+                    // SHARED COIL-AND-SPRING lane (user 2026-11-09: wolf2 is "similar to that
+                    // goblin jumper ... but it will charge from a long distance"): same machine,
+                    // per-kind knobs below, and NO hop for the mount.
+                    bool springer = kind == "fastgoblin"; // only the goblin springs with a visible hop
+                    float coilRing = springer ? FG_TRIGGER : W2_TRIGGER;
+                    float coilBeat = springer ? FG_PAUSE : W2_PAUSE;
+                    float springDist = springer ? FG_LUNGE_DIST : W2_DASH_DIST;
+                    float springSpd = springer ? FG_LUNGE_SPD : W2_DASH_SPD;
+                    float springCd = springer ? FG_LUNGE_CD : W2_DASH_CD;
                     // FAST GOBLIN lane (USER behaviour: "rapidly approach the player, pause,
                     // then lunge in a straight line over a set distance"): rush with a sin
                     // prowl wobble inside FG_TRIGGER it COILS (the pause beat, assistant 0.6 s),
@@ -414,10 +438,10 @@ public partial class Enemy : Combatant
                         float fwob = (float)System.Math.Sin(p.X * 0.04 + p.Y * 0.06) * 18.0f; // prowl wobble (assistant pick)
                         dir = (to + new Vector2(fwob * 0.5f, fwob)).Normalized();
                         _fgCd -= delta; // the breath clock only drains while running
-                        if (dist <= FG_TRIGGER && _fgCd <= 0.0f)
+                        if (dist <= coilRing && _fgCd <= 0.0f)
                         {
                             _fgState = 1;
-                            _fgT = FG_PAUSE;
+                            _fgT = coilBeat;
                             _fgDir = to.Normalized(); // LOCKED at the coil: the lunge never re-aims
                         }
                     }
@@ -432,21 +456,21 @@ public partial class Enemy : Combatant
                             if (!_fgLeaped)
                             {
                                 _fgLeaped = true;
-                                GD.Print("[10thAge] (fastgoblin) springs its first straight-line lunge"); // bench audit
+                                GD.Print("[10thAge] (" + kind + ") springs its first straight-line lunge"); // bench audit
                             }
                         }
                     }
                     else
                     {
                         dir = _fgDir; // the locked bearing, straight over the set distance
-                        moveSpd = FG_LUNGE_SPD;
-                        _fgDone += FG_LUNGE_SPD * delta;
-                        if (_rig != null) // JUMP animation: visual rig only, never the hitbox
-                            _rig.Position = new Vector2(0.0f, -(float)System.Math.Sin(System.Math.PI * (_fgDone / FG_LUNGE_DIST)) * FG_HOP);
-                        if (_fgDone >= FG_LUNGE_DIST)
+                        moveSpd = springSpd;
+                        _fgDone += springSpd * delta;
+                        if (_rig != null && springer) // JUMP animation: the goblin HOPS; the wolf2 mount stays on the floor
+                            _rig.Position = new Vector2(0.0f, -(float)System.Math.Sin(System.Math.PI * (_fgDone / springDist)) * FG_HOP);
+                        if (_fgDone >= springDist)
                         {
                             _fgState = 0;
-                            _fgCd = FG_LUNGE_CD; // breath between springs
+                            _fgCd = springCd; // breath between springs
                         }
                     }
                 }

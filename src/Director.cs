@@ -26,6 +26,12 @@ public partial class Director : Godot.Node2D
         // FAST GOBLIN with the rush/pause/lunge lane. Entry odds are assistant-picked knobs.
         const float G2_CH = 0.5f;  // per plain-goblin slot: chance the body enters as Goblin 2
         const float FAST_CH = 0.2f; // per-spawn roll on a tier-2+ leg: a fast goblin enters
+        // WOLF FAMILY (user 2026-11-09): the 30% wolf roll now splits three ways - a wolf2
+        // PACK of 3 (long-sight charge), a lone tanky wolf3, or the standard wolf. The family
+        // lane stays 0.30 so pacing is unchanged; the split inside it is an assistant-picked
+        // cadence knob, retunable by eye.
+        const float WOLF_PACK_CH = 0.35f; // of the wolf lane: the roll enters as a wolf2 pack of 3 (USER pack size)
+        const float WOLF3_CH = 0.30f;     // of what remains: a lone tanky wolf3
     // EARLY OGRE LOOK (user 2026-11-06: "spawn an ogre in at the start of the run so I
     // can test how it works much earlier"): the FIRST ordinary spawn of a run is forced
     // to be the ogre, so the telegraph + SLAM are on screen inside the first minute
@@ -163,6 +169,20 @@ public partial class Director : Godot.Node2D
             return;
         }
         bool wolf = tier >= 2 && (float)GD.Randf() < 0.30f;
+        // WOLF FAMILY (user 2026-11-09): the wolf roll splits - wolf2 pack / wolf3 / standard
+        // wolf. wolf3 keeps the wolf flag set so the goblin-vs-hob counter still reads it as
+        // not-a-goblin, and the pack owns this budgeted roll outright.
+        bool wolf3 = false;
+        if (wolf)
+        {
+            float wf = (float)GD.Randf();
+            if (wf < WOLF_PACK_CH)
+            {
+                SpawnWolfPack(g, pos, hordeScale);
+                return; // the pack owns this budgeted roll
+            }
+            wolf3 = wf < WOLF_PACK_CH + WOLF3_CH;
+        }
         // TIER-2 FAST GOBLIN (user 2026-11-07): own roll between the wolf and goblin lanes;
         // ordinary budgeted spawn like the rider rolls (the near-party guard already burned
         // pos upstream). NOT counted by the hob counter: "one hob per ten goblins" counts the
@@ -195,15 +215,15 @@ public partial class Director : Godot.Node2D
         // TIER-1 VARIETY (user 2026-11-07): half the plain-goblin slots enter as Goblin 2
         // (25 hp / 100 speed / contact 2 / 1 xp = USER numbers) - pure clump flavour.
         bool g2 = !wolf && !hob && (float)GD.Randf() < G2_CH;
-        e.kind = wolf ? "wolf" : (hob ? "hobgoblin" : (g2 ? "goblin2" : "goblin"));
+        e.kind = wolf ? (wolf3 ? "wolf3" : "wolf") : (hob ? "hobgoblin" : (g2 ? "goblin2" : "goblin"));
         // real tier-3 bodies landed, so the tier-2 pool holds its base HP on tier-3 legs;
         // tier 4 keeps the flagged placeholder bump on the pool (assistant pick - retunable).
         float tierBump = 1.0f; // tier-4 placeholder bump retired: real tier-4 bodies entered (the ogre), so pool bodies keep base HP
-        e.maxHp = (wolf ? 70.0f : (hob ? 60.0f : (g2 ? 25.0f : 30.0f))) * hordeScale * tierBump;
+        e.maxHp = (wolf3 ? 100.0f : (wolf ? 70.0f : (hob ? 60.0f : (g2 ? 25.0f : 30.0f)))) * hordeScale * tierBump; // USER numbers
         e.hp = e.maxHp;
-        e.speed = wolf ? 120.0f : (hob ? 100.0f : (g2 ? 100.0f : 90.0f));
-        e.contactDamage = wolf ? 3.0f : (hob ? 3.0f : 2.0f); // Goblin 2 chips 2 like the clump (USER)
-        e.xpValue = wolf ? 2.0f : (hob ? 3.0f : 1.0f); // Goblin 2 carries the same 1 xp gem (USER)
+        e.speed = wolf3 ? 100.0f : (wolf ? 120.0f : (hob ? 100.0f : (g2 ? 100.0f : 90.0f)));
+        e.contactDamage = wolf3 ? 4.0f : (wolf ? 3.0f : (hob ? 3.0f : 2.0f)); // wolf3 bites harder (USER); Goblin 2 chips 2 like the clump (USER)
+        e.xpValue = wolf3 ? 3.0f : (wolf ? 2.0f : (hob ? 3.0f : 1.0f)); // wolf3 carries the heavier 3 xp gem (USER); Goblin 2 carries the same 1 xp gem (USER)
         e.GlobalPosition = pos;
         g.RegisterEnemy(e);
         g.AddChild(e);
@@ -238,7 +258,7 @@ public partial class Director : Godot.Node2D
                 continue; // near-party guard per body, same discipline as Spawn()
             Enemy e2 = new Enemy();
             e2.kind = sword ? "rider" : "riderbow";
-            e2.maxHp = (sword ? 100.0f : 60.0f) * hordeScale * bump; // USER numbers
+            e2.maxHp = (sword ? 140.0f : 80.0f) * hordeScale * bump; // USER numbers (2026-11-09 retune: sword mount 100 -> 140, bow rider 60 -> 80)
             e2.hp = e2.maxHp;
             e2.speed = 110.0f;   // USER number
             e2.contactDamage = 4.0f; // USER number
@@ -269,6 +289,30 @@ public partial class Director : Godot.Node2D
         g.RegisterEnemy(e2);
         g.AddChild(e2);
         GD.Print("[10thAge] (mage) goblin mage slips in after the second hobgoblin");
+    }
+
+    // WOLF-2 PACK (user 2026-11-09): "have these spawn in packs of 3 when they do spawn"
+    // (USER cadence unit). USER numbers: 70 hp / 120 speed / contact 4 / 2 xp. Fan offsets and
+    // the per-body near-party guard ride the same discipline as SpawnRiderPack.
+    private void SpawnWolfPack(Game g, Vector2 at, float hordeScale)
+    {
+        for (int i2 = 0; i2 < 3; i2++)
+        {
+            Vector2 p2 = at + new Vector2((i2 - 1) * 56.0f, (i2 % 2) * 44.0f - 22.0f); // small fan (assistant pick)
+            if (g.GetLeader() != null && p2.DistanceTo(g.GetLeader().GlobalPosition) < 260.0f)
+                continue; // near-party guard per body, same discipline as Spawn()
+            Enemy e2 = new Enemy();
+            e2.kind = "wolf2";
+            e2.maxHp = 70.0f * hordeScale; // USER number
+            e2.hp = e2.maxHp;
+            e2.speed = 120.0f;       // USER number
+            e2.contactDamage = 4.0f; // USER number
+            e2.xpValue = 2.0f;       // USER number
+            e2.GlobalPosition = p2;
+            g.RegisterEnemy(e2);
+            g.AddChild(e2);
+        }
+        GD.Print("[10thAge] (wolf2) long-sight charge pack enters: 3 wolf2s on one bearing");
     }
 
     // TIER-4 OGRE (user 2026-11-05): "big, slow, and a lot of HP". HP/speed/contact/XP are
