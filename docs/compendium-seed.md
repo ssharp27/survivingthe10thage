@@ -58,8 +58,8 @@ A campfire sits after EVERY boss kill (mini, mid, and final alike).
 | Tier | Enters | Bodies (hp, xp) |
 | --- | --- | --- |
 | 1 | goblins only; 50% of plain slots enter as Goblin 2 (G2_CH) | goblin (30 hp, 1 xp) / goblin2 (25 hp, 1 xp, speed 100) |
-| 2 | 30% rolls wolves; fast goblins on 20% per-spawn rolls (FAST_CH); 1 hob per 10 goblins | wolf (70 hp, 2 xp); fastgoblin (40 hp, 2 xp: rush → pause → straight-line lunge); hobgoblin (60 hp, 3 xp) |
-| 3 | rider packs on 5% per-spawn rolls: 2 sword + 2 bow on one bearing | rider (100 hp) / riderbow (60 hp), 5 xp; mage 1 per 2 hobs (40 hp, 6 xp) |
+| 2 | 30% wolf-family rolls split 35% wolf2 PACK of 3 / 30% lone wolf3 / rest standard; fast goblins on 20% per-spawn rolls (FAST_CH); 1 hob per 10 goblins | wolf (70 hp, 2 xp); wolf2 (70 hp, contact 4, 2 xp: long-sight charge → pause → straight-line dash with overshoot, no hop); wolf3 (100 hp, contact 4, 3 xp: tanky); fastgoblin (40 hp, 2 xp: rush → pause → straight-line lunge); hobgoblin (60 hp, 3 xp) |
+| 3 | rider packs on 5% per-spawn rolls: 2 sword + 2 bow on one bearing | rider (140 hp) / riderbow (80 hp), 5 xp (user retune 2026-11-09: 100→140 / 60→80); mage 1 per 2 hobs (40 hp, 6 xp) |
 | 4 | ogre on 5% per-spawn rolls | ogre (220 hp, 10 xp) |
 
 ### Horde events (bonus swarms)
@@ -136,7 +136,7 @@ ONE language (the table slide) run at two speeds, so copy must not describe them
   cadence is that speed times `SWAY_RATE = 12` rad/s (the party's is 7.2 — monsters swing quicker),
   amplitude `SWAY_AMP = 3.4` px lateral (party 3.0), with the party's half-rate dip and a lean that trails
   the sway (`sw * 0.017`, the party constant). A body that stops EASES its last swing back level — a set-
-  down, never a jolt — and below `SWAY_MIN = 30` px/s it simply stands. Per-kind amp: hobgoblin 1.25 / wolf 0.9.
+  down, never a jolt — and below `SWAY_MIN = 30` px/s it simply stands. Per-kind amp: hobgoblin 1.25 / wolf + wolf2 0.9 / wolf3 0.75.
 - THE TWO-BEAT HEEL GAIT (abs(sin) step plant + squash) was BUILT and then SCRAPPED the same day — user
   hand-play called it "the head is vibrating rapidly, really difficult to look at". Do not resurrect it;
   compendium copy must not describe a foot-step plant either.
