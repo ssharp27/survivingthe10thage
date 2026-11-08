@@ -2403,6 +2403,44 @@ public void RegisterEnemy(Combatant e)
 		}
 	}
 
+	// The face-to-threat snap BOTH leader legs share (2026-11-09): the angle to the nearest
+	// live threat inside EffRange()*mult, or -1e30f when nothing is in sight (the caller keeps
+	// the walk direction). Bodies keep their slot past death, so the kind check is the skip.
+	private float NearestThreatAngle(PartyMember l, double mult)
+	{
+		Godot.Node2D best = null;
+		float bestD = 1e9f;
+		for (int i = 0; i < _enemies.Count; i++)
+		{
+			Combatant c = (Combatant)_enemies[i];
+			if (c == null || c.kind == "dead")
+				continue;
+			Godot.Node2D n = _enemies[i];
+			float dd = n.GlobalPosition.DistanceTo(l.GlobalPosition);
+			if (dd >= bestD)
+				continue;
+			bestD = dd;
+			best = n;
+		}
+		foreach (Boss b in _bosses)
+		{
+			if (!b.active || b.hp <= 0.0f)
+				continue; // parked bosses are not threats yet
+			float dd = b.GlobalPosition.DistanceTo(l.GlobalPosition);
+			if (dd < bestD)
+			{
+				bestD = dd;
+				best = b;
+			}
+		}
+		if (best == null || bestD > (float)l.EffRange() * (float)mult)
+			return -1e30f;
+		Vector2 v = best.GlobalPosition - l.GlobalPosition;
+		if (v.X == 0.0f && v.Y == 0.0f)
+			return -1e30f; // standing on the threat: keep the walk facing
+		return (float)System.Math.Atan2(v.Y, v.X);
+	}
+	
 	public override void _Process(double d)
 	{
 		float delta = (float)d;
@@ -2769,6 +2807,17 @@ public void RegisterEnemy(Combatant e)
 				_ultFired += 1;
 		}
 		bool moved = dir.LengthSquared() > 0.0025f;
+		// 2026-11-09 MOSIAH LANE LAW (user: "Mosiah no longer attacks unless I am standing still,
+		// he won't attack while moving anymore for some reason"): the rapier is the only LANE
+		// weapon (PartyMember's laneOnly = isLeader && !cleaver && !shotKit, a ~40 deg arc on
+		// leader.facing), and in HUMAN play facing only followed the WALK direction while moving.
+		// The face-to-threat snap lived on the idle leg alone, and the other aim assist (faceTo)
+		// is the _pilot lane, not the human lane. So a walking leader pointed wherever it walked
+		// and its narrow lane bit only what it happened to walk at, while standing still snapped
+		// to the nearest threat and bit normally. Fix: the SAME snap now runs on the moving leg
+		// for lane weapons, so the thrust turns to its prey exactly as standing still had it.
+		// Movement, the dash direction, the maul auto-aim and the bow lane stay as shipped.
+		bool laneLeader = leaderLive && leader.weaponKit == "melee" && leader.arcHalf <= 0.5f; // mirrors PartyMember's cleaver test: melee kit + narrow arc = lane weapon
 		if (moved)
 		{
 			dir = dir.Normalized();
@@ -2776,43 +2825,22 @@ public void RegisterEnemy(Combatant e)
 			if (faceTo.X != 0.0f || faceTo.Y != 0.0f)
 				leader.facing = (float)System.Math.Atan2(faceTo.Y, faceTo.X);
 			else
-				leader.facing = (float)System.Math.Atan2(dir.Y, dir.X);
+			{
+				float laneAng = laneLeader ? NearestThreatAngle(leader, 1.5) : -1e30f;
+				if (laneAng > -1e29f)
+					leader.facing = laneAng; // lane weapon walking: aim at the nearest threat (user 2026-11-09)
+				else
+					leader.facing = (float)System.Math.Atan2(dir.Y, dir.X);
+			}
 		}
 		else if (leader != null)
 		{
 			// idle leader turns to its nearest threat: facing only followed the
 			// movement direction, so standing still starved the maul everywhere
-			// except the way they last walked
-			Godot.Node2D best = null;
-			float bestD = 1e9f;
-			for (int i = 0; i < _enemies.Count; i++)
-			{
-				Combatant c = (Combatant)_enemies[i];
-				if (c == null || c.kind == "dead")
-					continue;
-				Godot.Node2D n = _enemies[i];
-				float dd = n.GlobalPosition.DistanceTo(leader.GlobalPosition);
-				if (dd >= bestD)
-					continue;
-				bestD = dd;
-				best = n;
-			}
-			foreach (Boss b in _bosses)
-			{
-				if (!b.active || b.hp <= 0.0f)
-					continue; // parked bosses are not threats yet
-				float dd = b.GlobalPosition.DistanceTo(leader.GlobalPosition);
-				if (dd < bestD)
-				{
-					bestD = dd;
-					best = b;
-				}
-			}
-			if (best != null && bestD <= (float)leader.EffRange() * 1.5f)
-			{
-				Vector2 v = best.GlobalPosition - leader.GlobalPosition;
-				leader.facing = (float)System.Math.Atan2(v.Y, v.X);
-			}
+			// except the way they last walked (the snap now lives in ONE helper both legs call)
+			float idleAng = NearestThreatAngle(leader, 1.5);
+			if (idleAng > -1e29f)
+				leader.facing = idleAng;
 		}
 
 		// ---------- the bodyguard ring (human-test locked + "always attached" locked) ----------

@@ -125,7 +125,9 @@ public partial class PartyMember : Godot.Node2D
 	static readonly double SHIELD_HOP = 160.0; // BASE px a bounce may hop. fx-feel9 (user: "it should just not even try to bounce if they are too far away"): the flight lane now NEVER widens this with rank - the rebound upgrade buys bounce COUNT only
 	// Wash hurl speed (user 2026-11-02: "far too quickly so it looks terrible... smooth bounce between enemies"): px/s of VISIBLE travel; PURE MOTION, damage model untouched
 	static readonly double SHIELD_HURL_SPEED = 340.0; // assistant pick: a 160 px hop ~0.47 s, a 60 px hop ~0.18 s - readable, never the old 0.09 s blur
-	static readonly double SHIELD_BOUNCE_SPIN = 0.10; // EXTRA rad/px a disc tumbles on BOUNCE legs (after its first bite): the base 0.045 drift keeps the first throw readable, every bounce DRUMROLLS (user 2026-11-08: "make the shield spin when it bounces off an enemy to another"); assistant knob
+	static readonly float SWEEP_ART_MUL = 1.3f;  // 2026-11-09 (user: the sweep is "way too big ... covers everything else on the screen"): the crescent box used to be 2.0 x EffRange, so its outer edge sat exactly ON his true reach - it was never offset, the art simply curls ~265 deg while the fan it bites is ~149. The box now spans 1.3 x reach: the swing reads INSIDE the area it actually hurts. Assistant pick - retunable
+	static readonly float SWEEP_ART_ALPHA = 0.55f; // 2026-11-09 (user: "make it semi-transparent"): a hint of a swing instead of a wall of paint hiding the horde; assistant knob
+	static readonly double SHIELD_BOUNCE_SPIN = 0.07; // 2026-11-09 retune (user: "the first shield throw is perfect, slightly reduce the number of spins after bouncing so it's a little less crazy"): the drumroll term on BOUNCE legs drops 0.10 -> 0.07 rad/px, the base 0.045 drift keeps the first throw as approved; assistant knob // EXTRA rad/px a disc tumbles on BOUNCE legs (after its first bite): the base 0.045 drift keeps the first throw readable, every bounce DRUMROLLS (user 2026-11-08: "make the shield spin when it bounces off an enemy to another"); assistant knob
 
 	// authored armour base (Wash 1 armour, user 2026-10-31): the ARMOUR tag seeds at BASE then adds
 
@@ -2353,7 +2355,15 @@ public partial class PartyMember : Godot.Node2D
 
 					{
 
-						float ba2 = (float)(orbitAng + (double)b2 * System.Math.PI * 2.0 / (double)bl);
+						// 2026-11-09 (user: "change Bruno's ultimate to spin counter-clockwise so the bladed
+						// part of the axe hits enemies. This is just a visual thing"): the orbit rides the NEGATED
+						// angle. Godot turns +angle clockwise on screen, and axe.png (head up, cutting edge on its
+						// own -X) at Rotation = ba2 + pi/2 drags with the edge TRAILING. Negating the drawn angle
+						// makes the orbit counter-clockwise AND puts the edge LEADING the direction of travel, so
+						// the head is what meets the horde. orbitAng itself still counts up, so the per-circle
+						// bite memos and the growing arm read the same clock; the rake disc below rides THESE
+						// positions, so the hurt arc is the drawn arc, unchanged in shape or size.
+						float ba2 = (float)(-(orbitAng + (double)b2 * System.Math.PI * 2.0 / (double)bl));
 
 						_axeFx[b2].GlobalPosition = GlobalPosition + new Vector2((float)System.Math.Cos(ba2), (float)System.Math.Sin(ba2)) * spinArm; // user 2026-11-06: art rides the GROWING arm, so what is drawn is what hurts
 
@@ -3786,13 +3796,24 @@ public partial class PartyMember : Godot.Node2D
 
 					_meleeFx.GlobalPosition = p; // arc radiates from his feet, not a floating sliver
 
-					_meleeFx.Scale = new Vector2(reach * 2.0f / texW, reach * 2.0f / texH);
+					// 2026-11-09 sweep retune (user: "way too big ... does this exactly reflect his attack range
+					// or is it offset because of the art"): NOT offset - the box was 2 x reach, so the crescent
+					// outer edge already sat on his EffRange (Baldrun 130 px). What made it read as the whole
+					// clearing: X and Y divided by DIFFERENT texel counts (102x128 art stretched ~25 pct sideways)
+					// and the band curls ~265 deg while the fan it actually bites is only ~149. ONE uniform scale
+					// off the taller axis keeps the crescent shape, SWEEP_ART_MUL puts it inside the fan it hurts,
+					// and the alpha lets the horde read through it.
+					float sm = (float)(SWEEP_ART_MUL * (double)reach / System.Math.Max((double)texW, (double)texH));
+					_meleeFx.Scale = new Vector2(sm, sm); // uniform: the art keeps its own proportions
+					_meleeFx.Modulate = new Color(1.0f, 1.0f, 1.0f, SWEEP_ART_ALPHA);
 
 				}
 
 				else
 
 				{
+
+					_meleeFx.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f); // only the sweep fades: the rapier sliver stays opaque
 
 					_meleeFx.GlobalPosition = p + new Vector2((float)System.Math.Cos(facing), (float)System.Math.Sin(facing)) * (reach * 0.5f); // centred on the stab corridor
 
