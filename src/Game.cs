@@ -586,6 +586,22 @@ public partial class Game : Godot.Node2D
 		const double CHAIN_BOLT_LIFE = 0.14; // seconds a bolt segment stays drawn (assistant pick)
 		const double CHAIN_BOLT_GAP = 0.05;  // hops light up this far apart: the fast-chain read (assistant pick)
 		const int CHAIN_BOLT_POOL = 24;      // 4 segments/chain, procs can overlap (assistant pick)
+		
+		// Dirt puffs (user 2026-11-09 hand-play: "give monsters a very small dirt-cloud
+		// puff on their steps, so it reads better on the map as moving"): the MONSTER SWAY
+		// rig in src/Enemy.cs kicks one up every time a foot plants - the side-to-side
+		// swing reaching an extreme, a half-period of the gait clock. PURE VFX lane: parked
+		// slots like every other pool, and nothing here touches motion, hitboxes or damage.
+		// Bosses and summons keep their own rigs and stay un-puffed (monsters only).
+		Godot.Collections.Array<Godot.Sprite2D> _puffs = new();
+		Godot.Collections.Array<double> _puffLife = new();
+		Godot.Texture2D _fxPuffTex = null;
+		const int PUFF_POOL = 32;      // ~3 plants/s per striding body x 0.3 s life: a big horde fits (pick)
+		const double PUFF_LIFE = 0.30;   // seconds a puff stays drawn (pick)
+		const float PUFF_FROM = 0.8f;    // scale at the plant: dustpuff.png is a 17x9 chunky cloud (pick)
+		const float PUFF_TO = 1.5f;      // spread it drifts to before it clears (pick)
+		const float PUFF_RISE = 26.0f;   // px/s the puff lifts off the plant (pick)
+		const float PUFF_ALPHA = 0.6f;   // opacity at the plant: grit, not a smoke bomb (pick)
 
 		const double REGEN_TICK = 10.0;   // Alvora: allies regen every 10 s (user)
 		const double REGEN_HP = 1.0;      // +1 HP per tick (user)
@@ -2401,6 +2417,23 @@ public void RegisterEnemy(Combatant e)
 			_beeRay.Add(0.0);
 			_beeTarget.Add(-1L);
 		}
+		// Dirt puff pool (user 2026-11-09): the grit the horde kicks up on its foot plants.
+		// Plain z (the scene sets none anywhere else, and the bees lane needed 20 to sit ABOVE
+		// the characters): these Sprite2D slots join the tree after the floor rect and before
+		// any runtime actor, so grit rides ABOVE the ground and BELOW every model - a mark on
+		// the map, never paint over a creature.
+		_fxPuffTex = GD.Load("res://art/fx/dustpuff.png") as Godot.Texture2D; // null-safe like the other art lanes: missing art draws nothing
+		for (int i = 0; i < PUFF_POOL; i++)
+		{
+			Godot.Sprite2D s = new Godot.Sprite2D();
+			s.Texture = _fxPuffTex;
+			s.Set("texture_filter", 0); // NEAREST like every other pool sprite: hard painted edges
+			s.GlobalPosition = new Vector2(-9000.0f, -9000.0f); // parked like every other pool
+			s.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);     // parked slots are invisible
+			AddChild(s);
+			_puffs.Add(s);
+			_puffLife.Add(0.0);
+		}
 	}
 
 	// The face-to-threat snap BOTH leader legs share (2026-11-09): the angle to the nearest
@@ -3116,6 +3149,7 @@ public void RegisterEnemy(Combatant e)
 		UpdateSummons(delta); // Yu's familiars: run at prey, detonate on contact OR on the fuse
 		UpdateCinderFx(delta); // cinder blooms: the pops the last CinderBurst loosed, grow + fade
 		UpdateChainFx(delta); // fx-feel9: chain bolts reveal + fade (Baldrun leader-bonus streaks)
+		UpdatePuffs(delta); // grit on foot plants: the map finally reads the horde as walking (user 2026-11-09)
 
 		UpdateHelpers(delta); // leader-bonus lane (user 2026-10-25): Alvora regen, Asper insects, Yu spirits
 		PickerTick(d);
@@ -3451,6 +3485,49 @@ public void RegisterEnemy(Combatant e)
 		((Godot.ColorRect)_spirits[i].GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
 	}
 
+	// One grit puff at a planted foot: next free slot, jittered so a clump walking in
+	// step never prints a perfect row of grit. The pool is pure VFX: a FULL pool simply
+	// drops the puff, so visuals can never block or delay a step.
+	public void SpawnDustPuff(Vector2 at)
+	{
+		for (int i = 0; i < _puffs.Count; i++)
+		{
+			if (_puffLife[i] > 0.0)
+				continue;
+			_puffLife[i] = PUFF_LIFE;
+			Godot.Sprite2D s = _puffs[i];
+			s.GlobalPosition = at + new Vector2((float)Rng.RandfRange(-3.0f, 3.0f), (float)Rng.RandfRange(-2.0f, 1.0f));
+			s.Rotation = (float)Rng.RandfRange(-0.5f, 0.5f); // a clump never puffs identically
+			s.Scale = new Vector2(PUFF_FROM, PUFF_FROM);
+			s.Modulate = new Color(1.0f, 1.0f, 1.0f, PUFF_ALPHA);
+			return;
+		}
+	}
+	
+	// grit puffs: spread + lift + clear over PUFF_LIFE, then park off-world and go fully
+	// transparent so the next foot plant can reuse the slot
+	private void UpdatePuffs(float delta)
+	{
+		for (int i = 0; i < _puffs.Count; i++)
+		{
+			if (_puffLife[i] <= 0.0)
+				continue;
+			_puffLife[i] -= delta;
+			Godot.Sprite2D s = _puffs[i];
+			if (_puffLife[i] <= 0.0)
+			{
+				s.GlobalPosition = new Vector2(-9000.0f, -9000.0f); // parked like every other pool
+				s.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+				continue;
+			}
+			float k = 1.0f - (float)(_puffLife[i] / PUFF_LIFE); // 0 at the plant -> 1 as it clears
+			float sc = PUFF_FROM + (PUFF_TO - PUFF_FROM) * k;
+			s.Scale = new Vector2(sc, sc);
+			s.Position = s.Position + new Vector2(0.0f, -PUFF_RISE * delta); // lifts off the plant
+			s.Modulate = new Color(1.0f, 1.0f, 1.0f, PUFF_ALPHA * (1.0f - k));
+		}
+	}
+	
 	// Asper seat upkeep: waiting insects wilt after INSECT_WAIT (pick); a standing ally
 	// walking within HELPER_PICK claims one (user's "getting close"): it rides 26 px above
 	// the host and fires the seat's own longbow numbers - same range, same attack speed,

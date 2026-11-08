@@ -108,6 +108,8 @@ public partial class Enemy : Combatant
     Godot.Node2D _rig;
     float _bobT = 0.0f;
     float _bobPhase = 0.0f;
+    int _dustPlant = 0;               // which half-swing last planted grit (the gait clock counts up)
+    bool _dustPrimed = false;         // first striding frame seeds the counter: never puffs the past
     Vector2 _lastMovePos = new Vector2(); // odometer: where the body stood last frame
     bool _movePrimed = false;             // the first frame has no previous checkpoint
     float _moveSpd = 0.0f;                // eased px/s: drives cadence + amplitude
@@ -251,6 +253,30 @@ public partial class Enemy : Combatant
                 float sw = (float)System.Math.Sin(ph) * SWAY_AMP * (kind == "hobgoblin" ? 1.25f : kind == "wolf" ? 0.9f : 1.0f);
                 _rig.Position = new Vector2(sw, -(float)System.Math.Abs((float)System.Math.Sin(ph * 0.5)) * 1.2f); // side to side + half-rate dip
                 _rig.Rotation = sw * 0.017f;        // the lean trails the sway (party constant)
+                // grit on the plant (user 2026-11-09 hand-play: "give monsters a very small dirt-cloud
+                // puff on their steps, so it reads better on the map as moving"): the foot that STOPS
+                // the side-to-side swing plants on the ground, exactly where sin(ph) reaches an
+                // extreme - every half-period of the gait clock. sw already IS that extreme, so the
+                // puff lands on the planting side and a walk alternates left/right like the gait.
+                // The pool jitters position + tilt so a clump never prints a row. PURE VFX: nothing
+                // here touches motion, hitboxes or damage, and the set-down lane below never emits,
+                // so a body that stops kicks nothing up.
+                int plants = (int)System.Math.Floor((ph + 1.5707963267948966) / 3.141592653589793);
+                if (!_dustPrimed)
+                {
+                    _dustPrimed = true;
+                    _dustPlant = plants; // first striding frame: anchor, do not puff the past
+                }
+                else if (plants > _dustPlant)
+                {
+                    int steps = plants - _dustPlant;
+                    if (steps > 2)
+                        steps = 2; // a hitch frame must not spam the pool
+                    _dustPlant = plants;
+                    float feet = kind == "hobgoblin" ? 26.0f : 23.0f; // art centres on the node: the ground sits half a sprite below (pick)
+                    for (int q = 0; q < steps; q++)
+                        g.SpawnDustPuff(gp + new Vector2(sw, feet));
+                }
             }
             else
             {
