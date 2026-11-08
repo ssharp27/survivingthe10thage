@@ -3206,6 +3206,13 @@ public partial class PartyMember : Godot.Node2D
 
 				float band2 = (float)(14.0 * stat[StatTags.AREA] * LeaderAreaMul()); // corridor half-width, rides attack size
 
+				// MELEE MISSILE SMASH: the second dagger shatters what its FRESH line sweeps.
+				int smashN2 = pg.SmashBulletsCorridor(p, aim2, reach, band2);
+
+				if (smashN2 > 0)
+
+					GD.Print("[10thAge] (smash) " + displayName + " second dagger shatters " + smashN2 + " missiles"); // bench audit
+
 				int hitN2 = 0;
 
 				for (int i = 0; i < enemies.Count; i++)
@@ -3285,6 +3292,14 @@ public partial class PartyMember : Godot.Node2D
 			cdTimer = (float)TWIN_STAGGER; // the very small delay between the jabs
 
 			float band = (float)(14.0 * stat[StatTags.AREA] * LeaderAreaMul()); // corridor half-width, rides attack size
+
+			// MELEE MISSILE SMASH (melee trio QoL, user 2026-11-09): the jab corridor shatters
+			// enemy missiles on the blade lane, same corridor test as the body bite.
+			int smashN = pg.SmashBulletsCorridor(p, twinAim, reach, band);
+
+			if (smashN > 0)
+
+				GD.Print("[10thAge] (smash) " + displayName + " first dagger shatters " + smashN + " missiles"); // bench audit
 
 			int hitN = 0;
 
@@ -3593,6 +3608,15 @@ public partial class PartyMember : Godot.Node2D
 
 		{
 
+			// MELEE MISSILE SMASH (user 2026-11-09 QoL, melee trio): the cleave fan shatters
+			// every ENEMY missile it sweeps, same arc test as the body bite (radius reach, half-arc
+			// arcEff). Friendly bolts live in the other pool, so this can never eat one.
+			int smashed = pg.SmashBulletsArc(p, facing, arcEff, reach);
+
+			if (smashed > 0)
+
+				GD.Print("[10thAge] (smash) " + displayName + " cleaver fan shatters " + smashed + " missiles"); // bench audit
+
 			// Maul: ARC CLEAVE, FULL damage to every body in the fan (user 2026-10-23:
 
 			// the split made the maul weaker than every other verb once a few bodies
@@ -3668,6 +3692,14 @@ public partial class PartyMember : Godot.Node2D
 			lane[0] = best;
 
 			float laneHalf = (float)System.Math.Max((double)arcEff, 0.16);
+
+			// MELEE MISSILE SMASH (melee trio QoL, user 2026-11-09): the lunge shatters enemy
+			// bolts down the SAME lane the skewer bites (laneHalf wide, reach long).
+			int smashed = pg.SmashBulletsArc(p, facing, laneHalf, reach);
+
+			if (smashed > 0)
+
+				GD.Print("[10thAge] (smash) " + displayName + " rapier lane shatters " + smashed + " missiles"); // bench audit
 
 			for (int s = 1; s < lane.Length; s++)
 

@@ -5,8 +5,9 @@ using Godot;
 /// an XP magnet, or short damage buffs to help runs"). Rare kill drops - the roll and
 /// the drop rail live in Game.cs (PICKUP_CH), the numbers are assistant-picked knobs
 /// below (the user dictated the CONCEPT, not the numbers, and picked "pull dropped
-/// gems" for the magnet). Three flavours: HEAL ORB (flat fixed heal on the member
-/// who walks over it - fixed not max-HP-fraction so early runs cannot chain a bar),
+/// gems" for the magnet). Three flavours: HEAL ORB (flat fixed heal on the LOWEST-HP
+/// standing member WHATEVER who walks over it - user 2026-11-09 retarget; fixed not max-HP-fraction
+/// so early runs cannot chain a bar),
 /// XP MAGNET (the UpdateGems collection bubble becomes WHOLE-FIELD for MAGNET_T
 /// seconds: dropped gems ride the proven 380 px/s vacuum and pay their own XP_PCT
 /// math at pickup - the magnet is Stack's puller lane made temporary), RAGE VIAL
@@ -31,7 +32,7 @@ public partial class Pickup : Godot.Node2D
     static bool _artTried = false;
     static readonly float PICKUP_ART_S = 0.42f; // 40 px art -> ~16 px: a touch over the 12 px shell (assistant pick)
     // assistant-picked knobs (hand-test retunes)
-    static readonly float HEAL_AMT = 15.0f; // flat hp on the picker (assistant pick)
+    static readonly float HEAL_AMT = 15.0f; // flat hp on the LOWEST-HP standing member (user 2026-11-09 retarget; amount an assistant pick)
     static readonly float MAGNET_T = 6.0f; // whole-field gem vacuum window (assistant pick)
     static readonly double RAGE_MUL = 0.2; // +20% incoming on LIVE enemies (assistant pick)
     static readonly double RAGE_T = 8.0; // frenzy window (assistant pick)
@@ -96,10 +97,17 @@ public partial class Pickup : Godot.Node2D
         // walk-over collect: the closest standing member grabs it
         if (pk == 0)
         {
-            m.hp += HEAL_AMT;
-            if (m.hp > m.EffMaxHp())
-                m.hp = (float)m.EffMaxHp(); // clamp at own cap like every other heal lane
-            GD.Print("[10thAge] (pickup) heal orb: +15 hp");
+            // HEAL RETARGET (user 2026-11-09): "fix health pickups to heal the lowest HP
+            // party member regardless of who picks it up". The WALK-OVER grab stays nearest
+            // (that is what collecting IS), but the heal lands on the most-wounded standing
+            // body - the picker no longer owns the potion.
+            PartyMember w = g.LowestHpMember();
+            if (w == null)
+                w = m; // safety net: the picker itself is standing, so the census never comes up empty
+            w.hp += HEAL_AMT;
+            if (w.hp > w.EffMaxHp())
+                w.hp = (float)w.EffMaxHp(); // clamp at own cap like every other heal lane
+            GD.Print("[10thAge] (pickup) heal orb: +15 hp on " + w.displayName + " (lowest hp)");
         }
         else if (pk == 1)
         {

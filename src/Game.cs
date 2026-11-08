@@ -3970,6 +3970,74 @@ private void UpdateSpirits(float delta)
 		}
 	}
 
+	// HEAL RETARGET (user 2026-11-09 QoL): "fix health pickups to heal the lowest HP party
+	// member regardless of who picks it up". The heal orb ASKS this instead of healing its
+	// picker; same live census as NearestMember (joined, not downed, not eliminated). Ties
+	// keep the lower seat: stable, no Rng burn, run streams never diverge.
+	public PartyMember LowestHpMember()
+	{
+		PartyMember w = null;
+		foreach (PartyMember pm in _party)
+		{
+			if (!pm.joined || pm.downed || pm.eliminated)
+				continue; // fallen / stranded bodies are out, same census as the gem rail
+			if (w == null || pm.hp < w.hp)
+				w = pm;
+		}
+		return w;
+	}
+
+	// MELEE MISSILE SMASH (user 2026-11-09 QoL): "Baldrun, Brook and Mosiah ... their attacks
+	// to be able to destroy enemy missiles. Later in the run there's a ton of missiles ...
+	// quite difficult if you happen to have mostly melee characters". NO side tag needed:
+	// EVERY live slot in _bullets is an ENEMY-owned projectile (UpdateBullets only ever bites
+	// the party, and party ranged weapons run in the mirror _shots pool below), so these scans
+	// can never eat a friendly bolt. Geometry mirrors each melee verb's OWN bite (cleaver/rapier
+	// fan, dagger thrust corridor), torus-safe via WrapDelta, dead slots sit at X < -8000.
+	public int SmashBulletsArc(Vector2 from, float facing, float arcHalf, float reach)
+	{
+		int smashed = 0;
+		for (int i = 0; i < _bullets.Count; i++)
+		{
+			Godot.Node2D b = _bullets[i];
+			if (b.GlobalPosition.X < -8000.0f)
+				continue; // pooled slot already expired
+			Vector2 v = WrapDelta(from, b.GlobalPosition);
+			if (v.Length() > reach)
+				continue;
+			float a = (float)System.Math.Atan2(v.Y, v.X);
+			float d = a - facing;
+			d = (d + (float)System.Math.PI * 3.0f) % ((float)System.Math.PI * 2.0f) - (float)System.Math.PI;
+			if (System.Math.Abs((double)d) > (double)arcHalf)
+				continue; // clear of the swing fan
+			DespawnBullet(i); // the blade clips the missile: it shatters
+			smashed++;
+		}
+		return smashed;
+	}
+
+	// DAGGER shape: the same thrust corridor the jab loop uses (segment from -> from + dir *
+	// reach, band px either side).
+	public int SmashBulletsCorridor(Vector2 from, Vector2 dir, float reach, float band)
+	{
+		int smashed = 0;
+		for (int i = 0; i < _bullets.Count; i++)
+		{
+			Godot.Node2D b = _bullets[i];
+			if (b.GlobalPosition.X < -8000.0f)
+				continue; // pooled slot already expired
+			Vector2 v = WrapDelta(from, b.GlobalPosition);
+			double along = v.Dot(dir);
+			if (along < 0.0 || along > (double)reach)
+				continue; // outside the jab segment
+			if ((v - dir * (float)along).Length() > band)
+				continue; // clear of the blade lane
+			DespawnBullet(i); // the dagger clips the missile: it shatters
+			smashed++;
+		}
+		return smashed;
+	}
+
 	// ---------- party-side shot pool (M2: Asper's longbow) ----------
 	// UpdateBullets is BOSS-owned: its bolts run into the party. A PC weapon that fires
 	// needs the mirror pool that runs into ENEMIES, so the two never share slots, owners
