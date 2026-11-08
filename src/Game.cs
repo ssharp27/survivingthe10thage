@@ -4197,7 +4197,8 @@ private void UpdateSpirits(float delta)
 			{
 				Godot.Sprite2D fxs = (Godot.Sprite2D)shell.GetChild(0);
 				fxs.Texture = tx;
-				float tsx = stingerArt ? 0.72f : 1.0f; // arrow + flame ride 1:1, stinger stays near the old shaft footprint (assistant pick - retunable)
+				float tsx = stingerArt ? 0.45f : 1.0f; // arrow + flame ride 1:1; 2026-11-09b hand-play (user: "shrink the stinger on the passive bees and we're good"): 0.72 drew the 46x24 stinger at 33x17 px against a 15x13 px bee,
+											  // i.e. the sting was longer than the bug carrying it. 0.45 draws it ~21x11 px - just past the bee. Assistant knob - retunable
 				fxs.Scale = new Vector2(tsx, tsx);
 				fxs.Rotation = (float)System.Math.Atan2((double)vel.Y, (double)vel.X);
 				fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
