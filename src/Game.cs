@@ -1316,10 +1316,10 @@ public partial class Game : Godot.Node2D
 		if (mfx != null)
 		{
 			fxs.Texture = mfx;
-			float ms = _fxMageTex != null ? 1.5f : 2.4f; // ~1.5x: the 40 px fireball art over the bullet body (assistant pick - retunable)
+			float ms = _fxMageTex != null ? 1.3f : 2.4f; // 2026-11-09 hand-play (user: "when goblin mages fire their fireball, it needs to be just a little bit smaller"): 1.5 drew the 40x15 art at 60x22 px, now 52x20. Assistant knob - retunable
 			fxs.Scale = new Vector2(ms, ms);
 			fxs.Modulate = _fxMageTex != null ? new Color(1.0f, 1.0f, 1.0f, 1.0f) : new Color(0.70f, 0.15f, 0.11f, 1.0f); // new art carries its own hues; fallback keeps the dark-red ENEMY read
-			fxs.Rotation = 0.0f; // a fireball tumbles; it does not point like an arrow
+			fxs.Rotation = (float)System.Math.Atan2((double)vel.Y, (double)vel.X); // 2026-11-09 hand-play (user: "the FX needs to rotate so it fires pointed at the players. Currently it's just static facing right"): measured, art/fx/mage_fireball.png IS authored head-forward - the 40x15 canvas tapers to a 1 px tail at x=0 and its 15 px head mass sits at x=26-34 - so riding the travel vector aims the head at the party, the same rail the arrow lane already uses
 			cr.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f); // shell stops drawing while art rides
 			// user 2026-11-07 (fireball HIT but drew NOTHING): the pool parks its shell Modulate at
 			// alpha 0 (build + DespawnBullet) and modulate CASCADES to the art child - the arrow
