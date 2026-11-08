@@ -112,7 +112,7 @@ above keeps field drops out of the additive meta pool.
 
 - Drop roll `PICKUP_CH = 0.02` per ORDINARY enemy kill (stage 1 only); escort kills NEVER drop — those
   bodies are the rescue meter, not a loot source. Flavour weights 40 heal / 30 magnet / 30 rage.
-- HEAL ORB `HEAL_AMT = 15` **FLAT** hp on the picker, clamped at own `EffMaxHp` — flat, not a max-HP
+- HEAL ORB `HEAL_AMT = 15` **FLAT** hp on the LOWEST-HP standing member WHATEVER who grabs it (user 2026-11-09 retarget), clamped at own `EffMaxHp` — flat, not a max-HP
   fraction, so an early run cannot chain a bar. It is the only HP recovery that does NOT pay the ×1.20
   rest/horde tax, which is why the roll stays scarce.
 - XP MAGNET `MAGNET_T = 6 s`: the gem collection bubble becomes WHOLE-FIELD, the vacuum itself is
