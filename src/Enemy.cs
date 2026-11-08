@@ -273,7 +273,7 @@ public partial class Enemy : Combatant
                     if (steps > 2)
                         steps = 2; // a hitch frame must not spam the pool
                     _dustPlant = plants;
-                    float feet = kind == "hobgoblin" ? 26.0f : 23.0f; // art centres on the node: the ground sits half a sprite below (pick)
+                    float feet = kind == "hobgoblin" ? 20.0f : 17.0f; // 2026-11-09 hand-play (user: "shift them a little higher/closer to the enemies' feet"): the art CENTRES on the node so half a sprite below IS the ground line - at 26/23 px the cloud sat with its middle ON the ground and read as sunk; riding a few px above that line reads as contact (pick - retunable)
                     for (int q = 0; q < steps; q++)
                         g.SpawnDustPuff(gp + new Vector2(sw, feet));
                 }

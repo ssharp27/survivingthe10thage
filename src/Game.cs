@@ -612,7 +612,7 @@ public partial class Game : Godot.Node2D
 		const double INSECT_EVERY = 30.0; // Asper: an insect waits every 30 s (user)
 		const double INSECT_LASTS = 10.0; // a claimed insect helps for 10 s (user)
 		const double INSECT_WAIT = 30.0;  // unclaimed wilts after 30 s: pick, keeps slots free
-		const double INSECT_HEAD_LIFT = 26.0; // px the riding helper floats ABOVE the host: its head (user 2026-11-09 head-float law, keeps the old 26 px number, assistant knob)
+		const double INSECT_HEAD_LIFT = 86.0; // 2026-11-09 hand-play (user: "place the friendly bees from his leader passive higher, near his head"): 26 px measured out to Asper's KNEE, because a PC node is FEET-anchored (miniScale 0.75 over ~118 px canvases with a 7 px rim pin -> crown ~83 px above the node), unlike an enemy node, which its art CENTRES on (so the ult swarm's 20 px lift is already head-high). 86 px puts the ~15 px bee just above the crown. Assistant knob - retunable
 		const double SPIRIT_EVERY = 30.0; // Yu: a spirit kindles every 30 s (user)
 		const double SPIRIT_LASTS = 30.0; // unclaimed wilts after 30 s: same pick
 		const float SPIRIT_HOP_EVERY = 0.85f; // one vigil hop cycle: push + rest (assistant pick)
