@@ -596,6 +596,7 @@ public partial class Game : Godot.Node2D
 		const double INSECT_EVERY = 30.0; // Asper: an insect waits every 30 s (user)
 		const double INSECT_LASTS = 10.0; // a claimed insect helps for 10 s (user)
 		const double INSECT_WAIT = 30.0;  // unclaimed wilts after 30 s: pick, keeps slots free
+		const double INSECT_HEAD_LIFT = 26.0; // px the riding helper floats ABOVE the host: its head (user 2026-11-09 head-float law, keeps the old 26 px number, assistant knob)
 		const double SPIRIT_EVERY = 30.0; // Yu: a spirit kindles every 30 s (user)
 		const double SPIRIT_LASTS = 30.0; // unclaimed wilts after 30 s: same pick
 		const float SPIRIT_HOP_EVERY = 0.85f; // one vigil hop cycle: push + rest (assistant pick)
@@ -2313,6 +2314,7 @@ public void RegisterEnemy(Combatant e)
 		// leader-bonus helper pools (user 2026-10-25): Asper's insects and Yu's spirits.
 		// Slots stay small because one spawns every 30 s and neither phase lives past
 		// 30 s - far more capacity than a run can ever have waiting at once.
+		Godot.Texture2D fxBugTex = GD.Load("res://art/fx/bee.png") as Godot.Texture2D; // 2026-11-09: the passive bugs ARE the friendly bees (same art as the ult swarm)
 		for (int i = 0; i < 8; i++)
 		{
 			Godot.Node2D s = new Node2D();
@@ -2322,8 +2324,22 @@ public void RegisterEnemy(Combatant e)
 			// chitin green: deliberately off every horde hue so a friendly bug never reads as prey
 			cr.Color = new Color(0.44f, 0.66f, 0.26f, 1.0f);
 			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			// 2026-11-09 (user: the leader-passive bugs ARE the friendly bees too): bee art rides
+			// the shell like the ult pool idiom - sprite child UNDER the ColorRect so the Modulate
+			// cascade hides/shows both, shell stops drawing when art is on disk
+			Godot.Sprite2D bsp = new Godot.Sprite2D();
+			bsp.Set("texture_filter", 0); // NEAREST like the shaft and the minis
+			bsp.Texture = fxBugTex;
+			if (fxBugTex != null)
+			{
+				bsp.Scale = new Vector2(BEE_ART_S, BEE_ART_S);
+				bsp.Position = new Vector2(6.0f - (float)fxBugTex.GetWidth() * BEE_ART_S * 0.5f, 6.0f - (float)fxBugTex.GetHeight() * BEE_ART_S * 0.5f);
+				cr.Color = new Color(0.44f, 0.66f, 0.26f, 0.0f); // art rides: the chitin square stops drawing
+			}
+			cr.AddChild(bsp);
 			s.AddChild(cr);
 			s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+			s.Set("z_index", 20); // passive bees draw ON TOP of every character too: same law as the ult pool
 			AddChild(s);
 			_insects.Add(s);
 			_insectLife.Add(0.0);
@@ -3440,7 +3456,11 @@ public void RegisterEnemy(Combatant e)
 					DespawnInsect(i); // host left the squad: the ride drops, the slot frees
 					continue;
 				}
-				s.GlobalPosition = host.GlobalPosition + new Vector2(0.0f, -26.0f);
+				// 2026-11-09 (user: passive bees need the SAME head-float as the ult swarm): the fixed
+				// 26 px ride becomes the bee anchor law - head lift + sway + bob, per-slot phase from
+				// the ride clock + slot index (world time only, no real-time leak)
+				float iph = (float)(INSECT_LASTS - _insectLife[i]); // seconds riding: bob phase
+				s.GlobalPosition = host.GlobalPosition + new Vector2((float)System.Math.Sin(iph * 2.1 + (float)i * 1.7f) * 0.8f, -(float)INSECT_HEAD_LIFT + (float)System.Math.Sin(iph * 6.0 + (float)i * 1.7f) * (float)BEE_BOB_PX);
 				_insectCd[i] -= delta;
 				if (_insectCd[i] > 0.0)
 				continue; // shot window still open
@@ -3463,7 +3483,7 @@ public void RegisterEnemy(Combatant e)
 				continue; // cooldown stays open (see comment above)
 				Vector2 dir = WrapDelta(s.GlobalPosition, prey.GlobalPosition).Normalized();
 				double dmg = seat.RollDamage(this, seat.weaponDamage) * 0.5; // half damage (user)
-				SpawnShot(s.GlobalPosition + dir * 18.0f, dir * seat.projSpeed, dmg, seat.projLife);
+				SpawnShot(s.GlobalPosition + dir * 18.0f, dir * seat.projSpeed, dmg, seat.projLife, 0.0, 0.0, 0.0, 0.0, true); // 2026-11-09 (user): friendly helper bees shoot stingers; defaults stamped because stingerArt follows them
 				_insectCd[i] = seat.EffCooldown(); // same attack speed as Asper (user)
 			}
 			else
@@ -3558,18 +3578,54 @@ public void RegisterEnemy(Combatant e)
 			}
 			else
 			{
-				double best = BEE_FIND * BEE_FIND;
-				Godot.Node2D pick = null;
+				// 2026-11-09 (user: ult bees "seek out different enemies unless there are no other
+				// enemies nearby"): TWO bests in one scan - the nearest UNCLAIMED body wins outright so
+				// the swarm spreads one quarry per bee; a bee only falls back to the nearest CLAIMED body
+				// when every body in BEE_FIND reach is already bitten into - it never starves or orbits.
+				// Dead bodies are skipped so a corpse can never be a latch (same skip as the insect prey scan).
+				double bestFree = BEE_FIND * BEE_FIND;
+				Godot.Node2D pickFree = null;
+				double bestTaken = BEE_FIND * BEE_FIND;
+				Godot.Node2D pickTaken = null;
 				foreach (Godot.Node2D n in enemies)
 				{
+					Combatant nc = (Combatant)n;
+					if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
+						continue; // free / dead bodies are not prey
 					Vector2 off = WrapDelta(s.GlobalPosition, n.GlobalPosition);
 					double d2 = off.X * off.X + off.Y * off.Y;
-					if (d2 < best)
+					if (d2 >= BEE_FIND * BEE_FIND)
+						continue; // out of reach for either pick
+					long iid = (long)n.GetInstanceId();
+					bool taken = false;
+					for (int q = 0; q < _beeTarget.Count; q++)
 					{
-						best = d2;
-						pick = n;
+						if (q == i)
+							continue; // this bee is hunting (_beeTarget[i] = -1 here)
+						if (_beeTarget[q] == iid)
+						{
+							taken = true;
+							break;
+						}
+					}
+					if (taken)
+					{
+						if (d2 < bestTaken)
+						{
+							bestTaken = d2;
+							pickTaken = n;
+						}
+					}
+					else
+					{
+						if (d2 < bestFree)
+						{
+							bestFree = d2;
+							pickFree = n;
+						}
 					}
 				}
+				Godot.Node2D pick = (pickFree != null) ? pickFree : pickTaken; // unclaimed quarry first (user law)
 				if (pick != null)
 				{
 					prey = pick;
@@ -4001,7 +4057,7 @@ private void UpdateSpirits(float delta)
 			return;
 		}
 	}
-	public void SpawnShot(Vector2 pos, Vector2 vel, double dmg, double life, double pen = 0.0, double burnDur = 0.0, double burnDps = 0.0, double cinder = 0.0) // pen/burn/cinder stamped at spawn: Asper + Mosiah pierce, Stack firebolt burn + cinder bloom; everyone else keeps the 0 defaults
+	public void SpawnShot(Vector2 pos, Vector2 vel, double dmg, double life, double pen = 0.0, double burnDur = 0.0, double burnDps = 0.0, double cinder = 0.0, bool stingerArt = false) // 2026-11-09: stingerArt ONLY the leader-passive insect bolts pass; pen/burn/cinder stamped at spawn: Asper + Mosiah pierce, Stack firebolt burn + cinder bloom; everyone else keeps the 0 defaults
 	{
 		for (int i = 0; i < _shots.Count; i++)
 		{
@@ -4031,12 +4087,12 @@ private void UpdateSpirits(float delta)
 				_fxFlameTex = GD.Load("res://art/fx/firebolt.png") as Godot.Texture2D;
 				_fxStingerTex = GD.Load("res://art/fx/stinger.png") as Godot.Texture2D;
 			}
-			Godot.Texture2D tx = burnDps > 0.0 ? _fxFlameTex : _fxStingerTex; // 2026-11-08 art pass: party bolts are Asper's longbow lane — the curved stinger replaces the borrowed arrow shaft (user: "stinger as its attack instead of an arrow"); the ENEMY bullet lane keeps the arrow
+			Godot.Texture2D tx = stingerArt ? _fxStingerTex : (burnDps > 0.0 ? _fxFlameTex : _fxArrowTex); // 2026-11-09 fix (user: "Asper should still be using the arrows, it's the friendly bees that spawn from his leader passive ... that should be shooting stingers"): whole-pool default rides the ARROW again; only insect bolts pass stingerArt
 			if (tx != null)
 			{
 				Godot.Sprite2D fxs = (Godot.Sprite2D)shell.GetChild(0);
 				fxs.Texture = tx;
-				float tsx = burnDps > 0.0 ? 1.0f : 0.72f; // 46x24 stinger art near the old 20x8 shaft footprint (assistant pick - retunable)
+				float tsx = stingerArt ? 0.72f : 1.0f; // arrow + flame ride 1:1, stinger stays near the old shaft footprint (assistant pick - retunable)
 				fxs.Scale = new Vector2(tsx, tsx);
 				fxs.Rotation = (float)System.Math.Atan2((double)vel.Y, (double)vel.X);
 				fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
