@@ -60,7 +60,7 @@ A campfire sits after EVERY boss kill (mini, mid, and final alike).
 | 1 | goblins only; 50% of plain slots enter as Goblin 2 (G2_CH) | goblin (30 hp, 1 xp) / goblin2 (25 hp, 1 xp, speed 100) |
 | 2 | 30% wolf-family rolls split 35% wolf2 PACK of 3 / 30% lone wolf3 / rest standard; fast goblins on 20% per-spawn rolls (FAST_CH); 1 hob per 10 goblins | wolf (70 hp, 2 xp); wolf2 (70 hp, contact 4, 2 xp: long-sight charge → pause → straight-line dash with overshoot, no hop); wolf3 (100 hp, contact 4, 3 xp: tanky); fastgoblin (40 hp, 2 xp: rush → pause → straight-line lunge); hobgoblin (60 hp, 3 xp) |
 | 3 | rider packs on 5% per-spawn rolls: 2 sword + 2 bow on one bearing | rider (140 hp) / riderbow (80 hp), 5 xp (user retune 2026-11-09: 100→140 / 60→80); mage 1 per 2 hobs (40 hp, 6 xp) |
-| 4 | ogre on 5% per-spawn rolls | ogre (220 hp, 10 xp) |
+| 4 | ogre on 5% per-spawn rolls; each ogre beat enters its ogre2 escort a stride apart on the same fold | ogre (220 hp, 10 xp) / ogre2 (220 hp, 10 xp: same slam as the ogre, and when a tier-1 goblin enters its grab reach it lifts and hurls it at the party — the consumed goblin grants no XP/gem) |
 
 ### Horde events (bonus swarms)
 
