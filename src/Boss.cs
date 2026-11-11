@@ -92,6 +92,40 @@ public partial class Boss : Combatant
         _rig.Name = "Rig";
         AddChild(_rig);
         _rig.AddChild(_body);
+        // BOSS ART (user 2026-11-11 rig-only: MINIS ride the goblin-rider ARCHER canvas - they
+        // loose arrow fans - the BOSSES ride the plain goblin-rider; both scaled up and ringed with a
+        // RED edge highlight; bosses get reworked later, this wiring is visual-only). The rider canvases
+        // are the user's untracked WIP; a MISSING load keeps the coloured greybox like every art rail.
+        string artPath = (kind == "mini1" || kind == "mini2" || kind == "mini")
+            ? "res://art/enemies/stage1/goblinriderarcher.png"
+            : "res://art/enemies/stage1/goblinrider.png"; // boss1 / boss2 / final
+        Godot.Texture2D tex = GD.Load(artPath) as Godot.Texture2D;
+        if (tex != null)
+        {
+            float th = (kind == "mini1" || kind == "mini2" || kind == "mini") ? 88.0f : 108.0f; // target heights: bosses ride BIGGER than the 46 px riders (assistant picks - retunable)
+            float texH = (float)tex.GetHeight();
+            if (texH > 0.0f)
+            {
+                float sc = th / texH;
+                for (int i = 0; i < 8; i++) // the RED edge highlight: 8 copies ringing behind the art at a 3 px radius (assistant pick)
+                {
+                    float a = (float)(i * System.Math.PI / 4.0);
+                    Godot.Sprite2D rim = new Godot.Sprite2D();
+                    rim.Texture = tex;
+                    rim.Name = "Rim"; // eight same-named copies, Godot renames freely
+                    rim.Position = new Vector2((float)System.Math.Cos(a) * 3.0f, (float)System.Math.Sin(a) * 3.0f);
+                    rim.Scale = new Vector2(sc, sc);
+                    rim.Modulate = new Color(1.0f, 0.18f, 0.18f); // red highlight (assistant pick)
+                    _rig.AddChild(rim);
+                }
+                Godot.Sprite2D art = new Godot.Sprite2D();
+                art.Texture = tex;
+                art.Name = "Art";
+                art.Scale = new Vector2(sc, sc);
+                _rig.AddChild(art); // on top of the rim ring: the RED only shows as the edge halo
+                _body.Visible = false; // greybox stands only while the art is missing
+            }
+        }
         // P1: NO RegisterEnemy here. An inactive boss must not be in the hittable
         // registry or weapons can pre-kill it (the old pre-killable mini softlocked
         // the run at 90 s). Game.ActivateBoss brings it in the moment its stage
