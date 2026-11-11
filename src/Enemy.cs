@@ -200,7 +200,9 @@ public partial class Enemy : Combatant
                            : kind == "hobgoblin" ? "res://art/enemies/stage1/hobgoblin.png"
                               : kind == "wolf" ? "res://art/enemies/stage1/wolf1.png"
                                 : kind == "wolf2" ? "res://art/enemies/stage1/wolf2.png"
-                                  : kind == "wolf3" ? "res://art/enemies/stage1/wolf3.png" : "";
+                                  : kind == "wolf3" ? "res://art/enemies/stage1/wolf3.png"
+                                    : kind == "rider" ? "res://art/enemies/stage1/goblinrider.png"
+                                      : kind == "riderbow" ? "res://art/enemies/stage1/goblinriderarcher.png" : "";
         if (artPath != "" && _spr == null)
         {
             Godot.Texture2D tex = GD.Load(artPath) as Godot.Texture2D;
@@ -209,7 +211,7 @@ public partial class Enemy : Combatant
                 _spr = new Godot.Sprite2D();
                 _spr.Texture = tex;
                 _spr.Name = "Art";
-                float th = kind == "hobgoblin" ? 52.0f : ((kind == "wolf" || kind == "wolf2" || kind == "wolf3") ? 38.0f : 46.0f); // wolves ride their OWN height: the ~120x80 landscape canvases would draw ~69 px wide at the 46 px humanoid target against the 34 px body (assistant pick - retunable)
+                float th = kind == "hobgoblin" ? 52.0f : ((kind == "wolf" || kind == "wolf2" || kind == "wolf3") ? 38.0f : 46.0f); // wolves ride their OWN height: the ~120x80 landscape canvases would draw ~69 px wide at the 46 px humanoid target against the 34 px body (assistant pick - retunable); riders KEEP 46: their ~120x96 mount canvases draw ~57 px wide = the same mount span the wolf art gets at 38, and the goblin shares the canvas height (pick)
                 float texH = (float)tex.GetHeight();
                 if (texH > 0.0f)
                 {
