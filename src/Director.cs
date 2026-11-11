@@ -54,7 +54,7 @@ public partial class Director : Godot.Node2D
     // body vs cap 40: the cap never binds here).
     float _testTimer = 2.0f; // first body lands ~2 s in so the room reads alive immediately
     int _testIdx = 0;        // rotation cursor: one cycle = the whole stage-1 ladder
-    static readonly string[] TEST_KINDS = { "goblin", "goblin2", "wolf", "fastgoblin", "hobgoblin", "rider", "riderbow", "mage", "ogre" }; // every stage-1 body: the two rider kinds and the mage ride as LONE test bodies (no packs) so each AI lane gets a clean turn
+    static readonly string[] TEST_KINDS = { "goblin", "goblin2", "wolf", "fastgoblin", "hobgoblin", "rider", "riderbow", "mage", "ogre", "ogre2" }; // every stage-1 body: the two rider kinds and the mage ride as LONE test bodies (no packs) so each AI lane gets a clean turn
     const float TEST_EVERY_LO = 15.0f; // USER cadence: "every 15-20 seconds"
     const float TEST_EVERY_HI = 20.0f;
 
@@ -331,6 +331,21 @@ public partial class Director : Godot.Node2D
         g.RegisterEnemy(e);
         g.AddChild(e);
         GD.Print("[10thAge] (ogre) tier-4 ogre lumbers in");
+        // OGRE2 ESCORT (user 2026-11-11: the second ogre "escorts the tier-4 ogre"): the pair
+        // enters on the SAME beat, a short stride apart on the SAME fold (the near-party guard
+        // already burned pos upstream, so a tight offset stays honest). SAME stat card as the
+        // ogre (USER: same stats); the escort owns the goblin-hurl lane in Enemy.cs.
+        Enemy o2 = new Enemy();
+        o2.kind = "ogre2";
+        o2.maxHp = 220.0f * hordeScale; // SAME card as the ogre (USER)
+        o2.hp = o2.maxHp;
+        o2.speed = 55.0f;
+        o2.contactDamage = 4.0f;
+        o2.xpValue = 10.0f;
+        o2.GlobalPosition = at + new Vector2(80.0f, 60.0f); // assistant pick: stride apart, same fold
+        g.RegisterEnemy(o2);
+        g.AddChild(o2);
+        GD.Print("[10thAge] (ogre) the ogre escort lumbers in beside it");
     }
 
 // HORDE EVENT: one bonus swarm, budget-free (user: "these won't count against the maximum
@@ -424,6 +439,7 @@ public partial class Director : Godot.Node2D
         else if (kind == "riderbow") { hp = 60.0f; spd = 110.0f; contact = 4.0f; ranged = 3.0f; xp = 5.0f; }
         else if (kind == "mage") { hp = 40.0f; spd = 70.0f; contact = 4.0f; ranged = 6.0f; xp = 6.0f; }
         else if (kind == "ogre") { hp = 220.0f; spd = 55.0f; contact = 4.0f; xp = 10.0f; }
+        else if (kind == "ogre2") { hp = 220.0f; spd = 55.0f; contact = 4.0f; xp = 10.0f; } // SAME card as the ogre (USER)
         e.maxHp = hp * hordeScale;
         e.hp = e.maxHp;
         e.speed = spd;

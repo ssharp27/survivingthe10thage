@@ -61,6 +61,18 @@ public partial class Enemy : Combatant
     private readonly float OGRE_SLAM_TELE = 1.0f; // windup seconds (USER number)
     private readonly float OGRE_SLAM_DMG = 25.0f; // blast damage (USER number)
     private readonly float OGRE_SLAM_CD = 6.0f;  // slam cadence (assistant pick: one volley per heal cycle)
+    // OGRE2 (user 2026-11-11: "he will still have the same slam as ogre1, but also when ogre2
+    // gets close to an enemy from tier 1, he will pick them up and throw them at the player"):
+    // same slam + stat card, escorts the tier-4 ogre (the Director pairs the entry). Reach /
+    // lift beat / hurl speed / impact / cadence are assistant picks - retunable by hand-play.
+    private readonly float OGRE2_GRAB_R = 110.0f;  // assistant pick: pickup reach, inside its slam ring
+    private readonly float OGRE2_GRAB_TELE = 0.5f; // assistant pick: lift beat before the hurl
+    private readonly float OGRE2_THROW_SPD = 240.0f; // assistant pick: hurled goblin flight speed
+    private readonly float OGRE2_THROW_DMG = 6.0f; // assistant pick: impact damage on the party
+    private readonly float OGRE2_THROW_CD = 4.0f;  // assistant pick: one hurl per slam cycle
+    // hurl state: lift-beat countdown + cadence clock
+    float _grabT = 0.0f;
+    float _throwCd = 0.0f;
     // slam state: windup countdown, cadence clock, LOCKED slam point, telegraph disc
     float _slamT = 0.0f;
     float _slamCd = 0.0f;
@@ -142,7 +154,7 @@ public partial class Enemy : Combatant
         _shotCd = kind == "riderbow" ? RIDER_SHOT_EVERY : (kind == "mage" ? 2.0f : 0.0f); // user 2026-11-06: fresh mage looses its first ball after 2 s, not a full 4 s cycle - the volley lands while the party is still untangling the new pack
         _firedShot = false; // fx-feel10: audit flag lands when the shot clock does
         _shotsLoosed = 0; // 2026-11-06: volley counter lands with the clock
-        if (kind == "ogre")
+        if (kind == "ogre" || kind == "ogre2")
         {
             // telegraph disc built ONCE per body (the Alvora aura-disc precedent): a 24-gon
             // at blast radius, hidden until a mark, then repositioned per windup. Child of the
@@ -175,7 +187,7 @@ public partial class Enemy : Combatant
             _rig.AddChild(_body);
             return;
         }
-        float w = kind == "ogre" ? 64.0f : (kind == "wolf3" ? 40.0f : (kind == "wolf" || kind == "wolf2" ? 34.0f : (kind == "hobgoblin" ? 32.0f : (kind == "rider" || kind == "riderbow" ? 40.0f : (kind == "fastgoblin" ? 28.0f : 26.0f))))); // wolf3: the tankier wolf (assistant pick); ogre: the map's biggest body (assistant pick)
+        float w = (kind == "ogre" || kind == "ogre2") ? 64.0f : (kind == "wolf3" ? 40.0f : (kind == "wolf" || kind == "wolf2" ? 34.0f : (kind == "hobgoblin" ? 32.0f : (kind == "rider" || kind == "riderbow" ? 40.0f : (kind == "fastgoblin" ? 28.0f : 26.0f))))); // wolf3: the tankier wolf (assistant pick); ogre: the map's biggest body (assistant pick)
         _body = new ColorRect();
         _body.Size = new Vector2(w, w * 0.8f);
         _body.Position = -_body.Size * 0.5f;
@@ -185,7 +197,7 @@ public partial class Enemy : Combatant
                                                     : kind == "rider" ? new Color(0.45f, 0.34f, 0.28f) // dusty mount (assistant pick)
                                                     : kind == "riderbow" ? new Color(0.38f, 0.36f, 0.47f) // steel-tinted saddle (assistant pick)
                                                     : kind == "mage" ? new Color(0.42f, 0.22f, 0.55f) // robe violet (assistant pick)
-                                                    : kind == "ogre" ? new Color(0.35f, 0.34f, 0.30f) // bog-brown brute (assistant pick)
+                                                    : (kind == "ogre" || kind == "ogre2") ? new Color(0.35f, 0.34f, 0.30f) // bog-brown brute (assistant pick)
                                                     : kind == "goblin2" ? new Color(0.18f, 0.44f, 0.40f) // teal dune clump variant (assistant pick)
                                                     : kind == "fastgoblin" ? new Color(0.62f, 0.72f, 0.20f) // acid-green sprinter (assistant pick)
                                                     : new Color(0.30f, 0.48f, 0.23f);
@@ -203,7 +215,7 @@ public partial class Enemy : Combatant
                                   : kind == "wolf3" ? "res://art/enemies/stage1/wolf3.png"
                                     : kind == "rider" ? "res://art/enemies/stage1/goblinrider.png"
                                       : kind == "riderbow" ? "res://art/enemies/stage1/goblinriderarcher.png"
-                                        : kind == "ogre" ? "res://art/enemies/stage1/ogre1.png" : "";
+                                        : kind == "ogre" ? "res://art/enemies/stage1/ogre1.png" : kind == "ogre2" ? "res://art/enemies/stage1/ogre2.png" : "";
         if (artPath != "" && _spr == null)
         {
             Godot.Texture2D tex = GD.Load(artPath) as Godot.Texture2D;
@@ -212,7 +224,7 @@ public partial class Enemy : Combatant
                 _spr = new Godot.Sprite2D();
                 _spr.Texture = tex;
                 _spr.Name = "Art";
-                float th = kind == "ogre" ? 72.0f : kind == "hobgoblin" ? 52.0f : ((kind == "wolf" || kind == "wolf2" || kind == "wolf3") ? 38.0f : 46.0f); // wolves ride their OWN height: the ~120x80 landscape canvases would draw ~69 px wide at the 46 px humanoid target against the 34 px body (assistant pick - retunable); riders KEEP 46: their ~120x96 mount canvases draw ~57 px wide = the same mount span the wolf art gets at 38, and the goblin shares the canvas height (pick); ogre rides BIGGER still: 72 px target on its ~94x108 canvas draws ~63 px wide = its 64 px body, the tallest creature on the map (assistant pick - retunable)
+                float th = (kind == "ogre" || kind == "ogre2") ? 72.0f : kind == "hobgoblin" ? 52.0f : ((kind == "wolf" || kind == "wolf2" || kind == "wolf3") ? 38.0f : 46.0f); // wolves ride their OWN height: the ~120x80 landscape canvases would draw ~69 px wide at the 46 px humanoid target against the 34 px body (assistant pick - retunable); riders KEEP 46: their ~120x96 mount canvases draw ~57 px wide = the same mount span the wolf art gets at 38, and the goblin shares the canvas height (pick); ogre rides BIGGER still: 72 px target on its ~94x108 canvas draws ~63 px wide = its 64 px body, the tallest creatures on the map; ogre2 rides the SAME 72 on its wider 112x108 canvas (~75 px wide, a touch over its 64 px body so the thrower reads WIDE), assistant pick - retunable
                 float texH = (float)tex.GetHeight();
                 if (texH > 0.0f)
                 {
@@ -381,12 +393,12 @@ public partial class Enemy : Combatant
                     Vector2 side = new Vector2(-to.Y, to.X).Normalized() * _riderSide * RIDER_ZIG_SIDE;
                     dir = (radial + side).Normalized();
                 }
-                else if (kind == "ogre")
+                else if (kind == "ogre" || kind == "ogre2")
                 {
                     // OGRE walks on like the rest until the slam lane commits it: mid
                     // windup it STANDS STILL so the marked circle reads as a readable
                     // telegraph the player can step out of (assistant read of the user's 1 s beat)
-                    if (_slamT > 0.0f)
+                    if (_slamT > 0.0f || _grabT > 0.0f)
                         dir = new Vector2();
                     else
                         dir = to.Normalized();
@@ -523,7 +535,7 @@ public partial class Enemy : Combatant
             // area on itself - the circle LOCKS where it marks (assistant read: the beat
             // is a dodge window), stands through the 1 s windup (USER), then lands the
             // 25 damage (USER) through Game.SlamArea, which rides the TakeHit defence lane.
-            if (kind == "ogre")
+            if (kind == "ogre" || kind == "ogre2")
             {
                 _slamCd -= delta;
                 if (_slamT > 0.0f)
@@ -558,6 +570,49 @@ public partial class Enemy : Combatant
                         _slamDisc.Position = g.WrapDelta(p, _slamPos);
                     }
                     GD.Print("[10thAge] (slam) ogre winds up: circle marks the slam area");
+                }
+            }
+            // OGRE2 hurl lane (user 2026-11-11: "when ogre2 gets close to an enemy from tier 1,
+            // he will pick them up and throw them at the player"): the lift beat stands it still
+            // (the walk branch reads _grabT), then CONSUMES the tier-1 victim the reaper way
+            // (kind "dead" + hidden + parked: the kill scan drops the registry slot, NO XP, NO
+            // gem, live count released once via the ownership flag) and HURLS it at the nearest
+            // ally through Game.SpawnBulletThrown - the flying goblin rides the ENEMY missile
+            // pool, so the melee trio can SMASH it for free (same rail as every volley).
+            if (kind == "ogre2")
+            {
+                _throwCd -= delta;
+                if (_grabT > 0.0f)
+                {
+                    _grabT -= delta;
+                    if (_grabT <= 0.0f)
+                    {
+                        Enemy hurl = g.NearestTier1Victim(p, OGRE2_GRAB_R);
+                        if (hurl != null)
+                        {
+                            Vector2 vp = hurl.GlobalPosition; // the hurl starts where the victim stood
+                            PartyMember prey = g.NearestMember(p);
+                            Vector2 aim = new Vector2(1.0f, 0.0f);
+                            if (prey != null)
+                            aim = g.WrapDelta(p, prey.GlobalPosition).Normalized();
+                            // consume the victim (the TEST reaper precedent above): no death cycle, no XP,
+                            // no gem - the goblin leaves the field IN the ogre's hand instead
+                            hurl.kind = "dead";
+                            hurl.Visible = false;
+                            hurl.GlobalPosition = new Vector2(0.0f, -10000.0f);
+                            g.ReleaseLiveCount(hurl); // ownership flag: the kill scan re-release is safe
+                            g.SpawnBulletThrown(vp, aim * OGRE2_THROW_SPD, OGRE2_THROW_DMG);
+                            _throwCd = OGRE2_THROW_CD;
+                            GD.Print("[10thAge] (throw) ogre2 hurls a goblin at the party");
+                        }
+                        else
+                        _throwCd = OGRE2_THROW_CD; // beat spent: the lifted body walked out of reach
+                    }
+                    }
+                else if (_throwCd <= 0.0f && g.NearestTier1Victim(p, OGRE2_GRAB_R) != null)
+                {
+                    _grabT = OGRE2_GRAB_TELE; // commit the lift; the next beat resolves the hurl
+                    GD.Print("[10thAge] (grab) ogre2 lifts a goblin: hurl winding up");
                 }
             }
             // downed bodies are still run into even though nobody chases them

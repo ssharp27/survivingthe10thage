@@ -546,6 +546,11 @@ public partial class Game : Godot.Node2D
 		// the goblin mage's OWN fireball (firebolt stays Stack's burn read), and the bee swarm art
 		Godot.Texture2D _fxStingerTex = null;
 		Godot.Texture2D _fxMageTex = null;
+		// OGRE2 hurl art: the thrown goblin rides the missile pool below (SpawnBulletThrown).
+		// OWN try-once flag: the arrow / fireball lanes set _fxTried on the FIRST loose and load
+		// ONLY their textures, so a shared flag would starve this lane forever.
+		Godot.Texture2D _fxThrownTex = null;
+		bool _fxThrownTried = false;
 		Godot.Texture2D _fxBeeTex = null;
 		bool _fxTried = false;
 		// ---------- leader-bonus helper pools (user 2026-10-25): Asper's insects, Yu's spirits ----------
@@ -1349,6 +1354,62 @@ public partial class Game : Godot.Node2D
 		}
 		return;
 		}
+		}
+	}
+	
+	// OGRE2 HURL LANE (user 2026-11-11: ogre2 "will pick them up and throw them at the
+	// player"): the hurled goblin rides the SAME enemy missile pool as every volley, goblin1
+	// canvas art on it (art/enemies/ is untracked user WIP: no art on disk = the goblin-green
+	// fallback square, the honest discipline every art lane carries). The melee trio reads
+	// ALL live _bullets slots, so a flying goblin is SMASHABLE for free - the free ride the
+	// QoL pass already won the melee party. Motion / hit lanes read the node POSITION like
+	// every volley (bite 12 + MEMBER_RADIUS), the art scale is visual-only.
+	public void SpawnBulletThrown(Vector2 pos, Vector2 vel, double dmg)
+	{
+		for (int i = 0; i < _bullets.Count; i++)
+		{
+			Godot.Node2D b = _bullets[i];
+			if (b.GlobalPosition.X < -8000.0f) // pooled slots park at X < -8000: the free-slot read
+			{
+				b.GlobalPosition = pos;
+				_bulletVel[i] = vel;
+				_bulletDmg[i] = dmg;
+				if (!_fxThrownTried) // try-once art discipline, OWN flag (see note above)
+				{
+					_fxThrownTried = true;
+					_fxThrownTex = GD.Load("res://art/enemies/stage1/goblin1.png") as Godot.Texture2D;
+				}
+				Godot.ColorRect cr = (Godot.ColorRect)b.GetChild(0);
+				Godot.Sprite2D fxs = (Godot.Sprite2D)cr.GetChild(0);
+				if (_fxThrownTex != null)
+				{
+					fxs.Texture = _fxThrownTex;
+					float ts = 26.0f / (float)_fxThrownTex.GetHeight(); // assistant pick: a goblin the party can read in flight
+					fxs.Scale = new Vector2(ts, ts); // recycled slot: normalise, no inherited fireball scale
+					fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f); // wake the art child
+					fxs.Rotation = 0.0f; // a recycled slot may still be aimed like an arrow: the goblin tumbles upright
+					cr.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f); // shell stops drawing while art rides
+					cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f); // wake the shell: modulate CASCADES to the art child (the fireball lesson)
+					b.Scale = new Vector2(1.0f, 1.0f);
+					if (cr.GetChildCount() > 1)
+					{
+						Godot.Sprite2D ghost = (Godot.Sprite2D)cr.GetChild(1);
+						ghost.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f); // hide whatever collar a rider left in this slot
+					}
+				}
+				else
+				{
+					b.Scale = new Vector2(1.8f, 1.8f); // fat goblin-green fallback: a thrown body, not a pellet
+					cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f); // wake the shell (the cascade lesson again)
+					cr.Color = new Color(0.30f, 0.48f, 0.23f, 1.0f); // goblin green: the ENEMY-projectile read this lane owns
+					fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f); // sink whatever art an earlier volley left riding
+					if (cr.GetChildCount() > 1)
+					{
+						((Godot.Sprite2D)cr.GetChild(1)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+					}
+				}
+			return;
+			}
 		}
 	}
 	
@@ -3941,6 +4002,39 @@ private void UpdateSpirits(float delta)
 		((Godot.ColorRect)gem.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
 	}
 
+	// OGRE2 HURL VICTIM SCAN (user 2026-11-11: "when ogre2 gets close to an enemy from
+	// tier 1, he will pick them up and throw them at the player"): nearest LIVE tier-1
+	// body within radius. TIER-1 KINDS ONLY = goblin / goblin2 (fastgoblin + hobgoblin are
+	// tier-2 lanes in the Director, so the user's "tier 1" law reads them OUT: assistant
+	// read - retunable). Downed / self-despawned bodies are off the menu; bosses ride
+	// _enemies too but are never Enemy so they skip. The reach knob lives on the caller.
+	public Enemy NearestTier1Victim(Vector2 from, float radius)
+	{
+		Enemy best = null;
+		float bestD = radius;
+		for (int i = 0; i < _enemies.Count; i++)
+		{
+			if (!(_enemies[i] is Enemy)) // bosses ride _enemies too: never menu items
+			{
+				continue;
+			}
+			Enemy e = (Enemy)_enemies[i];
+			// kind "dead" bodies linger in _enemies until the kill scan drops them; already-downed
+			// bodies are off the menu too
+			if ((e.kind != "goblin" && e.kind != "goblin2") || e.hp <= 0.0f)
+			{
+				continue;
+			}
+			// wrapping world: the fold-relative delta owns the distance read
+			float dist = WrapDelta(from, e.GlobalPosition).Length();
+			if (dist < bestD)
+			{
+				bestD = dist;
+				best = e;
+			}
+		}
+		return best;
+	}
 	private void UpdateBullets(float delta)
 	{
 		for (int i = 0; i < _bullets.Count; i++)
