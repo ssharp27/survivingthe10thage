@@ -46,6 +46,7 @@ var MODE_LABEL = ["closest", "furthest", "highest hp", "lowest hp", "boss"]
 
 var blur: ColorRect = null
 var wash: ColorRect = null
+var pause_field: CanvasLayer = null
 var header: Label = null
 var grid: GridContainer = null
 var hint: Label = null
@@ -137,6 +138,18 @@ func _build() -> void:
 	# ---------- the field behind the card: dim + soft (the user's fade/ blur ask) ----------
 	# the dark wash ALWAYS paints first: it is also the fallback, because a headless
 	# bench has no GPU and a shader that cannot load leaves the wash as the softener.
+	# PAUSE BLUR LAW (user 2026-11-12 hand-play: "The blur is still too much on the eyes.
+	# It's not the background, it's the text that's the problem"): the wash + blur sat on this
+	# layer-4 ROOT, so the blur shader sampled screen_texture THROUGH the HUD (layer 0) and
+	# smeared its HP strips + labels. They now ride their OWN nested CanvasLayer at layer 1:
+	# canvas_layer.cpp feeds viewport_set_canvas_stacking the node's OWN layer (nesting is
+	# ABSOLUTE against the viewport, not additive with the parent), so the stack is arena(0)
+	# -> blur field(1) -> HUD (lifted to 2 by Game.cs) -> this card furniture(4). The blur
+	# only ever samples what sits BELOW layer 1 now: the arena stays soft, the text stays crisp.
+	pause_field = CanvasLayer.new()
+	pause_field.name = "PauseField"
+	pause_field.layer = 1 # explicit even though the default is 1: the layer IS the law
+	add_child(pause_field)
 	wash = ColorRect.new()
 	wash.name = "Wash"
 	wash.color = Color(0.06, 0.05, 0.045, 0.55)
@@ -144,7 +157,7 @@ func _build() -> void:
 	wash.anchor_top = 0.0
 	wash.anchor_right = 1.0
 	wash.anchor_bottom = 1.0
-	add_child(wash)
+	pause_field.add_child(wash)
 	blur = null
 	# use_blur is an @export and C# pushes it as a VARIANT: force a real bool or
 	# `not` throws on e.g. Int(1) - same tax as the campfire float trap
@@ -205,7 +218,7 @@ func _paint_blur() -> void:
 	var mat: ShaderMaterial = ShaderMaterial.new()
 	mat.shader = sh
 	blur.material = mat
-	add_child(blur)
+	pause_field.add_child(blur)
 
 func _paint_columns() -> void:
 	# a repaint buries the old subtrees: the mode buttons live INSIDE their columns,

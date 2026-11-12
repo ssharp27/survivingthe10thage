@@ -486,6 +486,12 @@ public partial class Game : Godot.Node2D
 	// spin so it's more obvious it's a projectile"): rad/s per slot, ZERO for every ordinary
 	// volley so arrows / boss bolts / fireballs never twitch. Parallel to _bullets.
 	Godot.Collections.Array<double> _bulletSpin = new();
+	// BOSS SHOT LAW (user 2026-11-12: "Remove the ability to destroy boss projectiles.
+	// Keep destruction of regular enemy projectiles."): one bool per pooled slot, TRUE
+	// only for volleys Boss.cs fires. The two blade-vs-missile scans below skip those
+	// slots, so a boss bolt can never be shattered by a melee verb - it still hurts
+	// (UpdateBullets reads the same slots, untouched). Parallel to _bullets.
+	Godot.Collections.Array<bool> _bulletBoss = new();
 		// ---------- party-side projectile pool (M2: Asper's longbow) ----------
 		// The boss pool above is FACTION-OWNED: UpdateBullets runs volleys into the PARTY
 		// (NearestMemberAny -> TakeHit). A PC weapon that fires needs the mirror pool that
@@ -1177,7 +1183,7 @@ public partial class Game : Godot.Node2D
 		if (Rng.Randf() >= (float)PICKUP_CH)
 			return; // the rare roll: the same rail the creature lanes use (assistant pick)
 		double roll = Rng.Randf() * 100.0; // weighted flavour pick (assistant pick)
-		int pk = roll < 40.0 ? 0 : (roll < 70.0 ? 1 : 2); // 0 heal orb | 1 xp magnet | 2 rage vial
+		int pk = roll < 48.0 ? 0 : (roll < 63.0 ? 1 : 2); // 48 heal orb | 15 xp magnet (HALVED user 2026-11-12 hand-play: "reduce the number of magnet spawns by 50%") | 37 rage vial
 		SpawnPickup(c.GlobalPosition, pk);
 	}
 	
@@ -1192,7 +1198,7 @@ public partial class Game : Godot.Node2D
 		GD.Print("[10thAge] (pickup) " + label + " drops on the field");
 	}
 	
-	public void SpawnBullet(Vector2 pos, Vector2 vel, double dmg)
+	public void SpawnBullet(Vector2 pos, Vector2 vel, double dmg, bool bossShot = false)
 	{
 		for (int i = 0; i < _bullets.Count; i++)
 		{
@@ -1203,6 +1209,7 @@ public partial class Game : Godot.Node2D
 				_bulletVel[i] = vel;
 				_bulletDmg[i] = dmg;
 				_bulletSpin[i] = 0.0; // ordinary volley: no tumble
+				_bulletBoss[i] = bossShot; // BOSS SHOT LAW: Boss.cs passes true, every other lane stays false
 				b.Rotation = 0.0f; // a recycled slot may still hold a thrown goblin tumble
 				Godot.ColorRect cr = (Godot.ColorRect)b.GetChild(0);
 				cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
@@ -1220,7 +1227,7 @@ public partial class Game : Godot.Node2D
 		SpawnBulletArrow(pos, vel, dmg, false); // the party's mini fans keep the plain lane
 	}
 
-	public void SpawnBulletArrow(Vector2 pos, Vector2 vel, double dmg, bool redOutline)
+	public void SpawnBulletArrow(Vector2 pos, Vector2 vel, double dmg, bool redOutline, bool bossShot = false)
 	{
 		// Same bullet pool; this variant rides the arrow fx sprite rotated into flight
 		// instead of the red square (2026-11-02 mini dance: user asked for arrow fx on the
@@ -1236,6 +1243,7 @@ public partial class Game : Godot.Node2D
 				_bulletVel[i] = vel;
 				_bulletDmg[i] = dmg;
 				_bulletSpin[i] = 0.0; // ordinary volley: no tumble
+				_bulletBoss[i] = bossShot; // boss run-in fans flag true; riders take the false default
 				b.Rotation = 0.0f; // a recycled slot may still hold a thrown goblin tumble
 				Godot.ColorRect cr = (Godot.ColorRect)b.GetChild(0);
 				if (!_fxTried)
@@ -1317,6 +1325,7 @@ public partial class Game : Godot.Node2D
 		_bulletVel[i] = vel;
 		_bulletDmg[i] = dmg;
 		_bulletSpin[i] = 0.0; // ordinary volley: no tumble
+		_bulletBoss[i] = false; // mage fireballs are ordinary missiles: shatterable
 		b.Rotation = 0.0f; // a recycled slot may still hold a thrown goblin tumble
 			if (!_fxTried) // first fireball may precede any arrow: same try-once art discipline
 			{
@@ -1385,6 +1394,7 @@ public partial class Game : Godot.Node2D
 				_bulletVel[i] = vel;
 				_bulletDmg[i] = dmg;
 				_bulletSpin[i] = spin; // the tumbles pinned to this slot
+				_bulletBoss[i] = false; // thrown goblins are ordinary missiles: shatterable
 				b.Rotation = 0.0f; // the tumble starts upright, like every launch
 				if (!_fxThrownTried) // try-once art discipline, OWN flag (see note above)
 				{
@@ -2226,6 +2236,16 @@ public void RegisterEnemy(Combatant e)
 		// bump into anymore, and a painted border would fight the invisible fold box
 		_camera = GetNode("Camera2D") as Godot.Camera2D;
 		Godot.CanvasLayer hudl = new CanvasLayer();
+		// PAUSE BLUR LAW (user 2026-11-12 hand-play: "The blur is still too much on the
+		// eyes. It's not the background, it's the text that's the problem"): the wash + blur
+		// now ride their OWN nested CanvasLayer (layer 1 in PauseMenu.gd), so screen_texture
+		// samples ONLY the arena - CanvasLayer layer indexes stack ABSOLUTELY against the
+		// viewport (canvas_layer.cpp sets viewport_set_canvas_stacking with the node's own
+		// layer, not the parent's). This HUD (HP strips, picker label, join banner) lifts to
+		// layer 2: above the blur, crisp instead of smeared. The campfire card is ALSO 2 but
+		// instantiated later in tree order, so it still owns the frame like it did before;
+		// summary (3), pause furniture (4), leader card (9) and stage card (10) stay on top.
+		hudl.Layer = 2;
 		AddChild(hudl);
 		_hudLayer = hudl; // the HP strips parent to this once the party is known
 		_hud = new Label();
@@ -2296,6 +2316,7 @@ public void RegisterEnemy(Combatant e)
 			_bulletVel.Add(new Vector2(0, 0));
 			_bulletDmg.Add(0.0);
 			_bulletSpin.Add(0.0);
+			_bulletBoss.Add(false);
 		}
 		// party-side shot pool (M2 longbow): pooled like the gems and the boss volleys, so
 		// a rank-3 multishot archer never allocates a node per bolt mid-horde.
@@ -4114,6 +4135,8 @@ private void UpdateSpirits(float delta)
 			Godot.Node2D b = _bullets[i];
 			if (b.GlobalPosition.X < -8000.0f)
 				continue; // pooled slot already expired
+			if (_bulletBoss[i])
+				continue; // BOSS SHOT LAW: a boss volley is never shatterable
 			Vector2 v = WrapDelta(from, b.GlobalPosition);
 			if (v.Length() > reach)
 				continue;
@@ -4138,6 +4161,8 @@ private void UpdateSpirits(float delta)
 			Godot.Node2D b = _bullets[i];
 			if (b.GlobalPosition.X < -8000.0f)
 				continue; // pooled slot already expired
+			if (_bulletBoss[i])
+				continue; // BOSS SHOT LAW: a boss volley is never shatterable
 			Vector2 v = WrapDelta(from, b.GlobalPosition);
 			double along = v.Dot(dir);
 			if (along < 0.0 || along > (double)reach)

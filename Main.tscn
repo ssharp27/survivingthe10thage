@@ -139,30 +139,30 @@ class_ = "Rogue"
 [node name="BossMini" type="Node2D" parent="." unique_id=321225898]
 position = Vector2(0, -500)
 script = ExtResource("4_boss")
-maxHp = 300.0
+maxHp = 900.0
 kind = "mini1"
 
 [node name="BossMid" type="Node2D" parent="." unique_id=1786505761]
 position = Vector2(0, -620)
 script = ExtResource("4_boss")
-maxHp = 300.0
+maxHp = 900.0
 kind = "boss1"
 
 [node name="BossMid2" type="Node2D" parent="." unique_id=1123581023]
 position = Vector2(0, -980)
 script = ExtResource("4_boss")
-maxHp = 300.0
+maxHp = 900.0
 kind = "boss2"
 
 [node name="BossMini2" type="Node2D" parent="." unique_id=1840666997]
 position = Vector2(0, -740)
 script = ExtResource("4_boss")
 driftSpeed = 44.0
-maxHp = 380.0
+maxHp = 1140.0
 kind = "mini2"
 
 [node name="BossFinal" type="Node2D" parent="." unique_id=975914059]
 position = Vector2(0, -860)
 script = ExtResource("4_boss")
-maxHp = 300.0
+maxHp = 900.0
 kind = "final"

@@ -45,11 +45,19 @@ public partial class Director : Godot.Node2D
     // at min 1, 1.30 at min 6). The multiplier drives the live cap, the cadence divisor, the
     // horde-event swarm size, and the pack units (the 2+2 rider and 3-wolf2 USER packs grow
     // with it). Assistant-picked mapping of "numbers", retunable after hand-play.
+    // RETUNE (user 2026-11-12 HAND-PLAY, same day as that ask): "that ramp might be a
+    // bit too much... I am experiencing some performance issues. Make a note regarding
+    // performance for us to review again later. For the time being let's lower it to
+    // 2.5%/min." -> the per-minute step is 0.025 now (1.025 at min 1, 1.15 at min 6,
+    // 1.25 at min 10). PERFORMANCE REVIEW OWED (the user's note): the +5%/min cut
+    // produced frame-rate trouble on hand-play; the headless bench never reproduced it.
+    // Before raising the step again, review the live cap, the bullet / entity pools and
+    // the art draw cost alongside the planned boss rework passes.
     private static double SpawnRamp(Game g)
     {
-        return 1.0 + 0.05 * System.Math.Floor(System.Math.Max(0.0, g.GetRunTime()) / 60.0);
+        return 1.0 + 0.025 * System.Math.Floor(System.Math.Max(0.0, g.GetRunTime()) / 60.0);
     }
-    int _hordeEventsSeen = 0; // HORDE MIX LAW cursor: the FIRST bonus swarm stays pure tier-1 goblins (the opening rule), later swarms mix active tiers
+    int _hordeEventsSeen = 0; // HORDE MIX LAW cursor: the FIRST bonus swarm stays pure tier-1 goblins (the opening rule), later swarms mix tier-1/2 kinds
 
     // ---------- ENEMY TEST ROOM (user 2026-11-07: "let's build the enemy test room.
     // Functionally ... spawn an enemy every 15-20 seconds ... rotate through every enemy
@@ -387,7 +395,7 @@ public partial class Director : Godot.Node2D
         // cadence uses (GetPartyInPlay()/2), so a solo opener gets ~10 bodies and a 5-PC squad
         // the full 20+ - the event thickens with the party like every other spawn does.
         float partyScale = (float)g.GetPartyInPlay() / 2.0f;
-        int n = (int)(20.0f * hordeScale * partyScale * SpawnRamp(g)); // 2026-11-12 ramp: the bonus swarm thickens +5%/min (user rule)
+        int n = (int)(20.0f * hordeScale * partyScale * SpawnRamp(g)); // 2026-11-12 ramp: the bonus swarm thickens +2.5%/min (post-retune step)
         Vector2 cen = g.GetCameraCenter();
         Vector2 half = g.GetVisibleHalfExtents();
         float a0 = (float)GD.Randf() * (float)(System.Math.PI * 2.0); // random side of the frame
@@ -405,19 +413,23 @@ public partial class Director : Godot.Node2D
             if (g.GetLeader() != null && pos.DistanceTo(g.GetLeader().GlobalPosition) < 260.0f)
                 continue; // near-party guard, same discipline as Spawn()
             Enemy e = new Enemy();
-            // HORDE MIX LAW: first swarm pure tier-1 goblins; later swarms roll a kind per body
-            // across the ACTIVE tiers (pool mirrors the cadence gates: mage/rider/riderbow are
-            // tier-3 creatures, wolf2 packs and the ogre family are tier-4, tier 2 adds fastgoblin/hob/wolves)
+            // HORDE MIX LAW (user 2026-11-12: the all-tier mix "was actually a bad idea - keep
+            // swarms a mix of tier 1 and 2 enemies until I decide what else to do with them"): the
+            // FIRST swarm stays pure tier-1 goblins (opening rule); every LATER swarm re-rolls
+            // ONE kind per body across TIER-1/2 ONLY (the tier-2 cadence pool below). Rider /
+            // mage / ogre stat cards stay live for the planned revisit; the tier-3/4 pool
+            // branches are retired as comments just below (the hordeTier param stays).
             string k = "goblin";
-            if (_hordeEventsSeen > 0 && hordeTier > 1)
+            if (_hordeEventsSeen > 0) // tier gate dropped: the POOL is tier-capped (mix law)
             {
-                string[] pool;
-                if (hordeTier == 2)
-                    pool = new string[] { "goblin", "goblin2", "fastgoblin", "hobgoblin", "wolf", "wolf2", "wolf3" };
-                else if (hordeTier == 3)
-                    pool = new string[] { "goblin", "goblin2", "fastgoblin", "hobgoblin", "wolf", "wolf2", "wolf3", "rider", "riderbow", "mage" };
-                else
-                    pool = new string[] { "goblin", "goblin2", "fastgoblin", "hobgoblin", "wolf", "wolf2", "wolf3", "rider", "riderbow", "mage", "ogre", "ogre2" };
+                string[] pool = new string[] { "goblin", "goblin2", "fastgoblin", "hobgoblin",
+                "wolf", "wolf2", "wolf3" }; // TIER-1/2 ONLY (the mix-law cap above)
+                // REVISIT OWED (user 2026-11-12: "until I decide what else to do with
+                // them"): the all-tier mix was walked back - revive behind hordeTier when
+                // decided, the rider / mage / ogre stat cards below stay live for exactly
+                // that:
+                //   if (hordeTier == 3) pool += { "rider", "riderbow", "mage" };
+                //   if (hordeTier >= 4) pool += { "ogre", "ogre2" };
                 k = pool[(int)GD.RandRange(pool.Length - 1, 0)];
             }
             float hp = 30.0f, spd = 90.0f, contact = 2.0f, ranged = 0.0f, xp = 1.0f; // tier-1 goblin card (USER numbers)
@@ -444,7 +456,7 @@ public partial class Director : Godot.Node2D
         }
         _hordeEventsSeen++; // the swarm that just fired was the pure one if it was the first (mix law)
         g.AdvanceHordeSchedule();
-        GD.Print("[10thAge] (horde) bonus swarm: " + n + " bodies fan in on one bearing (first swarm pure goblins, later swarms mix active tiers), budget-free (xp per body)");
+        GD.Print("[10thAge] (horde) bonus swarm: " + n + " bodies fan in on one bearing (first swarm pure goblins, later swarms mix tier-1/2 kinds), budget-free (xp per body)");
     }
 
     // ENEMY TEST ROOM rotation (user 2026-11-07): one body every 15-20 s (USER cadence), cycling

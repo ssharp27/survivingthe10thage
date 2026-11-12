@@ -92,6 +92,23 @@ public partial class Pickup : Godot.Node2D
         PartyMember m = g.NearestMember(GlobalPosition);
         if (m == null || !m.joined || m.downed || m.eliminated)
             return; // no bubble from fallen / stranded bodies, same census as the gem rail
+        // PICKUP RIDE LAW (user 2026-11-12 hand-play: "The health, damage and magnet
+        // pickups should be drawn to the player/party members just like XP is"): all
+        // three flavours mirror the gem magnet law EXACTLY (same 110 x COLLECTION_RANGE
+        // x elixir x LeaderCollectMul bubble) and ride the SAME 380 px/s gem-stream
+        // speed. The PICK_R walk-over gate on the next line still owns the collect -
+        // the ride only ferries the body, nothing new decides who grabs it.
+        Vector2 pull = g.WrapDelta(GlobalPosition, m.GlobalPosition); // wrapped: toward the nearest standing member, like the distance gate below
+        float pd = pull.Length();
+        float bubble = 110.0f * (float)m.stat[StatTags.COLLECTION_RANGE] * (m.elixMagT > 0.0 ? 1.10f : 1.0f) * (float)g.LeaderCollectMul(); // gem rail math, copied not rederived
+        if (pd < bubble)
+        {
+            float step = 380.0f * delta; // the gem-stream speed
+            if (pd < step)
+                GlobalPosition = m.GlobalPosition; // snap on final approach: no jitter orbit at the feet
+            else
+                GlobalPosition = g.WrapNearCamera(GlobalPosition + pull.Normalized() * step); // fold like the gems do
+        }
         if (g.WrapDelta(GlobalPosition, m.GlobalPosition).Length() > PICK_R)
             return;
         // walk-over collect: the closest standing member grabs it

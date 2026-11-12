@@ -10,6 +10,12 @@ using Godot;
 /// campfire (Game.OnBossKilled: all boss kinds -> camp). The kind still owns body size /
 /// colour and the beat slot, so the loop stays data in the scene, not four copies of a class.
 /// Legacy "mini" still reads as a mini so an older scene keeps working.
+/// 2026-11-12 HAND-PLAY RETUNE (user): "Boss HP feels way too low... 3x their HP" - the
+/// authored maxHp lands at 900/900/900/1140/900 in Main.tscn (the hp = maxHp wiring below
+/// is untouched). Same-day ask: "Remove the ability to destroy boss projectiles" - the
+/// volley sites below opt into Game.SpawnBullet / SpawnBulletArrow bossShot named arg,
+/// and Game.cs flags those pooled slots so the blade smas scans skip them (the bolts
+/// still hurt the party through UpdateBullets exactly as before).
 /// </summary>
 public partial class Boss : Combatant
 {
@@ -260,7 +266,7 @@ public partial class Boss : Combatant
         for (int i = 0; i < ringN; i++)
         {
             float a = (float)(i * System.Math.PI * 2.0 / ringN) + _ringOffset;
-            g.SpawnBullet(p, new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a)) * speed, bulletDamage);
+            g.SpawnBullet(p, new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a)) * speed, bulletDamage, bossShot: true);
         }
         // aimed fan primitive (phases 1+)
         if (_phase >= 1)
@@ -268,7 +274,7 @@ public partial class Boss : Combatant
             for (int i = -1; i <= 1; i++)
             {
                 float a2 = aim + i * 0.18f;
-                g.SpawnBullet(p, new Vector2((float)System.Math.Cos(a2), (float)System.Math.Sin(a2)) * (speed + 40.0f), bulletDamage);
+                g.SpawnBullet(p, new Vector2((float)System.Math.Cos(a2), (float)System.Math.Sin(a2)) * (speed + 40.0f), bulletDamage, bossShot: true);
             }
         }
         // spokes primitive (phase 2)
@@ -277,7 +283,7 @@ public partial class Boss : Combatant
             for (int i = 0; i < 4; i++)
             {
                 float a3 = aim + (float)(i * System.Math.PI / 4.0) + 0.4f;
-                g.SpawnBullet(p, new Vector2((float)System.Math.Cos(a3), (float)System.Math.Sin(a3)) * (speed * 1.3f), bulletDamage);
+                g.SpawnBullet(p, new Vector2((float)System.Math.Cos(a3), (float)System.Math.Sin(a3)) * (speed * 1.3f), bulletDamage, bossShot: true);
             }
         }
     }
@@ -310,7 +316,7 @@ public partial class Boss : Combatant
                             _miniSaidEnrage = true;
                             GD.Print("[10thAge] (dance) " + kind + " under half hp: run-in shots live");
                         }
-                        g.SpawnBulletArrow(GlobalPosition, to.Normalized() * MINI_ARROW_SPEED, bulletDamage);
+                        g.SpawnBulletArrow(GlobalPosition, to.Normalized() * MINI_ARROW_SPEED, bulletDamage, false, bossShot: true);
                     }
                 }
             }
@@ -360,7 +366,7 @@ public partial class Boss : Combatant
                     for (int i = -(MINI_FAN_N / 2); i <= MINI_FAN_N / 2; i++)
                     {
                         float a = aim + (float)i * MINI_FAN_STEP;
-                        g.SpawnBulletArrow(GlobalPosition, new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a)) * MINI_ARROW_SPEED, bulletDamage);
+                        g.SpawnBulletArrow(GlobalPosition, new Vector2((float)System.Math.Cos(a), (float)System.Math.Sin(a)) * MINI_ARROW_SPEED, bulletDamage, false, bossShot: true);
                     }
                 }
                 // closer than MINI_FAN_DIST: the mini keeps circling SILENTLY while melee presses it (user:
