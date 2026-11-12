@@ -482,6 +482,10 @@ public partial class Game : Godot.Node2D
 	Godot.Collections.Array<Godot.Node2D> _bullets = new();
 	Godot.Collections.Array<Vector2> _bulletVel = new();
 	Godot.Collections.Array<double> _bulletDmg = new();
+	// HURL TUMBLE (user 2026-11-12 hand-play: "when ogre2 hurls a goblin, make the goblin
+	// spin so it's more obvious it's a projectile"): rad/s per slot, ZERO for every ordinary
+	// volley so arrows / boss bolts / fireballs never twitch. Parallel to _bullets.
+	Godot.Collections.Array<double> _bulletSpin = new();
 		// ---------- party-side projectile pool (M2: Asper's longbow) ----------
 		// The boss pool above is FACTION-OWNED: UpdateBullets runs volleys into the PARTY
 		// (NearestMemberAny -> TakeHit). A PC weapon that fires needs the mirror pool that
@@ -1198,6 +1202,8 @@ public partial class Game : Godot.Node2D
 				b.GlobalPosition = pos;
 				_bulletVel[i] = vel;
 				_bulletDmg[i] = dmg;
+				_bulletSpin[i] = 0.0; // ordinary volley: no tumble
+				b.Rotation = 0.0f; // a recycled slot may still hold a thrown goblin tumble
 				Godot.ColorRect cr = (Godot.ColorRect)b.GetChild(0);
 				cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
 				cr.Color = new Color(1.0f, 0.25f, 0.2f, 1.0f); // shell back to drawing: an arrow spawn zeroes its alpha
@@ -1229,6 +1235,8 @@ public partial class Game : Godot.Node2D
 				b.GlobalPosition = pos;
 				_bulletVel[i] = vel;
 				_bulletDmg[i] = dmg;
+				_bulletSpin[i] = 0.0; // ordinary volley: no tumble
+				b.Rotation = 0.0f; // a recycled slot may still hold a thrown goblin tumble
 				Godot.ColorRect cr = (Godot.ColorRect)b.GetChild(0);
 				if (!_fxTried)
 				{
@@ -1308,6 +1316,8 @@ public partial class Game : Godot.Node2D
 		b.GlobalPosition = pos;
 		_bulletVel[i] = vel;
 		_bulletDmg[i] = dmg;
+		_bulletSpin[i] = 0.0; // ordinary volley: no tumble
+		b.Rotation = 0.0f; // a recycled slot may still hold a thrown goblin tumble
 			if (!_fxTried) // first fireball may precede any arrow: same try-once art discipline
 			{
 				_fxTried = true;
@@ -1321,7 +1331,7 @@ public partial class Game : Godot.Node2D
 		if (mfx != null)
 		{
 			fxs.Texture = mfx;
-			float ms = _fxMageTex != null ? 1.3f : 2.4f; // 2026-11-09 hand-play (user: "when goblin mages fire their fireball, it needs to be just a little bit smaller"): 1.5 drew the 40x15 art at 60x22 px, now 52x20. Assistant knob - retunable
+			float ms = _fxMageTex != null ? 1.04f : 2.4f; // 2026-11-09 hand-play (user: "when goblin mages fire their fireball, it needs to be just a little bit smaller"): 1.5 drew the 40x15 art at 60x22 px, now 52x20 px; 2026-11-12 hand-play: still a touch big, 20% off = 1.04 (~42x16). Assistant knob - retunable
 			fxs.Scale = new Vector2(ms, ms);
 			fxs.Modulate = _fxMageTex != null ? new Color(1.0f, 1.0f, 1.0f, 1.0f) : new Color(0.70f, 0.15f, 0.11f, 1.0f); // new art carries its own hues; fallback keeps the dark-red ENEMY read
 			fxs.Rotation = (float)System.Math.Atan2((double)vel.Y, (double)vel.X); // 2026-11-09 hand-play (user: "the FX needs to rotate so it fires pointed at the players. Currently it's just static facing right"): measured, art/fx/mage_fireball.png IS authored head-forward - the 40x15 canvas tapers to a 1 px tail at x=0 and its 15 px head mass sits at x=26-34 - so riding the travel vector aims the head at the party, the same rail the arrow lane already uses
@@ -1364,7 +1374,7 @@ public partial class Game : Godot.Node2D
 	// ALL live _bullets slots, so a flying goblin is SMASHABLE for free - the free ride the
 	// QoL pass already won the melee party. Motion / hit lanes read the node POSITION like
 	// every volley (bite 12 + MEMBER_RADIUS), the art scale is visual-only.
-	public void SpawnBulletThrown(Vector2 pos, Vector2 vel, double dmg)
+	public void SpawnBulletThrown(Vector2 pos, Vector2 vel, double dmg, double spin)
 	{
 		for (int i = 0; i < _bullets.Count; i++)
 		{
@@ -1374,6 +1384,8 @@ public partial class Game : Godot.Node2D
 				b.GlobalPosition = pos;
 				_bulletVel[i] = vel;
 				_bulletDmg[i] = dmg;
+				_bulletSpin[i] = spin; // the tumbles pinned to this slot
+				b.Rotation = 0.0f; // the tumble starts upright, like every launch
 				if (!_fxThrownTried) // try-once art discipline, OWN flag (see note above)
 				{
 					_fxThrownTried = true;
@@ -1384,7 +1396,7 @@ public partial class Game : Godot.Node2D
 				if (_fxThrownTex != null)
 				{
 					fxs.Texture = _fxThrownTex;
-					float ts = 26.0f / (float)_fxThrownTex.GetHeight(); // assistant pick: a goblin the party can read in flight
+					float ts = 46.0f / (float)_fxThrownTex.GetHeight(); // SAME 46 px target a standing goblin rides (user 2026-11-12 hand-play: "I noticed the goblin shrinks when the ogre grabs it, keep it at its normal size")
 					fxs.Scale = new Vector2(ts, ts); // recycled slot: normalise, no inherited fireball scale
 					fxs.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f); // wake the art child
 					fxs.Rotation = 0.0f; // a recycled slot may still be aimed like an arrow: the goblin tumbles upright
@@ -2283,6 +2295,7 @@ public void RegisterEnemy(Combatant e)
 			_bullets.Add(b);
 			_bulletVel.Add(new Vector2(0, 0));
 			_bulletDmg.Add(0.0);
+			_bulletSpin.Add(0.0);
 		}
 		// party-side shot pool (M2 longbow): pooled like the gems and the boss volleys, so
 		// a rank-3 multishot archer never allocates a node per bolt mid-horde.
@@ -4043,6 +4056,11 @@ private void UpdateSpirits(float delta)
 			if (b.GlobalPosition.X < -8000.0f)
 				continue;
 			b.GlobalPosition += _bulletVel[i] * delta;
+			// HURL tumble (user 2026-11-12 hand-play): only thrown-goblin slots hold a non-zero
+			// spin, so arrows / bolts / fireballs never twitch; the tumble rides the NODE so the
+			// art child AND the fallback square turn. Motion + hit lanes read POSITION: visual only.
+			if (_bulletSpin[i] != 0.0)
+				b.Rotation += (float)_bulletSpin[i] * delta;
 			Vector2 p = b.GlobalPosition;
 			// no arena to die against anymore: a volley bolt expires once it is a touch
 			// past the measured frame (just inside the fold box, so it never gets a

@@ -70,6 +70,7 @@ public partial class Enemy : Combatant
     private readonly float OGRE2_THROW_SPD = 240.0f; // assistant pick: hurled goblin flight speed
     private readonly float OGRE2_THROW_DMG = 6.0f; // assistant pick: impact damage on the party
     private readonly float OGRE2_THROW_CD = 4.0f;  // assistant pick: one hurl per slam cycle
+    private readonly float OGRE2_THROW_SPIN = 12.0f; // assistant pick: thrown-goblin tumble rad/s (~2 turns/s): user 2026-11-12 hand-play "make the goblin spin so it's more obvious it's a projectile" - retunable
     // hurl state: lift-beat countdown + cadence clock
     float _grabT = 0.0f;
     float _throwCd = 0.0f;
@@ -126,6 +127,13 @@ public partial class Enemy : Combatant
     // lands, the Sprite2D rides the bob rig and the greybox ColorRect hides (a MISSING
     // load keeps the placeholder - the art/enemies/ tree is the user's WIP, untracked)
     Godot.Sprite2D _spr = null;
+    // ALWAYS-FACE law (user 2026-11-12 hand-play: "all enemies' art should flip/rotate to face
+    // the character at all times"): the art chain sets _artSc ONCE when the canvas loads and
+    // _Process re-applies it as base x mirror every frame, so the sway rig keeps owning
+    // position + lean and only the SPRITE turns. The mirror re-applies scale rather than
+    // flipping the node so the gait language below can never be overwritten by it.
+    float _artSc = 1.0f;
+    float _face = 1.0f;
     // mini-style motion rig (user 2026-10-21): enemies do NOT get the party's table
     // slide (they are creatures, not minis) - they get a walk bob on this pivot so
     // the theme contrasts; art/placeholder swap reparents here
@@ -224,12 +232,13 @@ public partial class Enemy : Combatant
                 _spr = new Godot.Sprite2D();
                 _spr.Texture = tex;
                 _spr.Name = "Art";
-                float th = (kind == "ogre" || kind == "ogre2") ? 72.0f : kind == "hobgoblin" ? 52.0f : ((kind == "wolf" || kind == "wolf2" || kind == "wolf3") ? 38.0f : 46.0f); // wolves ride their OWN height: the ~120x80 landscape canvases would draw ~69 px wide at the 46 px humanoid target against the 34 px body (assistant pick - retunable); riders KEEP 46: their ~120x96 mount canvases draw ~57 px wide = the same mount span the wolf art gets at 38, and the goblin shares the canvas height (pick); ogre rides BIGGER still: 72 px target on its ~94x108 canvas draws ~63 px wide = its 64 px body, the tallest creatures on the map; ogre2 rides the SAME 72 on its wider 112x108 canvas (~75 px wide, a touch over its 64 px body so the thrower reads WIDE), assistant pick - retunable
+                float th = (kind == "ogre" || kind == "ogre2") ? 133.0f : kind == "hobgoblin" ? 52.0f : (kind == "rider" || kind == "riderbow") ? 64.0f : ((kind == "wolf" || kind == "wolf2" || kind == "wolf3") ? 38.0f : 46.0f); // wolves ride their OWN height: the ~120x80 landscape canvases would draw ~69 px wide at the 46 px humanoid target against the 34 px body (assistant pick - retunable); riders KEEP 46: their ~120x96 mount canvases draw ~57 px wide = the same mount span the wolf art gets at 38, and the goblin shares the canvas height (pick); ogre rides BIGGER still: 72 px target on its ~94x108 canvas draws ~63 px wide = its 64 px body, the tallest creatures on the map; ogre2 rides the SAME 72 on its wider 112x108 canvas (~75 px wide, a touch over its 64 px body so the thrower reads WIDE). 2026-11-12 HAND-PLAY LAW: the ogres read SMALLER than everything, even the PCs - they must be 1.5x the player size MINIMUM, and PC art lands ~88 px on stage (canvas ~118 x miniScale 0.75), so the ogres ride 133 (ogre1 ~116 px wide on its 94x108 canvas, ogre2 ~137 px on 112x108): the biggest things on the map, hitboxes UNTOUCHED (still the 64 px body). Riders came up the user's 40% too (46 -> 64): the humanoid target lost ALL the mount detail, 64 draws the ~120x96 canvas ~80 px wide. Every height here is ONE branch number on this line - retunable
                 float texH = (float)tex.GetHeight();
                 if (texH > 0.0f)
                 {
                     float sc = th / texH;
                     _spr.Scale = new Vector2(sc, sc);
+                    _artSc = sc; // the always-face block re-applies this base with the mirror
                 }
                 _rig.AddChild(_spr);
                 _body.Visible = false; // greybox stands only while the art is missing
@@ -256,6 +265,25 @@ public partial class Enemy : Combatant
                     // without this guard a dead reaper would walk back into the arena
         if (g.GetWorldPause())
             return; // picker / join-banner soft pause: the horde holds still while the card is read
+            // ALWAYS-FACE law (user 2026-11-12 hand-play: "all enemies' art should flip/rotate to
+            // face the character at all times. I've noticed the newer wolves, riders and ogres all
+            // face one static direction"): EVERY stage-1 canvas is authored facing LEFT (checked by
+            // eye across the user's WIP set; ogre2 is a front stance so the mirror is harmless there),
+            // so the art child mirrors once a joined ally sits on the other side. The ±4 px deadzone
+            // under the body stops the mirror flickering when a body stands directly above the party.
+            // Visual only: the hitbox is the ENEMY node, and the mirror rides the SPRITE, not the
+            // sway rig (the rig owns position + lean, and sets nothing on the sprite itself).
+            if (_spr != null)
+            {
+                PartyMember face = g.NearestMember(GlobalPosition);
+                if (face != null)
+                {
+                    float fdx = g.WrapDelta(GlobalPosition, face.GlobalPosition).X;
+                    if (fdx > 4.0f || fdx < -4.0f)
+                    	_face = fdx > 0.0f ? -1.0f : 1.0f; // ally RIGHT of the body: mirror the left-authored canvas
+                }
+                _spr.Scale = new Vector2(_artSc * _face, _artSc); // re-apply the base scale the art chain set at init
+            }
         // monster sway (user 2026-11-08 hand-play: the gait pass that made heads vibrate was
         // SCRAPPED the same day; the user asked for the PLAYER-character language instead).
         // This is the party rig law copied across from src/PartyMember.cs 1910-1936 - an
@@ -601,7 +629,7 @@ public partial class Enemy : Combatant
                             hurl.Visible = false;
                             hurl.GlobalPosition = new Vector2(0.0f, -10000.0f);
                             g.ReleaseLiveCount(hurl); // ownership flag: the kill scan re-release is safe
-                            g.SpawnBulletThrown(vp, aim * OGRE2_THROW_SPD, OGRE2_THROW_DMG);
+                            g.SpawnBulletThrown(vp, aim * OGRE2_THROW_SPD, OGRE2_THROW_DMG, OGRE2_THROW_SPIN);
                             _throwCd = OGRE2_THROW_CD;
                             GD.Print("[10thAge] (throw) ogre2 hurls a goblin at the party");
                         }

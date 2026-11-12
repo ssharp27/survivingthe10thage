@@ -29,6 +29,14 @@ public partial class Boss : Combatant
     // party, just bigger amplitude - art swap reparents _body's replacement here
     Godot.Node2D _rig;
     float _rigT = 0.0f;
+    // ALWAYS-FACE law (user 2026-11-12 hand-play: "all enemies' art should flip/rotate to
+    // face the character at all times'): bosses ride the SAME rider canvases (authored LEFT),
+    // so the art AND its eight red rim copies mirror together. _EnterTree records the base
+    // scale + the nine copies; _Process re-applies base x mirror every frame.
+    Godot.Sprite2D _artSpr = null;
+    Godot.Sprite2D[] _rimSpr = null;
+    float _bSc = 1.0f;
+    float _bFace = 1.0f;
 
     // BOSS DANCE (user 2026-11-02, extended 2026-11-03): every boss runs this choreography,
     // not the old drift-and-ring engine. Cycle: run toward the party and settle at
@@ -107,6 +115,7 @@ public partial class Boss : Combatant
             if (texH > 0.0f)
             {
                 float sc = th / texH;
+                _bSc = sc; _rimSpr = new Godot.Sprite2D[8]; // the always-face mirror owns these per frame
                 for (int i = 0; i < 8; i++) // the RED edge highlight: 8 copies ringing behind the art at a 3 px radius (assistant pick)
                 {
                     float a = (float)(i * System.Math.PI / 4.0);
@@ -117,11 +126,13 @@ public partial class Boss : Combatant
                     rim.Scale = new Vector2(sc, sc);
                     rim.Modulate = new Color(1.0f, 0.18f, 0.18f); // red highlight (assistant pick)
                     _rig.AddChild(rim);
+                    _rimSpr[i] = rim;
                 }
                 Godot.Sprite2D art = new Godot.Sprite2D();
                 art.Texture = tex;
                 art.Name = "Art";
                 art.Scale = new Vector2(sc, sc);
+                _artSpr = art;
                 _rig.AddChild(art); // on top of the rim ring: the RED only shows as the edge halo
                 _body.Visible = false; // greybox stands only while the art is missing
             }
@@ -150,6 +161,23 @@ public partial class Boss : Combatant
             return;
         if (g.GetWorldPause())
             return; // picker / join-banner soft pause: the boss holds its volley mid-phase
+        // ALWAYS-FACE law (the Enemy.cs twin above): bosses ride the rider canvases too, authored
+        // LEFT. Art + red rim mirror together so the halo reads identical; visual only - the
+        // hitbox is the boss node.
+        if (_artSpr != null)
+        {
+            PartyMember face = g.NearestMember(GlobalPosition);
+            if (face != null)
+            {
+                float fdx = g.WrapDelta(GlobalPosition, face.GlobalPosition).X;
+                if (fdx > 4.0f || fdx < -4.0f)
+                	_bFace = fdx > 0.0f ? -1.0f : 1.0f; // ally RIGHT: mirror the left-authored canvas
+            }
+            _artSpr.Scale = new Vector2(_bSc * _bFace, _bSc);
+            if (_rimSpr != null)
+            	for (int bi = 0; bi < 8; bi++)
+            		_rimSpr[bi].Scale = new Vector2(_bSc * _bFace, _bSc); // the halo mirrors with the art
+        }
         float ratio = hp / maxHp;
         _phase = ratio > 0.66f ? 0 : (ratio > 0.33f ? 1 : 2);
         // mini slide (user 2026-10-21): the boss is a big painted miniature being
