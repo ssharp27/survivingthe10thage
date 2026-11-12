@@ -71,6 +71,18 @@ public partial class Enemy : Combatant
     private readonly float OGRE2_THROW_DMG = 6.0f; // assistant pick: impact damage on the party
     private readonly float OGRE2_THROW_CD = 4.0f;  // assistant pick: one hurl per slam cycle
     private readonly float OGRE2_THROW_SPIN = 12.0f; // assistant pick: thrown-goblin tumble rad/s (~2 turns/s): user 2026-11-12 hand-play "make the goblin spin so it's more obvious it's a projectile" - retunable
+    // GRAB-YANK (user 2026-11-12 hand-play: ogre2 "just needs a quick animation where the goblin
+    // he grabs is moved towards ogre2's hand, then is thrown at the player"): the LIFTED body
+    // walks its ART child to the hand point across the beat, and the hurl LEAVES THE HAND
+    // instead of the victim's feet. Hand radius / lift are assistant picks - retunable with
+    // the rest of the hurl knobs. The quarry is remembered by INSTANCE ID, never as a node:
+    // the kill scan QueueFrees a body that dies mid-beat (the bee-prey precedent in Game.cs),
+    // so a held node reference would dangle. The art child's POSITION is free territory - the
+    // sway rig owns _rig and always-face owns _spr.Scale - so nothing else writes it.
+    private readonly float OGRE2_HAND_R = 40.0f; // assistant pick: px the lifted goblin is held off the ogre's own centre
+    private readonly float OGRE2_HAND_LIFT = 30.0f; // assistant pick: px ABOVE that ring the lift winds up to
+    private long _grabId = -1L; // the body this lift beat owns (-1 = nothing lifted)
+    private Vector2 _grabHand = new Vector2(); // where the hand is THIS frame (world coords)
     // hurl state: lift-beat countdown + cadence clock
     float _grabT = 0.0f;
     float _throwCd = 0.0f;
@@ -191,6 +203,7 @@ public partial class Enemy : Combatant
             _body.Size = new Vector2(72.0f, 72.0f);
             _body.Position = -_body.Size * 0.5f;
             _body.Rotation = 0.785f;
+        hitR = 36.0f; // HITBOX = ART: the 72 px diamond already read as a 36 px core, so this is the same law written once
             _body.Color = new Color(0.85f, 0.12f, 0.12f);
             _rig.AddChild(_body);
             return;
@@ -210,6 +223,7 @@ public partial class Enemy : Combatant
                                                     : kind == "fastgoblin" ? new Color(0.62f, 0.72f, 0.20f) // acid-green sprinter (assistant pick)
                                                     : new Color(0.30f, 0.48f, 0.23f);
         _rig.AddChild(_body);
+    hitR = w * 0.5f; // HITBOX = ART law, greybox branch: half the placeholder while the canvas is missing
         // PAINTED CREATURE ART (user 2026-11-07 stage-1 assignments): goblin1 -> the clump
         // goblin, goblin2 -> Goblin 2, goblin3 -> Fast Goblin, hobgoblin -> Hobgoblin, all in
         // res://art/enemies/stage1/. GD.Load by path string only (same rail as the portraits);
@@ -232,18 +246,40 @@ public partial class Enemy : Combatant
                 _spr = new Godot.Sprite2D();
                 _spr.Texture = tex;
                 _spr.Name = "Art";
-                float th = (kind == "ogre" || kind == "ogre2") ? 133.0f : kind == "hobgoblin" ? 52.0f : (kind == "rider" || kind == "riderbow") ? 64.0f : ((kind == "wolf" || kind == "wolf2" || kind == "wolf3") ? 38.0f : 46.0f); // wolves ride their OWN height: the ~120x80 landscape canvases would draw ~69 px wide at the 46 px humanoid target against the 34 px body (assistant pick - retunable); riders KEEP 46: their ~120x96 mount canvases draw ~57 px wide = the same mount span the wolf art gets at 38, and the goblin shares the canvas height (pick); ogre rides BIGGER still: 72 px target on its ~94x108 canvas draws ~63 px wide = its 64 px body, the tallest creatures on the map; ogre2 rides the SAME 72 on its wider 112x108 canvas (~75 px wide, a touch over its 64 px body so the thrower reads WIDE). 2026-11-12 HAND-PLAY LAW: the ogres read SMALLER than everything, even the PCs - they must be 1.5x the player size MINIMUM, and PC art lands ~88 px on stage (canvas ~118 x miniScale 0.75), so the ogres ride 133 (ogre1 ~116 px wide on its 94x108 canvas, ogre2 ~137 px on 112x108): the biggest things on the map, hitboxes UNTOUCHED (still the 64 px body). Riders came up the user's 40% too (46 -> 64): the humanoid target lost ALL the mount detail, 64 draws the ~120x96 canvas ~80 px wide. Every height here is ONE branch number on this line - retunable
+                float th = (kind == "ogre" || kind == "ogre2") ? 133.0f : kind == "hobgoblin" ? 52.0f : kind == "rider" ? 64.0f : kind == "riderbow" ? 88.0f : ((kind == "wolf" || kind == "wolf2" || kind == "wolf3") ? 38.0f : 46.0f); // wolves ride their OWN height: the ~120x80 landscape canvases would draw ~69 px wide at the 46 px humanoid target against the 34 px body (assistant pick - retunable); riders KEEP 46: their ~120x96 mount canvases draw ~57 px wide = the same mount span the wolf art gets at 38, and the goblin shares the canvas height (pick); ogre rides BIGGER still: 72 px target on its ~94x108 canvas draws ~63 px wide = its 64 px body, the tallest creatures on the map; ogre2 rides the SAME 72 on its wider 112x108 canvas (~75 px wide, a touch over its 64 px body so the thrower reads WIDE). 2026-11-12 HAND-PLAY LAW: the ogres read SMALLER than everything, even the PCs - they must be 1.5x the player size MINIMUM, and PC art lands ~88 px on stage (canvas ~118 x miniScale 0.75), so the ogres ride 133 (ogre1 ~116 px wide on its 94x108 canvas, ogre2 ~137 px on 112x108): the biggest things on the map, hitboxes UNTOUCHED (still the 64 px body). Riders came up the user's 40% too (46 -> 64): the humanoid target lost ALL the mount detail, 64 draws the ~120x96 canvas ~80 px wide. RIDERBOW CAME UP ON ITS OWN BRANCH the same ratio the riders got (64 -> 88): the user read the archer as still small beside the mounted warrior, and its 121x98 canvas keeps more padding around the bow, so the shared humanoid target under-sold it. Every height here is ONE branch number on this line - retunable
                 float texH = (float)tex.GetHeight();
                 if (texH > 0.0f)
                 {
                     float sc = th / texH;
                     _spr.Scale = new Vector2(sc, sc);
                     _artSc = sc; // the always-face block re-applies this base with the mirror
+                    float drawnW = (float)tex.GetWidth() * sc;
+                    hitR = (drawnW > th ? drawnW : th) * 0.5f; // HITBOX = THE PAINTED CANVAS (user 2026-11-12): the radius the ART actually covers, so bolts / melee / contact all read the ogre the user sees instead of the old 20 px core. Retuning th retunes the hitbox with it - one lever, never two numbers to keep in step
                 }
                 _rig.AddChild(_spr);
                 _body.Visible = false; // greybox stands only while the art is missing
             }
         }
+    }
+    // THE LIFTED QUARRY, re-resolved every frame from the registry by INSTANCE ID: the kill
+    // scan QueueFrees a body that dies mid-beat, so holding its node across frames would
+    // dangle (the bee-prey precedent in Game.cs). A quarry that died simply stops resolving.
+    private Enemy _GrabbedVictim(Game g)
+    {
+        if (_grabId < 0L)
+        return null;
+        Godot.Collections.Array<Godot.Node2D> reg = g.GetEnemies();
+        for (int q = 0; q < reg.Count; q++)
+        {
+            Godot.Node2D n = reg[q];
+            if ((long)n.GetInstanceId() != _grabId || !(n is Enemy))
+            continue;
+            Enemy q2 = (Enemy)n;
+            if (q2.kind == "dead" || q2.hp <= 0.0f)
+            return null; // already dying: the yank has nothing left to hold
+            return q2;
+        }
+        return null;
     }
 
     public override void _Process(double d)
@@ -355,7 +391,7 @@ public partial class Enemy : Combatant
                 GlobalPosition = g.WrapNearCamera(GlobalPosition +
                                              g.WrapDelta(GlobalPosition, prey.GlobalPosition).Normalized() * spd * delta);
             PartyMember touch = g.NearestMemberAny(GlobalPosition);
-            if (touch != null && g.WrapDelta(GlobalPosition, touch.GlobalPosition).Length() < 36.0f + g.MEMBER_RADIUS
+            if (touch != null && g.WrapDelta(GlobalPosition, touch.GlobalPosition).Length() < hitR + g.MEMBER_RADIUS
                 && g.OnReaperDown(touch))
             {
                 // despawn only when a down actually landed: immune bodies let it lurk
@@ -525,7 +561,7 @@ public partial class Enemy : Combatant
                 if (dir.LengthSquared() > 0.0001f)
                     GlobalPosition += dir * moveSpd * delta; // draging maul: a dragged body shambles
                 GlobalPosition = g.WrapNearCamera(GlobalPosition); // fold instead of walls
-                if (dist < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
+                if (dist < hitR + g.MEMBER_RADIUS && _contactCd <= 0.0f)
                 {
                     _contactCd = 1.0f;
                     g.TakeHit(m, contactDamage * g.DrinkMul(this)); // Have a Drink!: burning bodies hit 10% softer
@@ -613,12 +649,35 @@ public partial class Enemy : Combatant
                 if (_grabT > 0.0f)
                 {
                     _grabT -= delta;
+                    // GRAB-YANK beat (user 2026-11-12 hand-play: "a quick animation where the goblin he grabs
+                    // is moved towards ogre2's hand, then is thrown at the player"): the lifted body's ART
+                    // child walks to the hand as the beat counts down. The NODE keeps its own lane - the
+                    // hitbox and the kill scan stay put - so this is visual only, and frac 1 lands the art
+                    // exactly ON the hand the hurl below leaves from.
+                    Enemy lift = _GrabbedVictim(g);
+                    if (lift == null)
+                    _grabId = -1L; // the quarry died mid-lift: nothing left to hold
+                    else
+                    {
+                        PartyMember prey = g.NearestMember(p);
+                        Vector2 aim = new Vector2(1.0f, 0.0f);
+                        if (prey != null)
+                        aim = g.WrapDelta(p, prey.GlobalPosition).Normalized();
+                        _grabHand = p + aim * OGRE2_HAND_R + new Vector2(0.0f, -OGRE2_HAND_LIFT); // the hand rides the aim line so the throw reads as ONE motion
+                        if (lift._spr != null)
+                        {
+                            float frac = 1.0f - _grabT / OGRE2_GRAB_TELE; // the yank tightens across the beat
+                            lift._spr.Position = g.WrapDelta(lift.GlobalPosition, _grabHand) * frac; // wrap-safe: the art walks the SHORT way to the hand
+                        }
+                    }
                     if (_grabT <= 0.0f)
                     {
-                        Enemy hurl = g.NearestTier1Victim(p, OGRE2_GRAB_R);
+                        Enemy hurl = _GrabbedVictim(g); // the body the yank already owns
+                        if (hurl == null)
+                        hurl = g.NearestTier1Victim(p, OGRE2_GRAB_R); // the lift lost its quarry: fall back to whatever is still in reach (the old law)
                         if (hurl != null)
                         {
-                            Vector2 vp = hurl.GlobalPosition; // the hurl starts where the victim stood
+                            Vector2 vp = _grabHand; // the hurl LEAVES THE HAND: the yank parked the art there, so the projectile and the art agree
                             PartyMember prey = g.NearestMember(p);
                             Vector2 aim = new Vector2(1.0f, 0.0f);
                             if (prey != null)
@@ -626,9 +685,12 @@ public partial class Enemy : Combatant
                             // consume the victim (the TEST reaper precedent above): no death cycle, no XP,
                             // no gem - the goblin leaves the field IN the ogre's hand instead
                             hurl.kind = "dead";
+                            if (hurl._spr != null)
+                            hurl._spr.Position = new Vector2(); // the yank leaves no leftover on the body the field took
                             hurl.Visible = false;
                             hurl.GlobalPosition = new Vector2(0.0f, -10000.0f);
                             g.ReleaseLiveCount(hurl); // ownership flag: the kill scan re-release is safe
+                            _grabId = -1L; // the lift is spent: nothing is held past the hurl
                             g.SpawnBulletThrown(vp, aim * OGRE2_THROW_SPD, OGRE2_THROW_DMG, OGRE2_THROW_SPIN);
                             _throwCd = OGRE2_THROW_CD;
                             GD.Print("[10thAge] (throw) ogre2 hurls a goblin at the party");
@@ -640,13 +702,16 @@ public partial class Enemy : Combatant
                 else if (_throwCd <= 0.0f && g.NearestTier1Victim(p, OGRE2_GRAB_R) != null)
                 {
                     _grabT = OGRE2_GRAB_TELE; // commit the lift; the next beat resolves the hurl
+                    Enemy lift = g.NearestTier1Victim(p, OGRE2_GRAB_R); // the body the yank owns across the beat
+                    _grabId = lift != null ? (long)lift.GetInstanceId() : -1L; // GetInstanceId is ulong: the ledger stays long, like the bee ledger
+                    _grabHand = new Vector2(); // stale hand until the first yank frame repoints it
                     GD.Print("[10thAge] (grab) ogre2 lifts a goblin: hurl winding up");
                 }
             }
             // downed bodies are still run into even though nobody chases them
             PartyMember hitAny = g.NearestMemberAny(p);
             if (hitAny != null && hitAny.downed &&
-                g.WrapDelta(p, hitAny.GlobalPosition).Length() < 8.0f + g.MEMBER_RADIUS && _contactCd <= 0.0f)
+                g.WrapDelta(p, hitAny.GlobalPosition).Length() < hitR + g.MEMBER_RADIUS && _contactCd <= 0.0f)
             {
                 _contactCd = 1.0f;
                 g.TakeHit(hitAny, contactDamage * g.DrinkMul(this)); // Have a Drink!: burning bodies hit 10% softer

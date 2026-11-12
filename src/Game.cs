@@ -4039,7 +4039,7 @@ private void UpdateSpirits(float delta)
 				continue;
 			}
 			// wrapping world: the fold-relative delta owns the distance read
-			float dist = WrapDelta(from, e.GlobalPosition).Length();
+			float dist = WrapDelta(from, e.GlobalPosition).Length() - e.hitR; // HITBOX = ART: the menu reads the drawn body, so the yank can grab a goblin whose art is in reach
 			if (dist < bestD)
 			{
 				bestD = dist;
@@ -4184,7 +4184,7 @@ private void UpdateSpirits(float delta)
 				// the arena, so the party's shooter has to be able to bite it - a bow that
 				// shrugged past a boss would be dead weight in every fight. The hit test
 				// rides the authored silhouette, not a fixed 20 px core.
-				float hitR = nc is Boss ? 8.0f + ((Boss)nc).radius : 20.0f;
+				float hitR = nc.hitR; // HITBOX = ART: Enemy.cs / Boss.cs stamp the drawn half-extent, so a bolt visibly brushing an ogre's arm BITES (an un-arted body keeps the old 20 px core, and a boss keeps its authored radius)
 				if (p.DistanceTo(n.GlobalPosition) < hitR)
 				{
 					// one bolt, one body: the FAN is the multishot, and pierce belongs to
@@ -4243,7 +4243,7 @@ private void UpdateSpirits(float delta)
 			Combatant nc = (Combatant)_enemies[i];
 			if (nc == null || nc.kind == "dead" || nc.hp <= 0.0 || nc is Boss)
 				continue; // already-dying bodies leave on their own; bosses hold their own lane
-			if (at.DistanceSquaredTo(nc.GlobalPosition) > CINDER_R * CINDER_R)
+			if (at.DistanceTo(nc.GlobalPosition) > CINDER_R + nc.hitR) // HITBOX = ART: the blast sweeps to the DRAWN edge (CINDER_R is small enough that the squared shortcut no longer pays)
 				continue; // small radius: the blast sweeps what stood beside the pyre
 			nc.TakeDamage(dmg);
 			hit++;
@@ -4512,7 +4512,7 @@ private void UpdateSpirits(float delta)
 			{
 				// a familiar bites a boss exactly like a bolt does: the beat loop cannot advance
 				// while a live boss owns the arena. The hit test rides the authored silhouette.
-				float hitR = bestC is Boss ? 16.0f + ((Boss)bestC).radius : 20.0f;
+				float hitR = bestC.hitR; // HITBOX = ART: the familiar rams the DRAWN body (bosses ride their art stamp too, so the silhouette is the same law the bolts read)
 				if (bestD <= hitR)
 				{
 					DetonateSummon(i); // it ran into a body: the fuse goes off ON contact
@@ -4557,7 +4557,7 @@ private void UpdateSpirits(float delta)
 				// the blast is a full-body sweep like the cleric's ring: damage is NOT split among
 				// whatever stands in it (user rule 2026-10-22), which is what makes a familiar
 				// worth spending on a packed horde instead of leaking damage on a lone body.
-				if (WrapDelta(p, n.GlobalPosition).Length() > r)
+				if (WrapDelta(p, n.GlobalPosition).Length() - nc.hitR > r) // HITBOX = ART: the ring bites whatever art crosses it
 					continue;
 				nc.TakeDamage(dmg);
 				TryChainLightning(n); // Baldrun seat: the blast can loose a chain per caught body

@@ -107,6 +107,11 @@ public partial class Boss : Combatant
         string artPath = (kind == "mini1" || kind == "mini2" || kind == "mini")
             ? "res://art/enemies/stage1/goblinriderarcher.png"
             : "res://art/enemies/stage1/goblinrider.png"; // boss1 / boss2 / final
+    // HITBOX = ART on the shared surface (Combatant.hitR): the boss keeps its AUTHORED
+    // contact radius below (the scene authors radius on BossMini/BossFinal), but the shot
+    // lane rides the drawn silhouette, so an arrow that visibly touches the painted boss
+    // bites it. Greybox first, art overwrites it a few lines down.
+    hitR = radius;
         Godot.Texture2D tex = GD.Load(artPath) as Godot.Texture2D;
         if (tex != null)
         {
@@ -116,6 +121,8 @@ public partial class Boss : Combatant
             {
                 float sc = th / texH;
                 _bSc = sc; _rimSpr = new Godot.Sprite2D[8]; // the always-face mirror owns these per frame
+    float drawnW = (float)tex.GetWidth() * sc;
+    hitR = (drawnW > th ? drawnW : th) * 0.5f; // the DRAWN canvas half-extent: ~54 px on the 88 px mini, so the old 8 px + radius bolt core stays honest
                 for (int i = 0; i < 8; i++) // the RED edge highlight: 8 copies ringing behind the art at a 3 px radius (assistant pick)
                 {
                     float a = (float)(i * System.Math.PI / 4.0);

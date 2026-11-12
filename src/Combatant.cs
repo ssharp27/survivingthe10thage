@@ -13,6 +13,15 @@ public partial class Combatant : Godot.Node2D
 	[Export] public string kind = "goblin";
 	public float contactDamage = 5.0f;
 	public float hurtFlash = 0.0f;
+	// HITBOX = THE ARTED SILHOUETTE (user 2026-11-12 hand-play: "the hitboxes need to be
+	// the actual enemy art - attacks are only aiming at the middle where the temp square
+	// used to be"): every hittable body carries the radius its DRAWN art covers, and the
+	// hit tests in the codebase read THIS instead of a fixed core. Enemy.cs stamps it from
+	// the canvas it loads (half the greybox while art is missing); Boss.cs stamps it from
+	// its own art. The DEFAULT keeps an unstamped body hittable at the old 20 px bolt core,
+	// so a body whose art failed to load can never become unhittable.
+	public float hitR = 20.0f;
+
 
 	// guiding light (Alvora ring vulnerability, user 2026-10-23): bodies caught by her
 	// ring take +% damage from ALL sources for a window. Lives on the SHARED surface so

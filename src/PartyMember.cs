@@ -2392,7 +2392,7 @@ public partial class PartyMember : Godot.Node2D
 
 									continue; // killed-but-unswept bodies are not valid bites (chain discipline)
 
-								if ((en.GlobalPosition - _axeFx[b2].GlobalPosition).Length() > spDisc)
+								if ((en.GlobalPosition - _axeFx[b2].GlobalPosition).Length() > spDisc + ec.hitR)
 
 									continue; // disc at the BLADE position: the hitbox the user asked for
 
@@ -2533,7 +2533,7 @@ public partial class PartyMember : Godot.Node2D
 					// prey no blade touched. Only the blade disc at this frame's art point bites (+14 px body
 					// allowance); convergence lives in _cresR (the prey's real distance) + _cresLo = 0 above.
 					Godot.Vector2 bv = wpg.WrapDelta(biteP, en.GlobalPosition); // blade -> body, wrap-short
-					if (bv.Length() > _cresBand + 14.0f)
+					if (bv.Length() > _cresBand + ec.hitR)
 						continue; // outside the drawn blade disc this frame (what is painted is what hurts)
 
 					ec.TakeDamage(_cresDmg);
@@ -2584,7 +2584,7 @@ public partial class PartyMember : Godot.Node2D
 							double catchAng = _cresA0 + ((cc % 2) == 0 ? 1.0 : -1.0) * System.Math.PI;
 							Godot.Vector2 catchP = GlobalPosition + new Godot.Vector2((float)System.Math.Cos(catchAng), (float)System.Math.Sin(catchAng)) * _cresLo;
 
-							if (wpg.WrapDelta(catchP, en.GlobalPosition).Length() > _cresBand + 14.0f)
+							if (wpg.WrapDelta(catchP, en.GlobalPosition).Length() > _cresBand + ec.hitR)
 
 								continue;
 
@@ -2927,7 +2927,7 @@ public partial class PartyMember : Godot.Node2D
 
 					continue;
 
-				if ((n.GlobalPosition - p).Length() > reach)
+				if ((n.GlobalPosition - p).Length() - nc.hitR > reach)
 
 					continue;
 
@@ -3231,11 +3231,11 @@ public partial class PartyMember : Godot.Node2D
 
 					double along = v.Dot(aim2);
 
-					if (along < 0.0 || along > (double)reach)
+					if (along < -(double)nc.hitR || along > (double)reach + nc.hitR)
 
 						continue; // outside the thrust corridor (segment p -> p + aim * reach)
 
-					if ((v - aim2 * (float)along).Length() > band2)
+					if ((v - aim2 * (float)along).Length() > band2 + nc.hitR)
 
 						continue; // clear of the blade lane
 
@@ -3319,11 +3319,11 @@ public partial class PartyMember : Godot.Node2D
 
 				double along = v.Dot(twinAim);
 
-				if (along < 0.0 || along > (double)reach)
+				if (along < -(double)nc.hitR || along > (double)reach + nc.hitR)
 
 					continue;
 
-				if ((v - twinAim * (float)along).Length() > band)
+				if ((v - twinAim * (float)along).Length() > band + nc.hitR)
 
 					continue;
 
@@ -3425,7 +3425,7 @@ public partial class PartyMember : Godot.Node2D
 
 			int crescents = 1 + axeN; // base ONE axe; extra-axes card adds crescents alternating arcs
 
-			float arcR = preyD; // user 2026-11-07 (converge-on-prey law): the loop MEETS AT THE TARGETED PREY'S SPOT - meet radius rides the prey's ACTUAL distance (the targeting logic already picked the body; reach only GATES the commit) so axes aimed at a body 30 px away meet 30 px out and boomerang home. Supersedes 2026-11-02 (c)'s FIXED-constant pick: "his axes should be able to meet at any range or else he can't actually hit anything next to him". His RAISED range (240 px + growth, Main.tscn) stays the attack gate.
+			float arcR = preyD + ((Combatant)prey).hitR; // PickPreyD answers EDGE distance now, so the CENTRE is back where the converge-on-prey law says the axes meet // user 2026-11-07 (converge-on-prey law): the loop MEETS AT THE TARGETED PREY'S SPOT - meet radius rides the prey's ACTUAL distance (the targeting logic already picked the body; reach only GATES the commit) so axes aimed at a body 30 px away meet 30 px out and boomerang home. Supersedes 2026-11-02 (c)'s FIXED-constant pick: "his axes should be able to meet at any range or else he can't actually hit anything next to him". His RAISED range (240 px + growth, Main.tscn) stays the attack gate.
 
 			float band = (float)(26.0 * (1.0 + 0.25 * (double)axeSize) * LeaderAreaMul()); // blade disc + band depth: Bruno lead widens the crescent band too
 
@@ -3641,7 +3641,7 @@ public partial class PartyMember : Godot.Node2D
 
 				Vector2 e = n.GlobalPosition - p;
 
-				if (e.Length() <= reach &&
+				if (e.Length() - nc.hitR <= reach &&
 
 					System.Math.Abs(angleDiff((float)System.Math.Atan2(e.Y, e.X), facing)) <= arcEff)
 
@@ -4010,7 +4010,7 @@ public partial class PartyMember : Godot.Node2D
 	}
 
 	// The shared prey pick. Candidates are reach-gated INSIDE so 'no prey in this mode'
-	// can fall back; PickPreyD answers the chosen body's distance (1e9f when nothing was
+	// can fall back; PickPreyD answers the chosen body's EDGE distance (1e9f when nothing was
 	// found). Flags keep each kit's old rules: wrap = torus delta (the seam-safe pair the
 	// melee kits rode), hpGate = also reject dying bodies, laneOnly = the facing-arc gate
 	// for lane weapons (bodies under 40 always count, exactly as the loop had it).
@@ -4042,7 +4042,7 @@ public partial class PartyMember : Godot.Node2D
 			if (mode == 4 && !(nc is Boss))
 				continue;
 			Vector2 v = wrap ? pg.WrapDelta(p, n.GlobalPosition) : n.GlobalPosition - p;
-			float dd = v.Length();
+			float dd = v.Length() - nc.hitR; // EDGE distance (HITBOX = ART, user 2026-11-12): reach gates the drawn silhouette, so a swing that visually overlaps an ogre targets it instead of aiming at the old core
 			if (dd > reach)
 				continue;
 			if (laneOnly && dd >= 40.0f && System.Math.Abs(angleDiff((float)System.Math.Atan2(v.Y, v.X), facing)) > arcEff)
@@ -4082,7 +4082,7 @@ public partial class PartyMember : Godot.Node2D
 				got = n;
 			}
 		}
-		PickPreyD = (got == null) ? 1e9f : gotD;
+		PickPreyD = (got == null) ? 1e9f : gotD; // answers that body's EDGE distance: every caller gates preyD > reach, so reach means "art within reach" all the way round
 		return got;
 	}
 
