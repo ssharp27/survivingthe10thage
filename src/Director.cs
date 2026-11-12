@@ -40,6 +40,16 @@ public partial class Director : Godot.Node2D
     // rule). Retunable with the rest of the tier cadence.
     const bool OGRE_AT_RUN_START = false; // user 2026-11-06 playtest: "remove the one at boot" - the forced opener is gone, the tier-4 roll owns ogre entry again
     bool _ogreAtStart = OGRE_AT_RUN_START; // consumed by the first ordinary spawn
+    // SPAWN RAMP (user 2026-11-12: "increase the enemy spawn numbers, including the maximum
+    // allowed, by 5% every minute the run is ongoing."): stepped per COMPLETED minute (1.05
+    // at min 1, 1.30 at min 6). The multiplier drives the live cap, the cadence divisor, the
+    // horde-event swarm size, and the pack units (the 2+2 rider and 3-wolf2 USER packs grow
+    // with it). Assistant-picked mapping of "numbers", retunable after hand-play.
+    private static double SpawnRamp(Game g)
+    {
+        return 1.0 + 0.05 * System.Math.Floor(System.Math.Max(0.0, g.GetRunTime()) / 60.0);
+    }
+    int _hordeEventsSeen = 0; // HORDE MIX LAW cursor: the FIRST bonus swarm stays pure tier-1 goblins (the opening rule), later swarms mix active tiers
 
     // ---------- ENEMY TEST ROOM (user 2026-11-07: "let's build the enemy test room.
     // Functionally ... spawn an enemy every 15-20 seconds ... rotate through every enemy
@@ -82,7 +92,7 @@ public partial class Director : Godot.Node2D
         // pauses hold it back), and placement lives HERE on the same edge-ray lane as ordinary
         // spawns - that is the infrastructure the user asked for to reuse hordes on other maps.
         if (g.GetHordeEventDue() > 0.0 && g.GetRunTime() >= g.GetHordeEventDue())
-            SpawnHordeEvent(g, (float)g.GetHordeScale());
+            SpawnHordeEvent(g, (float)g.GetHordeScale(), (int)g.GetHordeTier());
         _spawnTimer -= (float)d * (float)g.GetTimeWarp(); // TEST M1_TIMEWARP: cadence charges on the RUN clock so legs keep their NORMAL spawn budgets at warp speed
         if (_spawnTimer > 0.0f)
             return;
@@ -95,7 +105,8 @@ public partial class Director : Godot.Node2D
         float partyScale = (float)g.GetPartyInPlay() / 2.0f;
         // horde scale multiplies the cap too: a long-rest horde runs bigger AND denser
         float scale = (float)g.GetHordeScale();
-        if (g.GetLiveEnemies() >= (int)(MAX_LIVE * scale * partyScale))
+        float ramp = (float)SpawnRamp(g); // 2026-11-12 (user): COUNTS + the max allowed grow +5% per run minute
+        if (g.GetLiveEnemies() >= (int)(MAX_LIVE * scale * partyScale * ramp))
             return; // at cap: stop spawning, don't reset the timer either
         // the density curve ramps inside the CURRENT beat leg (len = next beat - this one),
         // so the schedule's pacing is data: move a beat's time and the ramp follows
@@ -114,7 +125,7 @@ public partial class Director : Godot.Node2D
         // the long rest's price lands here: horde scale densifies pacing AND beefs up
         // whatever the next leg spawns (Game._hordeScale -> GetHordeScale); the party
         // factor densifies pacing alongside it (solo = timer x2, 5 PCs = x0.4)
-        _spawnTimer /= (scale * partyScale);
+        _spawnTimer /= (scale * partyScale * ramp); // 2026-11-12 ramp: spawn NUMBERS charge +5%/min as well as the cap
         Vector2 near = g.GetLeader() != null ? g.GetLeader().GlobalPosition : new Vector2(0, 0);
         Spawn(g, near, scale);
     }
@@ -250,9 +261,14 @@ public partial class Director : Godot.Node2D
     private void SpawnRiderPack(Game g, Vector2 at, float hordeScale, int tier)
     {
         float bump = 1.0f; // tier-4 placeholder bump retired (real tier-4 bodies entered)
-        for (int i2 = 0; i2 < 4; i2++)
+        // 2026-11-12 SPAWN RAMP: the USER 2+2 pack unit thickens +5% per run minute;
+        // the sword/bow split stays even (assistant pick).
+        int pk = (int)(4.0 * SpawnRamp(g));
+        if (pk % 2 == 1)
+            pk += 1; // keep the sword/bow split even
+        for (int i2 = 0; i2 < pk; i2++)
         {
-            bool sword = i2 < 2;
+            bool sword = i2 < pk / 2;
             Vector2 p2 = at + new Vector2((i2 % 2) * 56.0f - 28.0f, (i2 / 2) * 56.0f - 28.0f);
             if (g.GetLeader() != null && p2.DistanceTo(g.GetLeader().GlobalPosition) < 260.0f)
                 continue; // near-party guard per body, same discipline as Spawn()
@@ -268,7 +284,7 @@ public partial class Director : Godot.Node2D
             g.RegisterEnemy(e2);
             g.AddChild(e2);
         }
-        GD.Print("[10thAge] (rider) tier-3 pack enters: 2 sword + 2 bow wolf riders on one bearing");
+        GD.Print("[10thAge] (rider) tier-3 pack enters: " + (pk / 2) + " sword + " + (pk / 2) + " bow wolf riders on one bearing");
     }
 
     private void SpawnMage(Game g, Vector2 at, float hordeScale, int tier)
@@ -296,9 +312,11 @@ public partial class Director : Godot.Node2D
     // the per-body near-party guard ride the same discipline as SpawnRiderPack.
     private void SpawnWolfPack(Game g, Vector2 at, float hordeScale)
     {
-        for (int i2 = 0; i2 < 3; i2++)
+        // 2026-11-12 SPAWN RAMP: the USER pack-of-3 unit thickens +5% per run minute (assistant mapping)
+        int pk = (int)(3.0 * SpawnRamp(g));
+        for (int i2 = 0; i2 < pk; i2++)
         {
-            Vector2 p2 = at + new Vector2((i2 - 1) * 56.0f, (i2 % 2) * 44.0f - 22.0f); // small fan (assistant pick)
+            Vector2 p2 = at + new Vector2((i2 - (pk - 1) * 0.5f) * 56.0f, (i2 % 2) * 44.0f - 22.0f); // small fan (assistant pick)
             if (g.GetLeader() != null && p2.DistanceTo(g.GetLeader().GlobalPosition) < 260.0f)
                 continue; // near-party guard per body, same discipline as Spawn()
             Enemy e2 = new Enemy();
@@ -312,7 +330,7 @@ public partial class Director : Godot.Node2D
             g.RegisterEnemy(e2);
             g.AddChild(e2);
         }
-        GD.Print("[10thAge] (wolf2) long-sight charge pack enters: 3 wolf2s on one bearing");
+        GD.Print("[10thAge] (wolf2) long-sight charge pack enters: " + pk + " wolf2s on one bearing");
     }
 
     // TIER-4 OGRE (user 2026-11-05): "big, slow, and a lot of HP". HP/speed/contact/XP are
@@ -356,13 +374,20 @@ public partial class Director : Godot.Node2D
 // fanned ~70 degrees with a staggered front row so the wave reads as a wave, not 20 bodies at
 // one pixel; they home to the squad for free (the Enemy class chases the nearest ally itself).
 // One Rng draw per event shifts the run stream downstream, like every other proc.
-    private void SpawnHordeEvent(Game g, float hordeScale)
+// HORDE MIX LAW (user 2026-11-12: "every horde spawn after the initial one can include any monsters
+// from any current active tiers"): the FIRST bonus swarm stays "just the very first goblin" (the
+// opening rule); every later swarm rolls ONE kind PER BODY across tiers 1..GetHordeTier(), pool
+// mirroring the cadence gates, each body on its ordinary stat card. Escort semantics (rider packs,
+// ogre2 escorts) do NOT chain inside a bonus wave - the swarm enters as one fanned group and
+// chained escorts would break the fan (assistant call, retunable). One Rng draw PER BODY on
+// mixed swarms shifts the run stream downstream, like every other proc.
+    private void SpawnHordeEvent(Game g, float hordeScale, int hordeTier)
     {
         // user 2026-11-06 playtest: the swarm size rides the SAME party factor the ordinary
         // cadence uses (GetPartyInPlay()/2), so a solo opener gets ~10 bodies and a 5-PC squad
         // the full 20+ - the event thickens with the party like every other spawn does.
         float partyScale = (float)g.GetPartyInPlay() / 2.0f;
-        int n = (int)(20.0f * hordeScale * partyScale);
+        int n = (int)(20.0f * hordeScale * partyScale * SpawnRamp(g)); // 2026-11-12 ramp: the bonus swarm thickens +5%/min (user rule)
         Vector2 cen = g.GetCameraCenter();
         Vector2 half = g.GetVisibleHalfExtents();
         float a0 = (float)GD.Randf() * (float)(System.Math.PI * 2.0); // random side of the frame
@@ -380,18 +405,46 @@ public partial class Director : Godot.Node2D
             if (g.GetLeader() != null && pos.DistanceTo(g.GetLeader().GlobalPosition) < 260.0f)
                 continue; // near-party guard, same discipline as Spawn()
             Enemy e = new Enemy();
-            e.kind = "goblin"; // tier-1 entry point: tier-2/3 mixes later ride g.GetHordeTier() right here
-            e.maxHp = 30.0f * hordeScale; // tier-1 goblin HP, rest chips fatten it like ordinary spawns
+            // HORDE MIX LAW: first swarm pure tier-1 goblins; later swarms roll a kind per body
+            // across the ACTIVE tiers (pool mirrors the cadence gates: mage/rider/riderbow are
+            // tier-3 creatures, wolf2 packs and the ogre family are tier-4, tier 2 adds fastgoblin/hob/wolves)
+            string k = "goblin";
+            if (_hordeEventsSeen > 0 && hordeTier > 1)
+            {
+                string[] pool;
+                if (hordeTier == 2)
+                    pool = new string[] { "goblin", "goblin2", "fastgoblin", "hobgoblin", "wolf", "wolf2", "wolf3" };
+                else if (hordeTier == 3)
+                    pool = new string[] { "goblin", "goblin2", "fastgoblin", "hobgoblin", "wolf", "wolf2", "wolf3", "rider", "riderbow", "mage" };
+                else
+                    pool = new string[] { "goblin", "goblin2", "fastgoblin", "hobgoblin", "wolf", "wolf2", "wolf3", "rider", "riderbow", "mage", "ogre", "ogre2" };
+                k = pool[(int)GD.RandRange(pool.Length - 1, 0)];
+            }
+            float hp = 30.0f, spd = 90.0f, contact = 2.0f, ranged = 0.0f, xp = 1.0f; // tier-1 goblin card (USER numbers)
+            if (k == "goblin2") { hp = 25.0f; spd = 100.0f; contact = 2.0f; }
+            else if (k == "fastgoblin") { hp = 40.0f; spd = 110.0f; contact = 3.0f; xp = 2.0f; }
+            else if (k == "hobgoblin") { hp = 60.0f; spd = 100.0f; contact = 3.0f; xp = 3.0f; }
+            else if (k == "wolf") { hp = 70.0f; spd = 120.0f; contact = 3.0f; xp = 2.0f; }
+            else if (k == "wolf2") { hp = 70.0f; spd = 120.0f; contact = 4.0f; xp = 2.0f; }
+            else if (k == "wolf3") { hp = 100.0f; spd = 100.0f; contact = 4.0f; xp = 3.0f; }
+            else if (k == "rider") { hp = 140.0f; spd = 110.0f; contact = 4.0f; xp = 5.0f; } // 2026-11-09 retuned mount card (USER)
+            else if (k == "riderbow") { hp = 80.0f; spd = 110.0f; contact = 4.0f; ranged = 3.0f; xp = 5.0f; }
+            else if (k == "mage") { hp = 40.0f; spd = 70.0f; contact = 4.0f; ranged = 6.0f; xp = 6.0f; }
+            else if (k == "ogre" || k == "ogre2") { hp = 220.0f; spd = 55.0f; contact = 4.0f; xp = 10.0f; }
+            e.kind = k; // HORDE MIX LAW body: pool-picked kind on its own card (first swarm stays pure tier-1)
+            e.maxHp = hp * hordeScale; // each body on its ordinary stat card, rest chips fatten it like ordinary spawns
             e.hp = e.maxHp;
-            e.speed = 90.0f;
-            e.contactDamage = 2.0f;
-            e.xpValue = 1.0f; // the user's "chance to gain a lot more XP": 20 clean bodies = a fat purse
+            e.speed = spd;
+            e.contactDamage = contact;
+            e.xpValue = xp; // the user's "chance to gain a lot more XP": clean bodies = a fat purse
+            e.rangedDamage = ranged; // bow riders + mages keep their ranged card inside the swarm
             e.GlobalPosition = pos;
             g.RegisterHordeBody(e); // budget-free lane: never counted, exactly like the boss nodes
             g.AddChild(e);
         }
+        _hordeEventsSeen++; // the swarm that just fired was the pure one if it was the first (mix law)
         g.AdvanceHordeSchedule();
-        GD.Print("[10thAge] (horde) bonus swarm: " + n + " goblins fan in on one bearing, budget-free (xp per body)");
+        GD.Print("[10thAge] (horde) bonus swarm: " + n + " bodies fan in on one bearing (first swarm pure goblins, later swarms mix active tiers), budget-free (xp per body)");
     }
 
     // ENEMY TEST ROOM rotation (user 2026-11-07): one body every 15-20 s (USER cadence), cycling

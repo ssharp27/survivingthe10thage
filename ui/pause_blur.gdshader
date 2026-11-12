@@ -9,8 +9,8 @@ shader_type canvas_item;
 // the screen (Godot bokeh-lite: a small poisson sample ring, cheap enough to hold
 // a full-screen blur at the pause card without any post pipeline).
 
-uniform float strength: hint_range(0.0, 1.0) = 0.55;
-uniform float radius: hint_range(0.0, 0.05) = 0.008;
+uniform float strength: hint_range(0.0, 1.0) = 0.3; // 2026-11-12 user: the pause blur hurt eyes - soft wash (assistant pick, retunable)
+uniform float radius: hint_range(0.0, 0.05) = 0.0035; // 2026-11-12: soft ring - the old 0.008 read harsh (assistant pick)
 // 4.x removed the 3.x screen_texture builtin; the hint belongs on a GLOBAL uniform
 // (seat 547 SHADER ERROR "Invalid variable type (samplers are not allowed)" - samplers
 // are not legal as local variables)
