@@ -54,7 +54,7 @@ public partial class Enemy : Combatant
     private readonly int MAGE2_SPIKES = 3; // mage2 volley count (USER number 2026-11-13: three ice spikes)
     private readonly float MAGE2_SPREAD_DEG = 14.0f; // degrees between neighbouring spikes (assistant pick - retunable)
     private readonly float MAGE2_DMG_MUL = 0.5f; // per-spike damage vs the 6 px ranged card: three SMALLER spikes ~the fireball's pressure (assistant pick)
-    private readonly float MAGE2_FIRE_MS = 0.62f; // spike scale vs the 1.04 fireball: smaller bodies until the ice FX pass lands (assistant pick)
+    private readonly float MAGE2_FIRE_MS = 0.62f; // spike scale on the ice art: 88x53 ice_spike.png -> ~55 px volley body (assistant pick, retunable)
     // TIER-4 OGRE (user 2026-11-05: this map's only tier-4 creature): big, slow, fat HP
     // (those ride the Director). The SLAM is the user lane: inside the cast ring it MARKS
     // a big circle, waits 1 s (USER number), then hits that area for 25 (USER number).
@@ -232,7 +232,7 @@ public partial class Enemy : Combatant
         // goblin, goblin2 -> Goblin 2, goblin3 -> Fast Goblin, hobgoblin -> Hobgoblin, all in
         // res://art/enemies/stage1/. GD.Load by path string only (same rail as the portraits);
         // a MISSING load keeps the greybox - the art/enemies/ tree is the user's WIP, untracked.
-        // 2026-11-13 RIG: mage -> goblinmage.png (the user's goblin-mage base art, 96x107 canvas: humanoid band so it KEEPS the 46 px default th, no new branch; the HITBOX = ART law sizes its radius off the drawn sprite automatically). goblinmage2.png rides the NEW mage2 kind (same-day follow-up: the mage's TWIN, SAME body/cadence, but it looses THREE ICE SPIKES instead of the fireball; ice FX is a LATER pass).
+        // 2026-11-13 RIG: mage -> goblinmage.png (the user's goblin-mage base art, 96x107 canvas: humanoid band so it KEEPS the 46 px default th, no new branch; the HITBOX = ART law sizes its radius off the drawn sprite automatically). goblinmage2.png rides the NEW mage2 kind (same-day follow-up: the mage's TWIN, SAME body/cadence, but it looses THREE ICE SPIKES instead of the fireball; ice FX shipped the SAME day: the volley rides art/fx/ice_spike.png).
         string artPath = kind == "goblin" ? "res://art/enemies/stage1/goblin1.png"
                        : kind == "goblin2" ? "res://art/enemies/stage1/goblin2.png"
                          : kind == "fastgoblin" ? "res://art/enemies/stage1/goblin3.png"
@@ -596,14 +596,14 @@ public partial class Enemy : Combatant
                             // three ice spikes instead of a fireball"): THREE smaller spikes fanned +/- MAGE2_SPREAD_DEG
                             // around the LIVE aim - same cadence / STAND band / stat card as the mage; per-spike
                             // MAGE2_DMG_MUL keeps the volley at the fireball's pressure; the spikes ride the fireball
-                            // lane at MAGE2_FIRE_MS scale until the ice FX pass lands - ordinary missiles, so the
+                            // lane at their OWN ice_spike.png art at MAGE2_FIRE_MS scale - ordinary missiles, so the
                             // melee trio can still shatter them
                             for (int sp = -(MAGE2_SPIKES / 2); sp <= MAGE2_SPIKES / 2; sp++)
                             {
                                 float sa = (float)sp * MAGE2_SPREAD_DEG * 0.0174532925199485f; // deg -> rad
                                 Vector2 sav = new Vector2(aim.X * (float)System.Math.Cos((double)sa) - aim.Y * (float)System.Math.Sin((double)sa),
                                                           aim.X * (float)System.Math.Sin((double)sa) + aim.Y * (float)System.Math.Cos((double)sa));
-                                g.SpawnBulletFire(GlobalPosition, sav * MAGE_FIRE_SPEED, rangedDamage * MAGE2_DMG_MUL, MAGE2_FIRE_MS);
+                                g.SpawnBulletFire(GlobalPosition, sav * MAGE_FIRE_SPEED, rangedDamage * MAGE2_DMG_MUL, MAGE2_FIRE_MS, true); // 2026-11-13 ice FX: true rides art/fx/ice_spike.png (the USER-picked slim icicle)
                             }
                         }
                         else
