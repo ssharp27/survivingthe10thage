@@ -228,6 +228,7 @@ public partial class Enemy : Combatant
         // goblin, goblin2 -> Goblin 2, goblin3 -> Fast Goblin, hobgoblin -> Hobgoblin, all in
         // res://art/enemies/stage1/. GD.Load by path string only (same rail as the portraits);
         // a MISSING load keeps the greybox - the art/enemies/ tree is the user's WIP, untracked.
+        // 2026-11-13 RIG: mage -> goblinmage.png (the user's goblin-mage base art, 96x107 canvas: humanoid band so it KEEPS the 46 px default th, no new branch; the HITBOX = ART law sizes its radius off the drawn sprite automatically). goblinmage2.png PARKED: a second mage casting different spells, design deferred (user note 2026-11-13 - another pass).
         string artPath = kind == "goblin" ? "res://art/enemies/stage1/goblin1.png"
                        : kind == "goblin2" ? "res://art/enemies/stage1/goblin2.png"
                          : kind == "fastgoblin" ? "res://art/enemies/stage1/goblin3.png"
@@ -237,7 +238,8 @@ public partial class Enemy : Combatant
                                   : kind == "wolf3" ? "res://art/enemies/stage1/wolf3.png"
                                     : kind == "rider" ? "res://art/enemies/stage1/goblinrider.png"
                                       : kind == "riderbow" ? "res://art/enemies/stage1/goblinriderarcher.png"
-                                        : kind == "ogre" ? "res://art/enemies/stage1/ogre1.png" : kind == "ogre2" ? "res://art/enemies/stage1/ogre2.png" : "";
+                                        : kind == "ogre" ? "res://art/enemies/stage1/ogre1.png" : kind == "ogre2" ? "res://art/enemies/stage1/ogre2.png"
+                                          : kind == "mage" ? "res://art/enemies/stage1/goblinmage.png" : "";
         if (artPath != "" && _spr == null)
         {
             Godot.Texture2D tex = GD.Load(artPath) as Godot.Texture2D;
