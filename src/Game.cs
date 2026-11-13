@@ -6472,7 +6472,15 @@ private void UpdateSpirits(float delta)
 		else
 			_pauseCard.Set("members", PauseCards()); // re-pull roster data on a re-open
 		_pauseCard.Show();
-		GetTree().Paused = true; // true tree pause like RunSummary/Campfire: the world freezes
+		// NESTED FIELD VISIBILITY LAW: the wash + blur ride a CHILD CanvasLayer (PauseField, layer 1)
+		// and a CanvasLayer's Show()/Hide() does NOT cascade into a nested CanvasLayer (stacking is
+		// ABSOLUTE against the viewport, not additive with the parent - same law as the pause-blur
+		// layer split). The card furniture (header/hint/grid, direct children of the root) hides fine,
+		// but the blurred field stays burnt into the background unless this node is toggled DIRECTLY.
+		// index 0 = PauseField: _build() adds it FIRST, header/hint/grid follow. The matching Hide
+		// lives in _OnPauseDismissed; this Show re-arms it on every re-open.
+		if (_pauseCard.GetChildCount() > 0)
+			((Godot.CanvasLayer)_pauseCard.GetChild(0)).Show(); // re-show the soft field on every open
 		// the pilot CLOSE valve is on the CARD (pilot_timeout export): its PROCESS_MODE_ALWAYS
 		// _process ticks during this freeze while Game._process does not (seat 545 froze at
 		// beat 1 with the valve here); 0.0 on a human seat = the card only closes on ESC
@@ -6496,7 +6504,14 @@ private void UpdateSpirits(float delta)
 	private void _OnPauseDismissed()
 	{
 		if (_pauseCard != null)
+		{
 			_pauseCard.Hide();
+			// NESTED FIELD VISIBILITY LAW (see the matching Show in ShowPauseCard): the wash + blur
+			// ride the CHILD CanvasLayer PauseField (index 0, layer 1); the root Hide() does NOT reach
+			// a nested CanvasLayer, so the soft field stays burnt in until this node hides it directly.
+			if (_pauseCard.GetChildCount() > 0)
+				((Godot.CanvasLayer)_pauseCard.GetChild(0)).Hide(); // the arena snaps back crisp the moment the card dismisses
+		}
 		GetTree().Paused = false;
 		_pauseJustClosed = true; // the card ate the SAME ESC press: eat one frame, no reopen
 		GD.Print("[10thAge] pause: card dismissed - the beat resumes");
