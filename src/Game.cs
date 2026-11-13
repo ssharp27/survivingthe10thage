@@ -479,6 +479,24 @@ public partial class Game : Godot.Node2D
 	// (anchors 0,0-1,1 resolve against the root viewport) - the window measurement
 	Godot.Control _winProbe = null;
 	Godot.Collections.Array<Godot.ColorRect> _floorPatches = new();
+	// STAGE-1 GROUND BAKE (user 2026-11-13 hand delivery: 3 tile chunks + 3 tree props in
+	// art/stages/stage1). The assistant feather-blended the chunks into ONE seamless field.
+	// The killed tile-floor experiment drove its pattern with texture_offset, which read
+	// FROZEN in hand-play (the setter never visibly moved the bake) - so this bake rides
+	// the world differently: full-size Sprite2D copies on a lattice of the bake period,
+	// period READ from the texture at load time. The pattern at world point P is always
+	// bake(P), so the ground is continuous over the whole infinite world: a seam jump
+	// cannot pop, and only proven primitives are involved (sprite + position). Overlapping
+	// copies draw identical pixels where they overlap, so they can never disagree.
+	Godot.Texture2D _bakeTex = null;
+	double _bakeW = 0.0; // bake period in world px (1 bake px = 1 world px)
+	double _bakeH = 0.0;
+	// lattice copies near the camera; unused slots park far off-screen (position only:
+	// hiding via a Set() call was never proven, moving always was)
+	Godot.Collections.Array<Godot.Sprite2D> _bakeCopies = new();
+	// user's cut-out tree props: decor-only (NO collision - the party strolls behind
+	// them like the old patches), folded every frame like every other entity
+	Godot.Collections.Array<Godot.Sprite2D> _treeProps = new();
 	Godot.Collections.Array<Godot.Node2D> _bullets = new();
 	Godot.Collections.Array<Vector2> _bulletVel = new();
 	Godot.Collections.Array<double> _bulletDmg = new();
@@ -1970,6 +1988,38 @@ public void RegisterEnemy(Combatant e)
 				 (int)(_visHalf.Y * 2.0f) + " world px | wrap period " + (int)_wrapW + "x" + (int)_wrapH);
 	}
 
+	// bake lattice: copy cell k paints bake(P - k*period); a seamless bake agrees across
+	// its own edge, so the ground covers the whole infinite world CONTINUOUSLY and never
+	// folds - a seam jump cannot pop. This every-frame call only re-picks the period-cells
+	// the frame straddles; unused pool slots park far off-screen (position only: proven
+	// setter, no hidden/visible API). Unlike the killed tile-floor experiment, nothing
+	// here relies on the texture_offset setter, which never visibly moved.
+	private void PlaceBakeCopies()
+	{
+		if (_bakeTex == null || _bakeCopies.Count == 0)
+		return;
+		Vector2 cen = GetCameraCenter();
+		// 240 px slack past the measured frame keeps ground ready under fold margins
+		int kx0 = (int)System.Math.Floor((cen.X - _visHalf.X - 240.0f) / (float)_bakeW);
+		int kx1 = (int)System.Math.Floor((cen.X + _visHalf.X + 240.0f) / (float)_bakeW);
+		int ky0 = (int)System.Math.Floor((cen.Y - _visHalf.Y - 240.0f) / (float)_bakeH);
+		int ky1 = (int)System.Math.Floor((cen.Y + _visHalf.Y + 240.0f) / (float)_bakeH);
+		int idx = 0;
+		for (int ky = ky0; ky <= ky1; ky++)
+		{
+			for (int kx = kx0; kx <= kx1; kx++)
+			{
+				if (idx >= _bakeCopies.Count) break; // pool exhausted: pathological tiny bake
+				Godot.Sprite2D cp = _bakeCopies[idx];
+				// CENTER pivot: the cell-k copy spans [k*period,(k+1)*period], centered (k+0.5)*period
+				cp.GlobalPosition = new Vector2((float)((kx + 0.5) * _bakeW), (float)((ky + 0.5) * _bakeH));
+				idx += 1;
+			}
+		}
+		// park the unused tail far from any camera: the bake could never reach 1e6 px
+		for (int pi = idx; pi < _bakeCopies.Count; pi++) _bakeCopies[pi].GlobalPosition = new Vector2(1000000.0f, 1000000.0f);
+	}
+
 	// re-scatter the motion-cue patches over the (possibly grown) wrap period
 	private void RescatterFloorPatches()
 	{
@@ -2202,6 +2252,30 @@ public void RegisterEnemy(Combatant e)
 		AddChild(floor);
 		_floorRect = floor; // rides the camera every frame: the looping world has no
 							// edge, so the plain ground just keeps covering the frame
+		// STAGE-1 GROUND BAKE: load the feather-blended field and lay its lattice. If the
+		// png is missing/unimported the run falls back to the flat rect + patch scatter, so
+		// a broken art drop can never crash a seat.
+		_bakeTex = GD.Load("res://art/stages/stage1/ground_bake.png") as Godot.Texture2D;
+		if (_bakeTex != null)
+		{
+			_bakeW = (double)_bakeTex.GetWidth();
+			_bakeH = (double)_bakeTex.GetHeight();
+			// worst case one copy per period-cell the frame straddles (2 per axis at this
+			// bake size) + slack; PlaceBakeCopies parks whatever the frame does not need
+			for (int ci = 0; ci < 9; ci++)
+			{
+				Godot.Sprite2D cp = new Sprite2D();
+				// 1 bake px = 1 world px: the art stays at its authored stage scale (the
+				// one-number knob the user retunes by eye after hand-play)
+				cp.Texture = _bakeTex;
+				cp.ZIndex = -19; // over the flat rect (-20), under props, patches, entities
+				AddChild(cp);
+				_bakeCopies.Add(cp);
+			}
+			PlaceBakeCopies();
+			GD.Print("[10thAge] stage-1 bake up: " + (int)_bakeW + "x" + (int)_bakeH +
+				" px seamless field | lattice rides the camera, offset never used");
+		}
 		// scattered floor patches = motion reference. the camera keeps the leader centered,
 		// so a single-color floor made movement LOOK frozen even when input worked
 		Rng = new Godot.RandomNumberGenerator();
@@ -2219,7 +2293,9 @@ public void RegisterEnemy(Combatant e)
 
 		// patch DENSITY is kept constant to the measured period, so big windows keep the
 		// same motion cues per screen area
-		int patchCount = (int)(60.0 * _wrapW * _wrapH / (2400.0 * 1800.0));
+		// the bake IS the motion cue once it loads (it scrolls with the pin AND loops), so
+		// the patch scatter is only the no-bake fallback
+		int patchCount = (_bakeTex != null) ? 0 : (int)(60.0 * _wrapW * _wrapH / (2400.0 * 1800.0));
 		if (patchCount > 400)
 			patchCount = 400;
 		for (int i = 0; i < patchCount; i++)
@@ -2234,6 +2310,55 @@ public void RegisterEnemy(Combatant e)
 			AddChild(p);
 			_floorPatches.Add(p); // folded per frame like every other entity: the ground
 								  // cover scrolls AND loops, so the wrap reads seamless
+		}
+		// STAGE-1 TREE PROPS (same hand delivery): the user's trees flood-cut to alpha.
+		// Jittered grid keeps density period-constant (the patch density law), FOOT anchor
+		// keeps the trunk planted when the fold moves the sprite, and decor z (-14) keeps
+		// them above the bake (-19) but below every entity.
+		if (_bakeTex != null)
+		{
+			// ~10 props per the default 2400x1800 wrap (assistant pick; user retunes by eye
+			// once hand-played); load failures drop quietly, broken art cannot crash a seat
+			int treeCount = (int)(10.0 * _wrapW * _wrapH / (2400.0 * 1800.0));
+			if (treeCount > 60) treeCount = 60;
+			Godot.Collections.Array<Godot.Texture2D> treeTex = new Godot.Collections.Array<Godot.Texture2D>();
+			Godot.Texture2D tr2 = GD.Load("res://art/stages/stage1/props/tree2_cut.png") as Godot.Texture2D;
+			Godot.Texture2D tr3 = GD.Load("res://art/stages/stage1/props/tree3_cut.png") as Godot.Texture2D;
+			Godot.Texture2D tr4 = GD.Load("res://art/stages/stage1/props/tree4_cut.png") as Godot.Texture2D;
+			if (tr2 != null) treeTex.Add(tr2);
+			if (tr3 != null) treeTex.Add(tr3);
+			if (tr4 != null) treeTex.Add(tr4);
+			if (treeTex.Count > 0 && treeCount > 0)
+			{
+				int cols = (int)System.Math.Sqrt((double)treeCount) + 1;
+				int rows = (treeCount + cols - 1) / cols;
+				double cellW = _wrapW / (double)cols;
+				double cellH = _wrapH / (double)rows;
+				int placed = 0;
+				// jittered grid cells over the wrap box (half-cell jitter: no rows, no clumps)
+				for (int ry = 0; ry < rows; ry++)
+				{
+					for (int cx = 0; cx < cols && placed < treeCount; cx++)
+					{
+						double fx = (cx + 0.5 + (double)Rng.Randf() - 0.5) * cellW;
+						double fy = (ry + 0.5 + (double)Rng.Randf() - 0.5) * cellH;
+						Godot.Texture2D tex = treeTex[placed % treeTex.Count];
+						// target trunk-to-crown height 240-430 world px (assistant pick)
+						double ts = (float)(240.0 + (double)Rng.Randf() * 190.0) / (double)tex.GetHeight();
+						Godot.Sprite2D sp = new Sprite2D();
+						sp.Texture = tex;
+						sp.Scale = new Vector2((float)ts, (float)ts);
+						sp.ZIndex = -14;
+						// Sprite2D pivots CENTER: lift half the scaled height so the written spot
+						// is the FOOT (trunk base), which is what the fold then plants
+						sp.Position = new Vector2((float)(fx - _wrapW * 0.5), (float)(fy - _wrapH * 0.5) - (float)tex.GetHeight() * (float)ts * 0.5f);
+						AddChild(sp);
+						_treeProps.Add(sp);
+						placed += 1;
+					}
+				}
+				GD.Print("[10thAge] stage-1 props: " + treeTex.Count + " tree kinds, " + _treeProps.Count + " planted over the wrap (decor, no collision)");
+			}
 		}
 		// ENEMY TEST ROOM: the training ring's floor READ lives in BuildTrainingRing() below, so
 		// the stage-select card can arm it AFTER a pick lands on the room. Arming here still covers
@@ -3039,6 +3164,11 @@ public void RegisterEnemy(Combatant e)
 			_floorRect.GlobalPosition = GetCameraCenter() - _floorRect.Size * 0.5f;
 		for (int fp = 0; fp < _floorPatches.Count; fp++)
 			_floorPatches[fp].GlobalPosition = WrapNearCamera(_floorPatches[fp].GlobalPosition);
+		// STAGE-1 bake lattice re-picks its cells around the camera every frame (the
+		// ground itself never folds), and the tree props fold like every other entity
+		PlaceBakeCopies();
+		for (int tp = 0; tp < _treeProps.Count; tp++) _treeProps[tp].GlobalPosition = WrapNearCamera(_treeProps[tp].GlobalPosition);
+
 		// recruit arrow: rides above the Leader and points at the stranded PC. Pure
 		// guidance - the user asked for "an arrow pointing to their location (HELP!)".
 		// both the arrow and the HELP! label now track the RECRUIT'S FOLDED position,
