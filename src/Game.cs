@@ -1311,6 +1311,11 @@ public partial class Game : Godot.Node2D
 
 	public void SpawnBulletFire(Vector2 pos, Vector2 vel, double dmg)
 		{
+		SpawnBulletFire(pos, vel, dmg, 1.04f); // 2026-11-13 legacy 3-arg rail: the 1.04 fireball scale stays the DEFAULT
+		}
+
+	public void SpawnBulletFire(Vector2 pos, Vector2 vel, double dmg, float msIn) // 2026-11-13 overload: mage2's THREE ICE SPIKES ride the SAME lane at a SMALLER scale (ice FX lands in a later pass); ordinary missiles stay shatterable
+		{
 		// same bullet pool; the mage fireball rides Stack's firebolt FX scaled UP
 		// (user 2026-11-03 tier-3 ask: "you can use a large version of the existing fire
 		// bolt FX"). No art on disk = fat orange square, same honest-fallback discipline
@@ -1340,7 +1345,7 @@ public partial class Game : Godot.Node2D
 		if (mfx != null)
 		{
 			fxs.Texture = mfx;
-			float ms = _fxMageTex != null ? 1.04f : 2.4f; // 2026-11-09 hand-play (user: "when goblin mages fire their fireball, it needs to be just a little bit smaller"): 1.5 drew the 40x15 art at 60x22 px, now 52x20 px; 2026-11-12 hand-play: still a touch big, 20% off = 1.04 (~42x16). Assistant knob - retunable
+			float ms = _fxMageTex != null ? msIn : 2.4f; // 2026-11-13: msIn owns the scale (mage2 spikes ride MAGE2_FIRE_MS 0.62); fallback stays the fat firebolt read // 2026-11-09 hand-play (user: "when goblin mages fire their fireball, it needs to be just a little bit smaller"): 1.5 drew the 40x15 art at 60x22 px, now 52x20 px; 2026-11-12 hand-play: still a touch big, 20% off = 1.04 (~42x16). Assistant knob - retunable
 			fxs.Scale = new Vector2(ms, ms);
 			fxs.Modulate = _fxMageTex != null ? new Color(1.0f, 1.0f, 1.0f, 1.0f) : new Color(0.70f, 0.15f, 0.11f, 1.0f); // new art carries its own hues; fallback keeps the dark-red ENEMY read
 			fxs.Rotation = (float)System.Math.Atan2((double)vel.Y, (double)vel.X); // 2026-11-09 hand-play (user: "the FX needs to rotate so it fires pointed at the players. Currently it's just static facing right"): measured, art/fx/mage_fireball.png IS authored head-forward - the 40x15 canvas tapers to a 1 px tail at x=0 and its 15 px head mass sits at x=26-34 - so riding the travel vector aims the head at the party, the same rail the arrow lane already uses

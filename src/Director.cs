@@ -18,6 +18,7 @@ public partial class Director : Godot.Node2D
         // TIER-3 spawn cadence (user 2026-11-03 creatures): assistant-picked knobs, tune after playtest.
         const float RIDER_PACK_CH = 0.05f; // per-spawn-roll chance a sword/bow pack enters on a tier-3+ leg (assistant pick: 0.16 TPKed Bruno, 0.08 still bled; retunable post-playtest)
         int _hobsSinceMage = 0; // USER RULE: one mage per two hobgoblin spawns
+        const float MAGE2_CH = 0.5f; // 2026-11-13: chance each mage entry becomes the mage2 ICE-SPIKE twin (the user asked to DUPLICATE the mage - 50/50 is the assistant pick, retunable)
         // TIER-4 OGRE (user 2026-11-05: this map's only tier-4 creature): per-spawn-roll
         // chance an ogre lumbers in on a tier-4+ leg. Budgeted ORDINARY spawn like the
         // rider rolls, so the cap binds it. Assistant-picked cadence knob.
@@ -72,7 +73,7 @@ public partial class Director : Godot.Node2D
     // body vs cap 40: the cap never binds here).
     float _testTimer = 2.0f; // first body lands ~2 s in so the room reads alive immediately
     int _testIdx = 0;        // rotation cursor: one cycle = the whole stage-1 ladder
-    static readonly string[] TEST_KINDS = { "goblin", "goblin2", "wolf", "fastgoblin", "hobgoblin", "rider", "riderbow", "mage", "ogre", "ogre2" }; // every stage-1 body: the two rider kinds and the mage ride as LONE test bodies (no packs) so each AI lane gets a clean turn
+    static readonly string[] TEST_KINDS = { "goblin", "goblin2", "wolf", "fastgoblin", "hobgoblin", "rider", "riderbow", "mage", "mage2", "ogre", "ogre2" }; // every stage-1 body: the two rider kinds and the mage ride as LONE test bodies (no packs) so each AI lane gets a clean turn
     const float TEST_EVERY_LO = 15.0f; // USER cadence: "every 15-20 seconds"
     const float TEST_EVERY_HI = 20.0f;
 
@@ -301,7 +302,7 @@ public partial class Director : Godot.Node2D
         if (g.GetLeader() != null && p2.DistanceTo(g.GetLeader().GlobalPosition) < 260.0f)
             return; // near-party guard
         Enemy e2 = new Enemy();
-        e2.kind = "mage";
+        e2.kind = (float)GD.Randf() < MAGE2_CH ? "mage2" : "mage"; // 2026-11-13: each mage entry FLIPS the twin; one Rng draw per ENTRY shifts the run stream downstream, like every other proc
         float bump = 1.0f; // tier-4 placeholder bump retired (real tier-4 bodies entered)
         e2.maxHp = 40.0f * hordeScale * bump; // USER number
         e2.hp = e2.maxHp;
@@ -312,7 +313,7 @@ public partial class Director : Godot.Node2D
         e2.GlobalPosition = p2;
         g.RegisterEnemy(e2);
         g.AddChild(e2);
-        GD.Print("[10thAge] (mage) goblin mage slips in after the second hobgoblin");
+        GD.Print("[10thAge] (mage) " + e2.kind + " slips in after the second hobgoblin (mage2 looses three ice spikes)");
     }
 
     // WOLF-2 PACK (user 2026-11-09): "have these spawn in packs of 3 when they do spawn"
@@ -441,7 +442,7 @@ public partial class Director : Godot.Node2D
             else if (k == "wolf3") { hp = 100.0f; spd = 100.0f; contact = 4.0f; xp = 3.0f; }
             else if (k == "rider") { hp = 140.0f; spd = 110.0f; contact = 4.0f; xp = 5.0f; } // 2026-11-09 retuned mount card (USER)
             else if (k == "riderbow") { hp = 80.0f; spd = 110.0f; contact = 4.0f; ranged = 3.0f; xp = 5.0f; }
-            else if (k == "mage") { hp = 40.0f; spd = 70.0f; contact = 4.0f; ranged = 6.0f; xp = 6.0f; }
+            else if (k == "mage" || k == "mage2") { hp = 40.0f; spd = 70.0f; contact = 4.0f; ranged = 6.0f; xp = 6.0f; }
             else if (k == "ogre" || k == "ogre2") { hp = 220.0f; spd = 55.0f; contact = 4.0f; xp = 10.0f; }
             e.kind = k; // HORDE MIX LAW body: pool-picked kind on its own card (first swarm stays pure tier-1)
             e.maxHp = hp * hordeScale; // each body on its ordinary stat card, rest chips fatten it like ordinary spawns
@@ -502,7 +503,7 @@ public partial class Director : Godot.Node2D
         else if (kind == "hobgoblin") { hp = 60.0f; spd = 100.0f; contact = 3.0f; xp = 3.0f; }
         else if (kind == "rider") { hp = 100.0f; spd = 110.0f; contact = 4.0f; xp = 5.0f; }
         else if (kind == "riderbow") { hp = 60.0f; spd = 110.0f; contact = 4.0f; ranged = 3.0f; xp = 5.0f; }
-        else if (kind == "mage") { hp = 40.0f; spd = 70.0f; contact = 4.0f; ranged = 6.0f; xp = 6.0f; }
+        else if (kind == "mage" || kind == "mage2") { hp = 40.0f; spd = 70.0f; contact = 4.0f; ranged = 6.0f; xp = 6.0f; }
         else if (kind == "ogre") { hp = 220.0f; spd = 55.0f; contact = 4.0f; xp = 10.0f; }
         else if (kind == "ogre2") { hp = 220.0f; spd = 55.0f; contact = 4.0f; xp = 10.0f; } // SAME card as the ogre (USER)
         e.maxHp = hp * hordeScale;

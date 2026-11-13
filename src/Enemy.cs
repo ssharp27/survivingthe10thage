@@ -51,6 +51,10 @@ public partial class Enemy : Combatant
     private readonly float MAGE_FIRE_SPEED = 130.0f; // "slow moving fireball" - px/s is assistant pick
     private readonly float MAGE_SHOT_RANGE = 520.0f; // user 2026-11-06 playtest: ONLY one mage shot in a whole run. The lane holds the STAND band, but a mage walks 70 px/s and a kiting party walks 128 px/s, so the ring slips out from under it and the old 420 px gate went cold - 520 px keeps the band honest to the fireball it still throws
     private readonly float MAGE_SHOT_EVERY = 4.0f; // user 2026-11-06 playtest: 6 s read as "one mage shot a run"; 4 s is the cadence the user asked for, and the retune note above still applies (watch the Bruno seat)
+    private readonly int MAGE2_SPIKES = 3; // mage2 volley count (USER number 2026-11-13: three ice spikes)
+    private readonly float MAGE2_SPREAD_DEG = 14.0f; // degrees between neighbouring spikes (assistant pick - retunable)
+    private readonly float MAGE2_DMG_MUL = 0.5f; // per-spike damage vs the 6 px ranged card: three SMALLER spikes ~the fireball's pressure (assistant pick)
+    private readonly float MAGE2_FIRE_MS = 0.62f; // spike scale vs the 1.04 fireball: smaller bodies until the ice FX pass lands (assistant pick)
     // TIER-4 OGRE (user 2026-11-05: this map's only tier-4 creature): big, slow, fat HP
     // (those ride the Director). The SLAM is the user lane: inside the cast ring it MARKS
     // a big circle, waits 1 s (USER number), then hits that area for 25 (USER number).
@@ -171,7 +175,7 @@ public partial class Enemy : Combatant
             _lastMovePos = GlobalPosition; // the odometer starts at the spawn, not at the origin
             _movePrimed = true;
         }
-        _shotCd = kind == "riderbow" ? RIDER_SHOT_EVERY : (kind == "mage" ? 2.0f : 0.0f); // user 2026-11-06: fresh mage looses its first ball after 2 s, not a full 4 s cycle - the volley lands while the party is still untangling the new pack
+        _shotCd = kind == "riderbow" ? RIDER_SHOT_EVERY : (kind == "mage" || kind == "mage2" ? 2.0f : 0.0f); // user 2026-11-06: fresh mage looses its first ball after 2 s, not a full 4 s cycle - the volley lands while the party is still untangling the new pack
         _firedShot = false; // fx-feel10: audit flag lands when the shot clock does
         _shotsLoosed = 0; // 2026-11-06: volley counter lands with the clock
         if (kind == "ogre" || kind == "ogre2")
@@ -217,7 +221,7 @@ public partial class Enemy : Combatant
                               : kind == "hobgoblin" ? new Color(0.13f, 0.26f, 0.12f)
                                                     : kind == "rider" ? new Color(0.45f, 0.34f, 0.28f) // dusty mount (assistant pick)
                                                     : kind == "riderbow" ? new Color(0.38f, 0.36f, 0.47f) // steel-tinted saddle (assistant pick)
-                                                    : kind == "mage" ? new Color(0.42f, 0.22f, 0.55f) // robe violet (assistant pick)
+                                                    : (kind == "mage" || kind == "mage2") ? new Color(0.42f, 0.22f, 0.55f) // robe violet, both mages (assistant pick)
                                                     : (kind == "ogre" || kind == "ogre2") ? new Color(0.35f, 0.34f, 0.30f) // bog-brown brute (assistant pick)
                                                     : kind == "goblin2" ? new Color(0.18f, 0.44f, 0.40f) // teal dune clump variant (assistant pick)
                                                     : kind == "fastgoblin" ? new Color(0.62f, 0.72f, 0.20f) // acid-green sprinter (assistant pick)
@@ -228,7 +232,7 @@ public partial class Enemy : Combatant
         // goblin, goblin2 -> Goblin 2, goblin3 -> Fast Goblin, hobgoblin -> Hobgoblin, all in
         // res://art/enemies/stage1/. GD.Load by path string only (same rail as the portraits);
         // a MISSING load keeps the greybox - the art/enemies/ tree is the user's WIP, untracked.
-        // 2026-11-13 RIG: mage -> goblinmage.png (the user's goblin-mage base art, 96x107 canvas: humanoid band so it KEEPS the 46 px default th, no new branch; the HITBOX = ART law sizes its radius off the drawn sprite automatically). goblinmage2.png PARKED: a second mage casting different spells, design deferred (user note 2026-11-13 - another pass).
+        // 2026-11-13 RIG: mage -> goblinmage.png (the user's goblin-mage base art, 96x107 canvas: humanoid band so it KEEPS the 46 px default th, no new branch; the HITBOX = ART law sizes its radius off the drawn sprite automatically). goblinmage2.png rides the NEW mage2 kind (same-day follow-up: the mage's TWIN, SAME body/cadence, but it looses THREE ICE SPIKES instead of the fireball; ice FX is a LATER pass).
         string artPath = kind == "goblin" ? "res://art/enemies/stage1/goblin1.png"
                        : kind == "goblin2" ? "res://art/enemies/stage1/goblin2.png"
                          : kind == "fastgoblin" ? "res://art/enemies/stage1/goblin3.png"
@@ -239,7 +243,8 @@ public partial class Enemy : Combatant
                                     : kind == "rider" ? "res://art/enemies/stage1/goblinrider.png"
                                       : kind == "riderbow" ? "res://art/enemies/stage1/goblinriderarcher.png"
                                         : kind == "ogre" ? "res://art/enemies/stage1/ogre1.png" : kind == "ogre2" ? "res://art/enemies/stage1/ogre2.png"
-                                          : kind == "mage" ? "res://art/enemies/stage1/goblinmage.png" : "";
+                                          : kind == "mage" ? "res://art/enemies/stage1/goblinmage.png"
+                                            : kind == "mage2" ? "res://art/enemies/stage1/goblinmage2.png" : "";
         if (artPath != "" && _spr == null)
         {
             Godot.Texture2D tex = GD.Load(artPath) as Godot.Texture2D;
@@ -469,7 +474,7 @@ public partial class Enemy : Combatant
                     else
                         dir = to.Normalized();
                 }
-                else if (kind == "mage")
+                else if (kind == "mage" || kind == "mage2") // mage2 SHARES the stand-band lane (user 2026-11-13: "pretty much the same as the first goblin mage")
                 {
                     // GOBLIN MAGE (user 2026-11-04: "move close enough to cast their attack, then
                     // try to slowly run away"; user 2026-11-06 playtest: "they move close, stand
@@ -570,7 +575,7 @@ public partial class Enemy : Combatant
                 }
                 // TIER-3 ranged lanes fire on their own cadence (rider: USER 3 s; mage: assistant
                 // pick). Aiming rides the LIVE squad position, same discipline as the mini fans.
-                if ((kind == "riderbow" || kind == "mage") && m != null)
+                if ((kind == "riderbow" || kind == "mage" || kind == "mage2") && m != null)
                 {
                     _shotCd -= delta;
                     bool inReach = kind == "riderbow" ? dist <= RIDER_SHOT_RANGE : dist <= MAGE_SHOT_RANGE;
@@ -578,13 +583,29 @@ public partial class Enemy : Combatant
                     {
                         _shotCd = kind == "riderbow" ? RIDER_SHOT_EVERY : MAGE_SHOT_EVERY;
                         _shotsLoosed++; // 2026-11-06 repeat-fire audit: count this body's volleys
-                        if (_shotsLoosed % 3 == 1 && (kind == "mage" || kind == "riderbow"))
+                        if (_shotsLoosed % 3 == 1 && (kind == "mage" || kind == "mage2" || kind == "riderbow"))
                             // prints volley 1/4/7/... per body: a body that only ever fires once
                             // prints ONCE; a body running its cadence prints every 3rd ball
                             GD.Print("[10thAge] (shot+) " + kind + " loosed volley " + _shotsLoosed);
                         Vector2 aim = g.WrapDelta(GlobalPosition, m.GlobalPosition).Normalized();
                         if (kind == "riderbow")
                             g.SpawnBulletArrow(GlobalPosition, aim * RIDER_ARROW_SPEED, rangedDamage, true); // user 2026-11-06: rider arrows ride the RED-OUTLINE variant so the volley reads as an enemy projectile at a glance
+                        else if (kind == "mage2")
+                        {
+                            // ICE-SPIKE VOLLEY (user 2026-11-13: mage2 is the mage's twin but "fire out
+                            // three ice spikes instead of a fireball"): THREE smaller spikes fanned +/- MAGE2_SPREAD_DEG
+                            // around the LIVE aim - same cadence / STAND band / stat card as the mage; per-spike
+                            // MAGE2_DMG_MUL keeps the volley at the fireball's pressure; the spikes ride the fireball
+                            // lane at MAGE2_FIRE_MS scale until the ice FX pass lands - ordinary missiles, so the
+                            // melee trio can still shatter them
+                            for (int sp = -(MAGE2_SPIKES / 2); sp <= MAGE2_SPIKES / 2; sp++)
+                            {
+                                float sa = (float)sp * MAGE2_SPREAD_DEG * 0.0174532925199485f; // deg -> rad
+                                Vector2 sav = new Vector2(aim.X * (float)System.Math.Cos((double)sa) - aim.Y * (float)System.Math.Sin((double)sa),
+                                                          aim.X * (float)System.Math.Sin((double)sa) + aim.Y * (float)System.Math.Cos((double)sa));
+                                g.SpawnBulletFire(GlobalPosition, sav * MAGE_FIRE_SPEED, rangedDamage * MAGE2_DMG_MUL, MAGE2_FIRE_MS);
+                            }
+                        }
                         else
                             g.SpawnBulletFire(GlobalPosition, aim * MAGE_FIRE_SPEED, rangedDamage);
 
@@ -592,7 +613,7 @@ public partial class Enemy : Combatant
                         {
                             // fx-feel10 bench evidence: first loose prints once per ranged body
                             _firedShot = true;
-                            GD.Print("[10thAge] (shot) " + kind + " loosed its first " + (kind == "mage" ? "fireball" : "arrow"));
+                            GD.Print("[10thAge] (shot) " + kind + " loosed its first " + (kind == "mage" ? "fireball" : kind == "mage2" ? "ice spikes" : "arrow"));
                         }
                     }
                 }
