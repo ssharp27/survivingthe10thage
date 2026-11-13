@@ -479,18 +479,6 @@ public partial class Game : Godot.Node2D
 	// (anchors 0,0-1,1 resolve against the root viewport) - the window measurement
 	Godot.Control _winProbe = null;
 	Godot.Collections.Array<Godot.ColorRect> _floorPatches = new();
-	// STAGE TILE-FLOOR (user 2026-11-13: stage-1 tileset sheets, wants BOTH A/B in-game to
-	// compare which reads better): the baked 512px ground field (32px tiles from the sheet)
-	// rides the SAME camera pin as the flat rect; texture_offset keeps its lattice world-
-	// anchored so a wrap jump never pops the tiling; M1_STAGE_TILES=B boots sheet B and a
-	// physical-T dev key flips sets mid-run. Props stay unwired art this pass (decor later).
-	Godot.TextureRect _floorTex = null;
-	string _tilesSet = "A"; // live sheet set: A (the user's on-tav pick) or B
-	bool _tilesOn = false; // true only when the bake actually loaded
-	// physical-T latch: a held key flips ONCE, not every frame
-	bool _tilesKeyHeld = false;
-	// px period of the baked ground field (16x16 tiles @32)
-	const int TILES_BAKE = 512;
 	Godot.Collections.Array<Godot.Node2D> _bullets = new();
 	Godot.Collections.Array<Vector2> _bulletVel = new();
 	Godot.Collections.Array<double> _bulletDmg = new();
@@ -1977,9 +1965,6 @@ public void RegisterEnemy(Combatant e)
 			// a NO-OP for translation - global_position setter just writes position.
 			// The pin below therefore pins TOP-LEFT = camera - size/2.
 		}
-		// STAGE TILE-FLOOR follows a wrap re-measure just like the flat rect
-		if (_floorTex != null)
-			_floorTex.Size = new Vector2((float)_wrapW, (float)_wrapH);
 		RescatterFloorPatches();
 		GD.Print("[10thAge] window measured: frame " + (int)(_visHalf.X * 2.0f) + "x" +
 				 (int)(_visHalf.Y * 2.0f) + " world px | wrap period " + (int)_wrapW + "x" + (int)_wrapH);
@@ -2217,32 +2202,6 @@ public void RegisterEnemy(Combatant e)
 		AddChild(floor);
 		_floorRect = floor; // rides the camera every frame: the looping world has no
 							// edge, so the plain ground just keeps covering the frame
-		// STAGE TILE-FLOOR (user 2026-11-13: "design a 32-bit tileset for stage 1... keep B as
-		// well... testing out both so I can see in-game"): the ground field is a BAKED 512px
-		// texture (16x16 tiles @32px) sliced from the stage sheets, so ONE TextureRect covers
-		// the whole wrap world at the tiles' design size. Boots on set A (the user's pick);
-		// M1_STAGE_TILES=B seats run sheet B, and a physical T mid-run flips sets for a side-
-		// by-side look. No sidecar -> load lands null -> the plain flat floor keeps running.
-		_tilesSet = "A";
-		if (OS.GetEnvironment("M1_STAGE_TILES") != null && OS.GetEnvironment("M1_STAGE_TILES") == "B")
-			_tilesSet = "B";
-		Godot.Texture2D tilesTex = GD.Load("res://art/stages/tanurial_forest/ground_" + _tilesSet + ".png") as Godot.Texture2D;
-		if (tilesTex != null)
-		{
-			Godot.TextureRect ft = new TextureRect();
-			// display scale 1: one bake px = one world px, tiles land at their 32px design size
-			ft.Texture = tilesTex;
-			ft.Size = new Vector2((float)_wrapW, (float)_wrapH); // covers the wrap, like the flat rect
-			ft.Position = -ft.Size * 0.5f; // same centering seed as the flat rect (2026-10-20 bug law)
-			ft.ZIndex = -19; // above the flat floor (-20), below patches (-15)/ring (-12)/every body
-			// 1 = TEXTURE_REPEAT_ENABLE: the field tiles across the whole wrap rect
-			ft.Set("texture_repeat", 1);
-			ft.Set("texture_offset", new Vector2(0.0f, 0.0f)); // rewritten every frame by the fold below
-			AddChild(ft);
-			_floorTex = ft;
-			_tilesOn = true;
-			GD.Print("[10thAge] stage floor: tileset " + _tilesSet + " field up (baked 512px of 32px tiles)");
-		}
 		// scattered floor patches = motion reference. the camera keeps the leader centered,
 		// so a single-color floor made movement LOOK frozen even when input worked
 		Rng = new Godot.RandomNumberGenerator();
@@ -2263,9 +2222,7 @@ public void RegisterEnemy(Combatant e)
 		int patchCount = (int)(60.0 * _wrapW * _wrapH / (2400.0 * 1800.0));
 		if (patchCount > 400)
 			patchCount = 400;
-		// tile floors carry their own motion cue (the world-anchored bake scrolls with the pin),
-		// so the dark scatter patches retire while a field is up
-		for (int i = 0; i < patchCount && !_tilesOn; i++)
+		for (int i = 0; i < patchCount; i++)
 		{
 			Godot.ColorRect p = new ColorRect();
 			float s = 6.0f + (float)Rng.Randf() * 10.0f;
@@ -2736,24 +2693,6 @@ public void RegisterEnemy(Combatant e)
 		//   V: park runT on the final-boss beat, so AdvanceBeats then walks the whole loop
 		//      one fight at a time (each live boss holds the next beat back).
 		//   J: park runT on the next ally beat so the escort drop fires next frame.
-		// STAGE TILE-SET flip (the user's A-vs-B in-game look test): physical T swaps the baked
-		// ground mid-run. Latch flag = one press flips ONCE even while held. Try loading the
-		// other set BEFORE claiming the swap, so missing art can never lie about the switch.
-		{
-			bool tDown = Input.IsPhysicalKeyPressed(Godot.Key.T); // physical 'T'
-			if (tDown && !_tilesKeyHeld && _floorTex != null)
-			{
-				string alt = _tilesSet == "A" ? "B" : "A";
-					Godot.Texture2D t2 = GD.Load("res://art/stages/tanurial_forest/ground_" + alt + ".png") as Godot.Texture2D;
-				if (t2 != null)
-				{
-					_tilesSet = alt;
-					_floorTex.Texture = t2;
-					GD.Print("[10thAge] stage floor tiles: now " + _tilesSet + " (A vs B look test)");
-				}
-			}
-			_tilesKeyHeld = tDown;
-		}
 		if (Input.IsActionJustPressed("dev_camp") || (_pilot && _devSkip == "camp"))
 		{
 			bool slayed = false;
@@ -3098,26 +3037,6 @@ public void RegisterEnemy(Combatant e)
 		// is what keeps the ground scrolling AND looping as the motion readout
 		if (_floorRect != null)
 			_floorRect.GlobalPosition = GetCameraCenter() - _floorRect.Size * 0.5f;
-		// STAGE TILE-FOLD: same pin as the flat rect PLUS texture_offset keeps the bake lattice
-		// anchored in WORLD space (offset = -topleft mod period). The pin jumps by the wrap
-		// period at a seam, but a period-jump of a repeating bake is the SAME image shifted
-		// by (period mod 512) px of identical grass - so the ground scrolls coherently AND
-		// loops seamlessly, no seam pop, and this is the motion readout the patches used to do.
-		if (_floorTex != null)
-		{
-			_floorTex.GlobalPosition = GetCameraCenter() - _floorTex.Size * 0.5f;
-			// C#'s % keeps the dividend's sign: land in [0, TILES_BAKE) by adding one period
-			// when negative
-			float ox = -_floorTex.GlobalPosition.X;
-			float oy = -_floorTex.GlobalPosition.Y;
-			ox = ox % (float)TILES_BAKE;
-			oy = oy % (float)TILES_BAKE;
-			if (ox < 0.0f)
-				ox = ox + (float)TILES_BAKE;
-			if (oy < 0.0f)
-				oy = oy + (float)TILES_BAKE;
-			_floorTex.Set("texture_offset", new Vector2(ox, oy));
-		}
 		for (int fp = 0; fp < _floorPatches.Count; fp++)
 			_floorPatches[fp].GlobalPosition = WrapNearCamera(_floorPatches[fp].GlobalPosition);
 		// recruit arrow: rides above the Leader and points at the stranded PC. Pure
