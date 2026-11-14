@@ -248,7 +248,7 @@ public partial class Game : Godot.Node2D
 		"Lucky Stabs (+5% Crit Chance)", "Sneak Attack (+5% Multistrike Chance)",
 											   "Fire Rune (+1 Burn Damage/sec for 5s)", "Harder Thrusts (+15% Crit Damage)",
 											   "Eagle Eye (+5% Crit Chance)", "Difficult Terrain (10% Slow for 2.5s)",
-											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Impact (Knocks Back Beam Hits)", "Arcane Echo (+5% Multistrike Chance)" };
+											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)" };
 	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 0, 1, 2, 3, 4, 9, 9, 9, 9, 9 };
 	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.86f, 1.0f, 1.0f, 1.0f };
 	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
@@ -318,10 +318,10 @@ public partial class Game : Godot.Node2D
 	// cadence the other speed cards use), Arcane Echo rides OPT_MS (+0.05/rank multistrike CHANCE -
 	// the Strikes() roll, NOT the +1-projectile OPT_SHOTS lane). These two columns are NEW:
 	// OPT_BEAM = Split Beams extra picks/rank (each extra prey gets its OWN hitscan lane + slot, cap 4);
-	// OPT_KNOCK = Arcane Impact rank: caught bodies shoved BEAM_KNOCK_PX (40 px, assistant pick -
-	// retune by eye) along the beam, boss-immune at the commit like the draging-maul law.
+	// OPT_REACH = Arcane Reach: +0.10 reach FACTOR per rank - the 2026-11-14 hand-play pass
+	// RETIRED the knockback the user did not like ("I actually don't like the knockback. Let's replace it with a simple +10% range increase"): EffRange() x (1 + beamReach) now widens the Nexus lane instead, and PartyMember draws the band tome->prey so it crosses the bodies it wounds.
 	static readonly int[] OPT_BEAM = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 };
-	static readonly int[] OPT_KNOCK = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 };
+	static readonly double[] OPT_REACH = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0 };
 
 
 	int[] _pickRank = new int[OPT_LABEL.Length];
@@ -5028,7 +5028,7 @@ private void UpdateSpirits(float delta)
 				SetRectSel(_selTile[ti], SEL_GRID[ti * 4], SEL_GRID[ti * 4 + 1],
 						SEL_GRID[ti * 4 + 2], SEL_GRID[ti * 4 + 3]);
 				_selName[ti] = new Label();
-				SetRectSel(_selName[ti], 0.02f, 0.78f, 0.98f, 0.96f);
+				SetRectSel(_selName[ti], 0.02f, 0.85f, 0.98f, 0.99f); // 2026-11-14 hand-play: the plates sat ON the painted minis - dropped to the slot floor (assistant pick, retune by eye)
 				_selName[ti].Text = pm2.displayName + (SEL_LOCKED[ti] ? " (locked)" : "");
 				_selName[ti].Set("horizontal_alignment", 1); // CENTER (string key: binding-safe)
 				_selTile[ti].AddChild(_selName[ti]);
@@ -5135,8 +5135,8 @@ private void UpdateSpirits(float delta)
 		txt += "\nAttack speed " + m.cooldown + " s (+0)"; // shot interval, as the mockup reads
 		txt += "\nDamage " + (int)m.weaponDamage + " (+0)";
 		txt += "\nRange " + (int)m.range + " (+0)"; // m.range is the seat's reach
-		txt += "\nLeader Ability: " + SEL_BONUS[slot];
-		txt += "\nUltimate Ability: " + SEL_ULT[slot];
+		txt += "\n" + SEL_BONUS[slot]; // the SEL strings are SELF-DESCRIBING ("Leader Bonus: ..."): the old "Leader Ability:" label doubled up (user 2026-11-14 saw "Ultimate Ability: Ultimate> Rewrite Reality")
+		txt += "\n" + SEL_ULT[slot]; // same self-describing law: the sheet now reads "Ultimate: Rewrite Reality (R) - ..." ONCE
 		_selPanel.Text = txt;
 	}
 	// card polling: the KEYBOARD pick rail is gone (mouse drives humans now), so
@@ -5913,7 +5913,7 @@ private void UpdateSpirits(float delta)
 		{ m.ringSlow += OPT_RING[option]; } // weighty ring (Alvora row 43): slow strength per rank, kit field
 		{ m.luckR += OPT_LUCK[option]; } // lucky explosions (Yu row 44): double-blast chance per rank, kit field
 		{ m.beamTargets += OPT_BEAM[option]; } // Split Beams (Keeko row 47): one more hitscan pick + its own lane per rank
-		{ m.beamKnock += OPT_KNOCK[option]; } // Arcane Impact (Keeko row 48): shove rank on the kit field (px maths ride PartyMember)
+		{ m.beamReach += OPT_REACH[option]; } // Arcane Reach (Keeko row 48): +0.10 reach factor per rank on the kit field (EffRange maths ride PartyMember)
 		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
 						 OPT_LABEL[option] + " x" + _pickRank[option];
 		GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +

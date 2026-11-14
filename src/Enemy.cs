@@ -759,6 +759,17 @@ public partial class Enemy : Combatant
             else
                 _body.Modulate = new Color(2.2f, 1.4f, 1.4f);
         }
+        else if (froz)
+        {
+            // Rewrite Reality frost (user 2026-11-14: "give all enemies a dark blue tint when frozen in time"):
+            // pinned bodies wear a dark-blue paint (assistant tint pick, retune by eye); the hurt-flash
+            // branch above still wins while a hit is blowing, and the white reset below restores as the
+            // freeze clock drains. Paint only - the MOVEMENT-ONLY gate law is untouched.
+            if (_spr != null)
+                _spr.Modulate = new Color(0.45f, 0.55f, 1.3f, 1.0f);
+            else
+                _body.Modulate = new Color(0.45f, 0.55f, 1.3f, 1.0f);
+        }
         else if (_spr != null)
             _spr.Modulate = new Color(1.0f, 1.0f, 1.0f);
         else

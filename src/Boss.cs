@@ -201,6 +201,13 @@ public partial class Boss : Combatant
         _rig.Position = new Vector2(slid, 0.0f);
         _rig.Rotation = slid * 0.012f;
 
+        // Rewrite Reality frost tint (user 2026-11-14): frozen bosses wear the same dark-blue paint
+        // as the horde twins. Skipped during a non-dance telegraph window so the 3x wind-up flash
+        // keeps its whole beat; the dance kinds never set _telegraph and their lanes never touch
+        // body modulate, so the per-frame white restore is safe there. Paint only - movement law live.
+        if (!_telegraph)
+            _body.Modulate = g.EnemiesFrozen() ? new Color(0.45f, 0.55f, 1.3f, 1.0f) : new Color(1.0f, 1.0f, 1.0f);
+
         // body-check the NEAREST live member, not the Leader specifically: the boss
         // must punish whoever stands in its way (downed bodies handled below)
         PartyMember target = g.NearestMember(GlobalPosition);

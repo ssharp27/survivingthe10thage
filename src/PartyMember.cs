@@ -193,18 +193,16 @@ public partial class PartyMember : Godot.Node2D
 
 	Godot.ColorRect[] _beamFx = null;
 
-	// Keeko kit fields: ranks ride Game's OPT_BEAM/OPT_KNOCK rows (50-wide tables, rows 45-49) exactly
+	// Keeko kit fields: ranks ride Game's OPT_BEAM/OPT_REACH rows (50-wide tables, rows 45-49) exactly
 	// like the axe/shield lanes ride their own columns; px maths live at the commit site.
 
 	public int beamTargets = 0; // Split Beams: one more enemy targeted per rank, each with its own hitscan line
 
-	public int beamKnock = 0; // Arcane Impact rank: caught bodies shoved BEAM_KNOCK_PX/rank along the beam
+	public double beamReach = 0.0; // Arcane Reach rank: +10% beam reach per rank riding EffRange (knockback retired at the 2026-11-14 hand-play pass - user "I actually don't like the knockback")
 
 	float _bookT = 0.0f; // book bob clock (decays with real delta in _Process)
 
 	private readonly float BEAM_HALF_PX = 14.0f; // hitscan lane half-width (assistant pick, retune by eye)
-
-	private readonly float BEAM_KNOCK_PX = 40.0f; // Arcane Impact shove per rank (assistant pick, retune by eye)
 
 	// fx-feel10: the single disc sprite is gone - art lives in _shldArt, one per slot.
 
@@ -1712,7 +1710,7 @@ public partial class PartyMember : Godot.Node2D
 
 	/** Authored reach scaled by the AREA tag (Bruno lead: +15%). */
 
-	public double EffRange() { return range * stat[StatTags.AREA] * (ultT > 0.0 ? ULT_RANGE : 1.0) * (awaT > 0.0 ? AWA_RANGE : 1.0) * LeaderAreaMul(); } // awakening widens too | Bruno lead widens too
+	public double EffRange() { return range * stat[StatTags.AREA] * (ultT > 0.0 ? ULT_RANGE : 1.0) * (awaT > 0.0 ? AWA_RANGE : 1.0) * LeaderAreaMul() * (1.0 + beamReach); } // awakening widens too | Bruno lead widens too | Keeko Arcane Reach +10%/rank (factor 1 for every other kit)
 
 	/** Authored maxHp plus the additive HEALTH tag (points). */
 
@@ -3859,8 +3857,6 @@ public partial class PartyMember : Godot.Node2D
 
 				Vector2 dir = e.Normalized();
 
-				float ang2 = (float)System.Math.Atan2(dir.Y, dir.X);
-
 				for (int i2 = 0; i2 < enemies.Count; i2++)
 
 				{
@@ -3895,15 +3891,8 @@ public partial class PartyMember : Godot.Node2D
 
 						nc.Burn(fireDps, 5.0); // fire rune rides any kit, same 5 s window as the fan
 
-					if (beamKnock > 0 && !(nc is Boss))
-
-					{
-
-							float shove = BEAM_KNOCK_PX * (float)beamKnock;
-
-							c.GlobalPosition = pg.WrapNearCamera(c.GlobalPosition + dir * shove); // Arcane Impact (boss-immune like the draging-maul law)
-
-					}
+					// Arcane Impact KNOCKBACK retired 2026-11-14 (user hand-play verdict: "I actually don't like the knockback. Let's replace it with a simple +10% range increase") - the card now buys +10% BEAM REACH per rank:
+					// OPT_REACH -> m.beamReach -> EffRange; no shove maths ride the beam lane any more.
 
 				}
 
@@ -3913,11 +3902,13 @@ public partial class PartyMember : Godot.Node2D
 
 					Godot.ColorRect bx = _beamFx[beams];
 
+					Vector2 bv = e - new Vector2(0.0f, -107.0f); // 2026-11-14 hand-play fix (user: the beam never crosses the body it wounds, always reads above it): the DRAWN lane must run TOME -> prey, not the body-correct line lifted onto the tome
+
 					bx.Position = new Vector2(0.0f, -107.0f); // drawn off the floating tome lane origin
 
-					bx.Size = new Vector2(segLen, 6.0f);
+					bx.Size = new Vector2(bv.Length(), 6.0f); // tome->prey span (was the body->prey segLen)
 
-					bx.Set("rotation", ang2); // pivot is the 6 px midline
+					bx.Set("rotation", (float)System.Math.Atan2(bv.Y, bv.X)); // tome->prey angle (ang2 was the body->prey angle: the pivot sat at the tome, so the whole band swung clear above the hurt bodies - that was the whole bug)
 
 					bx.Visible = true;
 
