@@ -212,7 +212,8 @@ public partial class Boss : Combatant
             // dance bosses ignore this drift lane: the BOSS DANCE below owns movement,
             // and its LIVE clamp lets melee close in and forces a back-off (user 2026-11-02).
             // The drift branch remains for a future non-dance kind.
-            if (!IsDanceKind() && dist > 100.0f)
+            bool froz = g.EnemiesFrozen(); // Rewrite Reality: the drift lane parks too (movement-only: contact + volleys stay live)
+            if (!IsDanceKind() && dist > 100.0f && !froz) // Rewrite Reality: a pinned boss holds its drift
                 GlobalPosition = g.WrapNearCamera(GlobalPosition + to.Normalized() * driftSpeed * delta * (burnT > 0.0 && g.LeaderDrink() ? 0.95f : 1.0f)); // Have a Drink!: a burning boss drifts slower - HALF the effect on bosses (user 2026-11-06)
             if (dist < radius + g.MEMBER_RADIUS && _contactCd <= 0.0f)
             {
@@ -297,6 +298,7 @@ public partial class Boss : Combatant
         if (target == null)
             return; // nobody standing to dance around: the mini holds still
         float slow = (burnT > 0.0 && g.LeaderDrink()) ? 0.95f : 1.0f; // Have a Drink!: a burning mini dances a beat slower - HALF the effect on bosses (user 2026-11-06)
+        bool froz = g.EnemiesFrozen(); // Rewrite Reality: the whole dance lane parks (fan + clocks keep ticking, movement-only like the horde twin)
         Vector2 to = g.WrapDelta(GlobalPosition, target.GlobalPosition); // boss -> party
         float dist = to.Length();
         _miniClock += delta;
@@ -304,6 +306,7 @@ public partial class Boss : Combatant
         {
             if (dist > MINI_STOP_DIST)
             {
+                if (!froz) // Rewrite Reality: pinned minis hold the run-in (enrage shots still fire)
                 GlobalPosition = g.WrapNearCamera(GlobalPosition + to.Normalized() * MINI_RUN_SPEED * slow * delta);
                 if (hp < maxHp * 0.5f) // ENRAGED: getting into position now adds aimed shots
                 {
@@ -352,6 +355,7 @@ public partial class Boss : Combatant
             Vector2 want = target.GlobalPosition - rel.Rotated(_miniSide * omega * delta);
             Vector2 drift = g.WrapDelta(GlobalPosition, want); // boss -> ring point, wrap-short way
             float step = MINI_RUN_SPEED * slow * delta; // user 2026-11-02: RUN to the ring point, never teleport ("if it's already too close, it teleports back to the set distance... have it run there instead"). Cap >= MINI_ORBIT_SPEED so an on-ring sweep still lands exactly on the swept point; only a too-close/seam miss forces a chase
+            if (!froz) // Rewrite Reality: the ring step parks (the fan + the clocks keep running)
             if (drift.Length() > step)
                 GlobalPosition = g.WrapNearCamera(GlobalPosition + drift.Normalized() * step);
             else
@@ -393,6 +397,7 @@ public partial class Boss : Combatant
         Vector2 want2 = target.GlobalPosition - rel2.Rotated(_miniSide * omega2 * delta);
         Vector2 drift2 = g.WrapDelta(GlobalPosition, want2);
         float step2 = MINI_RUN_SPEED * slow * delta; // cap > crawl speed: an on-ring sweep lands exactly on the swept point
+        if (!froz) // Rewrite Reality: pinned minis hold the crawl step too
         if (drift2.Length() > step2)
             GlobalPosition = g.WrapNearCamera(GlobalPosition + drift2.Normalized() * step2);
         else

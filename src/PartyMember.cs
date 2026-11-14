@@ -176,9 +176,35 @@ public partial class PartyMember : Godot.Node2D
 	// (tint + 1/3 scale live at the build below; damage, pulse and ring ranks untouched).
 	[Export] public string spiritFxArt = ""; // Alvora: Spirit Guardians mote art (spectral-blue tinted)
 
+	// Keeko "Nexus" (user 2026-11-14: "her BOOK, a wizard... 32-bit book floats above her head where attacks
+	// originate, similar to what we did for Stack"): the arted tome rides a sine bob over the head and is the
+	// DRAWN origin of every Nexus beam. Data-driven like every other fx export: only the Keeko node sets this.
+	[Export] public string bookFxArt = ""; // Keeko (wizard): floating Nexus tome art (beam origin)
+
 	Godot.Sprite2D _meleeFx = null;
 
 	Godot.Sprite2D _vialFx = null; // Stack: one vial slot, posed at the shot commit (mirrors _meleeFx)
+
+	// Keeko "Nexus" kit (2026-11-14): the floating book + up to FOUR instant beam slots (1 base + 3 Split
+	// Beams ranks; PICK_RANK_CAP caps the card at rank 3 so a fifth slot can never be asked for). The beam
+	// art is plain indigo-cyan ColorRects on the shared _fxT commit-flash decay (art rail owed by eye).
+
+	Godot.Sprite2D _bookFx = null;
+
+	Godot.ColorRect[] _beamFx = null;
+
+	// Keeko kit fields: ranks ride Game's OPT_BEAM/OPT_KNOCK rows (50-wide tables, rows 45-49) exactly
+	// like the axe/shield lanes ride their own columns; px maths live at the commit site.
+
+	public int beamTargets = 0; // Split Beams: one more enemy targeted per rank, each with its own hitscan line
+
+	public int beamKnock = 0; // Arcane Impact rank: caught bodies shoved BEAM_KNOCK_PX/rank along the beam
+
+	float _bookT = 0.0f; // book bob clock (decays with real delta in _Process)
+
+	private readonly float BEAM_HALF_PX = 14.0f; // hitscan lane half-width (assistant pick, retune by eye)
+
+	private readonly float BEAM_KNOCK_PX = 40.0f; // Arcane Impact shove per rank (assistant pick, retune by eye)
 
 	// fx-feel10: the single disc sprite is gone - art lives in _shldArt, one per slot.
 
@@ -821,6 +847,14 @@ public partial class PartyMember : Godot.Node2D
 
 			miniPath = "res://art/characters/brook.png";
 
+		else if (displayName == "Keeko")
+
+			// 2026-11-14: Keeko art probe (78x118 canvas, ~118 px profile like the class), so the
+
+			// default miniScale carries; no rim override (base plate shallow like Bruno/Brook)
+
+			miniPath = "res://art/characters/keeko.png";
+
 		if (miniPath != "")
 
 		{
@@ -928,6 +962,63 @@ public partial class PartyMember : Godot.Node2D
 			}
 
 		}
+
+		if (bookFxArt != "")
+
+		{
+
+			Godot.Texture2D fxT = GD.Load(bookFxArt) as Godot.Texture2D;
+
+			if (fxT != null)
+
+			{
+
+				_bookFx = new Godot.Sprite2D();
+
+				_bookFx.Texture = fxT;
+
+				_bookFx.Set("texture_filter", 0); // NEAREST like the painted minis: hard edges
+
+				_bookFx.Scale = new Vector2(0.5f, 0.5f); // 66x73 cut reads ~33 px on the 118 px profile (retune by eye)
+
+				_bookFx.Position = new Vector2(0.0f, -104.0f); // floats above the head: beam art origin (retune by eye)
+
+				_bookFx.Visible = false;
+
+				AddChild(_bookFx);
+
+			}
+
+		}
+
+		if (weaponKit == "beam")
+
+		{
+
+			_beamFx = new Godot.ColorRect[4]; // 1 base + 3 Split Beams ranks max (slot cap)
+
+			for (int b2 = 0; b2 < 4; b2++)
+
+			{
+
+				_beamFx[b2] = new Godot.ColorRect();
+
+				_beamFx[b2].Color = new Color(0.45f, 0.65f, 1.0f, 0.95f); // indigo-cyan lane (assistant pick, art rail owed)
+
+				_beamFx[b2].Position = new Vector2(0.0f, -107.0f); // 6 px band centred on the tome line
+
+				_beamFx[b2].Size = new Vector2(0.0f, 6.0f);
+
+				_beamFx[b2].ZIndex = 3; // above the horde bodies, below the chip UI
+
+				_beamFx[b2].Visible = false;
+
+				AddChild(_beamFx[b2]);
+
+			}
+
+		}
+
 
 		if (axeFxArt != "")
 
@@ -1259,6 +1350,14 @@ public partial class PartyMember : Godot.Node2D
 
 			return 9; // Assassination (the window lives on Game.AssassinationParty)
 
+		// Keeko "Rewrite Reality" (user 2026-11-14): the freeze clock + the final-boss fallback live
+
+		// on Game.RewriteReality (spawns born frozen; vs FINAL bosses it is +25% damage instead)
+
+		if (displayName == "Keeko")
+
+				return 10; // Rewrite Reality (the walk lives on Game.RewriteReality)
+
 		return 0; // other PCs: no ultimate authored yet (future lanes land here)
 
 	}
@@ -1521,6 +1620,32 @@ public partial class PartyMember : Godot.Node2D
 
 		}
 
+		// Keeko "Rewrite Reality" (user 2026-11-14): movement-only freeze on the Game clock, spawns
+
+		// included; against FINAL bosses the walk flips to Vulnerable(+25%) for 10 s instead
+
+		else if (ultKey() == 10)
+
+		{
+
+			ultCdT = ULT_CD_BASE / stat[StatTags.ULT];
+
+				Game g9 = GetParent() as Game;
+
+				if (g9 != null)
+
+						g9.RewriteReality();
+
+				GD.Print("[10thAge] (ult) Rewrite Reality: " + displayName +
+
+						" stops every enemy (incl. any that spawn) in place for 10 s - against FINAL bosses: +25% damage dealt to them, gate " +
+
+						(int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
+
+				return true;
+
+		}
+
 		// GD.Print("[10thAge] (ult) " + displayName + " has no ultimate yet");
 
 		return false;
@@ -1559,7 +1684,7 @@ public partial class PartyMember : Godot.Node2D
 
 	{
 
-		double spd = stat[StatTags.ATTACK_SPEED] * (insT > 0.0 ? INS_SPD : 1.0) * (ultT > 0.0 ? ULT_SPD : 1.0); // bardic +25% | Giant's Might +50% attack speed (user 2026-11-06)
+		double spd = stat[StatTags.ATTACK_SPEED] * (insT > 0.0 ? INS_SPD : 1.0) * (ultT > 0.0 ? ULT_SPD : 1.0) * LeaderAtkSpdMul(); // bardic +25% | Giant's Might +50% attack speed (user 2026-11-06) | Keeko lead +10% (Gekkota Training)
 
 		if (spd < 0.05)
 
@@ -1582,6 +1707,8 @@ public partial class PartyMember : Godot.Node2D
 	private double LeaderInspireHp() { Game g = GetParent() as Game; return g == null ? 0.0 : g.LeaderInspireHp(); } // Inspiring Leader seat rides live (same GetParent discipline as the Bruno pair)
 
 	private double LeaderMoveMul() { Game g = GetParent() as Game; return g == null ? 1.0 : g.LeaderMoveMul(); }
+
+	private double LeaderAtkSpdMul() { Game g = GetParent() as Game; return g == null ? 1.0 : g.LeaderAtkSpdMul(); } // Keeko lead (Gekkota Training): +10% attack speed for ALL allies while she leads
 
 	/** Authored reach scaled by the AREA tag (Bruno lead: +15%). */
 
@@ -1816,6 +1943,27 @@ public partial class PartyMember : Godot.Node2D
 
 			_auraPivot.Visible = !hidden && joined && !downed && weaponKit == "aura";
 
+		// Keeko's floating tome rides the same joined/live visibility law as the aura ring
+
+		if (_bookFx != null)
+
+			_bookFx.Visible = !hidden && joined && !downed && weaponKit == "beam";
+
+		if (_bookFx != null)
+
+		{
+
+				_bookT += delta;
+
+				if (_bookT > 100.0f)
+
+					_bookT = 0.0f; // keep the bob clock bounded
+
+				_bookFx.Position = new Vector2(0.0f, -104.0f + 5.0f * (float)System.Math.Sin((double)_bookT * 3.14159265)); // sine bob, ~2 s period, ~5 px
+
+		}
+
+
 		// ---- downed-body readout: the d20 chip + the STAND STILL channel bar ----
 
 		bool downChip = downed && !eliminated;
@@ -2004,6 +2152,11 @@ public partial class PartyMember : Godot.Node2D
 				_meleeFx.Visible = false;
 			if (_vialFx != null)
 				_vialFx.Visible = false; // generic death drop: a vial caught mid-pour never lingers
+			if (_bookFx != null)
+				_bookFx.Visible = false; // death-lane drop: the tome never lingers on a downed body
+			if (_beamFx != null)
+				foreach (Godot.ColorRect bx in _beamFx)
+					bx.Visible = false; // beams die with the body too
 			if (_cresFx != null)
 				 foreach (Godot.Sprite2D sx in _cresFx)
 					 sx.Visible = false;
@@ -2163,6 +2316,12 @@ public partial class PartyMember : Godot.Node2D
 				if (_vialFx != null)
 
 					_vialFx.Visible = false; // commit-flash decay: the vial drops on the same beat as the melee slivers
+
+				if (_beamFx != null)
+
+					foreach (Godot.ColorRect bx in _beamFx)
+
+						bx.Visible = false; // instant beams ride the same commit-flash beat
 
 				for (int sk = 0; sk < _shldT.Length; sk++)
 				{
@@ -2855,7 +3014,12 @@ public partial class PartyMember : Godot.Node2D
 
 		bool shotKit = weaponKit == "shot"; // longbow kit: fires the Game's party-side shot pool
 
-		bool cleaver = !shotKit && arcHalf > 0.5f; // maul kit: arc cleave, full damage per body (user 2026-10-23)
+		// Keeko "Nexus" kit (2026-11-14, FIRST beam character): an instant hitscan line at the pick,
+		// punching through everything between the book and the prey. Kit keys on weaponKit like every
+		// other lane - arcHalf stays purely melee, so the beam keeps the class-default arc for now.
+		bool beamKit = weaponKit == "beam";
+
+		bool cleaver = !shotKit && !beamKit && arcHalf > 0.5f; // maul kit: arc cleave, full damage per body (user 2026-10-23)
 
 		// Spirit Guardians kit: a ring that pulses around the caster. Damage is NOT split by
 
@@ -3524,7 +3688,7 @@ public partial class PartyMember : Godot.Node2D
 
 		// whatever way it faces, so the lane gate stays lane-only.
 
-		Godot.Node2D best = PickPrey(pg, enemies, p, reach, false, false, isLeader && !cleaver && !shotKit, facing, arcEff);
+		Godot.Node2D best = PickPrey(pg, enemies, p, reach, false, false, isLeader && !cleaver && !shotKit && !beamKit, facing, arcEff);
 
 		// bestD answers the chosen body's distance; the empty-clearing guard below stands
 
@@ -3540,7 +3704,7 @@ public partial class PartyMember : Godot.Node2D
 
 		float ang = (float)System.Math.Atan2(to.Y, to.X);
 
-		if (!isLeader || cleaver)
+		if (!isLeader || cleaver || beamKit)
 
 			facing = ang; // auto-aim: the cleave swings at its prey (Mosiah-style),
 
@@ -3601,6 +3765,175 @@ public partial class PartyMember : Godot.Node2D
 				_fxT = 0.16f; // same commit-flash beat the melee slivers use
 
 			}
+
+		}
+
+		// Keeko "Nexus" kit (2026-11-14, FIRST beam character): instant hitscan from the floating
+		// tome at the pick. Damage is measured from the BODY (p) along a thin lane (BEAM_HALF_PX)
+		// that punches through and wounds EVERYTHING between Keeko and the prey, so the pick itself
+		// can never whiff. Split Beams adds its OWN nearest extra pick per rank, each with its own
+		// lane + slot. Assistant picks (retune by eye): lane half-width, slot cap 4, book art origin.
+		else if (beamKit)
+
+		{
+
+			int picks = 1 + beamTargets;
+
+			if (picks > 4)
+
+				picks = 4; // slot cap: base + 3 Split Beams ranks (OPT row caps rank at 3)
+
+			Godot.Node2D[] bk = new Godot.Node2D[picks];
+
+			bk[0] = best;
+
+			for (int s = 1; s < picks; s++)
+
+			{
+
+				Godot.Node2D n = null;
+
+				float nd = 1e9f;
+
+				for (int i2 = 0; i2 < enemies.Count; i2++)
+
+				{
+
+					Godot.Node2D c = enemies[i2];
+
+					Combatant nc = (Combatant)c;
+
+					if (nc == null || nc.kind == "dead")
+
+						continue;
+
+					bool already = false;
+
+					for (int q = 0; q < s; q++)
+
+						if (bk[q] == c)
+
+							already = true;
+
+					if (already)
+
+						continue;
+
+					float dd = pg.WrapDelta(p, c.GlobalPosition).Length() - nc.hitR;
+
+					if (dd <= reach && dd < nd)
+
+					{
+
+							nd = dd;
+
+							n = c;
+
+					}
+
+				}
+
+				bk[s] = n; // may be null: fewer live bodies than ranks
+
+			}
+
+			int beams = 0;
+
+			for (int s = 0; s < picks; s++)
+
+			{
+
+				Godot.Node2D t = bk[s];
+
+				if (t == null)
+
+					continue;
+
+				Vector2 e = pg.WrapDelta(p, t.GlobalPosition);
+
+				float segLen = e.Length();
+
+				if (segLen < 0.001f)
+
+					continue;
+
+				Vector2 dir = e.Normalized();
+
+				float ang2 = (float)System.Math.Atan2(dir.Y, dir.X);
+
+				for (int i2 = 0; i2 < enemies.Count; i2++)
+
+				{
+
+					Godot.Node2D c = enemies[i2];
+
+					Combatant nc = (Combatant)c;
+
+					if (nc == null || nc.kind == "dead")
+
+						continue;
+
+					Vector2 r = pg.WrapDelta(p, c.GlobalPosition);
+
+					float along = r.X * dir.X + r.Y * dir.Y;
+
+					if (along < 0.0f - nc.hitR || along > segLen + nc.hitR)
+
+						continue; // only bodies between the book and the prey get punched
+
+					float perp = (float)System.Math.Abs(r.X * dir.Y - r.Y * dir.X);
+
+					if (perp > BEAM_HALF_PX + nc.hitR)
+
+						continue; // the thin lane: what the beam actually sweeps
+
+					nc.TakeDamage(dmg * Strikes()); // MULTISTRIKE repeats the whole beam, like every verb
+
+					pg.TryChainLightning(c); // Baldrun seat: the hit may loose a chain
+
+					if (fireDps > 0.0)
+
+						nc.Burn(fireDps, 5.0); // fire rune rides any kit, same 5 s window as the fan
+
+					if (beamKnock > 0 && !(nc is Boss))
+
+					{
+
+							float shove = BEAM_KNOCK_PX * (float)beamKnock;
+
+							c.GlobalPosition = pg.WrapNearCamera(c.GlobalPosition + dir * shove); // Arcane Impact (boss-immune like the draging-maul law)
+
+					}
+
+				}
+
+				if (_beamFx != null && beams < _beamFx.Length)
+
+				{
+
+					Godot.ColorRect bx = _beamFx[beams];
+
+					bx.Position = new Vector2(0.0f, -107.0f); // drawn off the floating tome lane origin
+
+					bx.Size = new Vector2(segLen, 6.0f);
+
+					bx.Set("rotation", ang2); // pivot is the 6 px midline
+
+					bx.Visible = true;
+
+					beams++;
+
+					_fxT = 0.16f; // same commit-flash beat the shot/vial kits use
+
+				}
+
+			}
+
+			if (_beamFx != null)
+
+				for (int s2 = beams; s2 < _beamFx.Length; s2++)
+
+						_beamFx[s2].Visible = false; // a lighter volley clears its spare slots
 
 		}
 

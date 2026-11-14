@@ -136,6 +136,20 @@ poisonDur = 5.0
 baseEvasion = 0.05
 class_ = "Rogue"
 
+[node name="Keeko" type="Node2D" parent="." unique_id=604918273]
+script = ExtResource("3_pm")
+displayName = "Keeko"
+weaponName = "Nexus"
+memberIndex = 9
+maxHp = 50.0
+baseSpeed = 130.0
+weaponDamage = 10.0
+cooldown = 1.5
+range = 520.0
+weaponKit = "beam"
+bookFxArt = "res://art/fx/keeko_book.png"
+class_ = "Wizard"
+
 [node name="BossMini" type="Node2D" parent="." unique_id=321225898]
 position = Vector2(0, -500)
 script = ExtResource("4_boss")

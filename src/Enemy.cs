@@ -301,6 +301,7 @@ public partial class Enemy : Combatant
         if (g == null)
             return;
         float spd = speed * (slowT > 0.0 ? 1.0f - (float)slowMul : 1.0f) * (burnT > 0.0 && g.LeaderDrink() ? 0.90f : 1.0f); // Have a Drink!: burning bodies shamble
+        bool froz = g.EnemiesFrozen(); // Rewrite Reality (Keeko ult, user 2026-11-14): movement-only freeze - every horde commit below parks; bodies still get hit, flash, and their contact/shot lanes stay live (the springer _fgDone clock drains while pinned: the BODY never advances, so a frozen spring simply finishes its spring at the pin mark)
         if (_body == null)
             InitVisuals();
         if (kind == "dead")
@@ -394,7 +395,7 @@ public partial class Enemy : Combatant
             // damage logic needed. kind "dead" + offscreen = clean despawn without
             // freeing (kill scan drops the registry entry, no XP).
             PartyMember prey = g.NearestMember(p);
-            if (prey != null)
+            if (prey != null && !froz) // Rewrite Reality: a frozen reaper stalks to a halt
                 GlobalPosition = g.WrapNearCamera(GlobalPosition +
                                              g.WrapDelta(GlobalPosition, prey.GlobalPosition).Normalized() * spd * delta);
             PartyMember touch = g.NearestMemberAny(GlobalPosition);
@@ -427,7 +428,7 @@ public partial class Enemy : Combatant
                 Vector2 goal = pc != null ? pc.GlobalPosition : escortHold;
                 Vector2 hold = g.WrapDelta(p, goal);
                 float hl = hold.Length();
-                if (hl > 18.0f)
+                if (hl > 18.0f && !froz) // Rewrite Reality: the escort cage holds still (the recruit chip below stays live)
                     GlobalPosition = g.WrapNearCamera(GlobalPosition +
                                    hold.Normalized() * spd * g.GetEscortCrawl() * delta);
                 _contactCd -= delta;
@@ -565,7 +566,7 @@ public partial class Enemy : Combatant
                     float wobble = (kind == "goblin" || kind == "goblin2") ? (float)System.Math.Sin(p.X * 0.05 + p.Y * 0.03) * 26.0f : 0.0f; // Goblin 2 prowls the clump too
                     dir = (to + new Vector2(wobble * 0.4f, wobble)).Normalized();
                 }
-                if (dir.LengthSquared() > 0.0001f)
+                if (dir.LengthSquared() > 0.0001f && !froz) // Rewrite Reality: pinned bodies (incl. springers mid lunge: BODY never advances) hold the chase
                     GlobalPosition += dir * moveSpd * delta; // draging maul: a dragged body shambles
                 GlobalPosition = g.WrapNearCamera(GlobalPosition); // fold instead of walls
                 if (dist < hitR + g.MEMBER_RADIUS && _contactCd <= 0.0f)
@@ -747,7 +748,7 @@ public partial class Enemy : Combatant
                 continue;
             Vector2 e = n.GlobalPosition;
             float d2 = (e - p).LengthSquared();
-            if (d2 < 400.0f && d2 > 0.0001f)
+            if (d2 < 400.0f && d2 > 0.0001f && !froz) // Rewrite Reality: no separation shove from a pinned body either
                 GlobalPosition += (p - e).Normalized() * 14.0f * delta;
         }
         if (hurtFlash > 0.0f)
