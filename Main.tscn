@@ -148,6 +148,7 @@ cooldown = 1.5
 range = 520.0
 weaponKit = "beam"
 bookFxArt = "res://art/fx/keeko_book.png"
+beamFxArt = "res://art/fx/keeko_beam.png"
 class_ = "Wizard"
 
 [node name="BossMini" type="Node2D" parent="." unique_id=321225898]

@@ -181,17 +181,23 @@ public partial class PartyMember : Godot.Node2D
 	// DRAWN origin of every Nexus beam. Data-driven like every other fx export: only the Keeko node sets this.
 	[Export] public string bookFxArt = ""; // Keeko (wizard): floating Nexus tome art (beam origin)
 
+
+	// Keeko "Nexus" BEAM lance (2026-11-14 art rail, user pick "I actually really like 4 the most":
+	// the star-less purple/white crackle lance, converter-cut to a 128x15 transparent PNG): the drawn
+	// band stretches along the tome->prey lane, so the cut's flat left end sits at the book and its
+	// taper reads out toward the wounded body. Only the Keeko node sets this; empty string = fallback band.
+	[Export] public string beamFxArt = ""; // Keeko (wizard): Nexus beam lance art (drawn along each hitscan lane)
 	Godot.Sprite2D _meleeFx = null;
 
 	Godot.Sprite2D _vialFx = null; // Stack: one vial slot, posed at the shot commit (mirrors _meleeFx)
 
 	// Keeko "Nexus" kit (2026-11-14): the floating book + up to FOUR instant beam slots (1 base + 3 Split
 	// Beams ranks; PICK_RANK_CAP caps the card at rank 3 so a fifth slot can never be asked for). The beam
-	// art is plain indigo-cyan ColorRects on the shared _fxT commit-flash decay (art rail owed by eye).
+	// art rail CLOSED 2026-11-14 (user picked the star-less crackle lance, installed at res://art/fx/keeko_beam.png): the lanes are TextureRect slots stretched to the tome->prey span, with the old indigo-cyan ColorRect as the art-absent fallback (band width BEAM_BAND_PX is an assistant pick, retune by eye).
 
 	Godot.Sprite2D _bookFx = null;
 
-	Godot.ColorRect[] _beamFx = null;
+	Godot.Control[] _beamFx = null; // 4 slots: TextureRect on the art rail, ColorRect fallback when the art is absent (Control is the shared base so both ride the same draw lane)
 
 	// Keeko kit fields: ranks ride Game's OPT_BEAM/OPT_REACH rows (50-wide tables, rows 45-49) exactly
 	// like the axe/shield lanes ride their own columns; px maths live at the commit site.
@@ -204,6 +210,8 @@ public partial class PartyMember : Godot.Node2D
 
 	private readonly float BEAM_HALF_PX = 14.0f; // hitscan lane half-width (assistant pick, retune by eye)
 
+
+	private readonly float BEAM_BAND_PX = 18.0f; // drawn lance band thickness (assistant pick on the 128x15 cut, retune by eye)
 	// fx-feel10: the single disc sprite is gone - art lives in _shldArt, one per slot.
 
 	Godot.Sprite2D[] _axeFx = null; // 5 SPIN blade slots (fx-feel8: the crescents got their OWN set so the default attack can run WHILE the ult spins - user: "allow him to continue his default attack while his ultimate is up")
@@ -993,19 +1001,46 @@ public partial class PartyMember : Godot.Node2D
 
 		{
 
-			_beamFx = new Godot.ColorRect[4]; // 1 base + 3 Split Beams ranks max (slot cap)
+			_beamFx = new Godot.Control[4]; // 1 base + 3 Split Beams ranks max (slot cap)
 
+
+			Godot.Texture2D bft = (beamFxArt != "") ? GD.Load(beamFxArt) as Godot.Texture2D : null; // the user-picked lance (art rail CLOSED 2026-11-14)
 			for (int b2 = 0; b2 < 4; b2++)
 
 			{
 
-				_beamFx[b2] = new Godot.ColorRect();
+				 Godot.Control slot = null;
 
-				_beamFx[b2].Color = new Color(0.45f, 0.65f, 1.0f, 0.95f); // indigo-cyan lane (assistant pick, art rail owed)
+				 if (bft != null)
+				 {
 
-				_beamFx[b2].Position = new Vector2(0.0f, -107.0f); // 6 px band centred on the tome line
+					 Godot.TextureRect br = new Godot.TextureRect();
 
-				_beamFx[b2].Size = new Vector2(0.0f, 6.0f);
+					 br.Texture = bft;
+
+					 br.Set("texture_filter", 0); // NEAREST like the painted minis: hard edges
+
+					 br.Set("stretch_mode", 0); // STRETCH_SCALE: the lance stretches to the tome->prey span
+
+					 slot = br;
+
+				 }
+				 else
+				 {
+
+					 Godot.ColorRect cr = new Godot.ColorRect();
+
+					 cr.Color = new Color(0.45f, 0.65f, 1.0f, 0.95f); // indigo-cyan fallback band (assistant pick, art-absent lane)
+
+					 slot = cr;
+
+				 }
+
+				 _beamFx[b2] = slot;
+
+				_beamFx[b2].Position = new Vector2(0.0f, -107.0f); // band centred on the tome line (the draw lane rotates it tome->prey per volley)
+
+				_beamFx[b2].Size = new Vector2(0.0f, BEAM_BAND_PX); // built at the band width (the draw lane restretches per volley)
 
 				_beamFx[b2].ZIndex = 3; // above the horde bodies, below the chip UI
 
@@ -2153,7 +2188,7 @@ public partial class PartyMember : Godot.Node2D
 			if (_bookFx != null)
 				_bookFx.Visible = false; // death-lane drop: the tome never lingers on a downed body
 			if (_beamFx != null)
-				foreach (Godot.ColorRect bx in _beamFx)
+				foreach (Godot.Control bx in _beamFx)
 					bx.Visible = false; // beams die with the body too
 			if (_cresFx != null)
 				 foreach (Godot.Sprite2D sx in _cresFx)
@@ -2317,7 +2352,7 @@ public partial class PartyMember : Godot.Node2D
 
 				if (_beamFx != null)
 
-					foreach (Godot.ColorRect bx in _beamFx)
+					foreach (Godot.Control bx in _beamFx)
 
 						bx.Visible = false; // instant beams ride the same commit-flash beat
 
@@ -3900,13 +3935,13 @@ public partial class PartyMember : Godot.Node2D
 
 				{
 
-					Godot.ColorRect bx = _beamFx[beams];
+					Godot.Control bx = _beamFx[beams];
 
 					Vector2 bv = e - new Vector2(0.0f, -107.0f); // 2026-11-14 hand-play fix (user: the beam never crosses the body it wounds, always reads above it): the DRAWN lane must run TOME -> prey, not the body-correct line lifted onto the tome
 
 					bx.Position = new Vector2(0.0f, -107.0f); // drawn off the floating tome lane origin
 
-					bx.Size = new Vector2(bv.Length(), 6.0f); // tome->prey span (was the body->prey segLen)
+					bx.Size = new Vector2(bv.Length(), BEAM_BAND_PX); // tome->prey span x the art-rail band (the 6 px plain band widened so the lance silhouette + crackle fringe read) (was the body->prey segLen)
 
 					bx.Set("rotation", (float)System.Math.Atan2(bv.Y, bv.X)); // tome->prey angle (ang2 was the body->prey angle: the pivot sat at the tome, so the whole band swung clear above the hurt bodies - that was the whole bug)
 
