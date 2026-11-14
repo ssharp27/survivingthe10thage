@@ -2,35 +2,35 @@
 
 Session resumed 2026-10-31 after the 2026-10-30 night pause (marker `d8cff96`). Start with **M2_STATUS.md** (the authoritative M2 trail + pitfalls) and this block. The 2026-10-21 block and everything below is archive history. **Queued batch (user 2026-11-01), ONE gated pass at a time — (1)+(2)+(3) + the off-queue EFFECT-ART pass + the 2026-11-01 FX-FIX bug batch SHIPPED `5a7f87f` + the BOOM-FIX follow-up SHIPPED `f165fbe` + the ULT-FIX follow-up SHIPPED `2f603f2` (**ULT user-VERIFIED in hand-play 2026-11-01**) + **BRUNO ART BATCH (a)/(b)/(c) SHIPPED `bef654b` (2026-11-02)** + **CAMP-UI + docs-sync pass SHIPPED `14cfb6c` + camp-slot correction `14d88c8` (2026-11-02: `ui/Campfire.gd` keeps `slots: int = 5` — a run is only ever 1 leader + 4 party — + `"away"` cards HIDDEN + all three docs re-synced to the 9-PC roster truth)** + **WASH SHIELD-HURL MOTION PASS SHIPPED `dde5008` (2026-11-02: constant-px/s hurl, damage model untouched)**, NEXT UP on user go-ahead (user-gated): Alvora ability art (user has specifics in mind):** (1) base-stat scene tweaks — **DONE `9f74abb`** (Baldrun/Alvora `baseArmour` 0→1.0, Mosiah `baseEvasion` 0→0.05, Brook `baseEvasion` 0.10→0.05, both evasion PC now 10% total); (2) audit bug fixes — **DONE `87c0153`** (Stack rows 20/21 un-swapped, Bruno `Bleed()` args corrected, DoT expiry now zeroes `dps`); (3) five NEW fifth cards for the first five PCs (Baldrun Fire Rune 1/2/3 dps ×5 s, Mosiah crit damage +10/20/30%, Asper crit chance +8/16/24%, Alvora radius slow 10/20/30%, Yu Lucky Explosions 5/10/15% double blast — OPT tables 40→45-wide, NEW `OPT_FIRE`/`OPT_LUCK`/radius-slow columns) — **DONE `c5589b6`**; (4) leader-bonus changes — **DONE `ddb3116` (2026-11-02: the `M1_TIMEWARP` valve SHIPPED on that very pass)** **GATE SPEED-UP NOW PROVEN LIVE (user 2026-10-31 decision, exercised by the effect-art trio): parallel project copies via `gatePAR_FX2.cmd` + per-run `runFX2xx.cmd` batch files, one process per DIRECTORY (real project + robocopy mirrors `copyA`/`copyB` carrying the SAME fresh DLL — rebuild + re-IMPORT before the batch). The TEST-only `M1_TIMEWARP` valve SHIPPED with that very pass (`ddb3116`: bench smokes only, `M1_TIMEWARP=<factor>` clamps [1,12], multiplies BOTH the run clock AND the Director spawn cadence so legs keep NORMAL spawn budgets at warp speed; trios now carry `M1_TIMEWARP=8`)** — saves ~45 min trio → ~5 min. Docs stay at the 8-PC sync `770d0e1` (user-gated only).
 
-## Where we are (2026-10-28→31 select-visual + ring-seat + polish + ring/Asper + Stack roster + cinder swap + Stack elixir/drink + Wash + Bruno roster + Bruno leader-bonus + doc-sync + Brook roster + **Yu spirit-guard** + **base-stat** + **audit-fix** + **five-cards** + **effect-art** + **fx-fix** + **boom-fix** + **ult-fix** + **leader-bonus/warp** + **bruno-art-batch** + **camp-UI + re-sync** + **wash-shield-hurl** + **alvora-spirit-art** + **horde-events** + **mini-boss-dance** + **fx-feel5** + **fx-feel6** + **fx-feel7** + **fx-feel8** + **fx-feel9** + **tier3-creatures** + **fx-feel10** + **boss-parity/camp** + **spirit-hop/beat20** + **mage-flee/spirit-ring/horde60/death-FX** + **tier4-ogre/slam** + **pause-card/targeting** + **esc-p-restore + early-ogre** + **m2-number-tweaks** + **playtest-2026-11-06b: horde-boot + mage-STAND-band + riderbow-red-outline + ogre-retune + pause-condense + Bruno-bite-deadzone** + **enemy-test-room (M1_TEST_ROOM rotation + training-ring XP faucet)** + **stage-select (stage card after leader card + stage-pair data + M1_STAGE bench valve)** + **bugfix-trio-2026-11-07 (stage card drew nothing + Bruno swept-arm restore + mage fireball Modulate wake)** + **bruno-converge-2026-11-07 (meets-at-prey/hands-floor/drawn-disc-only)** + **dot-crossfire-2026-11-07 (+5%-per-unique-DoT / half-on-bosses / counted-at-the-hit)** + **goblin-variety/fastgoblin-lunge 2026-11-08** + **field-pickups 2026-11-08 (heal orb / xp magnet / rage vial rare kill drops)** + **walk-gait-2026-11-08 (two-beat-gait/squash/lean, speed-driven, NO sprite frames)** + **monster-sway-2026-11-08 (party-slide-faster, gait SCRAPPED)** + **sweep-lunge-art (maul crescent band + thin pierce, user hand-fixed)** + **stack-chef-firebolt (split vial pose + flame comet flies)** + **stack-chef-hand-clean (cork-off vial, comet cleanup)** + **wash-shield-spin (bounce-leg drumroll)** + **asper-bees-head-hover (z-above + head float)** + **untested-handplay-rail (sign-off 2026-11-08: what to test tomorrow)** + **retune-2026-11-09b (shield-drumroll-0.07 / Bruno-CCW-axe / sweep-shrink / Mosiah-walk-face-lock)** + **fx-art-retune (firebolt-halved / dagger-point-leads)** + **dirt-puffs-on-foot-plants + **hand-play-b-2026-11-09 (sweep-rides-out / rapier-tip-leads / passive-bees-at-crown / grit-on-ground-line) + untested-handplay-rail sign-off 2026-11-09b** + **face-sizing-law-2026-11-12 (always-face / ogre-1.5x / rider-40pct / hurl-tumble / fireball-shrink)** + **hitbox-sizing-2026-11-12 (hitR=art / riderbow-88 / grab-yank)** + **sitting-4-2026-11-12 (rider-88-archer-72-own-swap / horde-tier1-2-mix-cap / ramp-2.5pct-PERF-REVIEW-OWED / pause-blur-LAYER-SPLIT / boss-hp-x3 / boss-shots-indestructible / pickups-ride-gem-law / magnet-halved)** + **mage-rig-art (goblinmage-rides-mage-kind / goblinmage2-PARKED)** + **mage2-ice-spikes (mage2-rides-goblinmage2 / three-spike-fan / ice-FX-deferred)** + **mage2-ice-fx (ice-spike-art-user-picked-A / iceArt-overload-pi-tip-lead)** + **stage1-ground-bake (feather-blend-3-chunks / lattice-copies-not-texture-offset / no-rotate-stamping)** + **pause-blur-2fix (soft-gaussian-defocus / nested-field-clear-on-unpause)** passes — CURRENT)
+## Where we are (2026-10-28→31 select-visual + ring-seat + polish + ring/Asper + Stack roster + cinder swap + Stack elixir/drink + Wash + Bruno roster + Bruno leader-bonus + doc-sync + Brook roster + **Yu spirit-guard** + **base-stat** + **audit-fix** + **five-cards** + **effect-art** + **fx-fix** + **boom-fix** + **ult-fix** + **leader-bonus/warp** + **bruno-art-batch** + **camp-UI + re-sync** + **wash-shield-hurl** + **alvora-spirit-art** + **horde-events** + **mini-boss-dance** + **fx-feel5** + **fx-feel6** + **fx-feel7** + **fx-feel8** + **fx-feel9** + **tier3-creatures** + **fx-feel10** + **boss-parity/camp** + **spirit-hop/beat20** + **mage-flee/spirit-ring/horde60/death-FX** + **tier4-ogre/slam** + **pause-card/targeting** + **esc-p-restore + early-ogre** + **m2-number-tweaks** + **playtest-2026-11-06b: horde-boot + mage-STAND-band + riderbow-red-outline + ogre-retune + pause-condense + Bruno-bite-deadzone** + **enemy-test-room (M1_TEST_ROOM rotation + training-ring XP faucet)** + **stage-select (stage card after leader card + stage-pair data + M1_STAGE bench valve)** + **bugfix-trio-2026-11-07 (stage card drew nothing + Bruno swept-arm restore + mage fireball Modulate wake)** + **bruno-converge-2026-11-07 (meets-at-prey/hands-floor/drawn-disc-only)** + **dot-crossfire-2026-11-07 (+5%-per-unique-DoT / half-on-bosses / counted-at-the-hit)** + **goblin-variety/fastgoblin-lunge 2026-11-08** + **field-pickups 2026-11-08 (heal orb / xp magnet / rage vial rare kill drops)** + **walk-gait-2026-11-08 (two-beat-gait/squash/lean, speed-driven, NO sprite frames)** + **monster-sway-2026-11-08 (party-slide-faster, gait SCRAPPED)** + **sweep-lunge-art (maul crescent band + thin pierce, user hand-fixed)** + **stack-chef-firebolt (split vial pose + flame comet flies)** + **stack-chef-hand-clean (cork-off vial, comet cleanup)** + **wash-shield-spin (bounce-leg drumroll)** + **asper-bees-head-hover (z-above + head float)** + **untested-handplay-rail (sign-off 2026-11-08: what to test tomorrow)** + **retune-2026-11-09b (shield-drumroll-0.07 / Bruno-CCW-axe / sweep-shrink / Mosiah-walk-face-lock)** + **fx-art-retune (firebolt-halved / dagger-point-leads)** + **dirt-puffs-on-foot-plants + **hand-play-b-2026-11-09 (sweep-rides-out / rapier-tip-leads / passive-bees-at-crown / grit-on-ground-line) + untested-handplay-rail sign-off 2026-11-09b** + **face-sizing-law-2026-11-12 (always-face / ogre-1.5x / rider-40pct / hurl-tumble / fireball-shrink)** + **hitbox-sizing-2026-11-12 (hitR=art / riderbow-88 / grab-yank)** + **sitting-4-2026-11-12 (rider-88-archer-72-own-swap / horde-tier1-2-mix-cap / ramp-2.5pct-PERF-REVIEW-OWED / pause-blur-LAYER-SPLIT / boss-hp-x3 / boss-shots-indestructible / pickups-ride-gem-law / magnet-halved)** + **mage-rig-art (goblinmage-rides-mage-kind / goblinmage2-PARKED)** + **mage2-ice-spikes (mage2-rides-goblinmage2 / three-spike-fan / ice-FX-deferred)** + **mage2-ice-fx (ice-spike-art-user-picked-A / iceArt-overload-pi-tip-lead)** + **pause-freeze-2026-11-14 (GetTree-Paused-armed-on-card-open / arming-frame-return-hold)** + **pause-blur-2fix (soft-gaussian-defocus / nested-field-clear-on-unpause)** passes — CURRENT)
 
-- **UNTESTED HAND-PLAY RAIL (sign-off 2026-11-12 — user hand-plays the day's passes; this sitting VERIFIED: melee missile shatter / fireball aim law / dirt puffs / hitbox = sprite law + riderbow bump + ogre2 grab-yank / heal orb / boss rig + facing / wolves-so-far VERIFIED GOOD; STILL OWED: sitting-4 rider 88 + archer 72 reads, tier-1/2 horde mix feel, 2.5%/min ramp feel + PERFORMANCE REVIEW, pause blur reads (does the arena CLEAR on unpause + is the gaussian defocus soft enough), boss HP x3 pacing, pickup-ride feel, magnet drop rate, mage rig size + spell reads, mage2 spike-volley + twin + ice-spike art reads, stage-1 ground-bake seam feel + tree size/density reads)**: everything SHIPPED since the: everything SHIPPED since the
+- **UNTESTED HAND-PLAY RAIL (sign-off 2026-11-12 — user hand-plays the day's passes; this sitting VERIFIED: melee missile shatter / fireball aim law / dirt puffs / hitbox = sprite law + riderbow bump + ogre2 grab-yank / heal orb / boss rig + facing / wolves-so-far VERIFIED GOOD; STILL OWED: sitting-4 rider 88 + archer 72 reads, tier-1/2 horde mix feel, 2.5%/min ramp feel + PERFORMANCE REVIEW, pause blur reads (does the arena CLEAR on unpause + is the gaussian defocus soft enough), boss HP x3 pacing, pickup-ride feel, magnet drop rate, mage rig size + spell reads, mage2 spike-volley + twin + ice-spike art reads, pause-freeze read (does the WORLD actually STOP behind the card))**: everything SHIPPED since the: everything SHIPPED since the
   last hand-test whose FEEL has never been seen in-game; all are GATED (compile-clean + `errBytes=0` bench) but user-
   unverified by eye. Newest first, each with its retunable knobs:
-    1. **Stage-1 ground bake + tree props (`2d6e19c`)** — does the feather-blended ground read as ONE
-      continuous field (bake-edge seam feel in motion, ground scale) and do the tree props read at sane
-      size/density: the USER delivered 3 tile chunks + 3 tree PNGs under `art/stages/stage1/` (folder per
-      the stage-number naming rule); the assistant feather-blended them into ONE 3412x2270 seamless bake
-      (base = chunk2 all-grass inner crop mirror-tiled 2x2, stamps = chunk3 clearing x3 + chunk1 x7 as
-      feathered rounded-blob masks, linear feather 46–52 px + angular noise 0.06, seed 20261113) and flood-cut
-      the trees — ALL EYE-CONFIRMED inline BEFORE wiring (art-rail law). LAWS THIS PASS TAUGHT: (a) NO stamp
-      rotation — PIL `rotate(expand=False)` paints vacated canvas corners PURE BLACK = the killed pass’s wedges
-      (no source chunk has true black; near-black comps are grass shadow, KEEP them); variety = mirror flips
-      + scale jitter + organic blob rims. (b) gutter crop per edge = near-black run depth, 90th-pct-capped
-      (chunk1 L5R5T8B8 / chunk2 L2R3T8B8 / chunk3 L2R2T7B7) — flood-fill bbox useless, the gutter is ONE
-      connected ring. (c) trees cut by BORDER flood-fill inward so interior dark outlines survive (315k/146k/144k
-      px erased + one soft-fringe pass). (d) NO texture_repeat/texture_offset plumbing (the killed experiment read
-      FROZEN — the offset setter was never proven): N full-size Sprite2D copies of the SAME texture on a lattice of
-      the bake period, period READ from the texture at load (GetWidth/GetHeight), re-picked around the camera each
-      frame; overlapping copies draw identical pixels so they can never disagree, unused slots park at 1e6 px
-      (position-only); the pattern at world point P is always bake(P) — continuous over the infinite world, NEVER
-      folds. Tree props fold like every entity, FOOT anchor (lift h*scale/2 so the trunk stays planted), decor-only
-      (no collision). Knobs (assistant picks): density 10 per 2400x1800 (cap 60), height 240–430 px, bake scale 1
-      (1 bake px = 1 world px). GATE: rebuild 0 err / 4 known warns, dll 1,135,616 B; BOTH reimports staged; seats
-      **PD154** (ENEMY TEST ROOM, 177,271 B: “stage-1 bake up: 3412x2270 … lattice rides the camera, offset never
-      used” + “stage-1 props: 3 tree kinds, 10 planted”) + **PD155** (full pilot, 312,303 B) both `timedOut=True
-      rc=1` EXPECTED **errBytes=0**. GOTCHA: a mirror seat WITHOUT `restageMirrorPD.py` silently runs the OLD dll
-      — new prints missing is the tell.
+    1. **Pause now FREEZES the run (`abfad31`)** - does the world actually STOP behind the card (the
+       user reported "The pause menu also doesn't pause. It blurs, but the game stays running in the
+       background.") AND does dismiss resume the beat cleanly: `ShowPauseCard` arms `GetTree().Paused =
+       true` beside the nested `PauseField.Show()`, `_pauseRunT` anchors the run clock, and the `_process`
+       pause rail RETURNS on the arming frame - `_process` runs run-clock / escort / TPK / horde AFTER the
+       pause rail in the SAME pass, so without the return one warped frame burns the card time at the
+       seat's ~10 fps (PD156 read `run clock held +1.2` on the PRE-hold dll; the same frame now reads +0).
+       FORENSICS ANSWERED the user's "worked fine before the blurring" reference note: 0 of 119 src/Game.cs
+       revisions ever wrote `Paused = true` and no PauseMenu.gd commit ever had `get_tree().paused = true`
+       (only `Campfire.gd:304` + `RunSummary.gd:39`), so the memory was about the card's LOOK/controls,
+       not a freeze - THIS ARM IS THE PROJECT'S FIRST. CLOSURE: a true tree freeze does not stop the card
+       (`PROCESS_MODE_ALWAYS`), so the card's own `pilot_timeout` valve (`Director.PAUSE_PILOT_TIMEOUT = 5.0`)
+       closes the run and `_pauseJustClosed` eats the dismissal frame; NO `do_not_default_pause` project
+       setting touched. Readouts print on open ("pause readout: tree armed, run clock parked at X") and on
+       dismiss ("pause readout: run clock held +X over the card") - the dismiss print MUST read +0.
+       GATE: rebuild 0 err / exactly the 4 known warns (3x godot_mcp CS0618 + `PartyMember.CRESCENT_FLOOR`
+       CS0414); dll 1,132,544 B staged ALL FOUR lanes (stamps 10:22:42 pre-hold / 10:48:43 final); seats
+       **PD156** (PRE-hold dll, +1.2 = evidence only), **PD157** (test room, hold dll: +0, 178,655 B,
+       errBytes=0, pilot beats resumed to t=1920), **PD158** VOID (killed mid-flight at 99 s, 30,845 B
+       truncated - errBytes=0 proves NOTHING), **PD159** (test room, 300 s wall per the user: +0, 96,980 B,
+       errBytes=0, 136 beat lines, 121-body stage-1 rotation clean) all `timedOut=True rc=1` EXPECTED.
+       EYES OWED: enemies visibly frozen behind the card (no drift, no horde crawl), run clock unmoved over
+       the whole card open-dismiss, dismiss resumes the beat, NO blur-softness re-read (retuned 2026-11-13
+       already VERIFIED; a SEPARATE softness read still owed on the rail list). Bake/props leak prints 0.
 
   2. **Pause-blur fix (`9b85017`)** — does the arena actually CLEAR when the card closes, and does the
       blur read SOFT (two user hand-play asks in one gated pass). (a) CLEAR-ON-UNPAUSE BUG: the pause blur
@@ -195,8 +195,51 @@ Session resumed 2026-10-31 after the 2026-10-30 night pause (marker `d8cff96`). 
      will be added), lunge 80x12 (on-axis pierce corridor).
   IF ANY KNOB IS RETUNED after testing: C# pass -> FULL rail again — rebuild (`dobuildPD.py`) + dll restage all four
   lanes (`restagePD.py` + `restageMirrorPD.py`) + project AND mirror `--headless --import` + refreshArtPD2 mirror sync
-  + FRESH seat gate `gatePDPD.py PD156 M1_SELECT=1 WALL=420` (`timedOut=True rc=1` EXPECTED, only guard `errBytes=0`);
+  + FRESH seat gate `gatePDPD.py PD160 M1_SELECT=1 WALL=420` (`timedOut=True rc=1` EXPECTED, only guard `errBytes=0`);
   an ART-ONLY pass skips rebuild/dll but STILL needs BOTH reimports before gating.
+- **STAGE-1 BAKE KILLED + PAUSE NOW TRULY FREEZES + KEEKO ART LAW `abfad31`** (user hand-play verdicts
+  2026-11-14 verbatim: "Let's revert back to the basic background we had previously. I don't like the
+  blend, too much clutter and hard to see enemies." + "The pause menu also doesn't pause. It blurs, but
+  the game stays running in the background." + "before the changes to the blurring, the pause screen
+  worked fine if you need something to reference back to."): THREE lanes, ONE gated pass. (a) BAKE KILL:
+  `git checkout c301780 -- src/Game.cs` restored the shipped flat-moss floor byte-for-byte (verified the
+  ONLY later revision touching Game.cs was `2d6e19c`; zero `_bakeTex` / `PlaceBakeCopies` / `ground_bake`
+  / `treeN_cut` symbols remain) and ONLY the 8 GENERATED art files were deleted (`ground_bake.png*` +
+  `props/tree{2,3,4}_cut.png*` + `.import` sidecars); the user's OWN `chunk1..3.jpg` + `props/treeN.png`
+  sources stay tracked/on disk and the user brings their own map art from here. `2d6e19c` stays in the
+  trail as HISTORY but is now USER-KILLED - its EYES-OWED seam/tree reads are DEAD, do not re-gate them.
+  (b) PAUSE FREEZE: `ShowPauseCard` arms `GetTree().Paused = true` beside the nested `PauseField.Show()`
+  + `_pauseRunT = _runT` readout anchor; FORENSICS ANSWERED the user's "worked fine before the blurring"
+  reference note - 0 of 119 src/Game.cs revisions EVER wrote `Paused = true`, and no PauseMenu.gd commit
+  ever had `get_tree().paused = true` (only `Campfire.gd:304` + `RunSummary.gd:39` did) - so the memory
+  was about the card's LOOK/controls, not a freeze: the arm is the project's FIRST and there was nothing
+  to "revert to". HOLD READ LAW (PD156 read `run clock held +1.2` before it): `_process` runs the run clock
+  / escort / TPK / horde AFTER the pause rail in the same pass, so the rail `return`s on the arming frame
+  (same shape as the `_selHold` / `_stageHold` rails) - the card is `PROCESS_MODE_ALWAYS` so it stays up +
+  closes on its OWN `pilot_timeout` (`Director.PAUSE_PILOT_TIMEOUT = 5.0`) and `_pauseJustClosed` eats the
+  dismissal frame; NO `do_not_default_pause` project-setting change. GATE: rebuild 0 err / exactly the 4
+  known warns (3x godot_mcp CS0618 + `PartyMember.CRESCENT_FLOOR` CS0414); dll **1,132,544 B** staged all
+  four lanes (real bin + .godot/mono/temp/bin/Debug + copyPD mirror pair; stamps 10:22:42 pre-hold, 10:48:43
+  final); PD156 (PRE-hold dll: `+1.2` = evidence only) / PD157 (test room, hold dll: both readouts, `+0`,
+  178,655 B, errBytes=0, beats resumed to t=1920) / PD158 VOID (killed mid-flight at 99 s, 30,845 B
+  truncated - errBytes=0 proves NOTHING) / PD159 (test room, WALL=300 per the user: `+0`, 96,980 B,
+  errBytes=0, 136 beat lines, 121-body stage-1 rotation clean) all `timedOut=True rc=1` EXPECTED. (c)
+  KEEKEO ART (user WIP, UNTRACKED, art-only): the user's 126x191 `keeko.png` is ~1.6x the roster class (79-98
+  W x 114-121 H; aspect matches so it is ONE uniform enlargement, plinth included) and reads out of place
+  because the select-card `STRETCH_KEEP_CENTERED` lane draws art at NATIVE size (no per-portrait knob) +
+  the stage mini rides `miniScale 0.75`. EYES rail (user: "art for a new character - Keeko - but it's a
+  little bigger... I was concerned it's going to look out of place" then "The art looks chopped up and
+  broken." then "I think it looks good, let's go with that for now"): PICKED = box (area) downscale to
+  **78x118** then snap every pixel to the source 58-colour palette + hard alpha (76x116 visible, 1 px
+  margins, 58 colours, 0 semi px, ONE connected silhouette). LAWS: plain LANCZOS invented 4,270 colours;
+  LANCZOS + palette-snap SHATTERED the silhouette into 9 components / 8 orphan specks = the "chopped up
+  and broken" complaint; NEAREST stair-stepped face detail. CLASS-SAFE SHRINK for the character class =
+  box-average THEN palette-snap (a non-integer NEAREST drop kills thin lines). Nothing GD.Loads keeko yet
+  (0 hits across .cs/.gd/.tscn) - the OLD 126x191 was CLEARED from real AND mirror lanes on the user's
+  word ("you can safely clear the old one as I have a copy of it", no backup kept); proof = import chain,
+  NOT a seat (the full-pilot seat was killed mid-flight FOR THAT REASON): real + mirror `--headless --import
+  rc=0`, ctex byte-identical across lanes, uids agree (`uid://82exg0af3vv7`). EYES OWED: the Keeko card
+  read is NOT testable in-game until the playable pass lands. Next fresh seat: **PD160**.
 - **STAGE-1 GROUND BAKE + TREE PROPS `2d6e19c`** (user hand-delivery 2026-11-13: 3 tile chunks + 3 tree PNGs in
   `art/stages/stage1/`; “inspect the chunks and props … insert them into the game with blended edges so they fit
   together, and place a few of the tree props”): assistant feather-blended the chunks into ONE 3412x2270 seamless
