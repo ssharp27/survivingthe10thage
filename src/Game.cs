@@ -690,6 +690,27 @@ public partial class Game : Godot.Node2D
 	Godot.Collections.Array<Godot.Node2D> _enemies = new();
 	Godot.Collections.Array<Boss> _bosses = new();
 	int _liveEnemies = 0;
+	// ---------- separation spatial hash (perf fix 2026-11-16) ----------
+	// The old rail had every enemy walk the WHOLE registry every frame: O(n^2). That is
+	// what turned 100+ body waves into a slideshow. Game rebuilds a fixed power-of-two hash
+	// of 40 px cells at the top of _Process (above the soft-pause rails, so the snapshot is
+	// never stale), and each enemy only reads the 3x3 cell ring around itself. 40 px cells
+	// vs the 20 px shove radius (d2 < 400) means an in-range neighbour can never sit outside
+	// the ring. Buckets chain through int arrays: no Dictionary, no per-frame allocation.
+	// Bosses ride the registry too and keep shoving, exactly like before.
+	const int SEP_CELL = 40;      // cell size in px (2x the shove radius)
+	const int SEP_SLOTS = 4096;   // power of two: the mask is SLOT - 1 (the ~10,000-cell sheet
+	// would fold 10 cells per chain at 1024, and a clumped horde walks those chains back to
+	// O(n^2); 4096 keeps a 400x400 px clump collision-free and empty sheet costs nothing)
+	const int SEP_MASK = 4095;
+	Godot.Collections.Array<int> _sepHead = new(); // slot -> first body index, -1 = empty
+	Godot.Collections.Array<int> _sepNext = new(); // body index -> next body index, -1 = end
+	// _sepBody MUST be its own array, not the registry: kills during the frame REMOVE bodies
+	// from _enemies after the rebuild ran, so a chain index into the registry can point past its
+	// end (PD187 gate: 1,822 ArgumentOutOfRangeException from SepBody). The snapshot is the same
+	// length as the census the chains were built for, so a chain can never read past it.
+	Godot.Collections.Array<Godot.Node2D> _sepBody = new(); // body index -> registry node
+	int _sepCount = 0;
 	double _ringAngle = 0.0;
 	// ---------- field-recruit state ----------
 	// run clock drives the beat table; camp is excluded because it is a read-the-card
@@ -916,7 +937,7 @@ public partial class Game : Godot.Node2D
 	public bool OnReaperDown(PartyMember m)
 	{
 		// TEST reaper (user death-state tester): whatever it touches goes DOWN and
-		// starts the d20 death-save cycle ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â this is the revival test bench. Returns
+		// starts the d20 death-save cycle — this is the revival test bench. Returns
 		// true only when the down actually landed, so immunity lets it keep lurking.
 		if (m == null || !m.joined || m.eliminated || m.downed)
 			return false;
@@ -1493,6 +1514,68 @@ public partial class Game : Godot.Node2D
 		_hordeEventDue += HORDE_EVENT_EVERY;
 	}
 
+	// ---------- separation spatial hash: rebuild + query ----------
+	// Rebuild runs at the TOP of _Process, before any rail can early-return: parent-first
+	// processing means the children (enemies) read the grid only after this ran. The world
+	// torus-wraps at ~2400 px, so shoves stay in raw global coords - cells are keyed straight
+	// off those, no wrap math, which keeps the push identical to the old rail's.
+	public void RebuildSeparationGrid()
+	{
+		if (_sepHead.Count < SEP_SLOTS)
+		{
+			// one-time grow to the fixed slot count: the table never reallocates after this
+			while (_sepHead.Count < SEP_SLOTS)
+				_sepHead.Add(-1);
+		}
+		for (int i = 0; i < SEP_SLOTS; i++)
+			_sepHead[i] = -1;
+		_sepCount = 0;
+		for (int i = 0; i < _enemies.Count; i++)
+		{
+			if (_sepNext.Count <= _sepCount)
+			{
+				// the arrays only ever grow to the high-mark census, then refill in place
+				_sepBody.Add(_enemies[i]);
+				_sepNext.Add(-1);
+			}
+			else
+				_sepBody[_sepCount] = _enemies[i];
+			Godot.Node2D n = _enemies[i];
+			int cx = (int)System.Math.Floor(n.GlobalPosition.X / SEP_CELL);
+			int cy = (int)System.Math.Floor(n.GlobalPosition.Y / SEP_CELL);
+			int h = SepCellKey(cx, cy);
+			_sepNext[_sepCount] = _sepHead[h];
+			_sepHead[h] = _sepCount;
+			_sepCount++;
+		}
+	}
+
+	private int SepCellKey(int cx, int cy)
+	{
+		// big-prime mix then mask: coords go negative west/north, & keeps the slot in range
+		return (int)((cx * 73856093L + cy * 19349663L) & (long)SEP_MASK);
+	}
+
+	// the query side Enemy uses: head of a cell's chain (-1 = empty), then chain-walk
+	// through SepNext. Guarded because a body can process before the first rebuild lands.
+	public int SepCellHead(int cx, int cy)
+	{
+		return _sepHead.Count > 0 ? _sepHead[SepCellKey(cx, cy)] : -1;
+	}
+
+	public Godot.Node2D SepBody(int i)
+	{
+		// the per-frame snapshot, NOT the registry: bodies killed later in the frame are gone
+		// from _enemies and the chain index would read past its end
+		return _sepBody[i];
+	}
+
+	public int SepNext(int i)
+	{
+		// -1 ends the chain
+		return _sepNext[i];
+	}
+
 	// HORDE EVENT bodies (user: "won't count against the maximum number of enemies that can spawn"): the
 	// same no-budget lane the boss nodes use - never counted, so ReleaseLiveCount is inert for them on
 	// every exit path and the director's cap keeps seeing only ordinary horde bodies
@@ -1679,7 +1762,7 @@ public void RegisterEnemy(Combatant e)
 				// holds the row back, it only lands once `final` is truly slain, so "cleared"
 				// stays honest even if the boss was still alive at the wrap time.
 				_state = StageState.VICTORY;
-				PrintSummary("VICTORY ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â " + StageBadge() + " cleared");
+				PrintSummary("VICTORY — " + StageBadge() + " cleared");
 			}
 			else
 			{
@@ -2621,6 +2704,8 @@ public void RegisterEnemy(Combatant e)
 	{
 		float delta = (float)d;
 		MeasureWindow(); // keep frame/period honest for any window size (DPI scaling)
+		RebuildSeparationGrid(); // parent-first: the hash snapshots the registry before any
+		// rail can bail out, so the enemies that process after this always read a fresh grid
 		if (_selHold)
 		{
 			PollSelect(delta); // boot card: the whole run loop waits so no beat burns while a

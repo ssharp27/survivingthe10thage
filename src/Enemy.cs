@@ -741,15 +741,35 @@ public partial class Enemy : Combatant
                 g.TakeHit(hitAny, contactDamage * g.DrinkMul(this)); // Have a Drink!: burning bodies hit 10% softer
             }
         }
-        // separation: n-bounded push apart (spatial hash replaces this in M2)
-        foreach (Godot.Node2D n in g.GetEnemies())
+        // separation: spatial-hash ring (perf fix 2026-11-16). The rail above used to walk
+        // the WHOLE registry per enemy - O(n^2), what made 100+ body waves crawl. Game
+        // rebuilt 40 px cells at the top of its _Process, so this reads only the 3x3 ring
+        // around the body: with 40 px cells, a neighbour inside the 20 px shove radius can
+        // never sit outside the ring, so the push is the same one the old loop made.
+        if (!froz) // Rewrite Reality: no separation shove from a pinned body either
         {
-            if (n == this)
-                continue;
-            Vector2 e = n.GlobalPosition;
-            float d2 = (e - p).LengthSquared();
-            if (d2 < 400.0f && d2 > 0.0001f && !froz) // Rewrite Reality: no separation shove from a pinned body either
-                GlobalPosition += (p - e).Normalized() * 14.0f * delta;
+            int cxr = (int)System.Math.Floor(p.X / 40.0f);
+            int cyr = (int)System.Math.Floor(p.Y / 40.0f);
+            for (int oy = -1; oy <= 1; oy++)
+            {
+                for (int ox = -1; ox <= 1; ox++)
+                {
+                    int k = g.SepCellHead(cxr + ox, cyr + oy);
+                    while (k >= 0)
+                    {
+                        Godot.Node2D n = g.SepBody(k);
+                        int nk = g.SepNext(k);
+                        if (n != this)
+                        {
+                            Vector2 e = n.GlobalPosition;
+                            float d2 = (e - p).LengthSquared();
+                            if (d2 < 400.0f && d2 > 0.0001f)
+                                GlobalPosition += (p - e).Normalized() * 14.0f * delta;
+                        }
+                        k = nk;
+                    }
+                }
+            }
         }
         if (hurtFlash > 0.0f)
         {

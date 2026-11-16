@@ -154,13 +154,13 @@ class_ = "Wizard"
 [node name="BossMini" type="Node2D" parent="." unique_id=321225898]
 position = Vector2(0, -500)
 script = ExtResource("4_boss")
-maxHp = 900.0
+maxHp = 450.0
 kind = "mini1"
 
 [node name="BossMid" type="Node2D" parent="." unique_id=1786505761]
 position = Vector2(0, -620)
 script = ExtResource("4_boss")
-maxHp = 900.0
+maxHp = 600.0
 kind = "boss1"
 
 [node name="BossMid2" type="Node2D" parent="." unique_id=1123581023]
@@ -173,11 +173,11 @@ kind = "boss2"
 position = Vector2(0, -740)
 script = ExtResource("4_boss")
 driftSpeed = 44.0
-maxHp = 1140.0
+maxHp = 750.0
 kind = "mini2"
 
 [node name="BossFinal" type="Node2D" parent="." unique_id=975914059]
 position = Vector2(0, -860)
 script = ExtResource("4_boss")
-maxHp = 900.0
+maxHp = 1050.0
 kind = "final"

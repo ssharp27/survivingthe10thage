@@ -11,8 +11,11 @@ using Godot;
 /// colour and the beat slot, so the loop stays data in the scene, not four copies of a class.
 /// Legacy "mini" still reads as a mini so an older scene keeps working.
 /// 2026-11-12 HAND-PLAY RETUNE (user): "Boss HP feels way too low... 3x their HP" - the
-/// authored maxHp lands at 900/900/900/1140/900 in Main.tscn (the hp = maxHp wiring below
-/// is untouched). Same-day ask: "Remove the ability to destroy boss projectiles" - the
+/// authored maxHp landed at 900/900/900/1140/900 in Main.tscn, then 2026-11-16: the same
+/// flat x3 read unevenly (mini1 held ~512 s early, boss2 died inside one tick), so the user
+/// hand-rescaled the ladder to 450/600/900/750/1050 (mini1/boss1/boss2/mini2/final). The
+/// hp = maxHp wiring below is untouched either way. Same-day ask: "Remove the ability to
+/// destroy boss projectiles" - the
 /// volley sites below opt into Game.SpawnBullet / SpawnBulletArrow bossShot named arg,
 /// and Game.cs flags those pooled slots so the blade smas scans skip them (the bolts
 /// still hurt the party through UpdateBullets exactly as before).
