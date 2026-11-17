@@ -503,7 +503,7 @@ public partial class Game : Godot.Node2D
 	const double GEM_TIER_RED = 50.0;     // XP at which an orb becomes the RED MEGA orb (USER)
 	// GEM ART (2026-11-17, the user picked the d20 XP chip: "gem_d20 is amazing. Let's use that
 	// one" + chose mega differentiation = bigger + inner star). Two HAND-AUTHORED tone-only
-	// canvases in art/fx: xp_gem.png 14x14 and xp_gem_mega.png 20x20. They carry SHAPE and DEPTH
+	// canvases in art/pickups: xp_gem.png 14x14 and xp_gem_mega.png 20x20. They carry SHAPE and DEPTH
 	// only (grey luminance), never their own colour, because PaintGem multiplies the tier hue
 	// through the sprite's Modulate - a baked hue would stop re-reading when a merge fattens an
 	// orb. Loaded ONCE at pool build into these statics so PaintGem never touches GD.Load.
@@ -2521,8 +2521,8 @@ public void RegisterEnemy(Combatant e)
 		_ultLabel.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
 		// GEM ART loads ONCE here (the bee / ult pool idiom): GD.Load per spawn would re-enter the
 		// resource loader on every kill. Null art = the shipped greybox square, unchanged.
-		_gemArtTex = GD.Load("res://art/fx/xp_gem.png") as Godot.Texture2D;
-		_gemMegaArtTex = GD.Load("res://art/fx/xp_gem_mega.png") as Godot.Texture2D;
+		_gemArtTex = GD.Load("res://art/pickups/xp_gem.png") as Godot.Texture2D;
+		_gemMegaArtTex = GD.Load("res://art/pickups/xp_gem_mega.png") as Godot.Texture2D;
 		for (int i = 0; i < 240; i++)
 		{
 			Godot.Node2D gem = new Node2D();
