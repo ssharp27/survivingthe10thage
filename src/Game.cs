@@ -22,6 +22,7 @@ public partial class Game : Godot.Node2D
 	double _wrapW = 2400.0;
 	double _wrapH = 1800.0;
 	public readonly float MEMBER_RADIUS = 16.0f;
+	public const float UNDEAD_RADIUS = 12.0f; // risen bodies (2026-11-17): the horde's shot-core lane uses this like MEMBER_RADIUS
 	public const double RING_RADIUS = 64.0; // bodyguard ring; sized so REVIVE_RANGE
 	// wraps a ring slot: a downed bodyguard is in arm's reach of the rescue
 	// ---------- ring seats (one distinct angle per roster seat) ----------
@@ -170,13 +171,13 @@ public partial class Game : Godot.Node2D
 	// without-replacement draw per ally beat, taken at boot. The run's own leader never
 	// rolls onto its own pool (it CAN show up on runs where it is not the leader).
 	// Row = registry index (BuildJoinLottery reads _stage): columns are memberIndex order
-	// (0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash | 7 Bruno | 8 Brook).
+	// (0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash | 7 Bruno | 8 Brook | 9 Keeko | 10 Hapi).
 	// Weight 0 = cannot appear on that stage. Stage 1 per the user: Baldrun + Mosiah more likely
 	// than the rest. The Enemy Test Room row is ALL ZERO on purpose: the room runs no ally beats,
 	// so the exhausted pool is a logged no-op and nothing can recruit there.
 	// Sanity numbers - the user will add rows/weights per future stage.
 	// the new-style initializer: Godot's C# build trips CS0623 on nested old-style braces
-	private static readonly int[][] JOIN_W = { new int[] { 3, 3, 1, 1, 1, 1, 1, 1, 1, 1 }, new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };   // row 0 = stage 1: Baldrun + Mosiah heavy, Wash + Bruno + Brook parity with the rest | row 1 = the test room: no recruits
+	private static readonly int[][] JOIN_W = { new int[] { 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1 }, new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };   // row 0 = stage 1: Baldrun + Mosiah heavy, the rest (Keeko 2026-11-14, Hapi 2026-11-17) at parity | row 1 = the test room: no recruits
 	private int[] _joinOrder = new int[0]; // ally slot k -> memberIndex drawn for it
 	private Godot.Collections.Array<int> _hpOrder = new(); // HUD strip slot -> memberIndex: the join order (see BuildJoinLottery)
 	private Godot.RandomNumberGenerator _joinRng; // UNSEEDED on purpose: a fresh process re-rolls
@@ -233,7 +234,7 @@ public partial class Game : Godot.Node2D
 	// kit-native ranks (pierce, multishot) ride the same cap. Ranks cap at 3 per DESIGN; the
 	// 4th rank would be the evolution (Stormcaller / Viperkiss), still stubbed for M2.
 	const int PICK_RANK_CAP = 3;
-	const int PICK_SLOTS = 10;   // keys pick_1..pick_10: nine members + one wild slot (pick_10 entered the input map 2026-10-31 with Brook)
+	const int PICK_SLOTS = 12;   // keys pick_1..pick_12: eleven members + one wild slot (Brook rode pick_10 2026-10-31, Keeko pick_11, Hapi pick_12 entered the input map 2026-11-17)
 	static readonly string[] OPT_LABEL = { "Longer Reach (+15% Range)", "Heavier Blows (+10% Damage)",
 										   "Swifter Swings (+16% Attack Speed)", "Quicker Thrusts (+16% Attack Speed)",
 										   "Deeper Thrusts (+16% Range, Pierce +1)", "Sharper Tip (+10% Damage)",
@@ -248,19 +249,19 @@ public partial class Game : Godot.Node2D
 		"Lucky Stabs (+5% Crit Chance)", "Sneak Attack (+5% Multistrike Chance)",
 											   "Fire Rune (+1 Burn Damage/sec for 5s)", "Harder Thrusts (+15% Crit Damage)",
 											   "Eagle Eye (+5% Crit Chance)", "Difficult Terrain (10% Slow for 2.5s)",
-											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)" };
-	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 0, 1, 2, 3, 4, 9, 9, 9, 9, 9 };
-	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.86f, 1.0f, 1.0f, 1.0f };
-	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)", "Overflowing Necrosis (+12% Damage)", "Swift Curse (+16% Attack Speed)", "Multi-Flame (+1 Pillar Target)", "Necrotic Plague (Flame DoT passes on touch)", "Greater Pestilence (+15% Pillar Radius)" };
+	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 0, 1, 2, 3, 4, 9, 9, 9, 9, 9 , 10, 10, 10, 10, 10 };
+	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f };
+	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
 	// user 2026-11-01 audit fix: Stack rows 20/21 were swapped - keener flame carried no bonus at all and quicker fuse carried the damage. damage 1.10 rides row 20, cooldown 0.85 rides row 21.
-	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f };
-	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // rows 4 + 8: Mosiah deeper thrust / Asper piercing shot (user 2026-10-30)
-	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
+	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f };
+	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // rows 4 + 8: Mosiah deeper thrust / Asper piercing shot (user 2026-10-30)
+	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
 	// guiding light (Alvora): the ring MARKS caught bodies for +10%/rank incoming damage
 	// from EVERY source, a window on the body that decays on its own (Combatant.TickVuln).
 	// The user swapped the old flat-armour defence for this offense (2026-10-23): the squad
 	// keeps no mitigation, but the cleric's ring becomes the party's damage setup.
-	static readonly int[] OPT_VULN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_VULN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 	// draging maul (Baldrun 4th card, user 2026-10-24): connected maul hits drag caught bodies to
 	// (1 - 0.25/rank) speed for a 2.5 s window (Combatant.slowMul/slowT, refresh-not-stack); only
 	// horde movement reads it and the cleave hook never marks Bosses. deadly aim (Mosiah 4th card):
@@ -268,38 +269,38 @@ public partial class Game : Godot.Node2D
 	// so the crit card is pure table data. Rows 18/19 of the 20-wide tables; caps bound both:
 	// drag <= 0.75 at rank 3, crit <= 0.05 + 3 x 0.08 = 0.29.
 	// OPT_SLOW = drag strength/rank (Baldrun row 18); OPT_CRIT = crit points/rank (Mosiah row 19).
-	static readonly double[] OPT_SLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_SLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 	// firebolt kit cards (Stack, user 2026-10-30): OPT_BURN = +2 s of linger per rank onto
 	// PartyMember.burnDur; OPT_CINDER = cinder bloom rank: a body that dies STILL burning bursts
 	// in CINDER_R px, scorching the live horde bodies in the blast for 25/50/75% of the firebolt's
 	// roll at rank 1/2/3 (Game.CinderBurst, hooked in the kill scan). Rows
 	// 25-29 of the now 25-wide tables.
-	static readonly double[] OPT_BURN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-	static readonly int[] OPT_CINDER = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_BURN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_CINDER = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 	static readonly double CINDER_R = 60.0; // cinder bloom blast radius (assistant pick: small)
 	// shield kit cards (Wash, user 2026-10-31): OPT_BOUNCE = +1 shield bounce per rank (the thrown
 	// shield hits its prey then hops to one MORE body per bounce; the hop lane lives on PartyMember);
 	// OPT_CRITD = +0.25 CRIT_DAMAGE points per rank on the tag store. Rows 25-29 of the now 30-wide
 	// tables: heavier shield | quicker hurl | more rebounds | sharper rim | crushing blow.
-	static readonly int[] OPT_BOUNCE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_CRITD = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.15, 0, 0, 0, 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_BOUNCE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_CRITD = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.15, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 	// axe kit cards (Bruno, user 2026-10-31): heavier axe rides the shared OPT_DMG 1.10 row,
 	// quicker throw rides the shared OPT_CD 0.85 row; these three columns are NEW:
 	// OPT_AXE = +1 extra crescent per rank (base ONE throw, arcs alternate top/bottom);
 	// OPT_SIZE = +1 size rank per rank (the blade disc + band depth read 1.0 + 0.25 * rank);
 	// OPT_BLEED = bleed rank (hit bodies bleed like the fire DoT, own status pair; dps scales
 	// with the damage card at the call site). Rows 30-34 of the then 35-wide tables.
-	static readonly int[] OPT_AXE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-	static readonly int[] OPT_SIZE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-	static readonly int[] OPT_BLEED = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_AXE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_SIZE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_BLEED = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 // Brook dagger cards (user 2026-10-31): sharper edges rides the shared OPT_DMG row,
 // quicker jabs the shared OPT_CD row, deadly angle the shared OPT_CRIT row; these two
 // columns are NEW: OPT_VENOM = +2 s of poison window per rank (lingering venom),
 // OPT_MS = +0.05/rank multistrike CHANCE (lucky strikes: a hit deals damage twice).
 // Rows 35-39 of the now 40-wide tables.
-	static readonly double[] OPT_VENOM = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_MS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05 };	// fifth cards (user 2026-11-01): the tables are now 45-wide and rows 40-44 give the FIRST five
+	static readonly double[] OPT_VENOM = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_MS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05 , 0, 0, 0, 0, 0 };	// fifth cards (user 2026-11-01): the tables are now 45-wide and rows 40-44 give the FIRST five
 	// PCs a fifth track each. Two of the five ride columns that already exist - deadlier aim (row
 	// 41) rides OPT_CRITD as +0.15 CRIT_DAMAGE points/rank (10% of the 1.5 BASE per rank, the same
 	// points lane the Wash crushing blow card uses), keener aim (row 42) rides OPT_CRIT +0.08/rank exactly
@@ -310,9 +311,9 @@ public partial class Game : Godot.Node2D
 	// the drag, 2.5 s refresh-not-stack window), OPT_LUCK = lucky-explosion chance/rank baked on the
 	// summon slot at spawn (_summonLuck, pool column grows WITH the pool) and rolled in DetonateSummon
 	// as a SECOND sweep pass - zero Rng draw when the rank is 0.
-	static readonly double[] OPT_FIRE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_RING = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0, 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_LUCK = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_FIRE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_RING = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_LUCK = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 	// Keeko "Nexus" kit cards (user 2026-11-14): rows 45-49, the tables are now 50-wide. Arcane Power
 	// rides the shared OPT_DMG 1.12 row, Faster Channeling the shared OPT_CD 0.86 row (the same +16%
 	// cadence the other speed cards use), Arcane Echo rides OPT_MS (+0.05/rank multistrike CHANCE -
@@ -320,8 +321,20 @@ public partial class Game : Godot.Node2D
 	// OPT_BEAM = Split Beams extra picks/rank (each extra prey gets its OWN hitscan lane + slot, cap 4);
 	// OPT_REACH = Arcane Reach: +0.10 reach FACTOR per rank - the 2026-11-14 hand-play pass
 	// RETIRED the knockback the user did not like ("I actually don't like the knockback. Let's replace it with a simple +10% range increase"): EffRange() x (1 + beamReach) now widens the Nexus lane instead, and PartyMember draws the band tome->prey so it crosses the bodies it wounds.
-	static readonly int[] OPT_BEAM = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 };
-	static readonly double[] OPT_REACH = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0 };
+	static readonly int[] OPT_BEAM = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_REACH = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0 , 0, 0, 0, 0, 0 };
+	// Hapi "Necrotic Flame" kit cards (user 2026-11-17): rows 50-54, the tables are now 55-wide. Overflowing
+	// Necrosis rides the shared OPT_DMG 1.12 row and Swift Curse the shared OPT_CD 0.86 row EXACTLY like
+	// every other kit's damage/speed pair; the necrosis DoT itself scales with the damage card at the commit
+	// (1 dps x damage stat, the user's 1 dmg/s x 5 s base). These THREE columns are NEW: OPT_PILLAR = Multi-Flame
+	// extra pillar drops/rank (each extra pick drops its OWN column - the radius test means a column bites
+	// EVERY body in PILLAR_R (1 + 0.15 x OPT_PEST rank), so Pestilence widens a REAL bite); OPT_PLAGUE =
+	// Necrotic Plague rank (carriers pass the flame to bodies within PLAGUE_TOUCH px, keeping the carrier's
+	// dps with AT LEAST 2 s left - plus the applier's OWN stamp runs +2 s/rank longer at the commit); OPT_PEST
+	// = Greater Pestilence rank (column radius x1.15/rank at the PartyMember commit site).
+	static readonly int[] OPT_PILLAR = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 };
+	static readonly int[] OPT_PLAGUE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 };
+	static readonly int[] OPT_PEST = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 };
 
 
 	int[] _pickRank = new int[OPT_LABEL.Length];
@@ -702,6 +715,31 @@ public partial class Game : Godot.Node2D
 		const float BEE_ART_S = 0.32f; // pick: 39x48 bee art -> ~13 px beside the 10 px shell (assistant knob, retunable)
 		const double BEE_HEAD_LIFT = 20.0; // riding anchor floats this many px ABOVE the victim center: near that character's head (user 2026-11-08: "floating near that character's head"); assistant knob
 		const double BEE_BOB_PX = 1.6;    // px of gentle vertical bob on riding bees: "floating", not glued; assistant knob
+		// Hapi "Necrotic Flame" pillar + "Bring Out Yer Dead!" risen pool (user 2026-11-17): the
+		// risen are PLAIN pooled Node2D shells, NOT Combatants: they never enter _enemies and never
+		// bite the party. The horde chews them through the Enemy chase branch and its shots
+		// intercept them (real HP: enemies can kill the risen). Art: the corpse's OWN Sprite2D
+		// texture + scale copied per spawn - no new art lane, no green tint over painted bodies.
+		const int UNDEAD_POOL = 24;        // pool cap: conversions + leader rises (assistant pick)
+		const double UNDEAD_LIFE = 10.0;   // user: each risen body lives 10 s after THEIR OWN rise
+		const double UNDEAD_FIND = 240.0;  // pick: hunting reach: a risen body chases bodies this far
+		const float UNDEAD_TOUCH = 10.0f;  // pick: bite range: px PAST the prey's arted hitR
+		const double TAUNT_PULL = 140.0;   // pick: risen halves yank enemies within this ring (Call of the Grave)
+		const double PLAGUE_TOUCH = 36.0;  // pick: Necrotic Plague pass-on reach (assistant pick)
+		const double RISE_CHANCE = 0.05;   // user: 5% of slain enemies rise while Hapi leads
+		const int PILLAR_POOL = 16;        // pick: pillar FX slots (Multi-Flame caps at 4 columns per volley)
+		const double PILLAR_LIFE = 0.5;    // pick: a column reads for half a second then fades
+		public const double PILLAR_R = 28.0; // BASE column radius: PartyMember commits PILLAR_R x (1 + 0.15 x Pest rank)
+		public Godot.Texture2D pillarFxTex = null; // Hapi column art: wired ONCE by the member's _EnterTree gate; null = silent skip
+		Godot.Collections.Array<Godot.Node2D> _undead = new();   // shells: child0 = fallback rect, child1 = art slot
+		Godot.Collections.Array<double> _undHp = new();     // REAL hp: the horde can fell them
+		Godot.Collections.Array<double> _undLife = new();   // seconds left after THEIR OWN rise
+		Godot.Collections.Array<double> _undCd = new();     // bite cadence (1 s chomps)
+		Godot.Collections.Array<double> _undDmg = new();    // bite = the corpse's contact damage
+		Godot.Collections.Array<double> _undSpd = new();    // chase speed = the corpse's own speed
+		Godot.Collections.Array<int> _undTaunt = new();     // 0 = conversion (no pull) / 1 = risen half (taunts)
+		Godot.Collections.Array<Godot.Sprite2D> _pillarFx = new();
+		Godot.Collections.Array<double> _pillarT = new();
 		// The Kaka (Yu ult, user 2026-10-26): six EMPOWERED copies of the ritual familiars -
 		// same pool, steering, fuse and no-split blast, only doubled reach and bite. The x2
 		// multiplies AFTER the rank scaling: the member passes already-scaled kit numbers and
@@ -1064,6 +1102,27 @@ public partial class Game : Godot.Node2D
 			if (_escortLeft <= 0)
 				JoinRecruit();
 		}
+		// Hapi "Bring Out Yer Dead!" kill lane (user 2026-11-17): a NON-boss kill while ANY joined
+		// member's 10 s conversion window is up rises THIS corpse with its own stats. Escort
+		// deaths already fed the rescue meter above, so they read BOTH lanes. The leader bonus
+		// (Call of the Grave) is the separate 5% half-rise lane below.
+		bool risenUp = false; // is any conversion window open across the squad?
+		foreach (PartyMember m in _party)
+		{
+			if (m.joined && m.convT > 0.0)
+			{
+				risenUp = true;
+				break;
+				}
+			}
+		if (risenUp)
+		{
+			SpawnUndead(c, false); // conversion rise: fights beside the squad, no pull
+			}
+		else if (LeaderBonusKey() == 11 && Rng.Randf() < RISE_CHANCE)
+		{
+			SpawnUndead(c, true); // risen HALF: half stats, and it taunts the nearby horde
+			}
 		// Guardian Awakening (Alvora ult, user 2026-10-26): every HORDE kill while an ally's
 		// awakening window is up heals ONE RANDOM standing ally +1 hp (user 2026-11-06: it
 		// used to heal the whole standing squad) - same eligibility the spirit heals use
@@ -1077,7 +1136,7 @@ public partial class Game : Godot.Node2D
 				m.awaKills += 1;
 				// one random standing ally per kill (user 2026-11-06): gather the eligible squad,
 				// draw ONE patient - the awakening no longer heals everybody
-				PartyMember[] cands = new PartyMember[9]; // roster-wide bound (9 PCs at 2026-11-01)
+				PartyMember[] cands = new PartyMember[11]; // roster-wide bound (11 PCs at 2026-11-17)
 				int cn = 0;
 				foreach (PartyMember mm in _party)
 				{
@@ -2709,6 +2768,42 @@ public void RegisterEnemy(Combatant e)
 			_beeRay.Add(0.0);
 			_beeTarget.Add(-1L);
 		}
+		// Hapi risen pool + pillar FX pool (2026-11-17): shells get a fallback sickly-green rect (child
+		// 0, parked invisible) + an art slot (child1) that SpawnUndead fills with the corpse's OWN
+		// texture. z 2 like the bodies; pillar columns ride z 3 like the beam lance.
+		for (int i = 0; i < UNDEAD_POOL; i++)
+		{
+			Godot.Node2D s = new Godot.Node2D();
+			Godot.ColorRect cr = new Godot.ColorRect();
+			cr.Size = new Vector2(14.0f, 18.0f);
+			cr.Position = new Vector2(-7.0f, -18.0f);
+			cr.Color = new Color(0.55f, 0.8f, 0.35f, 0.0f); // sickly green: parked slots invisible
+			s.AddChild(cr);
+			Godot.Sprite2D art = new Godot.Sprite2D();
+			art.Set("texture_filter", 0); // NEAREST like every other pool sprite
+			s.AddChild(art);
+			s.Set("z_index", 2); // bodies lane: the pillar FX (z 3) draws over them
+			s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+			AddChild(s);
+			_undead.Add(s);
+			_undHp.Add(0.0);
+			_undLife.Add(0.0);
+			_undCd.Add(0.0);
+			_undDmg.Add(0.0);
+			_undSpd.Add(0.0);
+			_undTaunt.Add(0);
+		}
+		for (int i = 0; i < PILLAR_POOL; i++)
+		{
+			Godot.Sprite2D s = new Godot.Sprite2D();
+			s.Set("texture_filter", 0); // NEAREST like every other pool sprite
+			s.Set("z_index", 3); // above the bodies, below the chip UI, same lane as the beam
+			s.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f); // parked slots invisible
+			s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+			AddChild(s);
+			_pillarFx.Add(s);
+			_pillarT.Add(0.0);
+		}
 		// Dirt puff pool (user 2026-11-09): the grit the horde kicks up on its foot plants.
 		// Plain z (the scene sets none anywhere else, and the bees lane needed 20 to sit ABOVE
 		// the characters): these Sprite2D slots join the tree after the floor rect and before
@@ -3488,7 +3583,7 @@ public void RegisterEnemy(Combatant e)
 						 " | party: " + hps +
 						 " | lb chain " + _lbChainFired + " bound " + _lbInsectBound + " healed " + _lbSpiritTaken +
 						 " drink " + _lbDrinkHits +
-						 " | ult " + _ultFired + " cd " + (_leader != null && _leader.ultCdT > 0.0 ? (int)System.Math.Ceiling(_leader.ultCdT) : 0));
+						 " | ult " + _ultFired + " cd " + (_leader != null && _leader.ultCdT > 0.0 ? (int)System.Math.Ceiling(_leader.ultCdT)  : 0));
 			}
 		}
 	}
@@ -3531,6 +3626,8 @@ public void RegisterEnemy(Combatant e)
 			return 9; // Inspiring Leader (user 2026-11-02): all allies +15 max hp / +1 armour while Wash leads: readers LeaderInspireHp() (EffMaxHp) + LeaderArmourFlat() (TakeHit)
 	if (_leader.displayName == "Keeko")
 		return 10; // Gekkota Training (user 2026-11-14): all allies +10% evasion / +10% move / +10% attack speed while Keeko leads: readers LeaderEvaMul/LeaderMoveMul/LeaderAtkSpdMul
+		if (_leader.displayName == "Hapi")
+			return 11; // Call of the Grave (user 2026-11-17): slain enemies 5% rise as undead halves (half stats) that taunt nearby enemies: the rise lives on Game.OnEnemyKilled, the pull on Game.GetTauntBody
 		return 0;
 	}
 	
@@ -3738,6 +3835,7 @@ public void RegisterEnemy(Combatant e)
 		UpdateInsects(delta);
 		UpdateSpirits(delta);
 		UpdateBees(delta); // swarm upkeep: lives under ANY seat once a cast ran
+		UpdateUndead(delta); // risen upkeep: columns fade, bodies shamble and chomp, plague walks
 	}
 
 	// Asper's vigil spawner: next free slot (parked at -9000 like the summon pool), a
@@ -4100,11 +4198,249 @@ public void RegisterEnemy(Combatant e)
 		}
 	}
 	
+	// Hapi column paint: PartyMember commits the column radius (PILLAR_R x Pest rank) alongside the
+	// hit, so the paint only reads the numbers. Silent skip while art is missing: the DoT already
+	// landed, only the column drops. Columns ride z 3 over the bodies, same lane as the beam lance.
+	public void SpawnPillarFx(Vector2 p, double radius)
+	{
+		for (int i = 0; i < _pillarFx.Count; i++)
+		{
+			if (_pillarT[i] > 0.0)
+				continue; // busy slot: a fading column still reads; this volley takes the next free one
+			Godot.Sprite2D s = _pillarFx[i];
+			_pillarT[i] = PILLAR_LIFE; // a column reads for half a second then fades
+			if (pillarFxTex == null)
+			{
+				s.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f); // no art lane: keep the slot invisible while spent
+				return; // silent skip: the DoT already committed at the caller
+			}
+			s.Texture = pillarFxTex;
+			s.Scale = new Vector2((float)(radius * 2.0 / 95.0), (float)(radius * 2.0 / 95.0)); // uniform: the 95 px sprite covers the column width, height rides with it (NEVER squash the art)
+			s.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f); // fresh paint: UpdateUndead fades it down each frame
+			// sprite origin is center: stand the column on the body foot line (half the SCALED 176 px height)
+			s.GlobalPosition = WrapNearCamera(p + new Vector2(0.0f, (float)(-88.0 * radius * 2.0 / 95.0)));
+			return;
+		}
+		GD.Print("[10thAge] (hapi) every column slot is busy: this volley paints nothing"); // overflow: the hits still landed
+	}
+	// Hapi per-frame upkeep: fade spent columns, shamble + chomp risen bodies, and walk the
+	// Necrotic Plague (opt-in while any joined member ranks the plague pick). Column paint is
+	// PartyMember-committed: this lane only reads the numbers.
+	private void UpdateUndead(double delta)
+	{
+		for (int i = 0; i < _pillarFx.Count; i++) // pillar fade FIRST: half a second then dust
+		{
+			if (_pillarT[i] <= 0.0)
+				continue; // spent slot
+			_pillarT[i] -= delta;
+			double f = _pillarT[i] / PILLAR_LIFE;
+			if (f < 0.0)
+				f = 0.0;
+				_pillarFx[i].Modulate = new Color(1.0f, 1.0f, 1.0f, (float)f); // linear fade to dust
+			}
+		bool plagueOn = false; // Necrotic Plague: only when a joined member ranks it
+		foreach (PartyMember m in _party)
+		{
+			if (m.joined && m.plagueR > 0)
+			{
+				plagueOn = true;
+				break;
+				}
+			}
+		Godot.Collections.Array<Godot.Node2D> enemies = GetEnemies(); // horde snapshot once
+		for (int i = 0; i < _undead.Count; i++)
+		{
+			Godot.Node2D s = _undead[i];
+			if (s.GlobalPosition.X <= -8000.0f)
+				continue; // parked slot
+			_undLife[i] -= delta;
+			if (_undLife[i] <= 0.0)
+			{
+				DespawnUndead(i);
+				GD.Print("[10thAge] (hapi) a risen body turns to dust"); // its own 10 s done
+				continue;
+			}
+			s.GlobalPosition = WrapNearCamera(s.GlobalPosition); // fold-follow like every pool
+			Godot.Node2D pn = null; // nearest live prey within UNDEAD_FIND, wrap-squared
+			double best = UNDEAD_FIND * UNDEAD_FIND;
+			foreach (Godot.Node2D n in enemies)
+			{
+				Combatant nc = (Combatant)n;
+				if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
+					continue; // dead bodies are not prey (same skip as the insect scan)
+				Vector2 off = WrapDelta(s.GlobalPosition, n.GlobalPosition);
+				double d2 = off.X * off.X + off.Y * off.Y;
+				if (d2 < best)
+				{
+					best = d2;
+					pn = n;
+					}
+				}
+			if (pn != null)
+			{
+				Combatant pc = (Combatant)pn;
+				double touch = (double)pc.hitR + UNDEAD_TOUCH;
+				Vector2 off = WrapDelta(s.GlobalPosition, pn.GlobalPosition);
+				double d2 = off.X * off.X + off.Y * off.Y;
+				if (d2 > touch * touch)
+				{
+					s.GlobalPosition = WrapNearCamera(s.GlobalPosition + off.Normalized() * (float)(_undSpd[i] * delta)); // shamble toward prey
+					}
+					else
+					{
+						_undCd[i] -= delta;
+						if (_undCd[i] <= 0.0)
+						{
+							_undCd[i] = 1.0; // 1 s chomps
+							pc.TakeDamage(_undDmg[i]); // bite = the corpse's own contact damage
+							}
+						}
+				}
+			if (plagueOn)
+			{
+				// pass 1: the FIRST live flamed carrier touching this body lends its curse
+				double cdps = 0.0;
+				double cdur = 0.0;
+				foreach (Godot.Node2D n in enemies)
+				{
+					Combatant nc = (Combatant)n;
+					if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f || nc.necrosisT <= 0.0)
+						continue; // only a flamed, living carrier passes the curse on
+					Vector2 off = WrapDelta(s.GlobalPosition, n.GlobalPosition);
+					double reach = (double)nc.hitR + UNDEAD_RADIUS + PLAGUE_TOUCH;
+					if (off.X * off.X + off.Y * off.Y <= reach * reach)
+					{
+						cdps = nc.necrosisDps;
+						cdur = nc.necrosisT; // carrier's own window: the floor below keeps it real
+						break;
+						}
+					}
+				if (cdps > 0.0)
+				{
+					// pass 2: the curse walks to fresh bodies touching the risen one
+					foreach (Godot.Node2D n in enemies)
+					{
+						Combatant nc = (Combatant)n;
+						if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f || nc.necrosisT > 0.0)
+							continue; // already-flamed bodies never re-carry
+						Vector2 off = WrapDelta(s.GlobalPosition, n.GlobalPosition);
+						double reach = (double)nc.hitR + UNDEAD_RADIUS + PLAGUE_TOUCH;
+						if (off.X * off.X + off.Y * off.Y <= reach * reach)
+						{
+							nc.Necrotic(cdps, System.Math.Max(2.0, cdur)); // min 2 s: the pass-on stays a real DoT
+							}
+						}
+					}
+				}
+			}
+		}
 	private void DespawnBee(int i)
 	{
 		Godot.Node2D s = _bees[i];
 		s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
 		((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+	}
+	// Hapi (2026-11-17): raise a corpse as a risen ally. half = leader-bonus halves ride HALF
+	// stats (hp / bite / speed) and half art scale; conversions ride the corpse's own stats.
+	// The corpse's OWN Sprite2D child (texture + scale + flip) is copied into the shell's art
+	// slot; no painted body gets a green tint. Parked -9000 like every pool.
+	private void SpawnUndead(Combatant c, bool half)
+	{
+		float k = half ? 0.5f : 1.0f;
+		int slot = -1; // free-slot scan like every pool: parked means free
+		for (int si = 0; si < _undead.Count; si++)
+		{
+			if (_undead[si].GlobalPosition.X <= -8000.0f)
+			{
+				slot = si;
+				break;
+			}
+		}
+		if (slot == -1)
+		{
+			GD.Print("[10thAge] (hapi) the graveyard is full: no free risen slot"); // pool overflow: log, never stall
+			return;
+		}
+		Godot.Node2D s = _undead[slot];
+		s.GlobalPosition = WrapNearCamera(c.GlobalPosition);
+		((Godot.ColorRect)s.GetChild(0)).Color = new Color(0.55f, 0.8f, 0.35f, 0.9f);
+		_undHp[slot] = (double)c.maxHp * k; // REAL hp lane: the horde can fell a risen body
+		_undDmg[slot] = (double)c.contactDamage * k; // bite = the corpse's own contact damage
+		_undSpd[slot] = ((Enemy)c).speed * k; // chase speed = the corpse's own speed
+		_undLife[slot] = UNDEAD_LIFE; // 10 s after THEIR OWN rise: conversions outlive the 10 s window edge
+		_undCd[slot] = 0.5; // first chomp half a second after rising
+		_undTaunt[slot] = half ? 1 : 0; // only risen halves taunt; conversions fight without pulling
+		Godot.Sprite2D art = (Godot.Sprite2D)s.GetChild(1);
+		art.Texture = null; // stale paint never rides a fresh corpse
+		foreach (Godot.Node ch in c.GetChildren()) // the corpse's OWN Sprite2D (texture + scale + flip)
+		{
+			if (ch is Godot.Sprite2D && ((Godot.Sprite2D)ch).Texture != null)
+			{
+				Godot.Sprite2D src = (Godot.Sprite2D)ch;
+				art.Texture = src.Texture;
+				art.Scale = src.Scale * k; // halves ride half paint too
+				art.FlipH = src.FlipH;
+				((Godot.ColorRect)s.GetChild(0)).Color = new Color(0.55f, 0.8f, 0.35f, 0.0f); // painted body: the rect stops drawing
+				break;
+			}
+		}
+	}
+	// Hapi shot intercept: nearest risen body inside the SAME 12 px bolt core members use.
+	private Godot.Node2D UndeadAt(Vector2 p)
+	{
+		Godot.Node2D w = null;
+		float nd = 1e9f;
+		foreach (Godot.Node2D s in _undead)
+		{
+			if (s.GlobalPosition.X < -8000.0f)
+				continue;
+			float d = p.DistanceTo(s.GlobalPosition);
+			if (d < 12.0f + UNDEAD_RADIUS && d < nd)
+			{
+				nd = d;
+				w = s;
+			}
+		}
+		return w;
+	}
+	public void UndeadHitBy(Godot.Node2D u, double dmg)
+	{
+		for (int i = 0; i < _undead.Count; i++)
+		{
+			if (_undead[i] == u)
+			{
+				_undHp[i] -= dmg;
+				if (_undHp[i] <= 0.0)
+					DespawnUndead(i);
+				return;
+			}
+		}
+	}
+	private void DespawnUndead(int i)
+	{
+		Godot.Node2D s = _undead[i];
+		s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+		((Godot.ColorRect)s.GetChild(0)).Color = new Color(0.55f, 0.8f, 0.35f, 0.0f);
+	}
+	// TAUNT QUERY (Call of the Grave): nearest risen HALF within TAUNT_PULL, wrap-corrected.
+	// null = zero chase change for the Enemy. Conversions (flag 0) never answer this.
+	public Godot.Node2D GetTauntBody(Vector2 pos)
+	{
+		Godot.Node2D w = null;
+		double nd = 1e9;
+		for (int i = 0; i < _undead.Count; i++)
+		{
+			Godot.Node2D s = _undead[i];
+			if (s.GlobalPosition.X < -8000.0f || _undTaunt[i] == 0)
+				continue;
+			double d = WrapNearCamera(pos).DistanceTo(WrapNearCamera(s.GlobalPosition)); // wrap-corrected like every chase lane
+			if (d < TAUNT_PULL && d < nd)
+			{
+				nd = d;
+				w = s;
+			}
+		}
+		return w;
 	}
 	
 // Yu seat upkeep (user 2026-11-02 rework): kindness spirits now RIDE like the gem pickups -
@@ -4165,7 +4501,7 @@ private void UpdateSpirits(float delta)
 			}
 		if (puller != null && dist < 14.0f)
 		{
-			PartyMember[] cands = new PartyMember[9]; // roster-wide bound (9 PCs at 2026-11-01; was exact-fit at 8)
+			PartyMember[] cands = new PartyMember[11]; // roster-wide bound (11 PCs at 2026-11-17; was exact-fit at 8)
 			int cn = 0;
 			foreach (PartyMember mm in _party)
 			{
@@ -4402,6 +4738,13 @@ private void UpdateSpirits(float delta)
 				DespawnBullet(i);
 				continue;
 			}
+			Godot.Node2D uw = UndeadAt(p); // Hapi shot intercept: the horde chews risen bodies too
+			if (uw != null)
+			{
+				UndeadHitBy(uw, _bulletDmg[i]); // real hp lane: a volley bolt can fell a risen body
+				DespawnBullet(i);
+				continue; // bolt spent on a risen body: members behind it stay untouched
+				}
 			PartyMember m = NearestMemberAny(p); // volleys hit downed bodies too
 			if (m != null && p.DistanceTo(m.GlobalPosition) < 12.0f + MEMBER_RADIUS)
 			{
@@ -5191,12 +5534,12 @@ private void UpdateSpirits(float delta)
 		0.04f, 0.49f, 0.30f, 0.70f, 0.35f, 0.49f, 0.61f, 0.70f, 0.66f, 0.49f, 0.96f, 0.70f,
 		0.04f, 0.72f, 0.30f, 0.93f, 0.35f, 0.72f, 0.61f, 0.93f, 0.66f, 0.72f, 0.96f, 0.93f }; // board fractions (assistant re-grid pick: 12 rects on 4 rows - retune by eye)
 	static readonly float[] SEL_PAGE = { 0.05f, 0.14f, 0.60f, 0.86f }; // the board window the build draws AND the click maps into
-	static readonly bool[] SEL_LOCKED = { false, false, false, false, false, false, false, false, false, false, };
+	static readonly bool[] SEL_LOCKED = { false, false, false, false, false, false, false, false, false, false, false };
 	static readonly float[] SEL_CONFIRM = { 0.32f, 0.88f, 0.58f, 0.96f };
 	// painted mini art per roster seat (index = memberIndex: 0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash | 7 Bruno | 8 Brook)
 		// art reorganised 2026-11-08 (user: "move all the current characters into the character folder")
 		// - portraits now live under res://art/characters/ alongside the art/enemies/ tree
-		static readonly string[] SEL_ART = { "res://art/characters/baldrun.png", "res://art/characters/mosiah.png", "res://art/characters/asper.png", "res://art/characters/alvora.png", "res://art/characters/yu.png", "res://art/characters/stack.png", "res://art/characters/wash.png", "res://art/characters/bruno.png", "res://art/characters/brook.png", "res://art/characters/keeko.png" };
+		static readonly string[] SEL_ART = { "res://art/characters/baldrun.png", "res://art/characters/mosiah.png", "res://art/characters/asper.png", "res://art/characters/alvora.png", "res://art/characters/yu.png", "res://art/characters/stack.png", "res://art/characters/wash.png", "res://art/characters/bruno.png", "res://art/characters/brook.png", "res://art/characters/keeko.png", "res://art/characters/hapi.png" };
 		static readonly string[] SEL_BONUS = {
 		"Leader Bonus: Chain Lightning - All attacks have a 5% chance to unleash lightning on 5 targets for 10 damage.",
 		"Leader Bonus: Pierce - All attacks gain +1 Pierce and all allies gain +5% Evasion.",
@@ -5207,7 +5550,8 @@ private void UpdateSpirits(float delta)
 		"Leader Bonus: Inspiring Leader - While Wash leads, all allies gain +15 Max HP and +1 Armour.",
 		"Leader Bonus: You... But Better! - All allies gain +15% Area and 10% Movement Speed.",
 		"Leader Bonus: Inquisitive Mind - All allies gain +5% Evasion, +15% Collection Range and +15% XP.",
-		"Leader Bonus: Gekkota Training - All allies gain +10% evasion, +10% movement speed and +10% attack speed." };
+		"Leader Bonus: Gekkota Training - All allies gain +10% evasion, +10% movement speed and +10% attack speed.",
+		"Leader Bonus: Call of the Grave - Enemies slain while Hapi leads have a 5% chance to rise as undead halves (half stats) that taunt nearby enemies." };
 	static readonly string[] SEL_ULT = {
 		"Ultimate: Giant's Might (R) - Doubles Baldrun's size and reach and grants +50% Damage and Attack Speed for 10s.",
 		"Ultimate: Bardic Inspiration (R) - All allies gain +25% Damage and Attack Speed for 10s",
@@ -5218,7 +5562,8 @@ private void UpdateSpirits(float delta)
 		"Ultimate: Oakhollow Assemble! (R) - All allies gain +25% Movement Speed, +5 Armour and 1% HP Regeneration per second for 10s",
 		"Ultimate: Axes Away! (R) - Bruno spins two axes around him for 10 seconds. These blades gain all of the effects of his chosen upgrades.",
 		"Ultimate: Assassination (R) - All allies gain +25% Multistrike, +15% Crit Chance and +25% Crit Damage for 10s",
-		"Ultimate: Rewrite Reality (R) - All enemies (including any that spawn) become frozen in place for 10 seconds. (Against final bosses, this instead increases damage dealt to them by 25%)" };
+		"Ultimate: Rewrite Reality (R) - All enemies (including any that spawn) become frozen in place for 10 seconds. (against final bosses, this instead increases damage dealt to them by 25%)",
+		"Ultimate: Bring Out Yer Dead! (R) - For 10 seconds, every enemy slain rises as an undead ally with the same stats and real HP (they can be killed by enemies) that fights beside the squad for 10 seconds of its own." };
 	public void BuildSelectScreen()
 	{
 		_selLayer = new CanvasLayer();
@@ -6155,6 +6500,9 @@ private void UpdateSpirits(float delta)
 		{ m.luckR += OPT_LUCK[option]; } // lucky explosions (Yu row 44): double-blast chance per rank, kit field
 		{ m.beamTargets += OPT_BEAM[option]; } // Split Beams (Keeko row 47): one more hitscan pick + its own lane per rank
 		{ m.beamReach += OPT_REACH[option]; } // Arcane Reach (Keeko row 48): +0.10 reach factor per rank on the kit field (EffRange maths ride PartyMember)
+		{ m.pillarTargets += OPT_PILLAR[option]; } // Multi-Flame (Hapi row 52): one more pillar drop per rank (cap 4 = base + 3 ranks)
+		{ m.plagueR += OPT_PLAGUE[option]; } // Necrotic Plague (Hapi row 53): rank spreads the flame DoT on touch AND stamps +2 s/rank longer
+		{ m.pillarR += OPT_PEST[option]; } // Greater Pestilence (Hapi row 54): column radius x1.15/rank, PILLAR_R x (1 + 0.15 x rank) at the commit
 		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
 						 OPT_LABEL[option] + " x" + _pickRank[option];
 		GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +
@@ -6921,3 +7269,4 @@ private void UpdateSpirits(float delta)
 		}
 	}
 }
+

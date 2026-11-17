@@ -297,6 +297,7 @@ public partial class Enemy : Combatant
         TickBurn((double)delta); // firebolt burn ticks like the vuln/slow windows do
         TickBleed((double)delta); // Bruno's bleed ticks on the same discipline (own pair)
         TickPoison((double)delta); // Brook's venom ticks on the same own-pair discipline
+        TickNecrotic((double)delta); // Hapi's necrotic flame ticks on the same own-pair discipline
         Game g = GetParent() as Game; // hoisted: the drink seat gates the spd calc below
         if (g == null)
             return;
@@ -442,12 +443,31 @@ public partial class Enemy : Combatant
         else
         {
             PartyMember m = g.NearestMember(GlobalPosition);
+            Godot.Node2D taunt = g.GetTauntBody(GlobalPosition); // Call of the Grave: nearest risen HALF pulling this body (null = none)
             _contactCd -= delta;
-            if (m != null)
+            if (m != null || taunt != null)
             {
                 // chase measures the WRAP-short way: an ally just across a seam is
                 // 100 px away, not the 2300 px the raw coords would read
-                Vector2 to = g.WrapDelta(p, m.GlobalPosition);
+                // Call of the Grave taunt lane (user 2026-11-17): a risen HALF within TAUNT_PULL yanks
+                // the nearby horde. The quarry is the NEAREST of squad and taunter (wrap-short, squared
+                // compare) so the body still closes on the squad when the grave-call is farther out.
+                Godot.Node2D quarry = null; // risen taunt body this frame: null = plain squad chase
+                bool chaseUndead = false; // contact lane: the horde chews the risen with REAL hp
+                if (taunt != null)
+                {
+                    if (m == null)
+                    quarry = taunt; // no squad in sight: the taunter still owns the chase
+                    else
+                    {
+                    double td = g.WrapDelta(p, taunt.GlobalPosition).LengthSquared();
+                    double md = g.WrapDelta(p, m.GlobalPosition).LengthSquared();
+                    if (td < md)
+                    quarry = taunt; // the grave-call is the closer quarry
+                    }
+                }
+                chaseUndead = quarry != null;
+                Vector2 to = g.WrapDelta(p, quarry != null ? quarry.GlobalPosition : m.GlobalPosition);
                 float dist = to.Length();
                 Vector2 dir;
                 float moveSpd = spd; // FAST GOBLIN rewrites this on its spring leg; everyone else runs at spd
@@ -569,9 +589,12 @@ public partial class Enemy : Combatant
                 if (dir.LengthSquared() > 0.0001f && !froz) // Rewrite Reality: pinned bodies (incl. springers mid lunge: BODY never advances) hold the chase
                     GlobalPosition += dir * moveSpd * delta; // draging maul: a dragged body shambles
                 GlobalPosition = g.WrapNearCamera(GlobalPosition); // fold instead of walls
-                if (dist < hitR + g.MEMBER_RADIUS && _contactCd <= 0.0f)
+                if (dist < hitR + (chaseUndead ? Game.UNDEAD_RADIUS : g.MEMBER_RADIUS) && _contactCd <= 0.0f)
                 {
                     _contactCd = 1.0f;
+                    if (chaseUndead)
+                    g.UndeadHitBy(quarry, contactDamage * g.DrinkMul(this)); // the horde chews the risen with REAL hp: they can be felled
+                    else
                     g.TakeHit(m, contactDamage * g.DrinkMul(this)); // Have a Drink!: burning bodies hit 10% softer
                 }
                 // TIER-3 ranged lanes fire on their own cadence (rider: USER 3 s; mage: assistant
@@ -796,4 +819,5 @@ public partial class Enemy : Combatant
             _body.Modulate = new Color(1.0f, 1.0f, 1.0f);
     }
 }
+
 

@@ -151,6 +151,23 @@ bookFxArt = "res://art/fx/keeko_book.png"
 beamFxArt = "res://art/fx/keeko_beam.png"
 class_ = "Wizard"
 
+[node name="Hapi" type="Node2D" parent="." unique_id=2100000001]
+script = ExtResource("3_pm")
+displayName = "Hapi"
+weaponName = "Necrotic Flame"
+memberIndex = 10
+maxHp = 60.0
+baseSpeed = 120.0
+weaponDamage = 15.0
+cooldown = 2.0
+range = 520.0
+weaponKit = "pillar"
+pillarFxArt = "res://art/fx/necro_pillar.png"
+necroDps = 1.0
+necroDur = 5.0
+baseEvasion = 0.05
+class_ = "Grave Cleric"
+
 [node name="BossMini" type="Node2D" parent="." unique_id=321225898]
 position = Vector2(0, -500)
 script = ExtResource("4_boss")

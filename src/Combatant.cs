@@ -76,6 +76,9 @@ public partial class Combatant : Godot.Node2D
 		// poison lives below in its own pair; count it via the window like burn/bleed
 		if (poisonT > 0.0)
 			n++;
+		// Hapi's necrosis lives below in its own pair; count it via the window like burn/bleed/poison
+		if (necrosisT > 0.0)
+			n++;
 		return n;
 	}
 
@@ -192,6 +195,36 @@ public partial class Combatant : Godot.Node2D
 		TakeDamage(poisonDps * delta); // poison kills ride the shared kill scan like any other
 		if (poisonT <= 0.0)
 			poisonDps = 0.0; // expiry clears the dps (same fix as the burn/bleed pairs)
+	}
+
+	// Hapi's necrotic flame (user 2026-11-17): its OWN status pair mirroring burn/bleed/poison -
+	// bodies caught in a necrotic flame pillar run necrosisDps damage/sec for necrosisT seconds
+	// (user kit: 1 dmg/s for 5 s). Deliberately SEPARATE so the cinder bloom / Drink "burning body"
+	// / venom lanes can never key on it; the Plague pass-on rail keys on THIS pair only.
+	// Kills ride the shared kill scan like any other.
+	public double necrosisDps = 0.0;
+	public double necrosisT = 0.0;
+
+	public void Necrotic(double dps, double dur)
+	{
+		if (dps <= 0.0 || dur <= 0.0)
+			return; // a plain pillar strike never sets a window
+		if (dps >= necrosisDps)
+			necrosisDps = dps; // the stronger flame owns the tick
+		if (dur > necrosisT)
+			necrosisT = dur; // the window refreshes, never stacks
+	}
+
+	public void TickNecrotic(double delta)
+	{
+		if (necrosisT <= 0.0)
+			return;
+		necrosisT -= delta;
+		if (necrosisT < 0.0)
+			necrosisT = 0.0;
+		TakeDamage(necrosisDps * delta); // necrotic kills ride the shared kill scan like any other
+		if (necrosisT <= 0.0)
+			necrosisDps = 0.0; // expiry clears the dps (same fix as the burn/bleed/poison pairs)
 	}
 
 	public void Slowed(double mul, double duration)

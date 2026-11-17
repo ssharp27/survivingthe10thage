@@ -205,6 +205,17 @@ public partial class PartyMember : Godot.Node2D
 	public int beamTargets = 0; // Split Beams: one more enemy targeted per rank, each with its own hitscan line
 
 	public double beamReach = 0.0; // Arcane Reach rank: +10% beam reach per rank riding EffRange (knockback retired at the 2026-11-14 hand-play pass - user "I actually don't like the knockback")
+	// Hapi kit fields (2026-11-17): ranks ride Game's OPT_PILLAR/OPT_PLAGUE/OPT_PEST rows (52-54, the
+
+	// 55-wide tables PD1 widened) exactly like the beam lane rides OPT_BEAM; convT is the ult clock.
+
+	public int pillarTargets = 0; // Multi-Flame: one more enemy column per rank (lane cap 4 per volley)
+
+	public double pillarR = 0.0; // Greater Pestilence rank: committed column radius PILLAR_R x (1 + 0.15 x rank)
+
+	public double plagueR = 0.0; // Necrotic Plague rank: flame passes on risen-body touch (Game lane) + lengthens itself
+
+	public double convT = 0.0; // Bring Out Yer Dead!: 10 s conversion window (decays beside ultT; Game reads it on kills)
 
 	float _bookT = 0.0f; // book bob clock (decays with real delta in _Process)
 
@@ -388,6 +399,11 @@ public partial class PartyMember : Godot.Node2D
 	[Export] public double poisonDur = 0.0;   // seconds the poison runs; lingering venom raises it
 
 	[Export] public double baseEvasion = 0.0; // per-PC authored evasion seeded into the EVASION tag (Brook 10%)
+	[Export] public double necroDps = 0.0;   // Hapi flame: damage/sec the column stamps (authored 1.0 on the node)
+
+	[Export] public double necroDur = 0.0;   // Hapi flame: seconds the column runs (authored 5.0; Plague ranks lengthen it)
+
+	[Export] public string pillarFxArt = ""; // Hapi column sprite: loaded ONCE into the shared Game.pillarFxTex
 
 	public double multiChance = 0.0;  // lucky strikes card: +0.05/rank chance a hit deals damage TWICE
 
@@ -861,6 +877,12 @@ public partial class PartyMember : Godot.Node2D
 
 			miniPath = "res://art/characters/keeko.png";
 
+			else if (displayName == "Hapi")
+
+			// 2026-11-17: Hapi art probe (the class body canvas rides the default miniScale like the rest)
+
+			miniPath = "res://art/characters/hapi.png";
+
 		if (miniPath != "")
 
 		{
@@ -1052,6 +1074,22 @@ public partial class PartyMember : Godot.Node2D
 
 		}
 
+
+		// Hapi column art: ONE load at tree entry wires the SHARED Game.pillarFxTex the column pool paints
+
+		// with (mirrors the axe/beam art gates); null art = SpawnPillarFx silently skips the paint.
+
+		if (pillarFxArt != "")
+
+		{
+
+				Game hpg = GetParent() as Game;
+
+				if (hpg != null)
+
+					hpg.pillarFxTex = GD.Load(pillarFxArt) as Godot.Texture2D;
+
+		}
 
 		if (axeFxArt != "")
 
@@ -1391,6 +1429,13 @@ public partial class PartyMember : Godot.Node2D
 
 				return 10; // Rewrite Reality (the walk lives on Game.RewriteReality)
 
+		// Hapi "Bring Out Yer Dead!" (user 2026-11-17): seat 11. The ult opens a 10 s conversion window
+
+		// (convT, decaying beside ultT); the kill lane itself lives on Game.OnEnemyKilled.
+
+		if (displayName == "Hapi")
+
+				return 11; // Bring Out Yer Dead! (window on convT; rises + leader halves live on Game)
 		return 0; // other PCs: no ultimate authored yet (future lanes land here)
 
 	}
@@ -1679,6 +1724,25 @@ public partial class PartyMember : Godot.Node2D
 
 		}
 
+		// Hapi "Bring Out Yer Dead!" (user 2026-11-17): opens the 10 s CONVERSION WINDOW on convT. Game.OnEnemyKilled
+
+		// rises every NON-BOSS kill while ANY joined member's window is up (corpses rise with their own stats
+
+		// and die 10 s after THEIR OWN rise); while Hapi leads, 5% of slain enemies rise as halves that taunt.
+
+		else if (ultKey() == 11)
+
+		{
+
+				convT = 10.0; // the window clock: decays beside ultT in _Process, read by Game on every kill
+
+				ultCdT = ULT_CD_BASE / stat[StatTags.ULT];
+
+				GD.Print("[10thAge] (ult) Bring Out Yer Dead!: kills for 10 s rise as risen allies (while Hapi leads, 5% of slain rise as halves that taunt), gate " + (int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
+
+				return true;
+
+		}
 		// GD.Print("[10thAge] (ult) " + displayName + " has no ultimate yet");
 
 		return false;
@@ -2972,6 +3036,9 @@ public partial class PartyMember : Godot.Node2D
 
 		}
 		ultT -= delta;
+		if (convT > 0.0)
+
+				convT -= delta; // Bring Out Yer Dead! window: sits beside the ultT decay (mirrors the Bruno/Alvora clocks)
 
 		if (_grown && ultT <= 0.0)
 
@@ -3051,8 +3118,13 @@ public partial class PartyMember : Godot.Node2D
 		// punching through everything between the book and the prey. Kit keys on weaponKit like every
 		// other lane - arcHalf stays purely melee, so the beam keeps the class-default arc for now.
 		bool beamKit = weaponKit == "beam";
+		// Hapi kit key: the pillar column lane; PickPrey stays lane-only for it (columns never inherit
 
-		bool cleaver = !shotKit && !beamKit && arcHalf > 0.5f; // maul kit: arc cleave, full damage per body (user 2026-10-23)
+		// the leader 360-degree pick), and it gates the cleaver fall-through like every other kit.
+
+		bool pillarKit = weaponKit == "pillar";
+
+		bool cleaver = !shotKit && !beamKit && !pillarKit && arcHalf > 0.5f; // maul kit: arc cleave, full damage per body (user 2026-10-23)
 
 		// Spirit Guardians kit: a ring that pulses around the caster. Damage is NOT split by
 
@@ -3721,7 +3793,7 @@ public partial class PartyMember : Godot.Node2D
 
 		// whatever way it faces, so the lane gate stays lane-only.
 
-		Godot.Node2D best = PickPrey(pg, enemies, p, reach, false, false, isLeader && !cleaver && !shotKit && !beamKit, facing, arcEff);
+		Godot.Node2D best = PickPrey(pg, enemies, p, reach, false, false, isLeader && !cleaver && !shotKit && !beamKit && !pillarKit, facing, arcEff);
 
 		// bestD answers the chosen body's distance; the empty-clearing guard below stands
 
@@ -3960,6 +4032,126 @@ public partial class PartyMember : Godot.Node2D
 				for (int s2 = beams; s2 < _beamFx.Length; s2++)
 
 						_beamFx[s2].Visible = false; // a lighter volley clears its spare slots
+
+		}
+
+		// Hapi "Necrotic Flame" kit: a column on the pick; Multi-Flame adds its OWN nearest extra pick per
+
+		// rank (the Split Beams idiom, cap 4). Every column bites EVERY body inside its committed radius
+
+		// (PILLAR_R x Greater Pestilence - the rank widens a REAL hit), and stamps the corpse's OWN DoT
+
+		// pair - separate from burn/bleed so the Drink rails never key on it - with dps riding the damage
+
+		// card like the dagger's venom stamps, +2 s per Plague rank on the flame it started.
+
+		else if (pillarKit)
+
+		{
+
+				int picks = 1 + pillarTargets;
+
+				if (picks > 4)
+
+					picks = 4; // lane cap 4 columns per volley (same idiom as the beam's slot cap)
+
+				Godot.Node2D[] pk = new Godot.Node2D[picks];
+
+				pk[0] = best;
+
+				for (int s = 1; s < picks; s++)
+
+				{
+
+					Godot.Node2D n = null;
+
+					float nd = 1e9f;
+
+					for (int i2 = 0; i2 < enemies.Count; i2++)
+
+					{
+
+						Godot.Node2D c = enemies[i2];
+
+						Combatant nc = (Combatant)c;
+
+						if (nc == null || nc.kind == "dead")
+
+							continue;
+
+						bool already = false;
+
+						for (int q = 0; q < s; q++)
+
+						if (pk[q] == c)
+
+							already = true;
+
+						if (already)
+
+							continue;
+
+						float dd = pg.WrapDelta(p, c.GlobalPosition).Length() - nc.hitR;
+
+						if (dd <= reach && dd < nd)
+
+						{
+
+							nd = dd;
+
+							n = c;
+
+						}
+
+					pk[s] = n; // may be null: fewer live bodies than ranks
+
+				}
+
+				}
+
+				double rcol = Game.PILLAR_R * (1.0 + 0.15 * pillarR); // committed column radius: Pest widens the real bite
+
+				double fdps = necroDps * stat[StatTags.ATTACK_DAMAGE]; // flame DoT rides the damage card (venom-stamp idiom)
+
+				double fdur = necroDur + 2.0 * plagueR; // Plague ranks lengthen the flame they started
+
+				for (int s = 0; s < picks; s++)
+
+				{
+
+					Godot.Node2D t = pk[s];
+
+					if (t == null)
+
+						continue;
+
+					pg.SpawnPillarFx(t.GlobalPosition, rcol); // paint first: the column reads even while the volley clears
+
+					for (int i2 = 0; i2 < enemies.Count; i2++)
+
+					{
+
+						Godot.Node2D c2 = enemies[i2];
+
+						Combatant nc2 = (Combatant)c2;
+
+						if (nc2 == null || nc2.kind == "dead")
+
+							continue;
+
+						float dd2 = pg.WrapDelta(t.GlobalPosition, c2.GlobalPosition).Length() - nc2.hitR;
+
+						if (dd2 > rcol)
+
+							continue; // outside the column: the flame never reaches it
+
+						nc2.TakeDamage(dmg * Strikes());
+
+						nc2.Necrotic(fdps, fdur); // separate DoT pair: burn/bleed rails can never key on necrosis
+
+					}
+
+				}
 
 		}
 
@@ -4446,3 +4638,5 @@ public partial class PartyMember : Godot.Node2D
 	}
 
 }
+
+

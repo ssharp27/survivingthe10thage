@@ -172,6 +172,7 @@ public partial class Boss : Combatant
         TickBurn((double)delta); // bosses burn too: the beat loop cannot stall past a DoT
         TickBleed((double)delta); // bosses bleed too: same own-pair discipline as burn
         TickPoison((double)delta); // bosses get poisoned too: same own-pair discipline
+        TickNecrotic((double)delta); // bosses catch necrotic flame too: same own-pair discipline
         Game g = GetParent() as Game;
         if (g == null)
             return;
