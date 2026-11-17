@@ -476,6 +476,30 @@ public partial class Game : Godot.Node2D
 	PartyMember _leader = null;
 	Godot.Collections.Array<Godot.Node2D> _gems = new();
 	Godot.Collections.Array<double> _gemVals = new();
+	// ---------- XP-gem FX tiers + merge rail (user 2026-11-17) ----------
+	// The pool is a FIXED 240 nodes, so near capacity a kill can no longer find a free slot.
+	// Easier fix the user asked for: fold CLUSTERS instead of growing the pool or evicting a
+	// live orb (Vampire-Survivors style - one gem carries the XP of its neighbours). Gated so
+	// an ordinary run never merges: the shipped drop-per-kill look stays untouched.
+	const int GEM_MERGE_TRIGGER_PCT = 75; // fold clusters once the pool is this % full (assistant pick)
+	const double GEM_MERGE_R = 34.0;      // fold radius at that moment, px (assistant pick)
+	// FX tiers: the 1-4 / 5-9 / 10-49 / 50+ split is the USER law (2026-11-17: "50+ we can set as
+	// red. This is our mega gem if it becomes too much"); the hues below are assistant picks.
+	const double GEM_TIER_BLUE = 5.0;     // XP at which an orb turns blue
+	const double GEM_TIER_GREEN = 10.0;   // XP at which an orb turns green
+	const double GEM_TIER_RED = 50.0;     // XP at which an orb becomes the RED MEGA orb (USER)
+	// GEM ART (2026-11-17, the user picked the d20 XP chip: "gem_d20 is amazing. Let's use that
+	// one" + chose mega differentiation = bigger + inner star). Two HAND-AUTHORED tone-only
+	// canvases in art/fx: xp_gem.png 14x14 and xp_gem_mega.png 20x20. They carry SHAPE and DEPTH
+	// only (grey luminance), never their own colour, because PaintGem multiplies the tier hue
+	// through the sprite's Modulate - a baked hue would stop re-reading when a merge fattens an
+	// orb. Loaded ONCE at pool build into these statics so PaintGem never touches GD.Load.
+	// Missing art leaves both null and the shipped greybox square is the fallback, unchanged.
+	// statics, not const: Vector2/Texture2D cannot be const in this dialect.
+	// NOTE: these are set in the pool-build pass below; a project that has never built the pool
+	// (never happens: the pool builds in InitVisuals before any kill can drop) reads null safely.
+	private static Godot.Texture2D _gemArtTex = null;   // 14x14 normal chip
+	private static Godot.Texture2D _gemMegaArtTex = null; // 20x20 chip + inner star (50+ tier)
 	// ---------- field pickups (user 2026-11-08: small random drops to help runs) ----------
 	// One rare roll per ORDINARY enemy kill (the kill rail calls MaybeDropPickup while the body
 	// is still live); flavour numbers live in Pickup.cs. Assistant-picked odds, hand-test retunes.
@@ -1191,8 +1215,14 @@ public partial class Game : Godot.Node2D
 		}
 	}
 
+	// XP orb. 2026-11-17 user rail part 1: a starved kill no longer drops nothing - the pool is
+	// fixed, so the XP folds into the NEAREST orb already on the field instead of being lost. XP
+	// is awarded at PICKUP, so a carrier paying the sum is the honest read; below saturation a
+	// free slot is always found and this is exactly the shipped path. part 2 (same day): MergeGemClusters
+	// folds whole clusters once the pool nears capacity, so the field never runs dry.
 	public void SpawnGem(Vector2 pos, double value)
 	{
+		// the shipped free-slot scan, unchanged
 		for (int i = 0; i < _gems.Count; i++)
 		{
 			Godot.Node2D gem = _gems[i];
@@ -1200,10 +1230,30 @@ public partial class Game : Godot.Node2D
 			{
 				gem.GlobalPosition = pos;
 				_gemVals[i] = value;
+				PaintGem(i); // tier hue for what it carries (user FX rail)
 				Godot.ColorRect cr = (Godot.ColorRect)gem.GetChild(0);
-				cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+				cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f); // alpha rides Modulate, as shipped
 				return;
 			}
+		}
+		// pool is full: hand the XP to the NEAREST orb instead of losing it outright (user 2026-11-17)
+		int best = -1;
+		double bestD = 1e30;
+		for (int q = 0; q < _gems.Count; q++)
+		{
+			if (_gems[q].GlobalPosition.X <= -8000.0f)
+				continue; // free slot: nothing to fold into
+			double d = _gems[q].GlobalPosition.DistanceTo(pos);
+			if (d < bestD)
+			{
+				bestD = d;
+				best = q;
+			}
+		}
+		if (best >= 0)
+		{
+			_gemVals[best] += value; // the carrier now pays the whole sum at pickup
+			PaintGem(best); // and shows it: a folded orb re-reads its tier
 		}
 	}
 
@@ -2410,6 +2460,10 @@ public void RegisterEnemy(Combatant e)
 		_ultLabel.ZIndex = 9;
 		AddChild(_ultLabel);
 		_ultLabel.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+		// GEM ART loads ONCE here (the bee / ult pool idiom): GD.Load per spawn would re-enter the
+		// resource loader on every kill. Null art = the shipped greybox square, unchanged.
+		_gemArtTex = GD.Load("res://art/fx/xp_gem.png") as Godot.Texture2D;
+		_gemMegaArtTex = GD.Load("res://art/fx/xp_gem_mega.png") as Godot.Texture2D;
 		for (int i = 0; i < 240; i++)
 		{
 			Godot.Node2D gem = new Node2D();
@@ -2419,6 +2473,18 @@ public void RegisterEnemy(Combatant e)
 			cr.Color = new Color(1.0f, 0.85f, 0.2f, 1.0f);
 			cr.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
 			gem.AddChild(cr);
+			// the art rail (2026-11-17): the chip rides UNDER the shell like every other pooled fx
+			// child, so the shell's Modulate alpha still owns the spawn/despawn fade (it cascades)
+			// and PaintGem owns the hue. Built ONLY when the canvas is on disk, so a project without
+			// the art keeps the shipped square with zero extra nodes.
+			if (_gemArtTex != null)
+			{
+				Godot.Sprite2D gsp = new Godot.Sprite2D();
+				gsp.Set("texture_filter", 0); // NEAREST: hard pixel edges like the shaft and minis
+				gsp.Position = new Vector2(5.0f, 5.0f); // Control origin is the corner -> centred
+				gsp.Texture = _gemArtTex;
+				cr.AddChild(gsp);
+			}
 			gem.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
 			AddChild(gem);
 			_gems.Add(gem);
@@ -3382,6 +3448,9 @@ public void RegisterEnemy(Combatant e)
 			}
 		}
 
+		// 2026-11-17 user rail: cluster-fold BEFORE the magnet pass, so a fold never moves a gem
+		// this frame already rode, and a folded carrier is collected next frame like any other.
+		MergeGemClusters();
 		UpdateGems(delta);
 		UpdateBullets(delta);
 		UpdateShots(delta); // the party's own projectiles: mirror pool, opposite faction
@@ -4188,6 +4257,93 @@ private void UpdateSpirits(float delta)
 		Godot.Node2D gem = _gems[i];
 		gem.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
 		((Godot.ColorRect)gem.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+	}
+
+	// ---------- XP-gem FX tiers + merge rail (user 2026-11-17) ----------
+	// Repaints an orb from the XP it carries. Only the base ColorRect hue moves: the spawn/despawn
+	// alpha stays on Modulate exactly as the shipped rail owns it, so the fade reads unchanged.
+	// The 1-4 / 5-9 / 10-49 / 50+ split is the USER law (2026-11-17: "50+ we can set as red.
+	// This is our mega gem if it becomes too much"); the hues below are assistant picks.
+	private void PaintGem(int i)
+	{
+		// what it carries
+		double v = _gemVals[i];
+		Godot.Node2D gem = _gems[i];
+		Godot.ColorRect cr = (Godot.ColorRect)gem.GetChild(0);
+		// the tier hue for what it carries (the 1-4 / 5-9 / 10-49 / 50+ split is the USER law:
+		// "50+ we can set as red. This is our mega gem if it becomes too much"; hues are picks)
+		Color hue;
+		if (v >= GEM_TIER_RED)
+			hue = new Color(1.0f, 0.18f, 0.18f, 1.0f); // 50+ XP: the RED MEGA orb (USER tier)
+		else if (v >= GEM_TIER_GREEN)
+			hue = new Color(0.3f, 1.0f, 0.45f, 1.0f); // 10+ XP: green (assistant pick: hue)
+		else if (v >= GEM_TIER_BLUE)
+			hue = new Color(0.3f, 0.62f, 1.0f, 1.0f); // 5-9 XP: blue (assistant pick: hue)
+		else
+			hue = new Color(1.0f, 0.85f, 0.2f, 1.0f); // 1-4 XP: the shipped yellow, untouched
+		// ART lane (2026-11-17, the d20 XP chip the user picked): the chip rides UNDER the shell,
+		// so the shell stops drawing (its Color alpha goes 0) and the hue multiplies through the
+		// sprite's own Modulate. The canvases are TONE-ONLY, so a fold or a cluster merge that
+		// fattens an orb RE-READS its tier - a baked-in art colour could not. The spawn/despawn
+		// fade still lives on the SHELL's Modulate and cascades to this child, so SpawnGem,
+		// DespawnGem and UpdateGems stay exactly as shipped.
+		// 50+ swaps to the bigger star-bearing canvas: the user's "bigger + inner star", authored
+		// as its own 20x20 file, so no runtime scale math. The sprite is centred (Sprite2D
+		// centered=true) on the shell, so the 14 px and the 20 px canvases share one position.
+		if (cr.GetChildCount() > 0)
+		{
+			Godot.Sprite2D sp = (Godot.Sprite2D)cr.GetChild(0);
+			if (_gemMegaArtTex != null && v >= GEM_TIER_RED)
+				sp.Texture = _gemMegaArtTex; // the MEGA chip: bigger + the inner star
+			else
+				sp.Texture = _gemArtTex; // the normal chip (the child exists only once art loaded)
+			sp.Modulate = hue; // the tier hue rides the art
+			cr.Color = new Color(hue.R, hue.G, hue.B, 0.0f); // the shell stops drawing over it
+		}
+		else
+			cr.Color = hue; // shipped greybox square fallback: the hue IS the face
+	}
+
+	// Vampire-Survivors-style cluster fold, once the pool nears capacity: orbs sitting within
+	// GEM_MERGE_R of each other collapse onto the lower-indexed carrier, which takes the SUM.
+	// Nothing moves, no node is created, no live orb is evicted - a carrier is picked up like any
+	// other orb and pays the whole sum, so no kill's XP is ever lost and the pool never grows.
+	// Gated at GEM_MERGE_TRIGGER_PCT so an ordinary run (hundreds of free slots) returns at once
+	// and keeps the shipped drop-per-kill look. Cost: O(n^2) over the FIXED 240 pool = 28,680
+	// pairs worst case, and only while saturated; the kill scan already clears 20,480 pairs.
+	private void MergeGemClusters()
+	{
+		int live = 0;
+		for (int i = 0; i < _gems.Count; i++)
+		{
+			if (_gems[i].GlobalPosition.X > -8000.0f)
+				live++;
+		}
+		// saturation rail, integer math so no float compare drifts: fold only when nearly full
+		if (live * 100 < GEM_MERGE_TRIGGER_PCT * _gems.Count)
+			return;
+		int merged = 0;
+		for (int i = 0; i < _gems.Count; i++)
+		{
+			Godot.Node2D gi = _gems[i];
+			if (gi.GlobalPosition.X <= -8000.0f)
+				continue;
+			// the carrier may already own a sum folded at a lower i: keep the sum, one carrier per
+			// cluster. Its post never moves here, so every distance rides the same point.
+			for (int j = i + 1; j < _gems.Count; j++)
+			{
+				Godot.Node2D gj = _gems[j];
+				if (gj.GlobalPosition.X <= -8000.0f)
+					continue;
+				if (gi.GlobalPosition.DistanceTo(gj.GlobalPosition) > (float)GEM_MERGE_R)
+					continue;
+				_gemVals[i] += _gemVals[j]; // the older orb keeps the sum, the newer folds in
+				DespawnGem(j); // parked free like any collected orb, so the rail stays honest
+				merged++;
+			}
+			if (merged > 0)
+				PaintGem(i); // and shows it: a merged carrier re-reads its tier
+		}
 	}
 
 	// OGRE2 HURL VICTIM SCAN (user 2026-11-11: "when ogre2 gets close to an enemy from
