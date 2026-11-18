@@ -9,8 +9,8 @@ shader_type canvas_item;
 // the screen (Godot bokeh-lite: a small poisson sample ring, cheap enough to hold
 // a full-screen blur at the pause card without any post pipeline).
 
-uniform float strength: hint_range(0.0, 1.0) = 0.28; // 2026-11-12 wash softened; 2026-11-13 nudge softer again (user: "like the background is unfocused") - assistant pick, retunable
-uniform float radius: hint_range(0.0, 0.05) = 0.006; // 2026-11-13: a wider gaussian defocus replaces the tight equal-weight ring that read HARRSH (the 0.0035 ring doubled edges harsh)
+uniform float strength: hint_range(0.0, 1.0) = 0.18; // 2026-11-12 wash softened; 2026-11-13 nudge softer again (user: "like the background is unfocused"); 2026-11-18 hand-play item 5 "camp blur still too harsh - soften to a soft blur": the CAMPFIRE screen has NO blur (its Backdrop is an OPAQUE ColorRect in ui/Campfire.tscn, no shader there), so this pause-card field is the only full-screen softener in the game and it is this one that went softer: 0.28 -> 0.18. Assistant pick, retunable
+uniform float radius: hint_range(0.0, 0.05) = 0.008; // 2026-11-13: a wider gaussian defocus replaces the tight equal-weight ring that read HARRSH (the 0.0035 ring doubled edges harsh); 2026-11-18: 0.006 -> 0.008, wider but gentler defocus so the field reads unfocused, not ghosted
 // 4.x removed the 3.x screen_texture builtin; the hint belongs on a GLOBAL uniform
 // (seat 547 SHADER ERROR "Invalid variable type (samplers are not allowed)" - samplers
 // are not legal as local variables)

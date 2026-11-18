@@ -54,7 +54,8 @@ public partial class Enemy : Combatant
     private readonly int MAGE2_SPIKES = 3; // mage2 volley count (USER number 2026-11-13: three ice spikes)
     private readonly float MAGE2_SPREAD_DEG = 14.0f; // degrees between neighbouring spikes (assistant pick - retunable)
     private readonly float MAGE2_DMG_MUL = 0.5f; // per-spike damage vs the 6 px ranged card: three SMALLER spikes ~the fireball's pressure (assistant pick)
-    private readonly float MAGE2_FIRE_MS = 0.62f; // spike scale on the ice art: 88x53 ice_spike.png -> ~55 px volley body (assistant pick, retunable)
+    private readonly float MAGE2_FIRE_MS = 0.31f; // user 2026-11-18 hand-play: HALVE the ice-spike projectile size - half of the 0.62 the same-day rail flew (~27 px volley body)
+    private readonly float MAGE2_ICE_SPEED = 190.0f; // user 2026-11-18 hand-play: the halved spikes ride a bit FASTER to compensate - 190 px/s vs the 130 px/s fireball
     // TIER-4 OGRE (user 2026-11-05: this map's only tier-4 creature): big, slow, fat HP
     // (those ride the Director). The SLAM is the user lane: inside the cast ring it MARKS
     // a big circle, waits 1 s (USER number), then hits that area for 25 (USER number).
@@ -302,7 +303,7 @@ public partial class Enemy : Combatant
         if (g == null)
             return;
         float spd = speed * (slowT > 0.0 ? 1.0f - (float)slowMul : 1.0f) * (burnT > 0.0 && g.LeaderDrink() ? 0.90f : 1.0f); // Have a Drink!: burning bodies shamble
-        bool froz = g.EnemiesFrozen(); // Rewrite Reality (Keeko ult, user 2026-11-14): movement-only freeze - every horde commit below parks; bodies still get hit, flash, and their contact/shot lanes stay live (the springer _fgDone clock drains while pinned: the BODY never advances, so a frozen spring simply finishes its spring at the pin mark)
+        bool froz = g.EnemiesFrozen(); // Rewrite Reality (Keeko ult, user 2026-11-14): movement-only freeze - every horde commit below parks; bodies still get hit and flash (user 2026-11-18 hand-play: the shot lanes are now gated too - riderbow/mage/mage2 hold their aim during the freeze via g.FreezeHold(), contact lanes stay live) (the springer _fgDone clock drains while pinned: the BODY never advances, so a frozen spring simply finishes its spring at the pin mark)
         if (_body == null)
             InitVisuals();
         if (kind == "dead")
@@ -601,9 +602,9 @@ public partial class Enemy : Combatant
                 // pick). Aiming rides the LIVE squad position, same discipline as the mini fans.
                 if ((kind == "riderbow" || kind == "mage" || kind == "mage2") && m != null)
                 {
-                    _shotCd -= delta;
+                    _shotCd -= delta; // user 2026-11-18: the cadence clock keeps draining while frozen (see the hold below), so a thaw does NOT gift a free volley
                     bool inReach = kind == "riderbow" ? dist <= RIDER_SHOT_RANGE : dist <= MAGE_SHOT_RANGE;
-                    if (_shotCd <= 0.0f && inReach)
+                    if (_shotCd <= 0.0f && inReach && !g.FreezeHold()) // user 2026-11-18 hand-play: "Keeko's ultimate time freeze doesn't stop enemies attacking, if you get close they will still shoot projectiles. This needs to be disabled during the time freeze" - riderbow/mage/mage2 hold their aim while Rewrite Reality runs; contact lanes stay live (a pinned body still grazes), and the cadence above keeps draining so a thaw gifts at most ONE volley
                     {
                         _shotCd = kind == "riderbow" ? RIDER_SHOT_EVERY : MAGE_SHOT_EVERY;
                         _shotsLoosed++; // 2026-11-06 repeat-fire audit: count this body's volleys
@@ -627,7 +628,7 @@ public partial class Enemy : Combatant
                                 float sa = (float)sp * MAGE2_SPREAD_DEG * 0.0174532925199485f; // deg -> rad
                                 Vector2 sav = new Vector2(aim.X * (float)System.Math.Cos((double)sa) - aim.Y * (float)System.Math.Sin((double)sa),
                                                           aim.X * (float)System.Math.Sin((double)sa) + aim.Y * (float)System.Math.Cos((double)sa));
-                                g.SpawnBulletFire(GlobalPosition, sav * MAGE_FIRE_SPEED, rangedDamage * MAGE2_DMG_MUL, MAGE2_FIRE_MS, true); // 2026-11-13 ice FX: true rides art/fx/ice_spike.png (the USER-picked slim icicle)
+                                g.SpawnBulletFire(GlobalPosition, sav * MAGE2_ICE_SPEED, rangedDamage * MAGE2_DMG_MUL, MAGE2_FIRE_MS, true); // user 2026-11-18 hand-play: HALVED size + a bit faster (190 px/s); iceArt stays TRUE - the "fireball" sighting was a null-tex fallback, the same-day rail is provably wired
                             }
                         }
                         else

@@ -792,7 +792,9 @@ public partial class Game : Godot.Node2D
 	double _runT = 0.0;
 	// Keeko "Rewrite Reality" (user 2026-11-14): world freeze clock in REAL seconds. While > 0 every
 	// horde + boss MOVEMENT commit parks (EnemiesFrozen() read per commit) - movement only: bodies
-	// still get hit, flash and cast. Spawns read the clock live, so newborn bodies are born frozen.
+	// still get hit and flash, but the SHOT lanes (riderbow/mage/mage2) hold their aim while the clock
+	// runs (user 2026-11-18 hand-play: "freeze doesn't stop enemies attacking... needs to be disabled");
+	// contact lanes stay live. Spawns read the clock live, so newborn bodies are born frozen.
 	double _freezeT = 0.0;
 	// TEST BENCH ONLY (same discipline as M1_PILOT / M1_DEV_SKIP / M1_REAPER): M1_TIMEWARP=<factor>
 	// advances the run CLOCK x factor so the beat table walks at warp speed; physics (movement,
@@ -1499,7 +1501,7 @@ public partial class Game : Godot.Node2D
 			}
 		Godot.ColorRect cr = (Godot.ColorRect)b.GetChild(0);
 		Godot.Sprite2D fxs = (Godot.Sprite2D)cr.GetChild(0);
-		Godot.Texture2D mfx = iceArt && _fxIceTex != null ? _fxIceTex : _fxMageTex != null ? _fxMageTex : _fxFlameTex; // 2026-11-08 art pass: mage rides its OWN fireball; 2026-11-13: iceArt rides the picked ice_spike.png first, firebolt stays the last fallback
+		Godot.Texture2D mfx = iceArt && _fxIceTex != null ? _fxIceTex : _fxMageTex != null ? _fxMageTex : _fxFlameTex; // 2026-11-08 art pass: mage rides its OWN fireball; 2026-11-13: iceArt rides the picked ice_spike.png first, firebolt stays the last fallback; user 2026-11-18 hand-play sighted FIREBALLS on the frost mage: the rail is provably wired (art tracked since 9f365f6, both try-once loaders + this pick verified) - prime suspect is a stale seat dll / un-imported .ctex; if it persists with a fresh import, chase _fxIceTex == null at runtime (the fallback below paints orange when ice is null)
 		if (mfx != null)
 		{
 			fxs.Texture = mfx;
@@ -2132,6 +2134,10 @@ public void RegisterEnemy(Combatant e)
 			_freezeT = 10.0; // user: 10 seconds, spawns born frozen (live clock, not a snapshot)
 	}
 	public bool EnemiesFrozen()
+	{
+		return _freezeT > 0.0;
+	}
+	public bool FreezeHold() // user 2026-11-18 hand-play: "Keeko's ultimate time freeze doesn't stop enemies attacking, if you get close they will still shoot projectiles. This needs to be disabled during the time freeze" - the RANGED shot lanes (riderbow/mage/mage2) read this and hold the cadence clock instead of firing while the freeze runs; contact lanes stay live (a pinned body still grazes), and because _shotCd keeps draining a thaw does NOT gift a free volley
 	{
 		return _freezeT > 0.0;
 	}

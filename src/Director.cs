@@ -49,14 +49,17 @@ public partial class Director : Godot.Node2D
     // RETUNE (user 2026-11-12 HAND-PLAY, same day as that ask): "that ramp might be a
     // bit too much... I am experiencing some performance issues. Make a note regarding
     // performance for us to review again later. For the time being let's lower it to
-    // 2.5%/min." -> the per-minute step is 0.025 now (1.025 at min 1, 1.15 at min 6,
-    // 1.25 at min 10). PERFORMANCE REVIEW OWED (the user's note): the +5%/min cut
+    // 2.5%/min." -> the per-minute step was 0.025. USER 2026-11-18 hand-play: "the horde
+    // scaling seems slow... clearing enemies as they spawned... increase it to 5% per
+    // minute again" -> the step is BACK to 0.05 (1.05 at min 1, 1.30 at min 6, 1.50 at
+    // min 10); the camp/recruitment leg (partyScale) and the ramp both verified live.
+    // PERFORMANCE REVIEW STILL OWED (the user's note): the +5%/min cut
     // produced frame-rate trouble on hand-play; the headless bench never reproduced it.
     // Before raising the step again, review the live cap, the bullet / entity pools and
     // the art draw cost alongside the planned boss rework passes.
     private static double SpawnRamp(Game g)
     {
-        return 1.0 + 0.025 * System.Math.Floor(System.Math.Max(0.0, g.GetRunTime()) / 60.0);
+        return 1.0 + 0.05 * System.Math.Floor(System.Math.Max(0.0, g.GetRunTime()) / 60.0); // user 2026-11-18 hand-play: back to +5%/min after the slow-horde sighting
     }
     int _hordeEventsSeen = 0; // HORDE MIX LAW cursor: the FIRST bonus swarm stays pure tier-1 goblins (the opening rule), later swarms mix tier-1/2 kinds
 
