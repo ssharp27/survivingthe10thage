@@ -443,14 +443,14 @@ public partial class Enemy : Combatant
         else
         {
             PartyMember m = g.NearestMember(GlobalPosition);
-            Godot.Node2D taunt = g.GetTauntBody(GlobalPosition); // Call of the Grave: nearest risen HALF pulling this body (null = none)
+            Godot.Node2D taunt = g.GetTauntBody(GlobalPosition); // Call of the Grave: nearest risen body pulling this body (null = none)
             _contactCd -= delta;
             if (m != null || taunt != null)
             {
                 // chase measures the WRAP-short way: an ally just across a seam is
                 // 100 px away, not the 2300 px the raw coords would read
-                // Call of the Grave taunt lane (user 2026-11-17): a risen HALF within TAUNT_PULL yanks
-                // the nearby horde. The quarry is the NEAREST of squad and taunter (wrap-short, squared
+                // Call of the Grave taunt lane (user 2026-11-17, widened 2026-11-18): EVERY risen body
+                // within TAUNT_PULL yanks the nearby horde, conversions included. The quarry is the NEAREST of squad and taunter (wrap-short, squared
                 // compare) so the body still closes on the squad when the grave-call is farther out.
                 Godot.Node2D quarry = null; // risen taunt body this frame: null = plain squad chase
                 bool chaseUndead = false; // contact lane: the horde chews the risen with REAL hp

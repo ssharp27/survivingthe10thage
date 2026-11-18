@@ -329,8 +329,11 @@ public partial class Game : Godot.Node2D
 	// (1 dps x damage stat, the user's 1 dmg/s x 5 s base). These THREE columns are NEW: OPT_PILLAR = Multi-Flame
 	// extra pillar drops/rank (each extra pick drops its OWN column - the radius test means a column bites
 	// EVERY body in PILLAR_R (1 + 0.15 x OPT_PEST rank), so Pestilence widens a REAL bite); OPT_PLAGUE =
-	// Necrotic Plague rank (carriers pass the flame to bodies within PLAGUE_TOUCH px, keeping the carrier's
-	// dps with AT LEAST 2 s left - plus the applier's OWN stamp runs +2 s/rank longer at the commit); OPT_PEST
+	// Necrotic Plague rank (REBALANCED 2026-11-18 hand-play: carriers no longer pass the flame on TOUCH,
+	// which read as free spread the horde could never answer - the curse now coughs on the flame itself,
+	// every second of the DoT window a flamed body rolls PLAGUE_CHANCE x rank to stamp one nearby un-flamed
+	// body inside PLAGUE_SPREAD with the window it still has); plus the applier's OWN stamp runs +2 s/rank
+	// longer at the commit); OPT_PEST
 	// = Greater Pestilence rank (column radius x1.15/rank at the PartyMember commit site).
 	static readonly int[] OPT_PILLAR = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 };
 	static readonly int[] OPT_PLAGUE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 };
@@ -722,10 +725,16 @@ public partial class Game : Godot.Node2D
 		// texture + scale copied per spawn - no new art lane, no green tint over painted bodies.
 		const int UNDEAD_POOL = 24;        // pool cap: conversions + leader rises (assistant pick)
 		const double UNDEAD_LIFE = 10.0;   // user: each risen body lives 10 s after THEIR OWN rise
-		const double UNDEAD_FIND = 240.0;  // pick: hunting reach: a risen body chases bodies this far
+		const double UNDEAD_FIND = 620.0;  // pick: hunting reach: risen bodies SEEK the horde this far (2026-11-18 hand-play: 240 left rises standing among the pack, the user asked for real hunting)
 		const float UNDEAD_TOUCH = 10.0f;  // pick: bite range: px PAST the prey's arted hitR
-		const double TAUNT_PULL = 140.0;   // pick: risen halves yank enemies within this ring (Call of the Grave)
-		const double PLAGUE_TOUCH = 36.0;  // pick: Necrotic Plague pass-on reach (assistant pick)
+		const double TAUNT_PULL = 140.0;   // pick: EVERY risen body yanks enemies within this ring (Call of the Grave + ult conversions, 2026-11-18 hand-play)
+		// NECROTIC PLAGUE (rebalanced 2026-11-18 hand-play): the OLD law had risen bodies pass the flame
+		// on to whatever they TOUCHED, which read as unanswerable free spread over the horde. The curse
+		// now coughs on the FLAME ITSELF - every second of the DoT window a flamed body rolls PLAGUE_CHANCE
+		// x rank to stamp one nearby un-flamed body inside PLAGUE_SPREAD with the window it STILL has.
+		// Ranks ALSO lengthen the applier's own stamp (+2 s/rank, at the PartyMember commit).
+		const double PLAGUE_SPREAD = 110.0; // pick: how far a flamed body can cough the curse (assistant pick - retune by eye)
+		const double PLAGUE_CHANCE = 0.10;  // user: 10/20/30% per rank, once per flame tick
 		const double RISE_CHANCE = 0.05;   // user: 5% of slain enemies rise while Hapi leads
 		const int PILLAR_POOL = 16;        // pick: pillar FX slots (Multi-Flame caps at 4 columns per volley)
 		const double PILLAR_LIFE = 0.5;    // pick: a column reads for half a second then fades
@@ -737,9 +746,10 @@ public partial class Game : Godot.Node2D
 		Godot.Collections.Array<double> _undCd = new();     // bite cadence (1 s chomps)
 		Godot.Collections.Array<double> _undDmg = new();    // bite = the corpse's contact damage
 		Godot.Collections.Array<double> _undSpd = new();    // chase speed = the corpse's own speed
-		Godot.Collections.Array<int> _undTaunt = new();     // 0 = conversion (no pull) / 1 = risen half (taunts)
+		Godot.Collections.Array<int> _undTaunt = new();     // 1 = risen body taunts the horde (2026-11-18: conversions taunt too; 0 only on parked slots)
 		Godot.Collections.Array<Godot.Sprite2D> _pillarFx = new();
 		Godot.Collections.Array<double> _pillarT = new();
+		double _plagueTick = 0.0;   // NECROTIC PLAGUE flame clock: one cough roll per second of the DoT
 		// The Kaka (Yu ult, user 2026-10-26): six EMPOWERED copies of the ritual familiars -
 		// same pool, steering, fuse and no-split blast, only doubled reach and bite. The x2
 		// multiplies AFTER the rank scaling: the member passes already-scaled kit numbers and
@@ -1117,7 +1127,7 @@ public partial class Game : Godot.Node2D
 			}
 		if (risenUp)
 		{
-			SpawnUndead(c, false); // conversion rise: fights beside the squad, no pull
+			SpawnUndead(c, false); // conversion rise: fights beside the squad AND taunts it (2026-11-18 hand-play)
 			}
 		else if (LeaderBonusKey() == 11 && Rng.Randf() < RISE_CHANCE)
 		{
@@ -4238,15 +4248,12 @@ public void RegisterEnemy(Combatant e)
 				f = 0.0;
 				_pillarFx[i].Modulate = new Color(1.0f, 1.0f, 1.0f, (float)f); // linear fade to dust
 			}
-		bool plagueOn = false; // Necrotic Plague: only when a joined member ranks it
+		int plagueRank = 0; // Necrotic Plague: the best rank among joined members drives the tick cough
 		foreach (PartyMember m in _party)
 		{
-			if (m.joined && m.plagueR > 0)
-			{
-				plagueOn = true;
-				break;
-				}
-			}
+			if (m.joined && (int)m.plagueR > plagueRank)
+				plagueRank = (int)m.plagueR; // the highest-ranked joined member coughs hardest
+		}
 		Godot.Collections.Array<Godot.Node2D> enemies = GetEnemies(); // horde snapshot once
 		for (int i = 0; i < _undead.Count; i++)
 		{
@@ -4296,54 +4303,69 @@ public void RegisterEnemy(Combatant e)
 							}
 						}
 				}
-			if (plagueOn)
+		}
+		// NECROTIC PLAGUE (rebalanced 2026-11-18 hand-play): the curse stopped riding risen bodies on
+		// contact, which read as free spread across the horde. It coughs on the FLAME ITSELF. One flame
+		// tick per second of the DoT window: every living, flamed body rolls PLAGUE_CHANCE x rank (user:
+		// 10/20/30%), and a hit stamps one nearby un-flamed body inside PLAGUE_SPREAD with the window
+		// THAT carrier still has - so a cough can never outlive the flame that bred it. Stamps are banked
+		// first: a fresh cough never rolls its own tick inside the SAME wave.
+		_plagueTick += delta;
+		if (plagueRank > 0 && _plagueTick >= 1.0)
+		{
+			_plagueTick -= 1.0; // the DoT's own 1 dmg/s cadence: one roll per second per carrier
+			double pch = PLAGUE_CHANCE * (double)plagueRank; // user: 10/20/30% per rank
+			int en = enemies.Count;
+			Godot.Node2D[] cough = new Godot.Node2D[en];
+			double[] coughDps = new double[en];
+			double[] coughDur = new double[en];
+			int coughN = 0;
+			foreach (Godot.Node2D n in enemies)
 			{
-				// pass 1: the FIRST live flamed carrier touching this body lends its curse
-				double cdps = 0.0;
-				double cdur = 0.0;
-				foreach (Godot.Node2D n in enemies)
+				Combatant nc = (Combatant)n;
+				if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f || nc.necrosisT <= 0.0)
+					continue; // only a living, flamed carrier ever coughs
+				if (Rng.Randf() >= pch)
+					continue; // the tick missed: the flame just keeps burning
+				Godot.Node2D t = null; // nearest FRESH body in cough range, wrap-squared like every pool
+				double best2 = 1e9;
+				foreach (Godot.Node2D m2 in enemies)
 				{
-					Combatant nc = (Combatant)n;
-					if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f || nc.necrosisT <= 0.0)
-						continue; // only a flamed, living carrier passes the curse on
-					Vector2 off = WrapDelta(s.GlobalPosition, n.GlobalPosition);
-					double reach = (double)nc.hitR + UNDEAD_RADIUS + PLAGUE_TOUCH;
-					if (off.X * off.X + off.Y * off.Y <= reach * reach)
-					{
-						cdps = nc.necrosisDps;
-						cdur = nc.necrosisT; // carrier's own window: the floor below keeps it real
-						break;
-						}
-					}
-				if (cdps > 0.0)
+					Combatant mc = (Combatant)m2;
+					if (mc == null || mc.kind == "dead" || mc.hp <= 0.0f || mc.necrosisT > 0.0)
+						continue; // already-flamed bodies never re-carry
+					Vector2 off = WrapDelta(n.GlobalPosition, m2.GlobalPosition);
+					double dd = (double)System.Math.Sqrt(off.X * off.X + off.Y * off.Y) - (double)mc.hitR;
+					if (dd > PLAGUE_SPREAD || dd >= best2)
+						continue; // the cough ring gates the painted silhouette, nearest body answers
+					best2 = dd;
+					t = m2;
+				}
+				if (t != null)
 				{
-					// pass 2: the curse walks to fresh bodies touching the risen one
-					foreach (Godot.Node2D n in enemies)
-					{
-						Combatant nc = (Combatant)n;
-						if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f || nc.necrosisT > 0.0)
-							continue; // already-flamed bodies never re-carry
-						Vector2 off = WrapDelta(s.GlobalPosition, n.GlobalPosition);
-						double reach = (double)nc.hitR + UNDEAD_RADIUS + PLAGUE_TOUCH;
-						if (off.X * off.X + off.Y * off.Y <= reach * reach)
-						{
-							nc.Necrotic(cdps, System.Math.Max(2.0, cdur)); // min 2 s: the pass-on stays a real DoT
-							}
-						}
-					}
+					cough[coughN] = t;
+					coughDps[coughN] = nc.necrosisDps; // the carrier's dps rides the cough unchanged
+					coughDur[coughN] = nc.necrosisT;    // the CURRENT window: a short flame coughs a short flame
+					coughN++;
 				}
 			}
+			for (int q = 0; q < coughN; q++)
+				((Combatant)cough[q]).Necrotic(coughDps[q], coughDur[q]); // one wave per second, banked first
 		}
+	}
 	private void DespawnBee(int i)
 	{
 		Godot.Node2D s = _bees[i];
 		s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
 		((Godot.ColorRect)s.GetChild(0)).Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
 	}
-	// Hapi (2026-11-17): raise a corpse as a risen ally. half = leader-bonus halves ride HALF
-	// stats (hp / bite / speed) and half art scale; conversions ride the corpse's own stats.
-	// The corpse's OWN Sprite2D child (texture + scale + flip) is copied into the shell's art
-	// slot; no painted body gets a green tint. Parked -9000 like every pool.
+	// Hapi (2026-11-17 + 2026-11-18 hand-play fixes): raise a corpse as a risen ally that SEEKS
+	// the horde (UNDEAD_FIND reach) and TAUNTS it - conversions pull too. half = leader
+	// bonus halves ride HALF stats (hp / bite / speed) but FULL corpse art (2026-11-18 hand-play:
+	// half paint read far too small); conversions ride the corpse's own stats. The corpse's OWN Sprite2D is found by a DEPTH WALK - the Enemy rigs its
+	// art under the sway node, so the flat child scan never saw it and the risen read as a green
+	// square. The paint rides the corpse's own texture + scale + offset, tinted sickly green (0.55,
+	// 0.8, 0.35) so a risen body reads as a zombie of the body it used to be.
 	private void SpawnUndead(Combatant c, bool half)
 	{
 		float k = half ? 0.5f : 1.0f;
@@ -4369,21 +4391,37 @@ public void RegisterEnemy(Combatant e)
 		_undSpd[slot] = ((Enemy)c).speed * k; // chase speed = the corpse's own speed
 		_undLife[slot] = UNDEAD_LIFE; // 10 s after THEIR OWN rise: conversions outlive the 10 s window edge
 		_undCd[slot] = 0.5; // first chomp half a second after rising
-		_undTaunt[slot] = half ? 1 : 0; // only risen halves taunt; conversions fight without pulling
+		_undTaunt[slot] = 1; // ALL risen bodies taunt: ult conversions yank the horde too (2026-11-18 hand-play: "which I think we missed out for his ultimate")
 		Godot.Sprite2D art = (Godot.Sprite2D)s.GetChild(1);
 		art.Texture = null; // stale paint never rides a fresh corpse
-		foreach (Godot.Node ch in c.GetChildren()) // the corpse's OWN Sprite2D (texture + scale + flip)
+		Godot.Sprite2D src = CorpseArt(c, 3); // the corpse's OWN art, walked THROUGH the sway rig
+		if (src != null && src.Texture != null)
+		{
+			art.Texture = src.Texture;
+			art.Position = src.GlobalPosition - c.GlobalPosition; // the paint keeps its offset off the body
+			art.Scale = src.Scale; // FULL corpse paint for both lanes: halves ride half STATS only (2026-11-18 hand-play: the half-paint rises read much smaller than the corpse the user called)
+			art.FlipH = src.FlipH;
+			art.Modulate = new Color(0.55f, 0.8f, 0.35f, 1.0f); // zombie read: the corpse's OWN art, tinted
+			((Godot.ColorRect)s.GetChild(0)).Color = new Color(0.55f, 0.8f, 0.35f, 0.0f); // painted body: the rect stops drawing
+		}
+	}
+
+	// Risen art pickup: the first TEXTURED Sprite2D under the body, walked by DEPTH. The Enemy hangs
+	// its art under the sway rig (_rig.AddChild(_spr)), so the old flat GetChildren scan never saw it
+	// and every risen body fell back to the green square the user called (2026-11-18 hand-play fix).
+	private Godot.Sprite2D CorpseArt(Godot.Node body, int depth)
+	{
+		if (depth <= 0)
+			return null;
+		foreach (Godot.Node ch in body.GetChildren())
 		{
 			if (ch is Godot.Sprite2D && ((Godot.Sprite2D)ch).Texture != null)
-			{
-				Godot.Sprite2D src = (Godot.Sprite2D)ch;
-				art.Texture = src.Texture;
-				art.Scale = src.Scale * k; // halves ride half paint too
-				art.FlipH = src.FlipH;
-				((Godot.ColorRect)s.GetChild(0)).Color = new Color(0.55f, 0.8f, 0.35f, 0.0f); // painted body: the rect stops drawing
-				break;
-			}
+				return (Godot.Sprite2D)ch;
+			Godot.Sprite2D deeper = CorpseArt(ch, depth - 1);
+			if (deeper != null)
+				return deeper;
 		}
+		return null;
 	}
 	// Hapi shot intercept: nearest risen body inside the SAME 12 px bolt core members use.
 	private Godot.Node2D UndeadAt(Vector2 p)
@@ -4422,8 +4460,9 @@ public void RegisterEnemy(Combatant e)
 		s.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
 		((Godot.ColorRect)s.GetChild(0)).Color = new Color(0.55f, 0.8f, 0.35f, 0.0f);
 	}
-	// TAUNT QUERY (Call of the Grave): nearest risen HALF within TAUNT_PULL, wrap-corrected.
-	// null = zero chase change for the Enemy. Conversions (flag 0) never answer this.
+	// TAUNT QUERY (Call of the Grave + 2026-11-18 hand-play fix): nearest risen body of ANY flavor
+	// (conversion or leader half) within TAUNT_PULL, wrap-corrected; null = zero chase change.
+	// Parked slots (flag 0) never answer this; every live risen body does.
 	public Godot.Node2D GetTauntBody(Vector2 pos)
 	{
 		Godot.Node2D w = null;
@@ -6501,7 +6540,7 @@ private void UpdateSpirits(float delta)
 		{ m.beamTargets += OPT_BEAM[option]; } // Split Beams (Keeko row 47): one more hitscan pick + its own lane per rank
 		{ m.beamReach += OPT_REACH[option]; } // Arcane Reach (Keeko row 48): +0.10 reach factor per rank on the kit field (EffRange maths ride PartyMember)
 		{ m.pillarTargets += OPT_PILLAR[option]; } // Multi-Flame (Hapi row 52): one more pillar drop per rank (cap 4 = base + 3 ranks)
-		{ m.plagueR += OPT_PLAGUE[option]; } // Necrotic Plague (Hapi row 53): rank spreads the flame DoT on touch AND stamps +2 s/rank longer
+		{ m.plagueR += OPT_PLAGUE[option]; } // Necrotic Plague (Hapi row 53): each flame tick rolls 10/20/30% to cough the curse onto a nearby body, and the applier's own stamp runs +2 s/rank longer
 		{ m.pillarR += OPT_PEST[option]; } // Greater Pestilence (Hapi row 54): column radius x1.15/rank, PILLAR_R x (1 + 0.15 x rank) at the commit
 		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
 						 OPT_LABEL[option] + " x" + _pickRank[option];
@@ -7269,4 +7308,3 @@ private void UpdateSpirits(float delta)
 		}
 	}
 }
-

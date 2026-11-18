@@ -213,7 +213,7 @@ public partial class PartyMember : Godot.Node2D
 
 	public double pillarR = 0.0; // Greater Pestilence rank: committed column radius PILLAR_R x (1 + 0.15 x rank)
 
-	public double plagueR = 0.0; // Necrotic Plague rank: flame passes on risen-body touch (Game lane) + lengthens itself
+	public double plagueR = 0.0; // Necrotic Plague rank: the FLAME coughs per second at PLAGUE_CHANCE x rank (Game lane, rebalanced 2026-11-18) + lengthens itself
 
 	public double convT = 0.0; // Bring Out Yer Dead!: 10 s conversion window (decays beside ultT; Game reads it on kills)
 
@@ -3896,49 +3896,19 @@ public partial class PartyMember : Godot.Node2D
 
 			{
 
-				Godot.Node2D n = null;
+				// SPLIT BEAMS follow the pause-screen targeting logic (user 2026-11-18 hand-play): the
 
-				float nd = 1e9f;
+				// old loop hard-wired NEAREST for every extra lane, so Keeko's second/third/fourth
 
-				for (int i2 = 0; i2 < enemies.Count; i2++)
+				// beam punched a different body than the player asked for while the base lane obeyed
 
-				{
+				// the mode. Each extra rank now asks the SAME mode-aware picker, with the bodies
 
-					Godot.Node2D c = enemies[i2];
+				// another beam already punched held out (bk, s) so no two lanes punch the same body;
 
-					Combatant nc = (Combatant)c;
+				// when the mode finds nothing left in reach, closest answers - PickPrey's fallback.
 
-					if (nc == null || nc.kind == "dead")
-
-						continue;
-
-					bool already = false;
-
-					for (int q = 0; q < s; q++)
-
-						if (bk[q] == c)
-
-							already = true;
-
-					if (already)
-
-						continue;
-
-					float dd = pg.WrapDelta(p, c.GlobalPosition).Length() - nc.hitR;
-
-					if (dd <= reach && dd < nd)
-
-					{
-
-							nd = dd;
-
-							n = c;
-
-					}
-
-				}
-
-				bk[s] = n; // may be null: fewer live bodies than ranks
+				bk[s] = PickBeamPrey(pg, enemies, p, reach, bk, s);
 
 			}
 
@@ -4568,16 +4538,32 @@ public partial class PartyMember : Godot.Node2D
 	public Godot.Node2D PickPrey(Game pg, Godot.Collections.Array<Godot.Node2D> enemies,
 		Vector2 p, float reach, bool wrap, bool hpGate, bool laneOnly, float facing, float arcEff)
 	{
-		Godot.Node2D got = _PickFor(targetMode, pg, enemies, p, reach, wrap, hpGate, laneOnly, facing, arcEff);
+		Godot.Node2D got = _PickFor(targetMode, pg, enemies, p, reach, wrap, hpGate, laneOnly, facing, arcEff, null, 0);
 		if (got == null && targetMode != 0)
-			got = _PickFor(0, pg, enemies, p, reach, wrap, hpGate, laneOnly, facing, arcEff);
+			got = _PickFor(0, pg, enemies, p, reach, wrap, hpGate, laneOnly, facing, arcEff, null, 0);
+		return got;
+	}
+
+	// SPLIT BEAMS extra picks: same pause-screen mode as the base lane, minus the bodies another
+	// beam already punched (bk[0..s)). The fallback law is the same one PickPrey uses: when the
+	// mode has nothing left in reach, closest answers, so the extra lane never idles.
+	private Godot.Node2D PickBeamPrey(Game pg, Godot.Collections.Array<Godot.Node2D> enemies,
+		Vector2 p, float reach, Godot.Node2D[] bk, int s)
+	{
+		// laneOnly is false here, so the arc arguments never gate - zeros keep that explicit.
+		Godot.Node2D got = _PickFor(targetMode, pg, enemies, p, reach, true, false, false, 0.0f, 0.0f, bk, s);
+		if (got == null && targetMode != 0)
+			got = _PickFor(0, pg, enemies, p, reach, true, false, false, 0.0f, 0.0f, bk, s);
 		return got;
 	}
 
 	// One mode's pick; mode 4 only scores bosses, so a horde with no live boss in reach
 	// leaves got null and PickPrey falls back to the closest.
+	// excl/exclN is the already-punched list Split Beams passes (null, 0 for every other kit):
+	// a body another beam already punched can never be punched again, so the extras stay distinct.
 	private Godot.Node2D _PickFor(int mode, Game pg, Godot.Collections.Array<Godot.Node2D> enemies,
-		Vector2 p, float reach, bool wrap, bool hpGate, bool laneOnly, float facing, float arcEff)
+		Vector2 p, float reach, bool wrap, bool hpGate, bool laneOnly, float facing, float arcEff,
+		Godot.Node2D[] excl, int exclN)
 	{
 		Godot.Node2D got = null;
 		float gotD = 1e9f;
@@ -4588,6 +4574,15 @@ public partial class PartyMember : Godot.Node2D
 			Combatant nc = (Combatant)n;
 			if (nc == null || nc.kind == "dead")
 				continue;
+			if (excl != null)
+			{
+				bool punched = false;
+				for (int q = 0; q < exclN; q++)
+					if (excl[q] == n)
+						punched = true;
+				if (punched)
+					continue; // another lane already owns this body
+			}
 			if (hpGate && nc.hp <= 0.0f)
 				continue;
 			if (mode == 4 && !(nc is Boss))
@@ -4638,5 +4633,3 @@ public partial class PartyMember : Godot.Node2D
 	}
 
 }
-
-
