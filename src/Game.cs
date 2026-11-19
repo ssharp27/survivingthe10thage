@@ -5585,6 +5585,15 @@ private void UpdateSpirits(float delta)
 		// art reorganised 2026-11-08 (user: "move all the current characters into the character folder")
 		// - portraits now live under res://art/characters/ alongside the art/enemies/ tree
 		static readonly string[] SEL_ART = { "res://art/characters/baldrun.png", "res://art/characters/mosiah.png", "res://art/characters/asper.png", "res://art/characters/alvora.png", "res://art/characters/yu.png", "res://art/characters/stack.png", "res://art/characters/wash.png", "res://art/characters/bruno.png", "res://art/characters/brook.png", "res://art/characters/keeko.png", "res://art/characters/hapi.png" };
+		// PER-SEAT select-card scale (2026-11-19, the 2x-art law): the user is shipping ~2x canvases
+		// now (Athios 175x235 against the 78-98 W x 114-121 H class) and plans to rework the shipped
+		// cast to that quality, so the select lane needs a SCALE ANSWER, not a pre-shrunk PNG - the
+		// Keeko law (box-downscale then palette-snap) exists only because there was no knob; it cost
+		// quality. 1.0 keeps the SHIPPED draw untouched. Card target = the class read (~118 px tall),
+		// so a 2x sheet rides 0.5. Index = memberIndex; out-of-range seats default to 1.
+		// The stage mini has its OWN knob (PartyMember.miniScale): 235 px * 0.38 = 89 px, the same
+		// on-stage size the class gets at 0.75. Keep the two lanes' numbers separate on purpose.
+		static readonly float[] SEL_ART_SCALE = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
 		static readonly string[] SEL_BONUS = {
 		"Leader Bonus: Chain Lightning - All attacks have a 5% chance to unleash lightning on 5 targets for 10 damage.",
 		"Leader Bonus: Pierce - All attacks gain +1 Pierce and all allies gain +5% Evasion.",
@@ -5639,6 +5648,7 @@ private void UpdateSpirits(float delta)
 			if (pm2.memberIndex >= 0 && pm2.memberIndex < SEL_ART.Length)
 			{
 				Godot.Texture2D tex = GD.Load(SEL_ART[pm2.memberIndex]) as Godot.Texture2D; // PM-verified load idiom
+				bool scaled = false; // does this seat ride SEL_ART_SCALE instead of the slot rect?
 				if (tex == null)
 				{				Godot.ColorRect ph = new ColorRect();
 					ph.Color = new Color(0.16f, 0.15f, 0.18f, 1.0f); // placeholder block (framework)
@@ -5649,15 +5659,48 @@ private void UpdateSpirits(float delta)
 				else
 				{
 					Godot.TextureRect tr = new Godot.TextureRect(); tr.Texture = tex; // Control-friendly: anchor rects ride it
-						tr.Set("stretch_mode", 3); // STRETCH_KEEP_CENTERED (3 in 4.7's renumbered enum,
-						// probed headless): art at NATIVE pixel size centered in the slot - user 2026-10-28
-						// said the 2.3x-scaled art looked stretched; native matches the stage minis
-					// (aspect is moot under KEEP_CENTERED: the art is never scaled at all)
-					tr.Set("texture_filter", 0); // NEAREST like the stage minis (hard painted edges)
+					float artScale = (pm2.memberIndex < SEL_ART_SCALE.Length) ? SEL_ART_SCALE[pm2.memberIndex] : 1.0f;
+					scaled = (artScale != 1.0f);
+					// s == 1 keeps the SHIPPED draw exactly: STRETCH_KEEP_CENTERED (3 in 4.7's renumbered
+					// enum, probed headless) paints native pixels centered, the user's 2026-10-28 "not
+					// stretched" pick. The hazard that pick hides: TextureRect's DEFAULT expand_mode is
+					// EXPAND_CLIP, so art bigger than the slot is CLIPPED to it - a 235 px sheet in the
+					// ~274 x 163 px slot loses its feet outright. The scaled branch stops leaning on the
+					// slot rect for exactly that reason.
+					if (!scaled)
+					{
+						tr.Set("stretch_mode", 3);
+						tr.Set("texture_filter", 0); // NEAREST like the stage minis (hard painted edges)
+					}
+					else
+					{
+						// STRETCH_SCALE (0) + a box pinned to the art's OWN native*scale px around the
+						// slot CENTRE: anchors 0.5 then offsets +/- (native*scale)/2. The box carries the
+						// art aspect BY CONSTRUCTION, so nothing distorts and nothing clips, and the px
+						// math never needs the window size (offsets ride the parent's centre, not its rect)
+						tr.Set("stretch_mode", 0);
+						tr.SetAnchor(Godot.Side.Left, 0.5f); tr.SetAnchor(Godot.Side.Right, 0.5f);
+						tr.SetAnchor(Godot.Side.Top, 0.5f); tr.SetAnchor(Godot.Side.Bottom, 0.5f);
+						tr.Set("offset_left", -(float)tex.GetWidth() * artScale * 0.5f);
+						tr.Set("offset_right", (float)tex.GetWidth() * artScale * 0.5f);
+						tr.Set("offset_top", -(float)tex.GetHeight() * artScale * 0.5f);
+						tr.Set("offset_bottom", (float)tex.GetHeight() * artScale * 0.5f);
+						// MIPMAP_LINEAR (2): a ~half-size NEAREST draw keeps only every 2nd source pixel
+						// and craters thin features; the shipped cast never needed mips because it is 1:1
+						// on the slot, this one does
+						tr.Set("texture_filter", 2);
+					}
 					_selTile[ti] = tr;
 				}
-				SetRectSel(_selTile[ti], SEL_GRID[ti * 4], SEL_GRID[ti * 4 + 1],
+				// the slot rect owns the tile ONLY for native seats: a scaled seat already pinned its own
+				// centre-anchored box, and SetRectSel would pin those offsets back to 0 and crush it to
+				// the slot. The name plate still rides the tile below, so a scaled seat's plate lands on
+				// the ART's own floor (retune by eye at hand-play)
+				if (!scaled)
+				{
+					SetRectSel(_selTile[ti], SEL_GRID[ti * 4], SEL_GRID[ti * 4 + 1],
 						SEL_GRID[ti * 4 + 2], SEL_GRID[ti * 4 + 3]);
+				}
 				_selName[ti] = new Label();
 				SetRectSel(_selName[ti], 0.02f, 0.85f, 0.98f, 0.99f); // 2026-11-14 hand-play: the plates sat ON the painted minis - dropped to the slot floor (assistant pick, retune by eye)
 				_selName[ti].Text = pm2.displayName + (SEL_LOCKED[ti] ? " (locked)" : "");
