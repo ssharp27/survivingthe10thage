@@ -171,13 +171,13 @@ public partial class Game : Godot.Node2D
 	// without-replacement draw per ally beat, taken at boot. The run's own leader never
 	// rolls onto its own pool (it CAN show up on runs where it is not the leader).
 	// Row = registry index (BuildJoinLottery reads _stage): columns are memberIndex order
-	// (0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash | 7 Bruno | 8 Brook | 9 Keeko | 10 Hapi).
+	// (0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash | 7 Bruno | 8 Brook | 9 Keeko | 10 Hapi | 11 Athios).
 	// Weight 0 = cannot appear on that stage. Stage 1 per the user: Baldrun + Mosiah more likely
 	// than the rest. The Enemy Test Room row is ALL ZERO on purpose: the room runs no ally beats,
 	// so the exhausted pool is a logged no-op and nothing can recruit there.
 	// Sanity numbers - the user will add rows/weights per future stage.
 	// the new-style initializer: Godot's C# build trips CS0623 on nested old-style braces
-	private static readonly int[][] JOIN_W = { new int[] { 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1 }, new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };   // row 0 = stage 1: Baldrun + Mosiah heavy, the rest (Keeko 2026-11-14, Hapi 2026-11-17) at parity | row 1 = the test room: no recruits
+	private static readonly int[][] JOIN_W = { new int[] { 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }, new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };   // row 0 = stage 1: Baldrun + Mosiah heavy, the rest (Keeko 2026-11-14, Hapi 2026-11-17, Athios 2026-11-19) at parity | row 1 = the test room: no recruits
 	private int[] _joinOrder = new int[0]; // ally slot k -> memberIndex drawn for it
 	private Godot.Collections.Array<int> _hpOrder = new(); // HUD strip slot -> memberIndex: the join order (see BuildJoinLottery)
 	private Godot.RandomNumberGenerator _joinRng; // UNSEEDED on purpose: a fresh process re-rolls
@@ -234,7 +234,7 @@ public partial class Game : Godot.Node2D
 	// kit-native ranks (pierce, multishot) ride the same cap. Ranks cap at 3 per DESIGN; the
 	// 4th rank would be the evolution (Stormcaller / Viperkiss), still stubbed for M2.
 	const int PICK_RANK_CAP = 3;
-	const int PICK_SLOTS = 12;   // keys pick_1..pick_12: eleven members + one wild slot (Brook rode pick_10 2026-10-31, Keeko pick_11, Hapi pick_12 entered the input map 2026-11-17)
+	const int PICK_SLOTS = 13;   // keys pick_1..pick_13: twelve members + one wild slot (Keeko pick_11 and Hapi pick_12 entered the input map 2026-11-17, Athios pick_13 2026-11-19)
 	static readonly string[] OPT_LABEL = { "Longer Reach (+15% Range)", "Heavier Blows (+10% Damage)",
 										   "Swifter Swings (+16% Attack Speed)", "Quicker Thrusts (+16% Attack Speed)",
 										   "Deeper Thrusts (+16% Range, Pierce +1)", "Sharper Tip (+10% Damage)",
@@ -249,19 +249,19 @@ public partial class Game : Godot.Node2D
 		"Lucky Stabs (+5% Crit Chance)", "Sneak Attack (+5% Multistrike Chance)",
 											   "Fire Rune (+1 Burn Damage/sec for 5s)", "Harder Thrusts (+15% Crit Damage)",
 											   "Eagle Eye (+5% Crit Chance)", "Difficult Terrain (10% Slow for 2.5s)",
-											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)", "Overflowing Necrosis (+12% Damage)", "Swift Curse (+16% Attack Speed)", "Multi-Flame (+1 Pillar Target)", "Necrotic Plague (Flame DoT passes on touch)", "Greater Pestilence (+15% Pillar Radius)" };
-	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 0, 1, 2, 3, 4, 9, 9, 9, 9, 9 , 10, 10, 10, 10, 10 };
-	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f };
-	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)", "Overflowing Necrosis (+12% Damage)", "Swift Curse (+16% Attack Speed)", "Multi-Flame (+1 Pillar Target)", "Necrotic Plague (Flame DoT passes on touch)", "Greater Pestilence (+15% Pillar Radius)" , "Sharper Claws (+12% Damage, +12% Crit)", "Savage Attacks (+16% Attack Speed)", "Primal Might (+1 Claw Attack)", "Haemorrhaging Bleed (Bleed also slows 10%/rank)", "Longer Claws (+15% Range)" };
+	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 0, 1, 2, 3, 4, 9, 9, 9, 9, 9 , 10, 10, 10, 10, 10 , 11, 11, 11, 11, 11 };
+	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f };
+	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.15f };
 	// user 2026-11-01 audit fix: Stack rows 20/21 were swapped - keener flame carried no bonus at all and quicker fuse carried the damage. damage 1.10 rides row 20, cooldown 0.85 rides row 21.
-	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f };
-	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // rows 4 + 8: Mosiah deeper thrust / Asper piercing shot (user 2026-10-30)
-	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
+	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f };
+	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // rows 4 + 8: Mosiah deeper thrust / Asper piercing shot (user 2026-10-30)
+	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
 	// guiding light (Alvora): the ring MARKS caught bodies for +10%/rank incoming damage
 	// from EVERY source, a window on the body that decays on its own (Combatant.TickVuln).
 	// The user swapped the old flat-armour defence for this offense (2026-10-23): the squad
 	// keeps no mitigation, but the cleric's ring becomes the party's damage setup.
-	static readonly int[] OPT_VULN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_VULN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 	// draging maul (Baldrun 4th card, user 2026-10-24): connected maul hits drag caught bodies to
 	// (1 - 0.25/rank) speed for a 2.5 s window (Combatant.slowMul/slowT, refresh-not-stack); only
 	// horde movement reads it and the cleave hook never marks Bosses. deadly aim (Mosiah 4th card):
@@ -269,38 +269,38 @@ public partial class Game : Godot.Node2D
 	// so the crit card is pure table data. Rows 18/19 of the 20-wide tables; caps bound both:
 	// drag <= 0.75 at rank 3, crit <= 0.05 + 3 x 0.08 = 0.29.
 	// OPT_SLOW = drag strength/rank (Baldrun row 18); OPT_CRIT = crit points/rank (Mosiah row 19).
-	static readonly double[] OPT_SLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_SLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0.12, 0, 0, 0, 0 };
 	// firebolt kit cards (Stack, user 2026-10-30): OPT_BURN = +2 s of linger per rank onto
 	// PartyMember.burnDur; OPT_CINDER = cinder bloom rank: a body that dies STILL burning bursts
 	// in CINDER_R px, scorching the live horde bodies in the blast for 25/50/75% of the firebolt's
 	// roll at rank 1/2/3 (Game.CinderBurst, hooked in the kill scan). Rows
 	// 25-29 of the now 25-wide tables.
-	static readonly double[] OPT_BURN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly int[] OPT_CINDER = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_BURN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_CINDER = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 	static readonly double CINDER_R = 60.0; // cinder bloom blast radius (assistant pick: small)
 	// shield kit cards (Wash, user 2026-10-31): OPT_BOUNCE = +1 shield bounce per rank (the thrown
 	// shield hits its prey then hops to one MORE body per bounce; the hop lane lives on PartyMember);
 	// OPT_CRITD = +0.25 CRIT_DAMAGE points per rank on the tag store. Rows 25-29 of the now 30-wide
 	// tables: heavier shield | quicker hurl | more rebounds | sharper rim | crushing blow.
-	static readonly int[] OPT_BOUNCE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_CRITD = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.15, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_BOUNCE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_CRITD = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.15, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 	// axe kit cards (Bruno, user 2026-10-31): heavier axe rides the shared OPT_DMG 1.10 row,
 	// quicker throw rides the shared OPT_CD 0.85 row; these three columns are NEW:
 	// OPT_AXE = +1 extra crescent per rank (base ONE throw, arcs alternate top/bottom);
 	// OPT_SIZE = +1 size rank per rank (the blade disc + band depth read 1.0 + 0.25 * rank);
 	// OPT_BLEED = bleed rank (hit bodies bleed like the fire DoT, own status pair; dps scales
 	// with the damage card at the call site). Rows 30-34 of the then 35-wide tables.
-	static readonly int[] OPT_AXE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly int[] OPT_SIZE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly int[] OPT_BLEED = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_AXE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_SIZE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_BLEED = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 // Brook dagger cards (user 2026-10-31): sharper edges rides the shared OPT_DMG row,
 // quicker jabs the shared OPT_CD row, deadly angle the shared OPT_CRIT row; these two
 // columns are NEW: OPT_VENOM = +2 s of poison window per rank (lingering venom),
 // OPT_MS = +0.05/rank multistrike CHANCE (lucky strikes: a hit deals damage twice).
 // Rows 35-39 of the now 40-wide tables.
-	static readonly double[] OPT_VENOM = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_MS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05 , 0, 0, 0, 0, 0 };	// fifth cards (user 2026-11-01): the tables are now 45-wide and rows 40-44 give the FIRST five
+	static readonly double[] OPT_VENOM = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_MS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };	// fifth cards (user 2026-11-01): the tables are now 45-wide and rows 40-44 give the FIRST five
 	// PCs a fifth track each. Two of the five ride columns that already exist - deadlier aim (row
 	// 41) rides OPT_CRITD as +0.15 CRIT_DAMAGE points/rank (10% of the 1.5 BASE per rank, the same
 	// points lane the Wash crushing blow card uses), keener aim (row 42) rides OPT_CRIT +0.08/rank exactly
@@ -311,9 +311,9 @@ public partial class Game : Godot.Node2D
 	// the drag, 2.5 s refresh-not-stack window), OPT_LUCK = lucky-explosion chance/rank baked on the
 	// summon slot at spawn (_summonLuck, pool column grows WITH the pool) and rolled in DetonateSummon
 	// as a SECOND sweep pass - zero Rng draw when the rank is 0.
-	static readonly double[] OPT_FIRE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_RING = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_LUCK = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_FIRE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_RING = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_LUCK = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 	// Keeko "Nexus" kit cards (user 2026-11-14): rows 45-49, the tables are now 50-wide. Arcane Power
 	// rides the shared OPT_DMG 1.12 row, Faster Channeling the shared OPT_CD 0.86 row (the same +16%
 	// cadence the other speed cards use), Arcane Echo rides OPT_MS (+0.05/rank multistrike CHANCE -
@@ -321,8 +321,8 @@ public partial class Game : Godot.Node2D
 	// OPT_BEAM = Split Beams extra picks/rank (each extra prey gets its OWN hitscan lane + slot, cap 4);
 	// OPT_REACH = Arcane Reach: +0.10 reach FACTOR per rank - the 2026-11-14 hand-play pass
 	// RETIRED the knockback the user did not like ("I actually don't like the knockback. Let's replace it with a simple +10% range increase"): EffRange() x (1 + beamReach) now widens the Nexus lane instead, and PartyMember draws the band tome->prey so it crosses the bodies it wounds.
-	static readonly int[] OPT_BEAM = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_REACH = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_BEAM = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_REACH = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 	// Hapi "Necrotic Flame" kit cards (user 2026-11-17): rows 50-54, the tables are now 55-wide. Overflowing
 	// Necrosis rides the shared OPT_DMG 1.12 row and Swift Curse the shared OPT_CD 0.86 row EXACTLY like
 	// every other kit's damage/speed pair; the necrosis DoT itself scales with the damage card at the commit
@@ -335,9 +335,17 @@ public partial class Game : Godot.Node2D
 	// body inside PLAGUE_SPREAD with the window it still has); plus the applier's OWN stamp runs +2 s/rank
 	// longer at the commit); OPT_PEST
 	// = Greater Pestilence rank (column radius x1.15/rank at the PartyMember commit site).
-	static readonly int[] OPT_PILLAR = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 };
-	static readonly int[] OPT_PLAGUE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 };
-	static readonly int[] OPT_PEST = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 };
+	static readonly int[] OPT_PILLAR = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_PLAGUE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_PEST = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 , 0, 0, 0, 0, 0 };
+	// Athios claw kit cards (user 2026-11-19): rows 55-59, tables now 60-wide. Sharper Claws rides the
+	// shared OPT_DMG (1.12) + OPT_CRIT (0.12) lanes, Savage Attacks the shared OPT_CD 0.86 cadence, Longer
+	// Claws the shared OPT_RANGE 1.15 area lane (assistant pick: +15% reach, matching Longer Reach). These
+	// two columns are NEW: OPT_CLAW = Primal Might one more claw swing per rank (the claw kit's two-beat
+	// stagger reads 2 + clawHits swings); OPT_BLEEDSLOW = Haemorrhaging Bleed slow strength/rank spent via
+	// Combatant.Slowed beside the Bleed stamp on every claw hit.
+	static readonly int[] OPT_CLAW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 };
+	static readonly double[] OPT_BLEEDSLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0 };
 
 
 	int[] _pickRank = new int[OPT_LABEL.Length];
@@ -902,6 +910,9 @@ public partial class Game : Godot.Node2D
 			return; // post-revive shield, or the body is mid-rescue: immune
 		if (m.elixHardT > 0.0)
 			amount *= 0.90; // Resilience elixir: every ally takes 10% less while brewed
+		if (m.rageT > 0.0)
+			amount *= 0.5; // Beastial Rage: the WHOLE squad (Athios + allies) takes HALF damage for the window
+		amount *= LeaderPrideDamageMul(); // Spiritmane Pride: all allies take 10% less while Athios leads (1.0 otherwise)
 		// defence tags (ARMOUR/EVASION): evasion rolls first for a full dodge,
 		// then armour subtracts flat - never below 1 damage (user floor 2026-10-24)
 		if (Rng != null && m.stat[StatTags.EVASION] * LeaderEvaMul() > 0.0 && Rng.Randf() < m.stat[StatTags.EVASION] * LeaderEvaMul()) // Inquisitive Mind: +5% while Brook leads
@@ -1148,7 +1159,7 @@ public partial class Game : Godot.Node2D
 				m.awaKills += 1;
 				// one random standing ally per kill (user 2026-11-06): gather the eligible squad,
 				// draw ONE patient - the awakening no longer heals everybody
-				PartyMember[] cands = new PartyMember[11]; // roster-wide bound (11 PCs at 2026-11-17)
+				PartyMember[] cands = new PartyMember[12]; // roster-wide bound (12 PCs at 2026-11-19)
 				int cn = 0;
 				foreach (PartyMember mm in _party)
 				{
@@ -2162,6 +2173,17 @@ public void RegisterEnemy(Combatant e)
 	{
 		foreach (PartyMember m in _party)
 			m.insT = secs; // every ally carries its OWN bardic clock (bench too - harmless)
+	}
+
+	// Athios "Beastial Rage" (user 2026-11-19, seat 12): party-wide 10 s window on each member's OWN
+	// rageT clock. Readers: Game.TakeHit halves incoming damage, PartyMember.EffCooldown pays RAGE_SPD
+	// (+50% attack speed) and Strikes() adds +1 attack for every kit that consumes multistrike (shot
+	// volleys, beam, cleave re-thrusts, summon repeat). The CLAW kit adds its own swing at its commit
+	// instead. Key 12 NEVER sets ultT for the caster: that would double-multiply EffCooldown speed.
+	public void RallyParty(double secs)
+	{
+		foreach (PartyMember m in _party)
+			m.rageT = secs; // every ally carries its OWN rage clock (bench too - harmless)
 	}
 
 	// how wide the camera can actually see: NOT assumed anymore. A DPI-scaled
@@ -3640,10 +3662,13 @@ public void RegisterEnemy(Combatant e)
 			return 5;
 		if (_leader.displayName == "Wash")
 			return 9; // Inspiring Leader (user 2026-11-02): all allies +15 max hp / +1 armour while Wash leads: readers LeaderInspireHp() (EffMaxHp) + LeaderArmourFlat() (TakeHit)
-	if (_leader.displayName == "Keeko")
-		return 10; // Gekkota Training (user 2026-11-14): all allies +10% evasion / +10% move / +10% attack speed while Keeko leads: readers LeaderEvaMul/LeaderMoveMul/LeaderAtkSpdMul
+		if (_leader.displayName == "Keeko")
+			return 10; // Gekkota Training (user 2026-11-14): all allies +10% evasion / +10% move / +10% attack speed while Keeko leads: readers LeaderEvaMul/LeaderMoveMul/LeaderAtkSpdMul
 		if (_leader.displayName == "Hapi")
 			return 11; // Call of the Grave (user 2026-11-17): slain enemies 5% rise as undead halves (half stats) that taunt nearby enemies: the rise lives on Game.OnEnemyKilled, the pull on Game.GetTauntBody
+		if (_leader.displayName == "Athios")
+			return 12; // Spiritmane Pride (user 2026-11-19): the pack is battle-born - +10% move, +10% dodge,
+		// 10% less damage taken party-wide. Readers: LeaderMoveMul / LeaderEvaMul / LeaderPrideDamageMul (below)
 		return 0;
 	}
 	
@@ -3733,7 +3758,7 @@ public void RegisterEnemy(Combatant e)
 	}
 	public double LeaderMoveMul()
 	{
-		return (LeaderBonusKey() == 7 || LeaderBonusKey() == 10) ? 1.10 : 1.0; // Bruno seat | Keeko Gekkota Training (user 2026-11-14)
+		return (LeaderBonusKey() == 7 || LeaderBonusKey() == 10 || LeaderBonusKey() == 12) ? 1.10 : 1.0; // Bruno seat | Keeko Gekkota Training | Athios Spiritmane Pride (user 2026-11-19)
 	}
 	// Brook "Inquisitive Mind" seat 8 (user 2026-10-31: allies +5% evasion, +15% collection
 // range, +15% XP while Brook leads): the SAME multiplier discipline as the Bruno pair -
@@ -3741,7 +3766,7 @@ public void RegisterEnemy(Combatant e)
 // write NO stat-store grants, so the 17-row audit stays a permanent-grant ledger.
 	public double LeaderEvaMul()
 	{
-		return LeaderBonusKey() == 10 ? 1.10 : ((LeaderBonusKey() == 8 || LeaderBonusKey() == 2) ? 1.05 : 1.0); // Keeko Gekkota Training +10% (user 2026-11-14) | Inquisitive Mind | Mosiah +5%
+		 return (LeaderBonusKey() == 10 || LeaderBonusKey() == 12) ? 1.10 : ((LeaderBonusKey() == 8 || LeaderBonusKey() == 2) ? 1.05 : 1.0); // Keeko Gekkota Training / Athios Spiritmane Pride +10% (user 2026-11-19) | Inquisitive Mind | Mosiah +5%
 	}
 
 	// Keeko "Gekkota Training" seat 10 (user 2026-11-14: while she leads, ALL allies get +10% attack
@@ -3770,8 +3795,18 @@ public void RegisterEnemy(Combatant e)
 		}
 		public double LeaderArmourFlat()
 		{
-		return LeaderBonusKey() == 9 ? 1.0 : 0.0;
-	}
+		return LeaderBonusKey() == 9 ? 1.0 : 0.0; // Inspiring Leader: +1 armour flat while Wash leads (TakeHit lane)
+		}
+		
+		// Athios "Spiritmane Pride" seat 12 (user 2026-11-19: party +10% move / +10% evasion / 10%
+		// less damage taken while he leads): the move + evasion halves ride the LeaderMoveMul and
+		// LeaderEvaMul lines above; the mitigation half is this live multiplier, consumed in the
+		// TakeHit incoming-damage gate beside the Resilience elixir. SAME multiplier discipline as
+		// every seat perk - no stat-store writes, a seat swap retargets by itself.
+		public double LeaderPrideDamageMul()
+		{
+			return LeaderBonusKey() == 12 ? 0.9 : 1.0;
+		}
 	
 	// per-frame half of the leader lane: regen ticks (Alvora), insect / spirit upkeep,
 	// and the seat-locked spawn clocks (Asper / Yu). Upkeep runs under ANY seat so a
@@ -4546,7 +4581,7 @@ private void UpdateSpirits(float delta)
 			}
 		if (puller != null && dist < 14.0f)
 		{
-			PartyMember[] cands = new PartyMember[11]; // roster-wide bound (11 PCs at 2026-11-17; was exact-fit at 8)
+			PartyMember[] cands = new PartyMember[12]; // roster-wide bound (12 PCs at 2026-11-19; was exact-fit at 8)
 			int cn = 0;
 			foreach (PartyMember mm in _party)
 			{
@@ -5579,12 +5614,12 @@ private void UpdateSpirits(float delta)
 		0.04f, 0.49f, 0.30f, 0.70f, 0.35f, 0.49f, 0.61f, 0.70f, 0.66f, 0.49f, 0.96f, 0.70f,
 		0.04f, 0.72f, 0.30f, 0.93f, 0.35f, 0.72f, 0.61f, 0.93f, 0.66f, 0.72f, 0.96f, 0.93f }; // board fractions (assistant re-grid pick: 12 rects on 4 rows - retune by eye)
 	static readonly float[] SEL_PAGE = { 0.05f, 0.14f, 0.60f, 0.86f }; // the board window the build draws AND the click maps into
-	static readonly bool[] SEL_LOCKED = { false, false, false, false, false, false, false, false, false, false, false };
+	static readonly bool[] SEL_LOCKED = { false, false, false, false, false, false, false, false, false, false, false, false };
 	static readonly float[] SEL_CONFIRM = { 0.32f, 0.88f, 0.58f, 0.96f };
 	// painted mini art per roster seat (index = memberIndex: 0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash | 7 Bruno | 8 Brook)
 		// art reorganised 2026-11-08 (user: "move all the current characters into the character folder")
 		// - portraits now live under res://art/characters/ alongside the art/enemies/ tree
-		static readonly string[] SEL_ART = { "res://art/characters/baldrun.png", "res://art/characters/mosiah.png", "res://art/characters/asper.png", "res://art/characters/alvora.png", "res://art/characters/yu.png", "res://art/characters/stack.png", "res://art/characters/wash.png", "res://art/characters/bruno.png", "res://art/characters/brook.png", "res://art/characters/keeko.png", "res://art/characters/hapi.png" };
+		static readonly string[] SEL_ART = { "res://art/characters/baldrun.png", "res://art/characters/mosiah.png", "res://art/characters/asper.png", "res://art/characters/alvora.png", "res://art/characters/yu.png", "res://art/characters/stack.png", "res://art/characters/wash.png", "res://art/characters/bruno.png", "res://art/characters/brook.png", "res://art/characters/keeko.png", "res://art/characters/hapi.png", "res://art/characters/athios.png" };
 		// PER-SEAT select-card scale (2026-11-19, the 2x-art law): the user is shipping ~2x canvases
 		// now (Athios 175x235 against the 78-98 W x 114-121 H class) and plans to rework the shipped
 		// cast to that quality, so the select lane needs a SCALE ANSWER, not a pre-shrunk PNG - the
@@ -5593,7 +5628,7 @@ private void UpdateSpirits(float delta)
 		// so a 2x sheet rides 0.5. Index = memberIndex; out-of-range seats default to 1.
 		// The stage mini has its OWN knob (PartyMember.miniScale): 235 px * 0.38 = 89 px, the same
 		// on-stage size the class gets at 0.75. Keep the two lanes' numbers separate on purpose.
-		static readonly float[] SEL_ART_SCALE = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+		static readonly float[] SEL_ART_SCALE = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.5f }; // seat 11 Athios: the 175x235 ~2x sheet rides 0.5 for the ~118 px class read (assistant pick, retune by eye)
 		static readonly string[] SEL_BONUS = {
 		"Leader Bonus: Chain Lightning - All attacks have a 5% chance to unleash lightning on 5 targets for 10 damage.",
 		"Leader Bonus: Pierce - All attacks gain +1 Pierce and all allies gain +5% Evasion.",
@@ -5605,7 +5640,8 @@ private void UpdateSpirits(float delta)
 		"Leader Bonus: You... But Better! - All allies gain +15% Area and 10% Movement Speed.",
 		"Leader Bonus: Inquisitive Mind - All allies gain +5% Evasion, +15% Collection Range and +15% XP.",
 		"Leader Bonus: Gekkota Training - All allies gain +10% evasion, +10% movement speed and +10% attack speed.",
-		"Leader Bonus: Call of the Grave - Enemies slain while Hapi leads have a 5% chance to rise as undead halves (half stats) that taunt nearby enemies." };
+		"Leader Bonus: Call of the Grave - Enemies slain while Hapi leads have a 5% chance to rise as undead halves (half stats) that taunt nearby enemies.",
+		"Leader Bonus: Spiritmane Pride - All allies gain +10% Movement Speed and +10% Evasion and take 10% less damage while Athios leads." };
 	static readonly string[] SEL_ULT = {
 		"Ultimate: Giant's Might (R) - Doubles Baldrun's size and reach and grants +50% Damage and Attack Speed for 10s.",
 		"Ultimate: Bardic Inspiration (R) - All allies gain +25% Damage and Attack Speed for 10s",
@@ -5617,7 +5653,8 @@ private void UpdateSpirits(float delta)
 		"Ultimate: Axes Away! (R) - Bruno spins two axes around him for 10 seconds. These blades gain all of the effects of his chosen upgrades.",
 		"Ultimate: Assassination (R) - All allies gain +25% Multistrike, +15% Crit Chance and +25% Crit Damage for 10s",
 		"Ultimate: Rewrite Reality (R) - All enemies (including any that spawn) become frozen in place for 10 seconds. (against final bosses, this instead increases damage dealt to them by 25%)",
-		"Ultimate: Bring Out Yer Dead! (R) - For 10 seconds, every enemy slain rises as an undead ally with the same stats and real HP (they can be killed by enemies) that fights beside the squad for 10 seconds of its own." };
+		"Ultimate: Bring Out Yer Dead! (R) - For 10 seconds, every enemy slain rises as an undead ally with the same stats and real HP (they can be killed by enemies) that fights beside the squad for 10 seconds of its own.",
+		"Ultimate: Beastial Rage (R) - All allies take half damage, attack 50% faster and gain +1 attack for 10s." };
 	public void BuildSelectScreen()
 	{
 		_selLayer = new CanvasLayer();
@@ -6591,6 +6628,8 @@ private void UpdateSpirits(float delta)
 		{ m.pillarTargets += OPT_PILLAR[option]; } // Multi-Flame (Hapi row 52): one more pillar drop per rank (cap 4 = base + 3 ranks)
 		{ m.plagueR += OPT_PLAGUE[option]; } // Necrotic Plague (Hapi row 53): each flame tick rolls 10/20/30% to cough the curse onto a nearby body, and the applier's own stamp runs +2 s/rank longer
 		{ m.pillarR += OPT_PEST[option]; } // Greater Pestilence (Hapi row 54): column radius x1.15/rank, PILLAR_R x (1 + 0.15 x rank) at the commit
+		{ m.clawHits += OPT_CLAW[option]; } // Primal Might (Athios row 57): one more claw swing per rank - the two-beat stagger becomes 2 + clawHits swings
+		{ m.bleedSlow += OPT_BLEEDSLOW[option]; } // Haemorrhaging Bleed (Athios row 58): slow strength per rank spent beside the Bleed stamp via Combatant.Slowed
 		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
 						 OPT_LABEL[option] + " x" + _pickRank[option];
 		GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +

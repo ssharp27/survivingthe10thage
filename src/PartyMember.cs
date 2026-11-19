@@ -229,6 +229,10 @@ public partial class PartyMember : Godot.Node2D
 
 	Godot.Sprite2D[] _cresFx = null; // 5 crescent blade slots: their own art set, so the spin and a volley never fight over one frame's placement
 
+	// 6 claw rake slots (fan size is variable): Athios's rakes ride their own set, so the fan
+	// never fights _meleeFx or the crescent set for a slot (fx-feel law, Bruno's _cresFx precedent)
+	Godot.Sprite2D[] _rakeFx = null;
+
 	float _fxT = 0.0f; // commit-fx visibility timer: decays with the world clock, hides sprites off-beat
 
 	// user 2026-11-01 art/feel pass (user's bug batch): crescent blades are TRAVELLING hitboxes
@@ -498,6 +502,23 @@ public partial class PartyMember : Godot.Node2D
 	readonly double INS_DMG = 1.25; // +25% damage while inspired (RollDamage choke)
 
 	readonly double INS_SPD = 1.25; // +25% attack speed: EffCooldown divisor, all kits
+	
+	// Athios "Beastial Rage" (user 2026-11-19, seat 12): rageT = rage seconds ON THIS body, stamped
+	// PARTY-WIDE by Game.RallyParty (Athios AND every ally). Readers: Game.TakeHit halves incoming
+	// damage, EffCooldown pays RAGE_SPD (+50% attack speed), Strikes() adds +1 attack for kits that
+	// consume multistrike (volleys/beam/cleave re-thrusts); the CLAW kit adds its own swing at its
+	// commit. Key 12 NEVER sets ultT: the cadence must not double-multiply.
+	public double rageT = 0.0;
+	
+	readonly double RAGE_LASTS = 10.0; // user number: the rage window is 10 s
+	readonly double RAGE_SPD = 1.5; // user number: attack 50% faster (EffCooldown divisor)
+	
+	// CLAW kit state (Athios, 2026-11-19): the combo is a SWING COUNTER, not the dagger's twinArm
+	// bool - Primal Might ranks and Beastial Rage stretch it past two beats
+	public int clawBeat = 0;       // swings landed in the current combo (0 = combo idle)
+	public double clawRoll = 0.0;  // one crit/roll SHARED across the whole combo (like twinDmg)
+	public int clawHits = 0;       // Primal Might: +1 claw swing per rank (OPT_CLAW)
+	public double bleedSlow = 0.0; // Haemorrhaging Bleed: slow strength stamped with each bleed (OPT_BLEEDSLOW)
 
 	// Alvora "Guardian Awakening" (user 2026-10-26): ring reach x2 MULTIPLIED after the
 
@@ -882,6 +903,16 @@ public partial class PartyMember : Godot.Node2D
 			// 2026-11-17: Hapi art probe (the class body canvas rides the default miniScale like the rest)
 
 			miniPath = "res://art/characters/hapi.png";
+			else if (displayName == "Athios")
+			{
+				// 2026-11-19: Athios art probe (175x235 canvas - the user's ~2x-quality drop, against the
+				// class's 78-98 W x 114-121 H). 235 px x 0.38 = 89 px, the same stage read the class gets
+				// at its default 0.75 on ~118 px sheets; rim 31 is the base-band centre read from the canvas
+				// bottom (assistant pick, retune by eye at hand-play; the SEL lane has its OWN 0.5 knob)
+				miniPath = "res://art/characters/athios.png";
+				miniScale = 0.38f;
+				miniRim = 31.0f;
+			}
 
 		if (miniPath != "")
 
@@ -947,6 +978,29 @@ public partial class PartyMember : Godot.Node2D
 
 				AddChild(_meleeFx);
 
+				// 2026-11-19 CONVERGING RAKE law (user: "Athios is melee so they shouldn't fly out like
+				// Bruno's do... theme is more important for the characters"): the volley stays ANCHORED
+				// at melee distance and only the GEOMETRY converges. The fan rides its OWN _rakeFx set
+				// (6 slots = max arm count, Bruno's _cresFx precedent: a variable-size fan never fights
+				// a shared slot for a frame's placement): same art, same NEAREST filter, parked invisible;
+				// the commit hook poses them per arm and _fxT decay hides them off-beat.
+				if (weaponKit == "claw")
+				{
+					_rakeFx = new Godot.Sprite2D[6];
+
+					for (int f2 = 0; f2 < 6; f2++)
+					{
+						_rakeFx[f2] = new Godot.Sprite2D();
+
+						_rakeFx[f2].Texture = fxT;
+
+						_rakeFx[f2].Set("texture_filter", 0); // NEAREST like the painted minis: hard edges
+
+						_rakeFx[f2].Visible = false;
+
+						AddChild(_rakeFx[f2]);
+					}
+				}
 			}
 
 		}
@@ -1433,6 +1487,9 @@ public partial class PartyMember : Godot.Node2D
 
 		// (convT, decaying beside ultT); the kill lane itself lives on Game.OnEnemyKilled.
 
+		// Athios "Beastial Rage" (user 2026-11-19): seat 12, party-wide rageT window via Game.RallyParty
+		if (displayName == "Athios")
+			return 12; // Beastial Rage: half damage + 50% attack speed + 1 attack for 10 s
 		if (displayName == "Hapi")
 
 				return 11; // Bring Out Yer Dead! (window on convT; rises + leader halves live on Game)
@@ -1743,6 +1800,19 @@ public partial class PartyMember : Godot.Node2D
 				return true;
 
 		}
+		// Athios "Beastial Rage" (user 2026-11-19): 10 s PARTY-WIDE window on each member's own rageT -
+		// half damage taken (Game.TakeHit), +50% attack speed (EffCooldown RAGE_SPD), +1 attack (Strikes()
+		// for volley kits; the claw combo adds a swing at its own commit). ultT stays UNSET here on purpose:
+		// paying ULT_SPD on top of RAGE_SPD would square the caster's cadence.
+		else if (ultKey() == 12)
+		{
+			ultCdT = ULT_CD_BASE / stat[StatTags.ULT];
+			Game g12 = GetParent() as Game;
+			if (g12 != null)
+				g12.RallyParty(RAGE_LASTS);
+			GD.Print("[10thAge] (ult) Beastial Rage: the squad takes half damage and attacks 50% faster with +1 attack for 10 s, gate " + (int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
+			return true;
+		}
 		// GD.Print("[10thAge] (ult) " + displayName + " has no ultimate yet");
 
 		return false;
@@ -1781,7 +1851,7 @@ public partial class PartyMember : Godot.Node2D
 
 	{
 
-		double spd = stat[StatTags.ATTACK_SPEED] * (insT > 0.0 ? INS_SPD : 1.0) * (ultT > 0.0 ? ULT_SPD : 1.0) * LeaderAtkSpdMul(); // bardic +25% | Giant's Might +50% attack speed (user 2026-11-06) | Keeko lead +10% (Gekkota Training)
+		double spd = stat[StatTags.ATTACK_SPEED] * (insT > 0.0 ? INS_SPD : 1.0) * (ultT > 0.0 ? ULT_SPD : 1.0) * (rageT > 0.0 ? RAGE_SPD : 1.0) * LeaderAtkSpdMul(); // bardic +25% | Giant's Might +50% attack speed (user 2026-11-06) | Keeko lead +10% (Gekkota Training)
 
 		if (spd < 0.05)
 
@@ -1826,6 +1896,8 @@ public partial class PartyMember : Godot.Node2D
 	{
 
 		int n = (int)stat[StatTags.MULTISTRIKE];
+		if (rageT > 0.0)
+			n += 1; // Beastial Rage: +1 attack for every kit consuming multistrike (the CLAW kit adds its swing at its own commit)
 
 		if (n < 1)
 
@@ -2260,6 +2332,9 @@ public partial class PartyMember : Godot.Node2D
 			if (_axeFx != null)
 				 foreach (Godot.Sprite2D sx in _axeFx)
 					 sx.Visible = false;
+			if (_rakeFx != null)
+				 foreach (Godot.Sprite2D sx in _rakeFx)
+					 sx.Visible = false; // the rake fan never lingers on a downed body
 			for (int sk = 0; sk < _shldT.Length; sk++)
 			{
 				 Godot.Sprite2D da = ShieldArt(sk);
@@ -2438,6 +2513,12 @@ public partial class PartyMember : Godot.Node2D
 							foreach (Godot.Sprite2D sx in _cresFx)
 
 								sx.Visible = false; // fx-feel8: crescent flash done on its OWN slots; the flight-clock guard keeps a volley mid-spin from being clipped
+
+				if (_rakeFx != null)
+
+					 foreach (Godot.Sprite2D sx in _rakeFx)
+
+						sx.Visible = false; // rake fan hides off-beat: the stamps are ANCHORED, so there is no flight clock to guard
 
 			}
 
@@ -3036,6 +3117,7 @@ public partial class PartyMember : Godot.Node2D
 
 		}
 		ultT -= delta;
+		rageT -= delta; // Beastial Rage window (party-wide clock, mirrors insT discipline)
 		if (convT > 0.0)
 
 				convT -= delta; // Bring Out Yer Dead! window: sits beside the ultT decay (mirrors the Bruno/Alvora clocks)
@@ -3123,8 +3205,11 @@ public partial class PartyMember : Godot.Node2D
 		// the leader 360-degree pick), and it gates the cleaver fall-through like every other kit.
 
 		bool pillarKit = weaponKit == "pillar";
+		// Athios claw kit: the 360-degree swipe ring. Keys on weaponKit like every other lane; it must
+		// gate the cleaver fall-through too, or the class-default arcHalf would drive the maul instead.
+		bool clawKit = weaponKit == "claw";
 
-		bool cleaver = !shotKit && !beamKit && !pillarKit && arcHalf > 0.5f; // maul kit: arc cleave, full damage per body (user 2026-10-23)
+		bool cleaver = !shotKit && !beamKit && !pillarKit && !clawKit && arcHalf > 0.5f; // maul kit: arc cleave, full damage per body (user 2026-10-23)
 
 		// Spirit Guardians kit: a ring that pulses around the caster. Damage is NOT split by
 
@@ -3770,6 +3855,246 @@ public partial class PartyMember : Godot.Node2D
 			}
 
 			return; // the volley owns its whole beat: the flight block prints when it lands
+
+		}
+
+		// Athios CLAW kit (user 2026-11-19): close-range rake that bites EVERY body inside reach, run as
+
+		// Brook's RAPID COMBO (two strikes on the TWIN_STAGGER cadence, ONE roll shared across the combo,
+
+		// and the follow-up RE-PICKS its own prey). 2026-11-19 CONVERGING RAKE law (user: "Athios is melee
+
+		// so they shouldn't fly out like Bruno's do. I don't mind the trade-off against a converging
+
+		// horde, theme is more important for the characters"): the volley NEVER leaves the body - the stamps
+
+		// stay ANCHORED at melee distance on the Baldrun PUSH law and only the GEOMETRY converges. The arms
+
+		// fan around the throw line to the picked prey (12 deg apart) and the bite test runs from the HANDS
+
+		// out to the prey's OWN spot like Bruno's converge-on-prey law: reach only GATES the commit, so a
+
+		// body cheek-to-cheek is raked at arm length instead of being popped out to the far ring. Primal
+
+		// Might and Beastial Rage WIDEN the fan instead of lengthening the combo, and a body under TWO arms
+
+		// takes two honest bites (different arms, same shared roll) while the print tallies UNIQUE bodies.
+
+		// Every caught body is BLED 1 dmg/s for 5 s (dps rides the damage card at the call site like the
+
+		// other DoT stamps) and Haemorrhaging Bleed drags it (same Slowed lane as draging maul/ring, bosses
+
+		// immune). The claw art rides its OWN _rakeFx set (6 slots = max fan) and MIRRORED (Scale.x negated)
+
+		// on the arms left of the throw line, like Baldrun's crescent on the later swings. Instant like
+
+		// every other melee verb: no shot-pool column to mirror.
+
+		if (clawKit)
+
+		{
+
+		int arms = 2 + clawHits; // base TWO arms; Primal Might adds one more arm to the FAN, never a third strike
+
+		if (rageT > 0.0)
+
+		arms += 1; // Beastial Rage: one more arm in the fan for the window
+
+		if (arms > 6)
+
+		arms = 6; // clamp: four Primal Might ranks + rage can never stretch the fan past six slots
+
+		if (clawBeat >= 2)
+
+		clawBeat = 0; // stale tail: a combo that ended short (an empty rake) restarts clean
+
+		if (clawBeat == 0)
+
+		clawRoll = RollDamage(pg, weaponDamage); // the combo OPENS with one crit/steal roll; the follow-up pays it
+
+		// prey pick mirrors Bruno's ritual: nearest living body whatever way the body faces, and reach only
+
+		// GATES the commit - the fan converges on the prey's REAL distance (2026-11-19 CONVERGING RAKE law:
+
+		// only the GEOMETRY converges, the claws themselves never fly out like the axes do)
+
+		Godot.Node2D prey = PickPrey(pg, enemies, p, reach, true, false, false, 0.0f, 0.0f);
+
+		float preyD = PickPreyD; // answers the chosen body's EDGE distance
+
+		if (prey == null || preyD > reach)
+
+		return; // nothing in sight: the beat stays ready, an empty clearing never stalls it
+
+		// converge geometry: the arms MEET AT THE TARGETED PREY'S SPOT (Bruno law) - arcR rides the prey's
+
+		// ACTUAL distance and the floor is back AT THE HANDS, so an adjacent body is raked honestly
+
+		float arcR = preyD + ((Combatant)prey).hitR; // the arm's far edge sits ON the prey, never past it
+
+		Vector2 aimv = pg.WrapDelta(p, prey.GlobalPosition); // the SHORT way: the fan rides reach, never a seam-pop
+
+		float a0 = (float)System.Math.Atan2(aimv.Y, aimv.X); // throw line angle
+
+		float band = 0.17f * reach; // one claw lane's depth (assistant knob, retunable)
+
+		Vector2[] adir = new Vector2[arms]; // the fan: arm directions, reused by the bite test AND the stamps
+
+		float[] afan = new float[arms]; // the same angles, for the art's Rotation
+
+		for (int k = 0; k < arms; k++)
+
+		{
+
+		afan[k] = a0 + (float)(k - (arms - 1) * 0.5) * 0.2094f; // 12 deg apart, CENTRED on the throw line
+
+		adir[k] = new Vector2((float)System.Math.Cos(afan[k]), (float)System.Math.Sin(afan[k]));
+
+		}
+
+		int hitN = 0; // UNIQUE bodies the rake caught (the print tallies these)
+
+		int biteN = 0; // honest bites: a body under two arms pays the shared roll twice
+
+		for (int i = 0; i < enemies.Count; i++)
+
+		{
+
+		Godot.Node2D n = enemies[i];
+
+		Combatant nc = (Combatant)n;
+
+		if (nc == null || nc.kind == "dead")
+
+		continue;
+
+		// per-arm lane test in the file's own idiom (along / perp off pg.WrapDelta): from the hands out to
+
+		// arcR, a body whose disc crosses an arm lane is bitten by that arm
+
+		Vector2 r = pg.WrapDelta(p, n.GlobalPosition);
+
+		int bites = 0;
+
+		for (int k = 0; k < arms; k++)
+
+		{
+
+		Vector2 dir = adir[k];
+
+		float along = r.X * dir.X + r.Y * dir.Y;
+
+		if (along < 0.0f - nc.hitR || along > arcR + nc.hitR)
+
+		continue; // behind the hands or past the converge point: that arm never touches it
+
+		float perp = (float)System.Math.Abs(r.X * dir.Y - r.Y * dir.X);
+
+		if (perp > band + nc.hitR)
+
+		continue; // outside that arm's lane
+
+		bites++;
+
+		}
+
+		if (bites <= 0)
+
+		continue;
+
+		for (int b = 0; b < bites; b++)
+
+		nc.TakeDamage(clawRoll); // ONE shared roll, paid once per arm that caught it (two honest bites)
+
+		nc.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 5.0); // user kit: Bleed 1 dmg/s for 5 s (dps rides the damage card)
+
+		if (bleedSlow > 0.0 && !(nc is Boss))
+
+		nc.Slowed(bleedSlow, 2.5); // Haemorrhaging Bleed: same drag lane as draging maul/ring
+
+		hitN++;
+
+		biteN += bites;
+
+		}
+
+		if (hitN <= 0)
+
+		{
+
+		clawBeat = 0; // an empty rake lands nothing: combo restarts clean, cooldown stays open
+
+		return;
+
+		}
+
+		_atkFlash = 0.08f; // same commit-frame flash discipline as every other verb
+
+		facing = a0; // the body reads toward what the rake actually committed on
+
+		if (_rakeFx != null)
+
+		{
+
+		float texW = 128.0f, texH = 128.0f; // the claw art's own box, normalized like Baldrun's crescent
+
+		if (_rakeFx[0].Texture != null)
+
+		{
+
+		texW = (float)_rakeFx[0].Texture.GetWidth();
+
+		texH = (float)_rakeFx[0].Texture.GetHeight();
+
+		}
+
+		float sm = (float)(SWEEP_ART_MUL * (double)reach / System.Math.Max((double)texW, (double)texH)); // same normalization as the crescent
+
+		for (int k = 0; k < arms; k++)
+
+		{
+
+		_rakeFx[k].GlobalPosition = p + adir[k] * (SWEEP_ART_PUSH * reach); // ANCHORED at melee distance on the PUSH law: the claws never fly out, only the fan angles converge
+
+		_rakeFx[k].Rotation = afan[k]; // the art's belly faces down its own arm
+
+		_rakeFx[k].Scale = new Vector2(k * 2 < arms ? -sm : sm, sm); // arms left of the throw line MIRROR the sweep (Baldrun's flip idiom)
+
+		_rakeFx[k].Modulate = new Color(1.0f, 1.0f, 1.0f, SWEEP_ART_ALPHA);
+
+		_rakeFx[k].Visible = true;
+
+		}
+
+		for (int k = arms; k < _rakeFx.Length; k++)
+
+		_rakeFx[k].Visible = false; // a lighter fan clears its spare slots (the beam idiom)
+
+		_fxT = 0.16f; // same commit-flash beat the shot/vial kits use
+
+		}
+
+		clawBeat += 1;
+
+		if (clawBeat < 2)
+
+		{
+
+		cdTimer = (float)TWIN_STAGGER; // rapid follow-up strike (Brook's two-dagger cadence)
+
+		GD.Print("[10thAge] (claw) " + displayName + " rake " + clawBeat + "/2 (" + arms + " arms, " + biteN + " bites raked " + hitN + " bodies)");
+
+		return; // mid-combo: the second strike lands when the stagger expires
+
+		}
+
+		clawBeat = 0;
+
+		cdTimer = (float)EffCooldown(); // combo done: the REAL cooldown gates the next beat
+
+		GD.Print("[10thAge] (claw) " + displayName + " claw combo done (2 rakes, " + biteN + " bites raked " + hitN + " bodies)");
+
+		return;
 
 		}
 

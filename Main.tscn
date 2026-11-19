@@ -168,6 +168,21 @@ necroDur = 5.0
 baseEvasion = 0.05
 class_ = "Grave Cleric"
 
+[node name="Athios" type="Node2D" parent="." unique_id=2100000002]
+script = ExtResource("3_pm")
+displayName = "Athios"
+weaponName = "Claws"
+memberIndex = 11
+maxHp = 80.0
+baseSpeed = 130.0
+weaponDamage = 8.0
+cooldown = 0.9
+range = 110.0
+weaponKit = "claw"
+meleeFxArt = "res://art/fx/claw.png"
+baseEvasion = 0.05
+class_ = "Beastlord"
+
 [node name="BossMini" type="Node2D" parent="." unique_id=321225898]
 position = Vector2(0, -500)
 script = ExtResource("4_boss")
