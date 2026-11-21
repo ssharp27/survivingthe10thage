@@ -5712,12 +5712,14 @@ private void UpdateSpirits(float delta)
 					else
 					{
 						// STRETCH_SCALE (0) + a box pinned to the art's OWN native*scale px around the
-						// slot CENTRE: anchors 0.5 then offsets +/- (native*scale)/2. The box carries the
-						// art aspect BY CONSTRUCTION, so nothing distorts and nothing clips, and the px
-						// math never needs the window size (offsets ride the parent's centre, not its rect)
+						// SLOT CENTRE: anchors at the slot's own centre read off SEL_GRID, then offsets +/- (native*scale)/2.
+						// The box carries the art aspect BY CONSTRUCTION, so nothing distorts and nothing clips, and the px
+						// math never needs the window size (offsets ride the slot's centre, not the page's)
 						tr.Set("stretch_mode", 0);
-						tr.SetAnchor(Godot.Side.Left, 0.5f); tr.SetAnchor(Godot.Side.Right, 0.5f);
-						tr.SetAnchor(Godot.Side.Top, 0.5f); tr.SetAnchor(Godot.Side.Bottom, 0.5f);
+						float slotCx = (SEL_GRID[ti * 4] + SEL_GRID[ti * 4 + 2]) * 0.5f;   // the slot's own centre, page fractions
+						float slotCy = (SEL_GRID[ti * 4 + 1] + SEL_GRID[ti * 4 + 3]) * 0.5f; // ditto, down the page
+						tr.SetAnchor(Godot.Side.Left, slotCx); tr.SetAnchor(Godot.Side.Right, slotCx);
+						tr.SetAnchor(Godot.Side.Top, slotCy); tr.SetAnchor(Godot.Side.Bottom, slotCy);
 						tr.Set("offset_left", -(float)tex.GetWidth() * artScale * 0.5f);
 						tr.Set("offset_right", (float)tex.GetWidth() * artScale * 0.5f);
 						tr.Set("offset_top", -(float)tex.GetHeight() * artScale * 0.5f);
@@ -5730,7 +5732,7 @@ private void UpdateSpirits(float delta)
 					_selTile[ti] = tr;
 				}
 				// the slot rect owns the tile ONLY for native seats: a scaled seat already pinned its own
-				// centre-anchored box, and SetRectSel would pin those offsets back to 0 and crush it to
+				// slot-centred box, and SetRectSel would pin those offsets back to 0 and crush it to
 				// the slot. The name plate still rides the tile below, so a scaled seat's plate lands on
 				// the ART's own floor (retune by eye at hand-play)
 				if (!scaled)
