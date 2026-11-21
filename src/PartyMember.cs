@@ -441,13 +441,20 @@ public partial class PartyMember : Godot.Node2D
 	// _rakeFx slots are re-anchored to their frozen world coord EVERY frame, so parent drift cannot drag the march along. Knobs
 	// tightened (step 0.42 -> 0.36) and the bite windows now OVERLAP (slice 0.62 of a step), matching the visible art.
 
-	static readonly double CLAW_STEP = 0.36; // v4 TIGHTER together per the redrawn art (reach 110 = ~40 px steps against the ~65 px visible slash: a deep, overlapping rake)
+	// CLAW v5 RE-RAKE law (user 2026-11-23, hand-play ON v4: "world-fixed feel bad - every other character has
+	// their attacks stuck to them. Let's just go back to the earlier concept", then "similar to Brook's daggers. Two rapid
+	// strikes initially, increasing to more with the skill rank and his ultimate, but with a short delay (I think Brook's is
+	// 0.4, so Athios can be 0.2), and each claw can retarget to hit another enemy if there is one in range"): the volley is
+	// TWO rapid strikes + one per Primal Might rank + one under Beastial Rage, the strikes ride the MEMBER (v4's frozen
+	// clawAnchor + per-frame re-anchor lane are DELETED, so the magnet closes BY CONSTRUCTION), every beat aims FRESH at
+	// the nearest live body and RETARGETS away from the previous strike's victim when another body is in reach (clawLastId
+	// ledger), and the art always rides FULL reach like the daggers' jabLen law. v3's and v4's march knobs are gone:
 
-	static readonly double CLAW_START = 0.40; // v4: first swipe a touch nearer per the reference (small arm gap), never hugging the torso
+			static readonly double CLAW_STAGGER = 0.2;  // v5 gap between strikes (USER number: "Brook's is 0.4, so Athios can be 0.2")
 
-	static readonly double CLAW_PERP = 0.16; // v4: SLIGHT zig-zag rows a bit deeper (reach 110 = ~18 px): the image's numbered pairs read clearer
+			static readonly double CLAW_BAND = 0.17;    // v5 strike corridor half-width as a fraction of reach (reach 110 = ~19 px: v4's bite band kept)
 
-	static readonly double CLAW_HEAD = 0.18; // head stamp rides this many steps PAST the frozen prey centre (v4 nudge: last swipe reads THROUGH the body)
+			static readonly double CLAW_RAKE = 0.62;    // v5 art pivot as a fraction of reach - the daggers' jabLen number: the rake always rides maximum distance
 
 	// Yu's familiars (M2, user dictation 2026-10-22): the fuse is the summon's LIFETIME, and
 
@@ -553,9 +560,7 @@ public partial class PartyMember : Godot.Node2D
 	public double bleedSlow = 0.0; // Haemorrhaging Bleed: slow strength stamped with each bleed (OPT_BLEEDSLOW)
 	public int clawSwings = 0;   // strikes THIS march runs (2 + Primal ranks, +1 raged): stamped when it opens
 	public Vector2 clawAim = new Vector2(1.0f, 0.0f); // the ONE throw line the whole march keeps, frozen at the open
-	public float clawDist = 0.0f; // center-to-center range to the prey, FROZEN at the OPEN: the v3 PREY-SPAN march anchors on THIS, never re-picked per beat
-	public Vector2 clawAnchor = new Vector2(0.0f, 0.0f); // v4 WORLD-FIX: Athios's own spot FROZEN at the march open: stamps and bite windows measure from THIS
-	public Vector2[] clawStampPos = null; // v4: frozen world coord per stamp slot (rake lane only): the per-frame re-anchor writes the slot here, killing the magnet effect
+		public long clawLastId = -1L; // v5 RETARGET ledger: the body the PREVIOUS strike raked (GetInstanceId is ulong, the ledger stays long like the bee ledger)
 
 	// Alvora "Guardian Awakening" (user 2026-10-26): ring reach x2 MULTIPLIED after the
 
@@ -1024,7 +1029,6 @@ public partial class PartyMember : Godot.Node2D
 				if (weaponKit == "claw")
 				{
 					_rakeFx = new Godot.Sprite2D[RAKE_SLOTS];
-					clawStampPos = new Vector2[RAKE_SLOTS]; // v4: parallel frozen-position bookkeeping for the stamps
 
 					for (int f2 = 0; f2 < RAKE_SLOTS; f2++)
 					{
@@ -2556,19 +2560,12 @@ public partial class PartyMember : Godot.Node2D
 
 					 foreach (Godot.Sprite2D sx in _rakeFx)
 
-						sx.Visible = false; // claw march hides off-beat: the stamps are ANCHORED, so there is no flight clock to guard
+						sx.Visible = false; // claw march hides off-beat: v5: the strikes ride the member, so the mount line below re-places them every beat
 
 			}
 
 		}
 
-		// v4 WORLD-FIX: claws are their own entity once fired - the slots hang off the MEMBER node, so re-anchor every
-		// visible stamp to its frozen world coord each frame: Athios's drift (the magnet complaint) cannot drag them along,
-		// and the coords are absolute map positions so a wrap never seam-pops the march.
-		if (_rakeFx != null && clawStampPos != null)
-				for (int rk = 0; rk < _rakeFx.Length; rk++)
-						if (_rakeFx[rk].Visible)
-								_rakeFx[rk].GlobalPosition = clawStampPos[rk]; // stay where the swipe landed
 				
 		cdTimer -= delta;
 
@@ -3904,219 +3901,286 @@ public partial class PartyMember : Godot.Node2D
 
 		}
 
-		// Athios CLAW kit (user 2026-11-19, PREY-SPAN SWIPES law v3 2026-11-21): close-range rake
+			// Athios CLAW kit (user 2026-11-19; CLAW v5 RE-RAKE law 2026-11-23): close-range rake that rides
+			// the MEMBER like every other melee verb. v4's WORLD-FIX (frozen anchor + per-frame re-anchor lane, c28d3fb)
+			// was hand-play REJECTED: "world-fixed feel bad - every other character has their attacks stuck to them.
+			// Let's just go back to the earlier concept". The earlier concept is the DAGGER cadence, and the user pinned it:
+			// "similar to Brook's daggers. Two rapid strikes initially, increasing to more with the skill rank and his
+			// ultimate, but with a short delay (I think Brook's is 0.4, so Athios can be 0.2), and each claw can retarget
+			// to hit another enemy if there is one in range". So: strikes = 2 + clawHits (+1 under Beastial Rage, clamped
+			// to RAKE_SLOTS); mid-march cdTimer = CLAW_STAGGER, the USER's 0.2 s gap. Every beat aims FRESH at the nearest
+			// live body, and when that nearest body is the PREVIOUS strike's victim AND another body is in reach the beat
+			// RETARGETS to the nearest body that is NOT (clawLastId ledger: GetInstanceId is ulong, the ledger stays long
+			// like the bee ledger in Enemy.cs). The scan is hand-rolled rather than PickPrey because the beat needs TWO
+			// answers (nearest AND nearest-not-last); dd follows the shared picker's EDGE convention (PickPreyD answers
+			// that body's edge distance) so reach reads the same "art within reach" way all the way round. Each strike
+			// bites the DAGGER corridor shape (segment p -> p + aim * reach, half-width CLAW_BAND * reach, hitR padding
+			// like every body test) and always RENDERS at full reach: the art box centres at CLAW_RAKE * reach along the
+			// fresh aim - the dagger jabLen "attacks at maximum distance" discipline. An empty beat still SWIPES: mid-march
+			// falls back to the last aim (the march never aborts); an OPEN beat with nobody in reach never opens at all.
+			// ONE crit/steal roll SHARED across the combo (clawRoll, like twinDmg). Every caught body is BLED 1 dmg/s for
+			// 5 s (dps rides the damage card at the call site like the other DoT stamps) and Haemorrhaging Bleed drags it
+			// (same Slowed lane as draging maul/ring, bosses immune). The art rides its OWN _rakeFx set and MIRRORS (Scale.x
+			// negated) on strikes aimed LEFT of the page, like Baldrun's crescent. Instant like every other melee verb:
+			// no shot-pool column to mirror. v1's same-target bug, v2's ATHIOS ladder, v3's PREY-SPAN march (the magnet
+			// complaint) and v4's frozen stamps (the detached feel) each shipped and each hand-play rejected; the strike
+			// COUNT grows but never a wider fan, and one shared roll keeps the volley honest.
 
-		// whose stamps emanate OUT OF ATHIOS itself, not from whatever body he happens to be looking at. The hand-play
+				if (clawKit)
+				{
 
-		// BUG in CLAW LINE v1 was re-anchoring every beat on the nearest body: with half-step padding the windows all
+				int strikes = 2 + clawHits; // base TWO rapid strikes (the user's claw law), +1 per Primal Might rank (OPT_CLAW)
 
-		// covered the same pile, so every swipe read as landing on the SAME target. The confirmed image: numbered
+				if (rageT > 0.0)
 
-		// stamps step steadily away from the body at even, ~art-width spacing and zig-zag above/below the throw line
+				strikes += 1; // Beastial Rage: one more strike in the volley for the ult window
 
-		// in alternating pairs, with a small delay between each so the march reads as a series of swipes. The prey
+				if (strikes > RAKE_SLOTS)
 
-		// pick now only GATES the open and freezes the direction; depth is measured from ATHIOS (clawDist frozen at the open, head past the prey, march stepped back) and each stamp rides its own perp offset, so its bite window travels WITH the stamp. A swipe
+				strikes = RAKE_SLOTS; // clamp: four Primal Might ranks + rage can never stretch the volley past the stamp set
 
-		// that catches nothing still SWIPES: the series never aborts mid-march. Rage and Primal Might still LENGTHEN
+				if (clawBeat >= clawSwings)
 
-		// it (clawSwings stamped at the open, clamped to RAKE_SLOTS). Every caught body is BLED 1 dmg/s for 5 s
+				clawBeat = 0; // stale tail: a combo that ended short restarts clean
 
-		// (dps rides the damage card at the call site like the other DoT stamps) and Haemorrhaging Bleed drags it
+				if (clawBeat == 0)
 
-		// (same Slowed lane as draging maul/ring, bosses immune). The claw art rides its OWN _rakeFx set and
+				clawLastId = -1L; // fresh combo: nothing has been raked yet, so the first strike may ride the nearest body
 
-		// MIRRORS (Scale.x negated) on strikes aimed LEFT of the page, like Baldrun's crescent. Instant like every
+				// FRESH prey scan (v5 RE-RAKE): every beat RE-POINTS at the nearest live body; when that nearest body is the
+				// PREVIOUS strike's victim and ANOTHER body is in reach, the beat RETARGETS to the nearest body that is NOT
+				// ("each claw can retarget to hit another enemy if there is one in range", user 2026-11-23). Hand-rolled rather
+				// than PickPrey because the beat needs TWO answers (nearest AND nearest-not-last); dd follows the shared picker's
+				// EDGE convention (PickPreyD answers the chosen body's edge distance), so reach reads "art within reach" all
+				// the way round.
 
-		// other melee verb: no shot-pool column to mirror.
+				Godot.Node2D prey = null;    // nearest live body in reach
 
-		if (clawKit)
+				Godot.Node2D altPrey = null; // nearest live body that is NOT the previous strike's victim
 
-		{
+				double clawBestD = 1e9;
 
-		int strikes = 2 + clawHits; // base TWO stamps; extra Primal Might ranks add one more stamp FURTHER OUT, never a wider fan
+				double clawAltD = 1e9;
 
-		if (rageT > 0.0)
+				for (int i = 0; i < enemies.Count; i++)
 
-		strikes += 1; // Beastial Rage: one more stamp at the far end of the line for the window
+				{
 
-		if (strikes > RAKE_SLOTS)
+				Godot.Node2D n = enemies[i];
 
-		strikes = RAKE_SLOTS; // clamp: four Primal Might ranks + rage can never stretch the march past the stamp set
+				Combatant nc = (Combatant)n;
 
-		if (clawBeat >= clawSwings)
+				if (nc == null || nc.kind == "dead")
 
-		clawBeat = 0; // stale tail: a march that ended short restarts clean
+				continue; // live bodies only: the march never bites a corpse
 
-		if (clawBeat == 0)
+				Vector2 v = pg.WrapDelta(p, n.GlobalPosition); // wrap-short like every other aim lane: the corridor never seam-pops
 
-		{
+				double dd = (double)v.Length() - (double)nc.hitR; // EDGE distance, the picker's convention
 
-		clawRoll = RollDamage(pg, weaponDamage); // the march OPENS with one crit/steal roll; every stamp pays it
+				if (dd > (double)reach)
 
-		clawSwings = strikes; // stamped at the open: the cadence and the done-print know how long the march is
+				continue; // outside claw reach
 
-		Godot.Node2D prey = PickPrey(pg, enemies, p, reach, true, false, false, 0.0f, 0.0f); // pick gates the OPEN only, never steers a beat
+				if (prey == null || dd < clawBestD)
 
-		float preyD = PickPreyD; // answers the chosen body's EDGE distance
+				{
 
-		if (prey == null || preyD > reach)
+				prey = n;
 
-		{
+				clawBestD = dd; // nearest live body in reach
 
-		clawSwings = 0; // nothing in reach: the march never opened, cooldown stays open
+				}
 
-		return;
+				if ((long)n.GetInstanceId() != clawLastId && dd < clawAltD)
 
-		}
+				{
 
-		Vector2 aimv = pg.WrapDelta(p, prey.GlobalPosition); // the SHORT way: the line never seam-pops
+				altPrey = n;
 
-		float line0 = (float)System.Math.Atan2(aimv.Y, aimv.X); // the ONE throw line the whole march keeps
+				clawAltD = dd; // nearest live body that was NOT the previous strike's victim
 
-		clawAim = new Vector2((float)System.Math.Cos(line0), (float)System.Math.Sin(line0)); // frozen at the open (unit by construction, no normalize)
+				}
 
-		clawDist = aimv.Length(); // FROZEN span (center-to-center, wrap-short like the line): the march anchors on THIS at the open only
-		clawAnchor = p; // v4: freeze the WORLD ANCHOR the whole march lives in - fired claws never follow Athios
+				}
 
-		}
+				// user RETARGET: the nearest body was the previous strike's victim; when ANOTHER body is in reach the strike
+				// rides THAT one instead, so the volley reads as raking different bodies (when the victim is the ONLY body in
+				// reach, re-raking it is the honest answer - the march never aborts to be polite)
 
-		float a0 = (float)System.Math.Atan2(clawAim.Y, clawAim.X); // throw line angle, off the FROZEN direction (never a re-pick)
+				if (prey != null && (long)prey.GetInstanceId() == clawLastId && altPrey != null)
 
-		Vector2 perpDir = new Vector2(-clawAim.Y, clawAim.X); // the page-normal the stamps zig-zag along, per the example art
+				prey = altPrey; // re-aim the beat at the NEXT nearest body in reach
 
-		double side = (clawBeat % 2) == 0 ? 1.0 : -1.0; // alternating above/below: the image's numbered PAIRS
+				if (prey == null && clawBeat == 0)
 
-		double off = side * CLAW_PERP * (double)reach; // how far off the throw line this stamp rides
+				{
 
-		double step = CLAW_STEP * (double)reach; // tight stamp-to-stamp spacing (~46 px at reach 110: ~70% of the visible slash, the stamps overlap into ONE continuous rake)
+				clawSwings = 0; // an OPEN beat with nobody in reach never opens the combo (cooldown stays open)
 
-		double head = clawDist + CLAW_HEAD * step; // the HEAD (far) stamp rides just PAST the frozen prey centre: the line reads THROUGH the body, per the hand-play "land ON the target"
+				return;
 
-		double start = head - (clawSwings - 1) * step; // march BACK from the head: extra strikes (Primal ranks, rage) extend OUTWARD at the far end, never crowd near the body
+				}
 
-		if (start < CLAW_START * (double)reach) start = CLAW_START * (double)reach; // body-clearance floor: the first swipe never hugs Athios (v2's 0.28 read far too close)
+				if (prey != null)
 
-		float depth = (float)(start + step * clawBeat); // this stamp's depth along the FROZEN aim line (clawDist set at the OPEN only: v1's same-target bug stays closed; v2's ATHIOS ladder is gone)
+				{
 
-		float slice = 0.62f * (float)step; // v4: windows OVERLAP like the art (a plain half-step just tiles): the bite matches the visible, overlapping rake
+				Vector2 aimv = pg.WrapDelta(p, prey.GlobalPosition); // fresh aim at where the body IS now (mid-march re-pick, daggers' law)
 
-		float band = 0.17f * reach; // one stamp's bite width (assistant knob, retunable)
+				if (aimv.Length() < 0.01f)
 
-		int hitN = 0; // bodies THIS stamp caught (the print tallies these)
+				clawAim = new Vector2(1.0f, 0.0f); // body standing on the blade: rake the facing line (the daggers' fallback)
 
-		for (int i = 0; i < enemies.Count; i++)
+				else
 
-		{
+				clawAim = aimv / aimv.Length(); // unit by division: no normalize drift
 
-		Godot.Node2D n = enemies[i];
+				clawLastId = (long)prey.GetInstanceId(); // ledger: GetInstanceId is ulong, this stays long (bee-ledger discipline)
 
-		Combatant nc = (Combatant)n;
+				}
 
-		if (nc == null || nc.kind == "dead")
+				else
 
-		continue;
+				{
 
-		Vector2 r = pg.WrapDelta(clawAnchor, n.GlobalPosition); // v4: window measured from the FROZEN anchor, not live Athios
+				// mid-march beat with no live prey left: the combo SWIPES on the last aim anyway (the march never aborts);
+				// clawAim already IS the last aim, and the ledger keeps the last raked body so the volley's honesty stays intact
 
-		float along = r.X * clawAim.X + r.Y * clawAim.Y;
+				}
 
-		if (along < depth - slice - nc.hitR || along > depth + slice + nc.hitR)
+				if (clawBeat == 0)
 
-		continue; // outside this stamp's window along the march
+				{
 
-		float across = r.X * perpDir.X + r.Y * perpDir.Y; // signed: the zig-zag offset travels WITH the stamp
+				clawRoll = RollDamage(pg, weaponDamage); // ONE crit/steal roll SHARED across the combo (like twinDmg)
 
-		if (System.Math.Abs(across - off) > band + nc.hitR)
+				clawSwings = strikes; // the combo knows its own length from the open: later grows mid-combo never stretch it
 
-		continue; // outside the stamp's own lane
+				}
 
-		nc.TakeDamage(clawRoll); // ONE shared roll, ONE honest bite per body per stamp: a march never double-eats
+				float a0 = (float)System.Math.Atan2(clawAim.Y, clawAim.X); // this strike's aim angle (FRESH per beat, never a frozen line)
 
-		nc.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 5.0); // user kit: Bleed 1 dmg/s for 5 s (dps rides the damage card)
+				float band = (float)(CLAW_BAND * (double)reach); // corridor half-width (assistant knob, retunable: v4's bite band kept its number)
 
-		if (bleedSlow > 0.0 && !(nc is Boss))
+				int hitN = 0; // bodies THIS strike caught (the print tallies these)
 
-		nc.Slowed(bleedSlow, 2.5); // Haemorrhaging Bleed: same drag lane as draging maul/ring
+				for (int i = 0; i < enemies.Count; i++)
 
-		hitN++;
+				{
 
-		}
+				Godot.Node2D n = enemies[i];
 
-		_atkFlash = 0.08f; // same commit-frame flash discipline as every other verb
+				Combatant nc = (Combatant)n;
 
-		facing = a0; // the body reads toward the line the march actually committed on
+				if (nc == null || nc.kind == "dead")
 
-		if (_rakeFx != null)
+				continue;
 
-		{
+				Vector2 r = pg.WrapDelta(p, n.GlobalPosition); // corridor measured from LIVE Athios (v5: strikes ride the member)
 
-		// the claw art's own box, normalized like Baldrun's crescent
+				float along = r.X * clawAim.X + r.Y * clawAim.Y; // depth along this strike's fresh aim
 
-		float texW = 128.0f, texH = 128.0f;
+				if (along < -nc.hitR || along > reach + nc.hitR)
 
-		if (_rakeFx[0].Texture != null)
+				continue; // outside the thrust corridor (segment p -> p + aim * reach, the dagger corridor shape)
 
-		{
+				if ((r - clawAim * along).Length() > band + nc.hitR)
 
-		texW = (float)_rakeFx[0].Texture.GetWidth();
+				continue; // clear of the blade lane
 
-		texH = (float)_rakeFx[0].Texture.GetHeight();
+				nc.TakeDamage(clawRoll); // the combo's shared roll: ONE honest bite per body per strike, a volley never double-eats
 
-		}
+				nc.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 5.0); // user kit: Bleed 1 dmg/s for 5 s (dps rides the damage card)
 
-		float sm = (float)(SWEEP_ART_MUL * (double)reach / System.Math.Max((double)texW, (double)texH)); // same normalization as the crescent
+				if (bleedSlow > 0.0 && !(nc is Boss))
 
-		for (int k = 0; k < _rakeFx.Length; k++)
+				nc.Slowed(bleedSlow, 2.5); // Haemorrhaging Bleed: same drag lane as draging maul/ring, bosses immune
 
-		_rakeFx[k].Visible = k == clawBeat; // this stamp shows its OWN art: the march never stacks a slot
+				hitN++;
 
-		clawStampPos[clawBeat] = clawAnchor + clawAim * depth + perpDir * (float)off; // v4: FROZEN world coord - the claw is its own entity once fired
-		_rakeFx[clawBeat].GlobalPosition = clawStampPos[clawBeat]; // mount the slot AT the frozen coord (the per-frame re-anchor keeps it there)
+				}
 
-		// the art's belly faces down the frozen line
+				_atkFlash = 0.08f; // same commit-frame flash discipline as every other verb
 
-		_rakeFx[clawBeat].Rotation = a0;
+				facing = a0; // the body reads toward the strike it actually committed on
 
-		// strikes aimed LEFT mirror the sweep (Baldrun's flip idiom)
+				if (_rakeFx != null)
 
-		_rakeFx[clawBeat].Scale = new Vector2(clawAim.X < 0.0f ? -sm : sm, sm);
+				{
 
-		_rakeFx[clawBeat].Modulate = new Color(1.0f, 1.0f, 1.0f, SWEEP_ART_ALPHA);
+				// the claw art's own box, normalized like Baldrun's crescent
 
-		_fxT = 0.16f; // same commit-flash beat the shot/vial kits use
+				float texW = 128.0f, texH = 128.0f;
 
-		}
+				if (_rakeFx[0].Texture != null)
 
-		clawBeat += 1;
+				{
 
-		if (clawBeat < clawSwings)
+				texW = (float)_rakeFx[0].Texture.GetWidth();
 
-		{
+				texH = (float)_rakeFx[0].Texture.GetHeight();
 
-		cdTimer = (float)TWIN_STAGGER; // rapid follow-up stamp (Brook's cadence): the march steps out on this clock
+				}
 
-		GD.Print("[10thAge] (claw) " + displayName + " claw " + clawBeat + "/" + clawSwings + " (" + hitN + " bodies raked at " + (int)depth + "px)");
+				float sm = (float)(SWEEP_ART_MUL * (double)reach / System.Math.Max((double)texW, (double)texH)); // same normalization as the crescent
 
-		// mid-march: the next stamp lands when the stagger expires; an empty stamp still swipes
+				for (int k = 0; k < _rakeFx.Length; k++)
 
-		return;
+				_rakeFx[k].Visible = k == clawBeat; // this strike shows its OWN slot: the volley never stacks a slot
 
-		}
+				// the art ALWAYS rides full reach (v5 jabLen law, inherited from the daggers' "attacks should always be
+				// attacking at maximum distance": a close body must not shrink the visible rake). CLAW_RAKE * reach centres the
+				// box on the blade lane between Athios and the hitbox ring - and the strike rides the MEMBER, so the magnet the
+				// user complained about closes BY CONSTRUCTION (v4's frozen coords + re-anchor lane are gone)
 
-		int marchN = clawSwings; // captured before zeroing: the done-print names the march length
+				_rakeFx[clawBeat].GlobalPosition = p + clawAim * (float)(CLAW_RAKE * (double)reach); // mount the slot at the rake pivot (member-relative via the node tree)
 
-		clawBeat = 0;
+				_rakeFx[clawBeat].Rotation = a0; // the art's belly faces down this strike's fresh line (art authored top-to-bottom, pose kept as shipped)
 
-		clawSwings = 0;
+				// ALTERNATING vertical flip (user 2026-11-23: "use that for attack 1, then flip it vertically for attack 2,
+				// then back to normal for 3, etc."): strike 0 rides the art AS-IS, ODD strikes show its mirrored twin
+							// (clawBeat is 0-based, so every OTHER rake reads belly-up - a two-handed alternating claw)
+							float clawFlipY = (clawBeat % 2 == 1) ? -sm : sm;
+							_rakeFx[clawBeat].Scale = new Vector2(clawAim.X < 0.0f ? -sm : sm, clawFlipY); // X keeps the LEFT-aim mirror (Baldrun's flip idiom), Y carries the per-strike claw alternation
 
-		cdTimer = (float)EffCooldown(); // march done: the REAL cooldown gates the next beat
+				_rakeFx[clawBeat].Modulate = new Color(1.0f, 1.0f, 1.0f, SWEEP_ART_ALPHA);
 
-		GD.Print("[10thAge] (claw) " + displayName + " claw march done (" + marchN + " stamps, " + hitN + " bodies raked on the last)");
+				}
 
-		return;
+				_fxT = 0.16f; // same commit-flash beat the shot/vial kits use
 
-		}
+				clawBeat += 1;
+
+				if (clawBeat < clawSwings)
+
+				{
+
+				cdTimer = (float)CLAW_STAGGER; // the USER's 0.2 s gap between claw strikes (v5 law: "Brook's is 0.4, so Athios can be 0.2")
+
+				GD.Print("[10thAge] (claw) " + displayName + " strike " + clawBeat + "/" + clawSwings + " (" + hitN + " bodies raked, fresh aim)");
+
+				// mid-combo: the next strike lands when the stagger expires; an empty strike still swiped
+
+				return;
+
+				}
+
+				int marchN = clawSwings; // captured before zeroing: the done-print names the volley length
+
+				clawBeat = 0;
+
+				clawSwings = 0;
+
+				clawLastId = -1L; // volley done: the ledger resets with the combo
+
+				cdTimer = (float)EffCooldown(); // volley done: the REAL cooldown gates the next beat
+
+				GD.Print("[10thAge] (claw) " + displayName + " volley done (" + marchN + " strikes, " + hitN + " bodies raked on the last)");
+
+				return;
+
+				}
 
 		// ONE shared picker for every kit (see PickPrey at the foot of the file): the
 
