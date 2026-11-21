@@ -435,14 +435,19 @@ public partial class PartyMember : Godot.Node2D
 	// clears his body; extra strikes extend OUTWARD, never crowd. v1 re-anchored per beat (same-target bug);
 
 	// v2 marched from ATHIOS on a fixed ladder (direction right, spacing too loose and too high).
+	// v4 WORLD-FIX (user 2026-11-22: "the attacks are magnetised to Athios - if he moves they are still on him", "they should
+	// kind of overlap, and be tighter together", per the UPDATED art): fired claws are their OWN entity. clawAnchor freezes
+	// Athios's spot AT the open, and every stamp coordinate + bite window measures from THAT, never from live p; the member-mounted
+	// _rakeFx slots are re-anchored to their frozen world coord EVERY frame, so parent drift cannot drag the march along. Knobs
+	// tightened (step 0.42 -> 0.36) and the bite windows now OVERLAP (slice 0.62 of a step), matching the visible art.
 
-	static readonly double CLAW_STEP = 0.42; // stamp-to-stamp step as a fraction of reach (110 px claw reach = ~46 px steps, ~ 70% of the ~65 px visible slash: a TIGHT, overlapping march per hand-play; v2's 0.62 was too loose)
+	static readonly double CLAW_STEP = 0.36; // v4 TIGHTER together per the redrawn art (reach 110 = ~40 px steps against the ~65 px visible slash: a deep, overlapping rake)
 
-	static readonly double CLAW_START = 0.45; // body-clearance FLOOR for the first stamp, as a fraction of reach (reach 110 = ~50 px off Athios; v2's 0.28 read far too close to the torso)
+	static readonly double CLAW_START = 0.40; // v4: first swipe a touch nearer per the reference (small arm gap), never hugging the torso
 
-	static readonly double CLAW_PERP = 0.13; // SLIGHT zig-zag off the aim line, as a fraction of reach (reach 110 = ~14 px: a nice zig-zag STRAIGHT line, per the redrawn art; v2's 0.3 swung way too high)
+	static readonly double CLAW_PERP = 0.16; // v4: SLIGHT zig-zag rows a bit deeper (reach 110 = ~18 px): the image's numbered pairs read clearer
 
-	static readonly double CLAW_HEAD = 0.15; // the HEAD (far) stamp rides this many steps PAST the frozen prey centre so the last swipe reads THROUGH the body; extra strikes extend OUTWARD from there
+	static readonly double CLAW_HEAD = 0.18; // head stamp rides this many steps PAST the frozen prey centre (v4 nudge: last swipe reads THROUGH the body)
 
 	// Yu's familiars (M2, user dictation 2026-10-22): the fuse is the summon's LIFETIME, and
 
@@ -549,6 +554,8 @@ public partial class PartyMember : Godot.Node2D
 	public int clawSwings = 0;   // strikes THIS march runs (2 + Primal ranks, +1 raged): stamped when it opens
 	public Vector2 clawAim = new Vector2(1.0f, 0.0f); // the ONE throw line the whole march keeps, frozen at the open
 	public float clawDist = 0.0f; // center-to-center range to the prey, FROZEN at the OPEN: the v3 PREY-SPAN march anchors on THIS, never re-picked per beat
+	public Vector2 clawAnchor = new Vector2(0.0f, 0.0f); // v4 WORLD-FIX: Athios's own spot FROZEN at the march open: stamps and bite windows measure from THIS
+	public Vector2[] clawStampPos = null; // v4: frozen world coord per stamp slot (rake lane only): the per-frame re-anchor writes the slot here, killing the magnet effect
 
 	// Alvora "Guardian Awakening" (user 2026-10-26): ring reach x2 MULTIPLIED after the
 
@@ -1017,6 +1024,7 @@ public partial class PartyMember : Godot.Node2D
 				if (weaponKit == "claw")
 				{
 					_rakeFx = new Godot.Sprite2D[RAKE_SLOTS];
+					clawStampPos = new Vector2[RAKE_SLOTS]; // v4: parallel frozen-position bookkeeping for the stamps
 
 					for (int f2 = 0; f2 < RAKE_SLOTS; f2++)
 					{
@@ -2554,6 +2562,14 @@ public partial class PartyMember : Godot.Node2D
 
 		}
 
+		// v4 WORLD-FIX: claws are their own entity once fired - the slots hang off the MEMBER node, so re-anchor every
+		// visible stamp to its frozen world coord each frame: Athios's drift (the magnet complaint) cannot drag them along,
+		// and the coords are absolute map positions so a wrap never seam-pops the march.
+		if (_rakeFx != null && clawStampPos != null)
+				for (int rk = 0; rk < _rakeFx.Length; rk++)
+						if (_rakeFx[rk].Visible)
+								_rakeFx[rk].GlobalPosition = clawStampPos[rk]; // stay where the swipe landed
+				
 		cdTimer -= delta;
 
 		ultCdT -= delta; // recharges on its own clock: bench ults stay ready when the seat flips
@@ -3961,6 +3977,7 @@ public partial class PartyMember : Godot.Node2D
 		clawAim = new Vector2((float)System.Math.Cos(line0), (float)System.Math.Sin(line0)); // frozen at the open (unit by construction, no normalize)
 
 		clawDist = aimv.Length(); // FROZEN span (center-to-center, wrap-short like the line): the march anchors on THIS at the open only
+		clawAnchor = p; // v4: freeze the WORLD ANCHOR the whole march lives in - fired claws never follow Athios
 
 		}
 
@@ -3982,7 +3999,7 @@ public partial class PartyMember : Godot.Node2D
 
 		float depth = (float)(start + step * clawBeat); // this stamp's depth along the FROZEN aim line (clawDist set at the OPEN only: v1's same-target bug stays closed; v2's ATHIOS ladder is gone)
 
-		float slice = 0.5f * (float)step; // bite window half a step deep: the march TILES its own lane, never stacks
+		float slice = 0.62f * (float)step; // v4: windows OVERLAP like the art (a plain half-step just tiles): the bite matches the visible, overlapping rake
 
 		float band = 0.17f * reach; // one stamp's bite width (assistant knob, retunable)
 
@@ -4000,7 +4017,7 @@ public partial class PartyMember : Godot.Node2D
 
 		continue;
 
-		Vector2 r = pg.WrapDelta(p, n.GlobalPosition);
+		Vector2 r = pg.WrapDelta(clawAnchor, n.GlobalPosition); // v4: window measured from the FROZEN anchor, not live Athios
 
 		float along = r.X * clawAim.X + r.Y * clawAim.Y;
 
@@ -4054,7 +4071,8 @@ public partial class PartyMember : Godot.Node2D
 
 		_rakeFx[k].Visible = k == clawBeat; // this stamp shows its OWN art: the march never stacks a slot
 
-		_rakeFx[clawBeat].GlobalPosition = p + clawAim * depth + perpDir * (float)off; // the stamp rides ITS OWN spot: out of Athios, zig-zag off the line
+		clawStampPos[clawBeat] = clawAnchor + clawAim * depth + perpDir * (float)off; // v4: FROZEN world coord - the claw is its own entity once fired
+		_rakeFx[clawBeat].GlobalPosition = clawStampPos[clawBeat]; // mount the slot AT the frozen coord (the per-frame re-anchor keeps it there)
 
 		// the art's belly faces down the frozen line
 
