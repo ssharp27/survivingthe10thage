@@ -422,15 +422,21 @@ public partial class PartyMember : Godot.Node2D
 
 	static readonly double TWIN_STAGGER = 0.4; // USER number (2026-11-02: "modify the delay to 0.4"; was 0.1): the counted gap between Brook's twin jabs
 
-	// CLAW LINE law (user 2026-11-21 hand-play: overlapping strikes were the BUG - the march "steps steadily
+	// SERPENTINE SWIPES law (user 2026-11-21, off the example art): the stamps emanate OUT OF ATHIOS itself
 
-	// further out" along ONE direction and never turns, so a longer line has to rake MORE bodies): swing j
+	// at even, ~art-width spacing and zig-zag above/below the throw line in alternating pairs, with a small
 
-	// commits at the prey + CLAW_STEP * reach * j along the frozen throw line, and its bite window is half
+	// delay between each so the march reads as a series of swipes. The prey pick only GATES the open and
 
-	// a step deep, so the march tiles the line instead of stacking on it.
+	// freezes the direction; depth is measured from ATHIOS, each stamp rides its own perp offset, and an
 
-	static readonly double CLAW_STEP = 0.66; // how much further out each next strike reaches, as a fraction of reach (assistant pick, retune by eye: 110 px claw reach = ~73 px steps)
+	// empty stamp still swipes (CLAW LINE v1 re-anchored every beat on the nearest body - the same-target bug).
+
+	static readonly double CLAW_STEP = 0.62; // how much further out each next stamp rides, as a fraction of reach (110 px claw reach = ~68 px steps, ~ the visible slash width)
+
+	static readonly double CLAW_START = 0.28; // how close to Athios the first stamp lands, as a fraction of reach
+
+	static readonly double CLAW_PERP = 0.3; // zig-zag offset off the throw line, as a fraction of reach (the pairs read ~half a stamp above/below the line)
 
 	// Yu's familiars (M2, user dictation 2026-10-22): the fuse is the summon's LIFETIME, and
 
@@ -3875,45 +3881,43 @@ public partial class PartyMember : Godot.Node2D
 
 		}
 
-		// Athios CLAW kit (user 2026-11-19, CLAW LINE law 2026-11-21 hand-play): close-range rake that bites
+		// Athios CLAW kit (user 2026-11-19, SERPENTINE SWIPES law 2026-11-21 from the example art): close-range rake
 
-		// EVERY body on one straight lane, run as Brook's RAPID COMBO (strikes on the TWIN_STAGGER cadence,
+		// whose stamps emanate OUT OF ATHIOS itself, not from whatever body he happens to be looking at. The hand-play
 
-		// ONE roll shared across the march, and the follow-up RE-PICKS who to march FROM). The hand-play
+		// BUG in CLAW LINE v1 was re-anchoring every beat on the nearest body: with half-step padding the windows all
 
-		// BUG that superseded the 2026-11-19 CONVERGING RAKE was OVERLAPPING strikes: the fan put several
+		// covered the same pile, so every swipe read as landing on the SAME target. The confirmed image: numbered
 
-		// arms 12 deg around the SAME throw line, so the same bodies ate several stamps at once. The CONFIRMED
+		// stamps step steadily away from the body at even, ~art-width spacing and zig-zag above/below the throw line
 
-		// law: strikes step STEADILY FURTHER OUT along ONE fixed direction and NEVER turn, so a longer
+		// in alternating pairs, with a small delay between each so the march reads as a series of swipes. The prey
 
-		// line has to rake MORE bodies. Swing j rides its OWN _rakeFx slot at the prey-centre distance +
+		// pick now only GATES the open and freezes the direction; depth is measured from ATHIOS (CLAW_START + CLAW_STEP *
 
-		// CLAW_STEP * j * reach along the line FROZEN at the open (member clawAim), and its bite window is
+		// j * reach) and each stamp rides its own perp offset, so its bite window travels WITH the stamp. A swipe
 
-		// half a step deep, so the march TILES the lane instead of stacking on it. Primal Might and Beastial
+		// that catches nothing still SWIPES: the series never aborts mid-march. Rage and Primal Might still LENGTHEN
 
-		// Rage LENGTHEN the march (clawSwings stamped at the open, clamped to RAKE_SLOTS). Every caught
+		// it (clawSwings stamped at the open, clamped to RAKE_SLOTS). Every caught body is BLED 1 dmg/s for 5 s
 
-		// body is BLED 1 dmg/s for 5 s (dps rides the damage card at the call site like the other DoT
+		// (dps rides the damage card at the call site like the other DoT stamps) and Haemorrhaging Bleed drags it
 
-		// stamps) and Haemorrhaging Bleed drags it (same Slowed lane as draging maul/ring, bosses immune).
+		// (same Slowed lane as draging maul/ring, bosses immune). The claw art rides its OWN _rakeFx set and
 
-		// The claw art rides its OWN _rakeFx set (8 slots = max strikes, Bruno's _cresFx precedent) and
+		// MIRRORS (Scale.x negated) on strikes aimed LEFT of the page, like Baldrun's crescent. Instant like every
 
-		// MIRRORED (Scale.x negated) on strikes aimed LEFT of the page, like Baldrun's crescent on the later
-
-		// swings. Instant like every other melee verb: no shot-pool column to mirror.
+		// other melee verb: no shot-pool column to mirror.
 
 		if (clawKit)
 
 		{
 
-		int strikes = 2 + clawHits; // base TWO strikes; Primal Might adds one more swing FURTHER OUT, never a wider fan
+		int strikes = 2 + clawHits; // base TWO stamps; extra Primal Might ranks add one more stamp FURTHER OUT, never a wider fan
 
 		if (rageT > 0.0)
 
-		strikes += 1; // Beastial Rage: one more strike at the far end of the line for the window
+		strikes += 1; // Beastial Rage: one more stamp at the far end of the line for the window
 
 		if (strikes > RAKE_SLOTS)
 
@@ -3921,27 +3925,17 @@ public partial class PartyMember : Godot.Node2D
 
 		if (clawBeat >= clawSwings)
 
-		clawBeat = 0; // stale tail: a march that ended short (or an aborted one) restarts clean
-
-		float marchBase = 0.0f; // the prey-CENTRE distance this beat marches out from (re-anchored each strike)
+		clawBeat = 0; // stale tail: a march that ended short restarts clean
 
 		if (clawBeat == 0)
 
 		{
 
-		clawRoll = RollDamage(pg, weaponDamage); // the march OPENS with one crit/steal roll; every strike pays it
+		clawRoll = RollDamage(pg, weaponDamage); // the march OPENS with one crit/steal roll; every stamp pays it
 
 		clawSwings = strikes; // stamped at the open: the cadence and the done-print know how long the march is
 
-		}
-
-		// prey pick mirrors Bruno's ritual EVERY beat: nearest living body whatever way the body faces, and
-
-		// reach only GATES the commit. The DIRECTION stays frozen at the open, so a follow-up re-picks
-
-		// who to march FROM, never where to march (2026-11-21 CLAW LINE law: the line never turns)
-
-		Godot.Node2D prey = PickPrey(pg, enemies, p, reach, true, false, false, 0.0f, 0.0f);
+		Godot.Node2D prey = PickPrey(pg, enemies, p, reach, true, false, false, 0.0f, 0.0f); // pick gates the OPEN only, never steers a beat
 
 		float preyD = PickPreyD; // answers the chosen body's EDGE distance
 
@@ -3949,37 +3943,35 @@ public partial class PartyMember : Godot.Node2D
 
 		{
 
-		clawBeat = 0; // an empty strike lands nothing: march restarts clean, cooldown stays open
-
-		clawSwings = 0; // zeroing the length keeps a stale tail from resuming into a fresh clearing
+		clawSwings = 0; // nothing in reach: the march never opened, cooldown stays open
 
 		return;
 
 		}
 
-		marchBase = preyD + ((Combatant)prey).hitR; // PREY CENTRE distance: strike 0 ALWAYS lands on the nearest body
-
-		if (clawBeat == 0)
-
-		{
-
 		Vector2 aimv = pg.WrapDelta(p, prey.GlobalPosition); // the SHORT way: the line never seam-pops
 
 		float line0 = (float)System.Math.Atan2(aimv.Y, aimv.X); // the ONE throw line the whole march keeps
 
-		clawAim = new Vector2((float)System.Math.Cos(line0), (float)System.Math.Sin(line0)); // frozen at the open: the march never turns (unit by construction, no normalize)
+		clawAim = new Vector2((float)System.Math.Cos(line0), (float)System.Math.Sin(line0)); // frozen at the open (unit by construction, no normalize)
 
 		}
 
-		float depth = marchBase + (float)(CLAW_STEP * (double)clawBeat * (double)reach); // swing j steps CLAW_STEP further out along the SAME line
+		float a0 = (float)System.Math.Atan2(clawAim.Y, clawAim.X); // throw line angle, off the FROZEN direction (never a re-pick)
 
-		float slice = 0.5f * (float)CLAW_STEP * reach; // bite window half a step deep: the march TILES the lane, never stacks
+		Vector2 perpDir = new Vector2(-clawAim.Y, clawAim.X); // the page-normal the stamps zig-zag along, per the example art
 
-		float band = 0.17f * reach; // one claw lane's width (assistant knob, retunable)
+		double side = (clawBeat % 2) == 0 ? 1.0 : -1.0; // alternating above/below: the image's numbered PAIRS
 
-		float a0 = (float)System.Math.Atan2(clawAim.Y, clawAim.X); // throw line angle, off the FROZEN direction (never the re-pick)
+		double off = side * CLAW_PERP * (double)reach; // how far off the throw line this stamp rides
 
-		int hitN = 0; // bodies THIS strike caught (the print tallies these)
+		float depth = (float)(CLAW_START * (double)reach + CLAW_STEP * (double)clawBeat * (double)reach); // stamp j rides EVENLY out from ATHIOS itself, never re-anchored on prey
+
+		float slice = 0.5f * (float)CLAW_STEP * reach; // bite window half a step deep: the march TILES its own lane, never stacks
+
+		float band = 0.17f * reach; // one stamp's bite width (assistant knob, retunable)
+
+		int hitN = 0; // bodies THIS stamp caught (the print tallies these)
 
 		for (int i = 0; i < enemies.Count; i++)
 
@@ -3993,25 +3985,21 @@ public partial class PartyMember : Godot.Node2D
 
 		continue;
 
-		// single-lane depth slice (along / perp off pg.WrapDelta, the file's own idiom): inside this
-
-		// strike's window along the march AND across the lane
-
 		Vector2 r = pg.WrapDelta(p, n.GlobalPosition);
 
 		float along = r.X * clawAim.X + r.Y * clawAim.Y;
 
 		if (along < depth - slice - nc.hitR || along > depth + slice + nc.hitR)
 
-		continue; // outside this strike's window along the march
+		continue; // outside this stamp's window along the march
 
-		float perp = (float)System.Math.Abs(r.X * clawAim.Y - r.Y * clawAim.X);
+		float across = r.X * perpDir.X + r.Y * perpDir.Y; // signed: the zig-zag offset travels WITH the stamp
 
-		if (perp > band + nc.hitR)
+		if (System.Math.Abs(across - off) > band + nc.hitR)
 
-		continue; // outside the claw lane
+		continue; // outside the stamp's own lane
 
-		nc.TakeDamage(clawRoll); // ONE shared roll, ONE honest bite per body per strike: a march never double-eats
+		nc.TakeDamage(clawRoll); // ONE shared roll, ONE honest bite per body per stamp: a march never double-eats
 
 		nc.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 5.0); // user kit: Bleed 1 dmg/s for 5 s (dps rides the damage card)
 
@@ -4020,18 +4008,6 @@ public partial class PartyMember : Godot.Node2D
 		nc.Slowed(bleedSlow, 2.5); // Haemorrhaging Bleed: same drag lane as draging maul/ring
 
 		hitN++;
-
-		}
-
-		if (hitN <= 0)
-
-		{
-
-		clawBeat = 0; // an empty strike lands nothing: march restarts clean, cooldown stays open
-
-		clawSwings = 0; // zeroing the length keeps a stale tail from resuming into a fresh clearing
-
-		return;
 
 		}
 
@@ -4061,9 +4037,9 @@ public partial class PartyMember : Godot.Node2D
 
 		for (int k = 0; k < _rakeFx.Length; k++)
 
-		_rakeFx[k].Visible = k == clawBeat; // this strike shows its OWN stamp: the march never stacks a slot
+		_rakeFx[k].Visible = k == clawBeat; // this stamp shows its OWN art: the march never stacks a slot
 
-		_rakeFx[clawBeat].GlobalPosition = p + clawAim * depth; // the stamp rides this swing's own depth along the line
+		_rakeFx[clawBeat].GlobalPosition = p + clawAim * depth + perpDir * (float)off; // the stamp rides ITS OWN spot: out of Athios, zig-zag off the line
 
 		// the art's belly faces down the frozen line
 
@@ -4085,11 +4061,11 @@ public partial class PartyMember : Godot.Node2D
 
 		{
 
-		cdTimer = (float)TWIN_STAGGER; // rapid follow-up strike (Brook's cadence): the march steps out on this clock
+		cdTimer = (float)TWIN_STAGGER; // rapid follow-up stamp (Brook's cadence): the march steps out on this clock
 
 		GD.Print("[10thAge] (claw) " + displayName + " claw " + clawBeat + "/" + clawSwings + " (" + hitN + " bodies raked at " + (int)depth + "px)");
 
-		// mid-march: the next strike lands when the stagger expires
+		// mid-march: the next stamp lands when the stagger expires; an empty stamp still swipes
 
 		return;
 
@@ -4103,7 +4079,7 @@ public partial class PartyMember : Godot.Node2D
 
 		cdTimer = (float)EffCooldown(); // march done: the REAL cooldown gates the next beat
 
-		GD.Print("[10thAge] (claw) " + displayName + " claw march done (" + marchN + " strikes, " + hitN + " bodies raked on the last)");
+		GD.Print("[10thAge] (claw) " + displayName + " claw march done (" + marchN + " stamps, " + hitN + " bodies raked on the last)");
 
 		return;
 
