@@ -422,21 +422,27 @@ public partial class PartyMember : Godot.Node2D
 
 	static readonly double TWIN_STAGGER = 0.4; // USER number (2026-11-02: "modify the delay to 0.4"; was 0.1): the counted gap between Brook's twin jabs
 
-	// SERPENTINE SWIPES law (user 2026-11-21, off the example art): the stamps emanate OUT OF ATHIOS itself
+	// PREY-SPAN SWIPES law v3 (user 2026-11-21 hand-play ON v2: "first stamp far too close to Athios, the
 
-	// at even, ~art-width spacing and zig-zag above/below the throw line in alternating pairs, with a small
+	// stamps land really high off the target, spacing too wide - I want just a nice zig-zag STRAIGHT line"):
 
-	// delay between each so the march reads as a series of swipes. The prey pick only GATES the open and
+	// the march ANCHORS ON THE PREY SPAN stamped at the open. clawDist freezes the center-to-center range,
 
-	// freezes the direction; depth is measured from ATHIOS, each stamp rides its own perp offset, and an
+	// the HEAD stamp rides CLAW_HEAD steps PAST the prey centre so the last swipe reads through the body,
 
-	// empty stamp still swipes (CLAW LINE v1 re-anchored every beat on the nearest body - the same-target bug).
+	// and the rest march back from there at tight CLAW_STEP steps, floored at CLAW_START so the first stamp
 
-	static readonly double CLAW_STEP = 0.62; // how much further out each next stamp rides, as a fraction of reach (110 px claw reach = ~68 px steps, ~ the visible slash width)
+	// clears his body; extra strikes extend OUTWARD, never crowd. v1 re-anchored per beat (same-target bug);
 
-	static readonly double CLAW_START = 0.28; // how close to Athios the first stamp lands, as a fraction of reach
+	// v2 marched from ATHIOS on a fixed ladder (direction right, spacing too loose and too high).
 
-	static readonly double CLAW_PERP = 0.3; // zig-zag offset off the throw line, as a fraction of reach (the pairs read ~half a stamp above/below the line)
+	static readonly double CLAW_STEP = 0.42; // stamp-to-stamp step as a fraction of reach (110 px claw reach = ~46 px steps, ~ 70% of the ~65 px visible slash: a TIGHT, overlapping march per hand-play; v2's 0.62 was too loose)
+
+	static readonly double CLAW_START = 0.45; // body-clearance FLOOR for the first stamp, as a fraction of reach (reach 110 = ~50 px off Athios; v2's 0.28 read far too close to the torso)
+
+	static readonly double CLAW_PERP = 0.13; // SLIGHT zig-zag off the aim line, as a fraction of reach (reach 110 = ~14 px: a nice zig-zag STRAIGHT line, per the redrawn art; v2's 0.3 swung way too high)
+
+	static readonly double CLAW_HEAD = 0.15; // the HEAD (far) stamp rides this many steps PAST the frozen prey centre so the last swipe reads THROUGH the body; extra strikes extend OUTWARD from there
 
 	// Yu's familiars (M2, user dictation 2026-10-22): the fuse is the summon's LIFETIME, and
 
@@ -542,6 +548,7 @@ public partial class PartyMember : Godot.Node2D
 	public double bleedSlow = 0.0; // Haemorrhaging Bleed: slow strength stamped with each bleed (OPT_BLEEDSLOW)
 	public int clawSwings = 0;   // strikes THIS march runs (2 + Primal ranks, +1 raged): stamped when it opens
 	public Vector2 clawAim = new Vector2(1.0f, 0.0f); // the ONE throw line the whole march keeps, frozen at the open
+	public float clawDist = 0.0f; // center-to-center range to the prey, FROZEN at the OPEN: the v3 PREY-SPAN march anchors on THIS, never re-picked per beat
 
 	// Alvora "Guardian Awakening" (user 2026-10-26): ring reach x2 MULTIPLIED after the
 
@@ -3881,7 +3888,7 @@ public partial class PartyMember : Godot.Node2D
 
 		}
 
-		// Athios CLAW kit (user 2026-11-19, SERPENTINE SWIPES law 2026-11-21 from the example art): close-range rake
+		// Athios CLAW kit (user 2026-11-19, PREY-SPAN SWIPES law v3 2026-11-21): close-range rake
 
 		// whose stamps emanate OUT OF ATHIOS itself, not from whatever body he happens to be looking at. The hand-play
 
@@ -3893,9 +3900,7 @@ public partial class PartyMember : Godot.Node2D
 
 		// in alternating pairs, with a small delay between each so the march reads as a series of swipes. The prey
 
-		// pick now only GATES the open and freezes the direction; depth is measured from ATHIOS (CLAW_START + CLAW_STEP *
-
-		// j * reach) and each stamp rides its own perp offset, so its bite window travels WITH the stamp. A swipe
+		// pick now only GATES the open and freezes the direction; depth is measured from ATHIOS (clawDist frozen at the open, head past the prey, march stepped back) and each stamp rides its own perp offset, so its bite window travels WITH the stamp. A swipe
 
 		// that catches nothing still SWIPES: the series never aborts mid-march. Rage and Primal Might still LENGTHEN
 
@@ -3955,6 +3960,8 @@ public partial class PartyMember : Godot.Node2D
 
 		clawAim = new Vector2((float)System.Math.Cos(line0), (float)System.Math.Sin(line0)); // frozen at the open (unit by construction, no normalize)
 
+		clawDist = aimv.Length(); // FROZEN span (center-to-center, wrap-short like the line): the march anchors on THIS at the open only
+
 		}
 
 		float a0 = (float)System.Math.Atan2(clawAim.Y, clawAim.X); // throw line angle, off the FROZEN direction (never a re-pick)
@@ -3965,9 +3972,17 @@ public partial class PartyMember : Godot.Node2D
 
 		double off = side * CLAW_PERP * (double)reach; // how far off the throw line this stamp rides
 
-		float depth = (float)(CLAW_START * (double)reach + CLAW_STEP * (double)clawBeat * (double)reach); // stamp j rides EVENLY out from ATHIOS itself, never re-anchored on prey
+		double step = CLAW_STEP * (double)reach; // tight stamp-to-stamp spacing (~46 px at reach 110: ~70% of the visible slash, the stamps overlap into ONE continuous rake)
 
-		float slice = 0.5f * (float)CLAW_STEP * reach; // bite window half a step deep: the march TILES its own lane, never stacks
+		double head = clawDist + CLAW_HEAD * step; // the HEAD (far) stamp rides just PAST the frozen prey centre: the line reads THROUGH the body, per the hand-play "land ON the target"
+
+		double start = head - (clawSwings - 1) * step; // march BACK from the head: extra strikes (Primal ranks, rage) extend OUTWARD at the far end, never crowd near the body
+
+		if (start < CLAW_START * (double)reach) start = CLAW_START * (double)reach; // body-clearance floor: the first swipe never hugs Athios (v2's 0.28 read far too close)
+
+		float depth = (float)(start + step * clawBeat); // this stamp's depth along the FROZEN aim line (clawDist set at the OPEN only: v1's same-target bug stays closed; v2's ATHIOS ladder is gone)
+
+		float slice = 0.5f * (float)step; // bite window half a step deep: the march TILES its own lane, never stacks
 
 		float band = 0.17f * reach; // one stamp's bite width (assistant knob, retunable)
 
