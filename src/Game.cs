@@ -171,13 +171,13 @@ public partial class Game : Godot.Node2D
 	// without-replacement draw per ally beat, taken at boot. The run's own leader never
 	// rolls onto its own pool (it CAN show up on runs where it is not the leader).
 	// Row = registry index (BuildJoinLottery reads _stage): columns are memberIndex order
-	// (0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash | 7 Bruno | 8 Brook | 9 Keeko | 10 Hapi | 11 Athios).
+	// (0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash | 7 Bruno | 8 Brook | 9 Keeko | 10 Hapi | 11 Athios | 12 Hew).
 	// Weight 0 = cannot appear on that stage. Stage 1 per the user: Baldrun + Mosiah more likely
 	// than the rest. The Enemy Test Room row is ALL ZERO on purpose: the room runs no ally beats,
 	// so the exhausted pool is a logged no-op and nothing can recruit there.
 	// Sanity numbers - the user will add rows/weights per future stage.
 	// the new-style initializer: Godot's C# build trips CS0623 on nested old-style braces
-	private static readonly int[][] JOIN_W = { new int[] { 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }, new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };   // row 0 = stage 1: Baldrun + Mosiah heavy, the rest (Keeko 2026-11-14, Hapi 2026-11-17, Athios 2026-11-19) at parity | row 1 = the test room: no recruits
+	private static readonly int[][] JOIN_W = { new int[] { 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }, new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };   // row 0 = stage 1: Baldrun + Mosiah heavy, the rest (Keeko 2026-11-14, Hapi 2026-11-17, Athios 2026-11-19, Hew 2026-11-22) at parity | row 1 = the test room: no recruits
 	private int[] _joinOrder = new int[0]; // ally slot k -> memberIndex drawn for it
 	private Godot.Collections.Array<int> _hpOrder = new(); // HUD strip slot -> memberIndex: the join order (see BuildJoinLottery)
 	private Godot.RandomNumberGenerator _joinRng; // UNSEEDED on purpose: a fresh process re-rolls
@@ -249,19 +249,19 @@ public partial class Game : Godot.Node2D
 		"Lucky Stabs (+5% Crit Chance)", "Sneak Attack (+5% Multistrike Chance)",
 											   "Fire Rune (+1 Burn Damage/sec for 5s)", "Harder Thrusts (+15% Crit Damage)",
 											   "Eagle Eye (+5% Crit Chance)", "Difficult Terrain (10% Slow for 2.5s)",
-											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)", "Overflowing Necrosis (+12% Damage)", "Swift Curse (+16% Attack Speed)", "Multi-Flame (+1 Pillar Target)", "Necrotic Plague (Flame DoT passes on touch)", "Greater Pestilence (+15% Pillar Radius)" , "Sharper Claws (+20% Damage, +20% Crit)", "Savage Attacks (+20% Attack Speed)", "Primal Might (+1 Claw Swing, +2 while Ultimate is up)", "Haemorrhaging Bleed (Bleed slows 10%)", "Longest Claws (+25% Range)" }; // 2026-11-22 claw-kit law: cards are OFF/ON switches with the USER's numbers (hand-play spec quoted verbatim), and "Longest Claws" is the card's name (user renamed it from "Longer Claws")
-	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 0, 1, 2, 3, 4, 9, 9, 9, 9, 9 , 10, 10, 10, 10, 10 , 11, 11, 11, 11, 11 };
-	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.833f, 1.0f, 1.0f, 1.0f }; // row 56 Savage Attacks: cd x0.833 = +20% attack speed (user number)
-	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.25f }; // row 59 Longest Claws: +25% range (user number)
+											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)", "Overflowing Necrosis (+12% Damage)", "Swift Curse (+16% Attack Speed)", "Multi-Flame (+1 Pillar Target)", "Necrotic Plague (Flame DoT passes on touch)", "Greater Pestilence (+15% Pillar Radius)" , "Sharper Claws (+20% Damage, +20% Crit)", "Savage Attacks (+20% Attack Speed)", "Primal Might (+1 Claw Swing, +2 while Ultimate is up)", "Haemorrhaging Bleed (Bleed slows 10%)", "Longest Claws (+25% Range)" , "Remove Inhibitors (+12% Damage)", "Wider Barrel (+16% Beam Width)", "Efficient Gears (+16% Attack Speed)", "Vampiric Core (Martha Heals 1% of All Damage Dealt)", "Explosive Finale (Kill Blast 25/50/75% Damage)" }; // 2026-11-22 claw-kit law: cards are OFF/ON switches with the USER's numbers (hand-play spec quoted verbatim), and "Longest Claws" is the card's name (user renamed it from "Longer Claws") | rows 60-64 = Hew's Thunder Cannon kit (user 2026-11-22, spec verbatim: "Remove Inhibitors: +12% damage. Wider Barrel: +16% area. Efficient Gears: +16% attack speed. Vampiric Core: Martha heals 1% of all damage dealt. Explosive Finale: Hew and Martha kills explode for 25/50/75% damage")
+	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 0, 1, 2, 3, 4, 9, 9, 9, 9, 9 , 10, 10, 10, 10, 10 , 11, 11, 11, 11, 11 , 12, 12, 12, 12, 12 };
+	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.833f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 0.86f, 1.0f, 1.0f }; // row 56 Savage Attacks: cd x0.833 = +20% attack speed (user number) | row 62 Efficient Gears: cd x0.86 = +16% (shared lane; HEW clamps the authored 2.0 s and reroutes speed to damage at HALF rate)
+	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.25f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }; // row 59 Longest Claws: +25% range (user number) | Hew keeps reach PINNED at 520: Wider Barrel rides OPT_BARREL and widens only the beam band
 	// user 2026-11-01 audit fix: Stack rows 20/21 were swapped - keener flame carried no bonus at all and quicker fuse carried the damage. damage 1.10 rides row 20, cooldown 0.85 rides row 21.
-	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.20f, 1.0f, 1.0f, 1.0f, 1.0f }; // row 55 Sharper Claws: +20% damage (user number, switch not rank)
-	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // rows 4 + 8: Mosiah deeper thrust / Asper piercing shot (user 2026-10-30)
-	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
+	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.20f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f }; // row 55 Sharper Claws: +20% damage (user number, switch not rank) | row 60 Remove Inhibitors: +12% damage (user number)
+	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // rows 4 + 8: Mosiah deeper thrust / Asper piercing shot (user 2026-10-30) | Hew's cannon pierces natively (the lane damages EVERY body it covers), no card needed
+	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0  , 0, 0, 0, 0,0 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
 	// guiding light (Alvora): the ring MARKS caught bodies for +10%/rank incoming damage
 	// from EVERY source, a window on the body that decays on its own (Combatant.TickVuln).
 	// The user swapped the old flat-armour defence for this offense (2026-10-23): the squad
 	// keeps no mitigation, but the cleric's ring becomes the party's damage setup.
-	static readonly int[] OPT_VULN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_VULN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 	// draging maul (Baldrun 4th card, user 2026-10-24): connected maul hits drag caught bodies to
 	// (1 - 0.25/rank) speed for a 2.5 s window (Combatant.slowMul/slowT, refresh-not-stack); only
 	// horde movement reads it and the cleave hook never marks Bosses. deadly aim (Mosiah 4th card):
@@ -269,38 +269,38 @@ public partial class Game : Godot.Node2D
 	// so the crit card is pure table data. Rows 18/19 of the 20-wide tables; caps bound both:
 	// drag <= 0.75 at rank 3, crit <= 0.05 + 3 x 0.08 = 0.29.
 	// OPT_SLOW = drag strength/rank (Baldrun row 18); OPT_CRIT = crit points/rank (Mosiah row 19).
-	static readonly double[] OPT_SLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0.2, 0, 0, 0, 0 }; // row 55 Sharper Claws: +20 CRIT_CHANCE points on the store (switch, one flip only)
+	static readonly double[] OPT_SLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0.2, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // row 55 Sharper Claws: +20 CRIT_CHANCE points on the store (switch, one flip only)
 	// firebolt kit cards (Stack, user 2026-10-30): OPT_BURN = +2 s of linger per rank onto
 	// PartyMember.burnDur; OPT_CINDER = cinder bloom rank: a body that dies STILL burning bursts
 	// in CINDER_R px, scorching the live horde bodies in the blast for 25/50/75% of the firebolt's
 	// roll at rank 1/2/3 (Game.CinderBurst, hooked in the kill scan). Rows
 	// 25-29 of the now 25-wide tables.
-	static readonly double[] OPT_BURN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly int[] OPT_CINDER = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_BURN = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_CINDER = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 	static readonly double CINDER_R = 60.0; // cinder bloom blast radius (assistant pick: small)
 	// shield kit cards (Wash, user 2026-10-31): OPT_BOUNCE = +1 shield bounce per rank (the thrown
 	// shield hits its prey then hops to one MORE body per bounce; the hop lane lives on PartyMember);
 	// OPT_CRITD = +0.25 CRIT_DAMAGE points per rank on the tag store. Rows 25-29 of the now 30-wide
 	// tables: heavier shield | quicker hurl | more rebounds | sharper rim | crushing blow.
-	static readonly int[] OPT_BOUNCE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_CRITD = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.15, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_BOUNCE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_CRITD = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.15, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 	// axe kit cards (Bruno, user 2026-10-31): heavier axe rides the shared OPT_DMG 1.10 row,
 	// quicker throw rides the shared OPT_CD 0.85 row; these three columns are NEW:
 	// OPT_AXE = +1 extra crescent per rank (base ONE throw, arcs alternate top/bottom);
 	// OPT_SIZE = +1 size rank per rank (the blade disc + band depth read 1.0 + 0.25 * rank);
 	// OPT_BLEED = bleed rank (hit bodies bleed like the fire DoT, own status pair; dps scales
 	// with the damage card at the call site). Rows 30-34 of the then 35-wide tables.
-	static readonly int[] OPT_AXE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly int[] OPT_SIZE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly int[] OPT_BLEED = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_AXE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_SIZE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_BLEED = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
 // Brook dagger cards (user 2026-10-31): sharper edges rides the shared OPT_DMG row,
 // quicker jabs the shared OPT_CD row, deadly angle the shared OPT_CRIT row; these two
 // columns are NEW: OPT_VENOM = +2 s of poison window per rank (lingering venom),
 // OPT_MS = +0.05/rank multistrike CHANCE (lucky strikes: a hit deals damage twice).
 // Rows 35-39 of the now 40-wide tables.
-	static readonly double[] OPT_VENOM = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_MS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };	// fifth cards (user 2026-11-01): the tables are now 45-wide and rows 40-44 give the FIRST five
+	static readonly double[] OPT_VENOM = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_MS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };	// fifth cards (user 2026-11-01): the tables are now 45-wide and rows 40-44 give the FIRST five
 	// PCs a fifth track each. Two of the five ride columns that already exist - deadlier aim (row
 	// 41) rides OPT_CRITD as +0.15 CRIT_DAMAGE points/rank (10% of the 1.5 BASE per rank, the same
 	// points lane the Wash crushing blow card uses), keener aim (row 42) rides OPT_CRIT +0.08/rank exactly
@@ -311,9 +311,9 @@ public partial class Game : Godot.Node2D
 	// the drag, 2.5 s refresh-not-stack window), OPT_LUCK = lucky-explosion chance/rank baked on the
 	// summon slot at spawn (_summonLuck, pool column grows WITH the pool) and rolled in DetonateSummon
 	// as a SECOND sweep pass - zero Rng draw when the rank is 0.
-	static readonly double[] OPT_FIRE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_RING = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_LUCK = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_FIRE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly double[] OPT_RING = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0  , 0, 0, 0, 0,0 };
+	static readonly double[] OPT_LUCK = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.05, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0  , 0, 0, 0, 0,0 };
 	// Keeko "Nexus" kit cards (user 2026-11-14): rows 45-49, the tables are now 50-wide. Arcane Power
 	// rides the shared OPT_DMG 1.12 row, Faster Channeling the shared OPT_CD 0.86 row (the same +16%
 	// cadence the other speed cards use), Arcane Echo rides OPT_MS (+0.05/rank multistrike CHANCE -
@@ -321,8 +321,8 @@ public partial class Game : Godot.Node2D
 	// OPT_BEAM = Split Beams extra picks/rank (each extra prey gets its OWN hitscan lane + slot, cap 4);
 	// OPT_REACH = Arcane Reach: +0.10 reach FACTOR per rank - the 2026-11-14 hand-play pass
 	// RETIRED the knockback the user did not like ("I actually don't like the knockback. Let's replace it with a simple +10% range increase"): EffRange() x (1 + beamReach) now widens the Nexus lane instead, and PartyMember draws the band tome->prey so it crosses the bodies it wounds.
-	static readonly int[] OPT_BEAM = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_REACH = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_BEAM = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0  , 0, 0, 0, 0,0 };
+	static readonly double[] OPT_REACH = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0  , 0, 0, 0, 0,0 };
 	// Hapi "Necrotic Flame" kit cards (user 2026-11-17): rows 50-54, the tables are now 55-wide. Overflowing
 	// Necrosis rides the shared OPT_DMG 1.12 row and Swift Curse the shared OPT_CD 0.86 row EXACTLY like
 	// every other kit's damage/speed pair; the necrosis DoT itself scales with the damage card at the commit
@@ -335,9 +335,9 @@ public partial class Game : Godot.Node2D
 	// body inside PLAGUE_SPREAD with the window it still has); plus the applier's OWN stamp runs +2 s/rank
 	// longer at the commit); OPT_PEST
 	// = Greater Pestilence rank (column radius x1.15/rank at the PartyMember commit site).
-	static readonly int[] OPT_PILLAR = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly int[] OPT_PLAGUE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 , 0, 0, 0, 0, 0 };
-	static readonly int[] OPT_PEST = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 , 0, 0, 0, 0, 0 };
+	static readonly int[] OPT_PILLAR = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 , 0, 0, 0, 0, 0  , 0, 0, 0, 0,0 };
+	static readonly int[] OPT_PLAGUE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 , 0, 0, 0, 0, 0  , 0, 0, 0, 0,0 };
+	static readonly int[] OPT_PEST = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 , 0, 0, 0, 0, 0  , 0, 0, 0, 0,0 };
 	// Athios claw kit cards (user 2026-11-19; OFF/ON law 2026-11-22: "no scaling with card rank - these
 	// are just off/on switches now", spec verbatim "Sharper Claws: +20% damage, +20% crit. Savage Attacks:
 	// +20% attack speed. Primal Might: +1 claw attack. Haemorrhaging Bleed: Bleed slows 10%. Longest Claws:
@@ -347,8 +347,26 @@ public partial class Game : Godot.Node2D
 	// Two columns are NEW: OPT_CLAW = Primal Might PRESENCE switch (ON = +1 swing, +2 more while Beastial
 	// Rage runs, read at the march); OPT_BLEEDSLOW = one 10% slow stamped beside the Bleed via Combatant.Slowed.
 	// OPT_MEMBER 11 gates the rows to Athios; the picker + ApplyUpgrade guards flip each card exactly once.
-	static readonly int[] OPT_CLAW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 };
-	static readonly double[] OPT_BLEEDSLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0 }; // 10%/rank, matching the card text (user 2026-11-22 hand-play: the old 1.0 was a decimal-point typo - rank 1 parked bodies (speed * (1-1)) outright and rank 2 flipped them to NEGATIVE speed, fleeing at full run; the Slowed lane itself is fine, Keeko's freeze was a red herring)
+	static readonly int[] OPT_CLAW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0  , 0, 0, 0, 0,0 };
+	static readonly double[] OPT_BLEEDSLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0  , 0, 0, 0, 0,0 }; // 10%/rank, matching the card text (user 2026-11-22 hand-play: the old 1.0 was a decimal-point typo - rank 1 parked bodies (speed * (1-1)) outright and rank 2 flipped them to NEGATIVE speed, fleeing at full run; the Slowed lane itself is fine, Keeko's freeze was a red herring)
+	// Hew Thunder Cannon kit cards (user 2026-11-22; rows 60-64 of the 65-wide tables, OPT_MEMBER 12 gates
+	// them to Hew). Remove Inhibitors rides the SHARED OPT_DMG lane (1.12), Efficient Gears rides the SHARED
+	// OPT_CD lane (0.86 - but HEW clamps the authored 2.0 s cooldown and reroutes attack-speed bonuses to
+	// damage at HALF rate per the spec, while MARTHA's bite really speeds up), and Wider Barrel deliberately
+	// does NOT ride OPT_RANGE - Hew's reach is PINNED at the authored 520 and only the beam BAND widens.
+	// THREE new columns carry the bespoke kits: OPT_BARREL = Wider Barrel presence switch (band x1.16/rank
+	// at the cannon march; radius upgrades widen the beam too, spec "the beam gets wider with radius upgrades"),
+	// OPT_VAMP = Vampiric Core presence (Martha heals 1% of ALL damage dealt by the party, capped at her 40 hp
+	// pool), OPT_EXPLO = Explosive Finale presence (Hew and Martha kills explode for 25/50/75% of the kill's
+	// damage by rank, ~60 px blast at the corpse).
+	// The Leader Bonus lane is separate: every defeated enemy while Hew leads has a 5% chance to drop an
+	// UPGRADE part (5% damage / 5% attack speed / 5% radius / 1 armour / 5 hp) boosting that stat for ALL
+	// characters and Martha, run-permanent, diminishing per kind (n-th part = base x 0.9^n); Game.cs counts
+	// the kinds and calls PartyMember.applyUpgradeBonus + the Martha fields.
+	// NOTE: the claw OFF/ON guards key on rows 55-59 ONLY (OPT_MEMBER 11), so Hew's rank cards keep rank.
+	static readonly int[] OPT_BARREL = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 1, 0, 0, 0 };
+	static readonly int[] OPT_VAMP = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 1, 0 };
+	static readonly int[] OPT_EXPLO = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 1 };
 
 
 	int[] _pickRank = new int[OPT_LABEL.Length];
@@ -767,7 +785,50 @@ public partial class Game : Godot.Node2D
 		Godot.Collections.Array<int> _undTaunt = new();     // 1 = risen body taunts the horde (2026-11-18: conversions taunt too; 0 only on parked slots)
 		Godot.Collections.Array<Godot.Sprite2D> _pillarFx = new();
 		Godot.Collections.Array<double> _pillarT = new();
-		double _plagueTick = 0.0;   // NECROTIC PLAGUE flame clock: one cough roll per second of the DoT
+	 double _plagueTick = 0.0;   // NECROTIC PLAGUE flame clock: one cough roll per second of the DoT
+		// HEW "Upgrades!" leader bonus (user 2026-11-22): every defeated enemy has a 5% chance to
+		// drop a part that boosts a RANDOM stat for ALL characters (and Martha): 5% Damage / 5%
+		// Attack Speed / 5% Radius / +1 Armour / +5 HP, run-permanent. Parts land INSTANTLY on the
+		// kill (no pickup node to chase) and DIMINISH: the n-th part of a kind applies at base x 0.9^n
+		// (assistant pick - the user left the stacking open and straight 5% compounding read as a
+		// snowball), so a lucky run still plateaus. Counters are RUN-WIDE: every character reads the
+		// SAME tally, which is what "for ALL characters" means.
+		int _upDmgN = 0;   // parts of each kind dropped this run (drives the 0.9^n dampener)
+		int _upSpdN = 0;
+		int _upRadN = 0;
+		int _upArmN = 0;
+		int _upHpN = 0;
+		// MARTHA (user 2026-11-22, Hew's companion): a dedicated PERSISTENT Node2D singleton, NOT a
+		// PartyMember and NOT a risen shell - own bite lane, own damage route, never despawns. She IS
+		// the horde's other player character: the Enemy chase already walks a Node2D quarry (GetTauntBody)
+		// and chews it with REAL hp (UndeadHitBy), so she rides those lanes as a puller and answers the
+		// shot intercept (UndeadAt) - no Enemy.cs edit needed. At 0 hp she is BROKEN for 20 s and
+		// knits herself back (the countdown runs 2x while Hew stands close - proximity is an assistant
+		// pick, retunable). Art: res://art/characters/martha.png (104x97 sheet, on the user's WIP rail).
+		const double MARTHA_HP = 40.0;        // user
+		const double MARTHA_ARMOUR = 3.0;  // user
+		const double MARTHA_EVA = 0.05;     // user: 5% evasion
+		const double MARTHA_CRIT = 0.05;   // user: 5% crit chance (her bite rolls it)
+		const double MARTHA_BITE = 10.0;   // user
+		const double MARTHA_BITE_EVERY = 1.5; // assistant pick (retune by eye): her bite cadence
+		const double MARTHA_SPEED = 130.0;   // assistant pick: scuttles a touch faster than Hew (115)
+		const double MARTHA_BREAK = 20.0;    // user: 20 s broken at 0 hp, repairs herself
+		const double MARTHA_NEAR = 100.0;  // assistant pick (retunable): px within which Hew's presence DOUBLES the repair tick
+		const double MARTHA_LEASH = 120.0; // assistant pick (retunable): px past which she runs back to Hew by the shortest (wrap) route
+		const double MARTHA_PULL = 140.0;  // assistant pick (mirrors TAUNT_PULL): how far the horde notices her at all
+		const double MARTHA_FIND = 620.0;  // assistant pick (mirrors UNDEAD_FIND): she chews live prey this far
+		const float MARTHA_RADIUS = 12.0f; // assistant pick: her hit core, same read as MEMBER_RADIUS / UNDEAD_RADIUS
+		Godot.Node2D _marthaBody = null;   // her singleton node (null until BuildMartha seats her)
+		double _marthaHp = 0.0;            // REAL hp: the horde can fell her (mirrors _undHp)
+		double _marthaT = 0.0;            // BROKEN countdown: > 0 = she is repairing, never biting
+		double _marthaCd = 0.0;           // bite cadence clock (mirrors _undCd)
+		double _marthaDmg = 1.0;          // Upgrades! parts that landed on her: damage multiplier
+		double _marthaSpd = 1.0;          // ditto: bite-speed multiplier
+		double _marthaRad = 1.0;          // ditto: reach multiplier (her bite's touch band)
+		double _marthaArm = 0.0;          // ditto: flat armour points on top of her 3
+		double _marthaHpBonus = 0.0;      // ditto: flat hp points on top of her 40
+		double _marthaVamp = 0.0;         // Vampiric Core (Hew card): hp she has drunk this run, clamped to her own ceiling
+		const double EXPLO_BLAST = 60.0; // assistant pick (retunable): px ring an Explosive Finale kill detonates into
 		// The Kaka (Yu ult, user 2026-10-26): six EMPOWERED copies of the ritual familiars -
 		// same pool, steering, fuse and no-split blast, only doubled reach and bite. The x2
 		// multiplies AFTER the rank scaling: the member passes already-scaled kit numbers and
@@ -1169,7 +1230,7 @@ public partial class Game : Godot.Node2D
 				m.awaKills += 1;
 				// one random standing ally per kill (user 2026-11-06): gather the eligible squad,
 				// draw ONE patient - the awakening no longer heals everybody
-				PartyMember[] cands = new PartyMember[12]; // roster-wide bound (12 PCs at 2026-11-19)
+				PartyMember[] cands = new PartyMember[13]; // roster-wide bound (13 PCs once seat 12 Hew joins)
 				int cn = 0;
 				foreach (PartyMember mm in _party)
 				{
@@ -1192,6 +1253,7 @@ public partial class Game : Godot.Node2D
 				break; // exactly one awakening owner per kill
 			}
 		}
+		UpgradePartDrop(); // Hew's Upgrades! lane: a 5% part on this kill, before the body leaves the registry
 		SpawnGem(c.GlobalPosition, ((Enemy)c).xpValue);
 		MaybeDropPickup(c); // rare kill drop, before the body leaves the registry
 		c.kind = "dead"; // drop the registry entry in the kill scan
@@ -2841,6 +2903,7 @@ public void RegisterEnemy(Combatant e)
 			_undSpd.Add(0.0);
 			_undTaunt.Add(0);
 		}
+		BuildMartha(); // her singleton, once per run (parked until Hew joins)
 		for (int i = 0; i < PILLAR_POOL; i++)
 		{
 			Godot.Sprite2D s = new Godot.Sprite2D();
@@ -3679,6 +3742,8 @@ public void RegisterEnemy(Combatant e)
 		if (_leader.displayName == "Athios")
 			return 12; // Spiritmane Pride (user 2026-11-19): the pack is battle-born - +10% move, +10% dodge,
 		// 10% less damage taken party-wide. Readers: LeaderMoveMul / LeaderEvaMul / LeaderPrideDamageMul (below)
+		if (_leader.displayName == "Hew")
+		 return 13; // Upgrades! (user 2026-11-22): every defeated enemy has a 5% chance to drop a part boosting a random stat for ALL characters (and Martha): 5% Damage / 5% Attack Speed / 5% Radius / +1 Armour / +5 HP. Run-permanent; the lane lives on Game.OnEnemyKilled (below), Martha's half on her own upkeep
 		return 0;
 	}
 	
@@ -3890,13 +3955,15 @@ public void RegisterEnemy(Combatant e)
 				SpawnSpirit();
 			}
 		}
-		// upkeep is unconditional: a helper on the field keeps living even if the seat
-		// moved (nothing can move it today), so nothing pops off mid-raid. foreach over
-		// Godot.Collections.Array is safe: _party never shrinks (join/eliminate flip flags)
 		UpdateInsects(delta);
 		UpdateSpirits(delta);
 		UpdateBees(delta); // swarm upkeep: lives under ANY seat once a cast ran
 		UpdateUndead(delta); // risen upkeep: columns fade, bodies shamble and chomp, plague walks
+		// MARTHA upkeep (Hew's companion): parked while he is off-field; hunts, bites, leashes home,
+		// knits when broken (see the Martha block). Unconditional like every other helper lane: a
+		// body already on the field keeps living even if the seat moved (nothing can move it today),
+		// and _party never shrinks (join/eliminate only flip flags), so the foreach stays safe.
+		UpdateMartha(delta);
 	}
 
 	// Asper's vigil spawner: next free slot (parked at -9000 like the summon pool), a
@@ -4490,10 +4557,29 @@ public void RegisterEnemy(Combatant e)
 				w = s;
 			}
 		}
+
+		// Martha answers the intercept too: she IS the horde's other player character, and the same
+		// 12 px bolt core that reaches a risen body reaches her. hp > 0 = standing: broken iron is
+		// not a shot target, so a knitting Martha never eats a bullet that was meant to fly through.
+		if (_marthaBody != null && _marthaHp > 0.0 && _marthaBody.GlobalPosition.X > -8000.0f)
+		{
+			float md = p.DistanceTo(_marthaBody.GlobalPosition);
+			if (md < 12.0f + MARTHA_RADIUS && md < nd)
+			{
+				nd = md;
+				w = _marthaBody;
+			}
+		}
 		return w;
 	}
 	public void UndeadHitBy(Godot.Node2D u, double dmg)
 	{
+
+		if (u == _marthaBody)
+		{
+			MarthaHitBy(dmg); // her own damage route: real hp, her armour, her evasion
+			return; // she is not in the risen table, so the loop below could never spend her
+		}
 		for (int i = 0; i < _undead.Count; i++)
 		{
 			if (_undead[i] == u)
@@ -4530,9 +4616,306 @@ public void RegisterEnemy(Combatant e)
 				w = s;
 			}
 		}
+
+		// Martha is the horde's OTHER player character: within MARTHA_PULL she pulls chase exactly like
+		// a risen body, which is why the Enemy needs no edit at all. hp > 0 = standing: a broken body is
+		// iron nobody chews, and a parked one is off-field.
+		if (_marthaBody != null && _marthaHp > 0.0 && _marthaBody.GlobalPosition.X > -8000.0f)
+		{
+			double md = WrapNearCamera(pos).DistanceTo(WrapNearCamera(_marthaBody.GlobalPosition));
+			if (md < MARTHA_PULL && md < nd)
+			{
+				nd = md;
+			w = _marthaBody;
+			}
+		}
 		return w;
 	}
 	
+
+//T// MARTHA (Hew's companion, user 2026-11-22): seat her singleton ONCE, like every other helper
+//T// pool, and PARK her at -9000 until Hew joins (UpdateMartha does the seating). A missing sheet
+//T// leaves the body invisible but the hit core still works: the greybox contract never depends on
+//T// art, so her bite lane and the horde's pull both survive an art-less run.
+	private void BuildMartha()
+	{
+		_marthaBody = new Godot.Node2D();
+		_marthaBody.Name = "Martha";
+		_marthaBody.GlobalPosition = new Vector2(-9000.0f, -9000.0f); // parked until Hew joins
+		_marthaHp = MARTHA_HP; // hp is armed here, so a hand-play never reads a 0 pool
+		_marthaT = 0.0;
+		_marthaCd = 0.0;
+		AddChild(_marthaBody); // persistent: never pooled, never QueueFreed
+		Godot.Texture2D tex = GD.Load("res://art/characters/martha.png") as Godot.Texture2D; // 104x97 sheet, on the user's WIP rail
+		if (tex == null)
+			return; // greybox: she still bites, still gets chewed, she just has no sheet
+		Godot.Sprite2D art = new Godot.Sprite2D();
+		art.Texture = tex;
+		art.Set("texture_filter", 0); // NEAREST like every other pool sprite
+		art.Set("z_index", 2); // body band: a rank under the ~90 px PCs (Hew reads 256 x 0.35)
+		double ms = 0.65; // assistant pick (retune by eye): the 97 px sheet lands ~63 px tall
+		art.Scale = new Vector2((float)ms, (float)ms);
+		// rim 0: her base band sits at the canvas bottom, so pin the sheet bottom to the node origin
+		art.Position = new Vector2(0.0f, (float)(-(tex.GetHeight() * 0.5) * ms));
+		_marthaBody.AddChild(art);
+	}
+//T// The Hew member, or null while he is off-field (never joined / eliminated). He is the ONLY seat
+//T// Martha listens to: no Hew = no body on the field, and every lane below keeps that read.
+	private PartyMember FindHew()
+	{
+		foreach (PartyMember m in _party)
+		{
+			if (m.displayName == "Hew")
+				return m.joined && !m.eliminated ? m : null; // downed is NOT off-field: he is still a seat
+		}
+		return null;
+	}
+//T// MARTHA upkeep (the lane UpdateHelpers calls once a frame): parked while he is off-field; hunts,
+//T// bites, leashes home, knits when broken. She is NOT a PartyMember, so none of the party lanes
+//T// see her; the horde instead reaches her through GetTauntBody / UndeadAt / UndeadHitBy, which is
+//T// what "enemies attack her as another player character" needs - and no Enemy.cs edit at all.
+	private void UpdateMartha(float delta)
+	{
+		PartyMember hew = FindHew();
+		// off-field: park her and drop every timer, so a later join cannot burst banked time (the same
+		// drain-to-0 discipline the Yu spirit clock uses for a downed seat)
+		if (hew == null || _marthaBody == null)
+		{
+			if (_marthaBody != null)
+				_marthaBody.GlobalPosition = new Vector2(-9000.0f, -9000.0f);
+			return;
+		}
+		if (_marthaBody.GlobalPosition.X <= -8000.0f)
+		{
+			// FIRST tick after he joins: seat her at his flank. The lazy seat is why she needs no join
+			// hook at all - the stage-1 lottery can fire on any frame.
+			_marthaHp = MARTHA_HP + _marthaHpBonus;
+			_marthaT = 0.0;
+			_marthaCd = 0.5; // a half-second wind-up, then the bite clock
+			_marthaBody.GlobalPosition = WrapNearCamera(hew.GlobalPosition + new Vector2(-40.0f, 0.0f));
+			if (_pilot)
+				GD.Print("[10thAge] (martha) Martha crawls out beside Hew (40 hp / 3 armour, 10 px bite)");
+		}
+		_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition); // fold-follow like every pool
+		// BROKEN lane (user: at 0 hp she is broken 20 s and repairs herself). The countdown runs 2x while
+		// Hew stands within MARTHA_NEAR (assistant pick: the user asked for a Hew-close repair and left
+		// the rate open). Broken iron neither hunts, bites nor drinks.
+		if (_marthaT > 0.0)
+		{
+			_marthaT -= delta * (WrapDelta(hew.GlobalPosition, _marthaBody.GlobalPosition).Length() <= MARTHA_NEAR ? 2.0 : 1.0);
+			if (_marthaBody.GetChildCount() > 0)
+			{
+				// dim tint: a hand-play can SEE why she is out, and the tint fades back as she knits
+				((Godot.Sprite2D)_marthaBody.GetChild(0)).Modulate = new Color(0.5f, 0.5f, 0.6f, 0.45f + 0.55f * (float)(1.0 - _marthaT / MARTHA_BREAK));
+			}
+			if (_marthaT <= 0.0)
+			{
+				_marthaT = 0.0;
+				_marthaHp = MARTHA_HP + _marthaHpBonus; // knitted back to her OWN ceiling, parts included
+				_marthaCd = 0.5; // the fresh line bites after a wind-up, not straight out of the yard
+				if (_pilot)
+					GD.Print("[10thAge] (martha) Martha knits herself back to full"); // the 20 s done
+			}
+			return; // broken: nothing else this frame
+		}
+		// hunt: nearest live prey within MARTHA_FIND, wrap-squared, with the SAME body skip the risen
+		// scan uses (dead / spent entries are not prey). Bosses ARE prey: she is a chomper, not a bolt.
+		Godot.Collections.Array<Godot.Node2D> enemies = GetEnemies();
+		Godot.Node2D pn = null;
+		double best = MARTHA_FIND * MARTHA_FIND;
+		foreach (Godot.Node2D n in enemies)
+		{
+			Combatant nc = (Combatant)n;
+			if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
+				continue; // dead bodies are not prey
+			Vector2 off = WrapDelta(_marthaBody.GlobalPosition, n.GlobalPosition);
+			double d2 = off.X * off.X + off.Y * off.Y;
+			if (d2 < best)
+			{
+				best = d2;
+				pn = n;
+			}
+		}
+		if (pn != null)
+		{
+			Combatant pc = (Combatant)pn;
+			// Radius parts widen her touch band (the user's radius card boosts a random stat for the whole
+			// squad, so reach belongs to her bite too, exactly like the cannon band widens)
+			double touch = (double)pc.hitR + (double)MARTHA_RADIUS * _marthaRad;
+			Vector2 off = WrapDelta(_marthaBody.GlobalPosition, pn.GlobalPosition);
+			double d2 = off.X * off.X + off.Y * off.Y;
+			bool ult = hew.ultT > 0.0; // Maximum Firepower!: +25% damage AND +25% attack speed on HER
+			if (d2 > touch * touch)
+			{
+				// chomp band not reached yet: scuttle along the SHORTEST (wrap) route toward the prey
+				_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition + off.Normalized() * (float)(MARTHA_SPEED * delta));
+				_marthaCd = 0.0; // re-set, not banked: she only bites from a standstill inside the band
+			}
+			else
+			{
+				_marthaCd -= delta;
+				if (_marthaCd <= 0.0)
+				{
+					double spd = _marthaSpd * (ult ? 1.25 : 1.0);
+					_marthaCd = MARTHA_BITE_EVERY / spd; // 1.5 s cadence, attack-speed parts and the ult on top
+					double dealt = MARTHA_BITE * _marthaDmg * (ult ? 1.25 : 1.0);
+					if (Rng != null && Rng.Randf() < MARTHA_CRIT)
+						dealt *= 1.5; // her crit mirrors the engine's CRIT_DAMAGE base (1.5x)
+					pc.TakeDamage(dealt);
+					MarthaVampSip(dealt); // Vampiric Core (Hew card): she drinks what she bites
+					if (pc.hp <= 0.0f || pc.kind == "dead")
+						ExplosiveFinale(pn.GlobalPosition, dealt); // Explosive Finale: HER kill detonates the ring
+				}
+			}
+		}
+		else
+		{
+			// nothing in find range: run home by the shortest route once she strays past the leash
+			Vector2 home = WrapDelta(hew.GlobalPosition, _marthaBody.GlobalPosition); // her offset FROM Hew
+			if (home.Length() > MARTHA_LEASH)
+				_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition - home.Normalized() * (float)(MARTHA_SPEED * delta));
+			_marthaCd = 0.0;
+		}
+	}
+//T// the horde's OTHER player character: an enemy that reached her chews HERE instead of the risen
+//T// hp table (UndeadHitBy routes her body). Armour is a flat soak with a never-below-1 floor, the
+//T// same read Game.TakeHit gives the ARMOUR tag, so her 3 plus parts can soften but never fence her.
+	public void MarthaHitBy(double dmg)
+	{
+		if (_marthaBody == null || _marthaT > 0.0)
+			return; // broken iron is already spent: no soak, no second break while she knits
+		PartyMember hew = FindHew();
+		if (hew != null && hew.ultT > 0.0)
+		{
+			if (_pilot)
+				GD.Print("[10thAge] (martha) Maximum Firepower!: Martha is invulnerable while the ult runs");
+			return; // user: the ult makes her INVULNERABLE for its 10 s
+		}
+		if (Rng != null && Rng.Randf() < MARTHA_EVA)
+		{
+			if (_pilot)
+				GD.Print("[10thAge] (martha) Martha twists out of the bite"); // her 5% evasion
+			return;
+		}
+		double soak = dmg - (MARTHA_ARMOUR + _marthaArm);
+		if (soak < 1.0)
+			soak = 1.0;
+		_marthaHp -= soak;
+		if (_marthaHp <= 0.0)
+		{
+			_marthaHp = 0.0;
+			_marthaT = MARTHA_BREAK; // BROKEN for 20 s: the upkeep lane knits her back (2x while Hew is close)
+			if (_pilot)
+				GD.Print("[10thAge] (martha) Martha is DOWN - she spends 20 s in the yard knitting");
+		}
+	}
+//T// Vampiric Core (Hew's card): she heals 1% of ALL damage she deals per rank, clamped to her own
+//T// ceiling (assistant pick: the cap keeps a lucky sip lane from trading whole pools into free
+//T// healing). No sip while broken - she is not biting, so there is nothing to drink.
+	public void MarthaVampSip(double dealt)
+	{
+		PartyMember hew = FindHew();
+		if (hew == null || hew.vampRank <= 0.0 || _marthaT > 0.0)
+			return; // no card, no lane
+		double cap = MARTHA_HP + _marthaHpBonus;
+		if (_marthaHp >= cap)
+			return; // already at the ceiling: a sip is never wasted on a full pool
+		_marthaHp += dealt * 0.01 * hew.vampRank;
+		if (_marthaHp > cap)
+			_marthaHp = cap;
+	}
+//T// Explosive Finale (Hew's card): a Hew or Martha kill detonates a 25/50/75% blast into the horde.
+//T// Ranks live on the Hew member (Game.cs has no upgrade registry of its own), so the lane reads
+//T// them through FindHew. The ring never chains: the scan skips bodies that are already spent, so
+//T// the one kill that fired it cannot fan out across the squad.
+	public void ExplosiveFinale(Vector2 at, double dealt)
+	{
+		PartyMember hew = FindHew();
+		if (hew == null || hew.exploRank <= 0)
+			return; // the card is not in the pile: nothing detonates
+		double blast = dealt * 0.25 * (double)hew.exploRank; // 25 / 50 / 75% of the kill that made it
+		if (blast <= 0.0)
+			return;
+		double r2 = EXPLO_BLAST * EXPLO_BLAST; // assistant pick: the ring's px radius
+		foreach (Godot.Node2D n in GetEnemies())
+		{
+			Combatant nc = (Combatant)n;
+			if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
+				continue; // spent bodies never pop a second time
+			Vector2 off = WrapDelta(at, n.GlobalPosition);
+			if (off.X * off.X + off.Y * off.Y > r2)
+				continue;
+			nc.TakeDamage(blast);
+			MarthaVampSip(blast); // the shockwave is HER damage too, so it drinks
+		}
+	}
+//T// HEW "Upgrades!" leader bonus (user 2026-11-22): 5% per defeated enemy for a part boosting a
+//T// RANDOM stat for ALL characters (and Martha), run-permanent, applied INSTANTLY on the kill (no
+//T// pickup node to chase) and DIMINISHING: the n-th part of a kind lands at base x 0.9^n (assistant
+//T// pick - the user left stacking open and a flat 5% read as a snowball). Bosses never feed the lane:
+//T// OnEnemyKilled returns before this call for them. Downed bodies DO take parts (they are still on
+//T// the field); eliminated ones do not, and every character reads the SAME run-wide tally.
+	private void UpgradePartDrop()
+	{
+		if (LeaderBonusKey() != 13)
+			return; // the seat is not Hew's: the bonus is inert under every other leader
+		if (Rng == null || Rng.Randf() >= 0.05)
+			return; // the 5% roll
+		int kind = (int)(Rng.Randf() * 5.0); // one of five stats, uniform (the user asked for RANDOM)
+		if (kind > 4)
+			kind = 4; // belt-and-braces: Randf is < 1
+		double damp; // the n-th part of THIS kind applies at base x 0.9^n
+		int tally; // how many of this kind have landed (the pilot read only)
+		if (kind == 0)
+		{ damp = System.Math.Pow(0.9, (double)_upDmgN); _upDmgN++; tally = _upDmgN; }
+		else if (kind == 1)
+		{ damp = System.Math.Pow(0.9, (double)_upSpdN); _upSpdN++; tally = _upSpdN; }
+		else if (kind == 2)
+		{ damp = System.Math.Pow(0.9, (double)_upRadN); _upRadN++; tally = _upRadN; }
+		else if (kind == 3)
+		{ damp = System.Math.Pow(0.9, (double)_upArmN); _upArmN++; tally = _upArmN; }
+		else
+		{ damp = System.Math.Pow(0.9, (double)_upHpN); _upHpN++; tally = _upHpN; }
+		string[] tag = { "damage", "attack speed", "radius", "armour", "hp" }; // pilot read only
+		if (_pilot)
+			GD.Print("[10thAge] (upgrades) part: " + tag[kind] + " x" + tally + " (dim " + (float)damp + ")");
+		foreach (PartyMember m in _party)
+		{
+			if (m.eliminated)
+				continue; // a body off the run takes nothing
+			// the multiplier tags are multipliers (base 1.0); HEALTH and ARMOUR are flat points
+			if (kind == 0)
+				m.stat[StatTags.ATTACK_DAMAGE] += 0.05 * damp;
+			else if (kind == 1)
+				m.stat[StatTags.ATTACK_SPEED] += 0.05 * damp;
+			else if (kind == 2)
+				m.stat[StatTags.AREA] += 0.05 * damp;
+			else if (kind == 3)
+				m.stat[StatTags.ARMOUR] += 1.0 * damp;
+			else
+			{
+				// +5 hp raises the CEILING and the line: the part is a weld, not a promise
+				double before = m.EffMaxHp();
+				m.stat[StatTags.HEALTH] += 5.0 * damp;
+				m.hp += (float)(m.EffMaxHp() - before);
+			}
+		}
+		// Martha is not in _party, so she reads the SAME tally through her own fields
+		if (kind == 0)
+			_marthaDmg *= 1.0 + 0.05 * damp;
+		else if (kind == 1)
+			_marthaSpd *= 1.0 + 0.05 * damp;
+		else if (kind == 2)
+			_marthaRad *= 1.0 + 0.05 * damp;
+		else if (kind == 3)
+			_marthaArm += 1.0 * damp;
+		else
+		{
+			_marthaHpBonus += 5.0 * damp;
+			if (_marthaHp > 0.0)
+				_marthaHp += 5.0 * damp; // a standing Martha gets the weld right now
+		}
+	}
 // Yu seat upkeep (user 2026-11-02 rework): kindness spirits now RIDE like the gem pickups -
 // the SAME 110 px collection bubble + 380 px/s stream that UpdateGems uses pull a vigil to
 // its closest standing member (magnet elixir + Inquisitive Mind widen the bubble like every
@@ -4591,7 +4974,7 @@ private void UpdateSpirits(float delta)
 			}
 		if (puller != null && dist < 14.0f)
 		{
-			PartyMember[] cands = new PartyMember[12]; // roster-wide bound (12 PCs at 2026-11-19; was exact-fit at 8)
+			PartyMember[] cands = new PartyMember[13]; // roster-wide bound (13 PCs once seat 12 Hew joins; was exact-fit at 8)
 			int cn = 0;
 			foreach (PartyMember mm in _party)
 			{
@@ -5625,14 +6008,15 @@ private void UpdateSpirits(float delta)
 	static readonly float[] SEL_GRID = { 0.04f, 0.03f, 0.30f, 0.24f, 0.35f, 0.03f, 0.61f, 0.24f, 0.66f, 0.03f, 0.96f, 0.24f,
 		0.04f, 0.26f, 0.30f, 0.47f, 0.35f, 0.26f, 0.61f, 0.47f, 0.66f, 0.26f, 0.96f, 0.47f,
 		0.04f, 0.49f, 0.30f, 0.70f, 0.35f, 0.49f, 0.61f, 0.70f, 0.66f, 0.49f, 0.96f, 0.70f,
-		0.04f, 0.72f, 0.30f, 0.93f, 0.35f, 0.72f, 0.61f, 0.93f, 0.66f, 0.72f, 0.96f, 0.93f }; // board fractions (assistant re-grid pick: 12 rects on 4 rows - retune by eye)
+		0.04f, 0.72f, 0.30f, 0.93f, 0.35f, 0.72f, 0.61f, 0.93f, 0.66f, 0.72f, 0.96f, 0.93f,
+		0.04f, 0.95f, 0.30f, 1.16f }; // board fractions (assistant re-grid pick: 12 rects on 4 rows - retune by eye). 13th rect (seat 12 Hew): the page-bottom LEFT strip under row 4, clear of the CONFIRM plate at root-local 0.32-0.58 x 0.88-0.96 (page fractions run past 1.0 down there; existing 12 stay byte-identical, retune by eye)
 	static readonly float[] SEL_PAGE = { 0.05f, 0.14f, 0.60f, 0.86f }; // the board window the build draws AND the click maps into
-	static readonly bool[] SEL_LOCKED = { false, false, false, false, false, false, false, false, false, false, false, false };
+	static readonly bool[] SEL_LOCKED = { false, false, false, false, false, false, false, false, false, false, false, false, false }; // 13 seats (seat 12 Hew joins at parity)
 	static readonly float[] SEL_CONFIRM = { 0.32f, 0.88f, 0.58f, 0.96f };
 	// painted mini art per roster seat (index = memberIndex: 0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash | 7 Bruno | 8 Brook)
 		// art reorganised 2026-11-08 (user: "move all the current characters into the character folder")
 		// - portraits now live under res://art/characters/ alongside the art/enemies/ tree
-		static readonly string[] SEL_ART = { "res://art/characters/baldrun.png", "res://art/characters/mosiah.png", "res://art/characters/asper.png", "res://art/characters/alvora.png", "res://art/characters/yu.png", "res://art/characters/stack.png", "res://art/characters/wash.png", "res://art/characters/bruno.png", "res://art/characters/brook.png", "res://art/characters/keeko.png", "res://art/characters/hapi.png", "res://art/characters/athios.png" };
+		static readonly string[] SEL_ART = { "res://art/characters/baldrun.png", "res://art/characters/mosiah.png", "res://art/characters/asper.png", "res://art/characters/alvora.png", "res://art/characters/yu.png", "res://art/characters/stack.png", "res://art/characters/wash.png", "res://art/characters/bruno.png", "res://art/characters/brook.png", "res://art/characters/keeko.png", "res://art/characters/hapi.png", "res://art/characters/athios.png", "res://art/characters/hew.png" };
 		// PER-SEAT select-card scale (2026-11-19, the 2x-art law): the user is shipping ~2x canvases
 		// now (Athios 175x235 against the 78-98 W x 114-121 H class) and plans to rework the shipped
 		// cast to that quality, so the select lane needs a SCALE ANSWER, not a pre-shrunk PNG - the
@@ -5641,7 +6025,7 @@ private void UpdateSpirits(float delta)
 		// so a 2x sheet rides 0.5. Index = memberIndex; out-of-range seats default to 1.
 		// The stage mini has its OWN knob (PartyMember.miniScale): 235 px * 0.38 = 89 px, the same
 		// on-stage size the class gets at 0.75. Keep the two lanes' numbers separate on purpose.
-		static readonly float[] SEL_ART_SCALE = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.5f }; // seat 11 Athios: the 175x235 ~2x sheet rides 0.5 for the ~118 px class read (assistant pick, retune by eye)
+		static readonly float[] SEL_ART_SCALE = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.5f, 0.46f }; // seat 11 Athios: the 175x235 ~2x sheet rides 0.5 for the ~118 px class read (assistant pick, retune by eye). Seat 12 Hew: the 256x256 canvas rides 0.46 for the ~118 px read (assistant pick)
 		static readonly float SEL_RING_PAD = 6.0f; // scaled-seat gold ring: px of gold around the seat's OWN art box (2026-11-22 hand-play fix: the slot-wide ring turned a small scaled card into a big gold plate)
 		static readonly string[] SEL_BONUS = {
 		"Leader Bonus: Chain Lightning - All attacks have a 5% chance to unleash lightning on 5 targets for 10 damage.",
@@ -5655,7 +6039,8 @@ private void UpdateSpirits(float delta)
 		"Leader Bonus: Inquisitive Mind - All allies gain +5% Evasion, +15% Collection Range and +15% XP.",
 		"Leader Bonus: Gekkota Training - All allies gain +10% evasion, +10% movement speed and +10% attack speed.",
 		"Leader Bonus: Call of the Grave - Enemies slain while Hapi leads have a 5% chance to rise as undead halves (half stats) that taunt nearby enemies.",
-		"Leader Bonus: Spiritmane Pride - All allies gain +10% Movement Speed and +10% Evasion and take 10% less damage while Athios leads." };
+		"Leader Bonus: Spiritmane Pride - All allies gain +10% Movement Speed and +10% Evasion and take 10% less damage while Athios leads.",
+		"Leader Bonus: Upgrades! - Every defeated enemy has a 5% chance to drop a part that boosts a random stat for ALL characters (and Martha): 5% Damage, 5% Attack Speed, 5% Radius, +1 Armour or +5 HP." };
 	static readonly string[] SEL_ULT = {
 		"Ultimate: Giant's Might (R) - Doubles Baldrun's size and reach and grants +50% Damage and Attack Speed for 10s.",
 		"Ultimate: Bardic Inspiration (R) - All allies gain +25% Damage and Attack Speed for 10s",
@@ -5668,7 +6053,8 @@ private void UpdateSpirits(float delta)
 		"Ultimate: Assassination (R) - All allies gain +25% Multistrike, +15% Crit Chance and +25% Crit Damage for 10s",
 		"Ultimate: Rewrite Reality (R) - All enemies (including any that spawn) become frozen in place for 10 seconds. (against final bosses, this instead increases damage dealt to them by 25%)",
 		"Ultimate: Bring Out Yer Dead! (R) - For 10 seconds, every enemy slain rises as an undead ally with the same stats and real HP (they can be killed by enemies) that fights beside the squad for 10 seconds of its own.",
-		"Ultimate: Beastial Rage (R) - All allies take half damage, attack 50% faster and gain +1 attack for 10s." };
+		"Ultimate: Beastial Rage (R) - All allies take half damage, attack 50% faster and gain +1 attack for 10s.",
+		"Ultimate: Maximum Firepower! (R) - For 10 seconds Martha is invulnerable and gains +25% Damage and +25% Attack Speed, and Hew gains +25% Damage and +50% beam radius and area." };
 	public void BuildSelectScreen()
 	{
 		_selLayer = new CanvasLayer();
@@ -6706,6 +7092,9 @@ private void UpdateSpirits(float delta)
 		{ m.pillarR += OPT_PEST[option]; } // Greater Pestilence (Hapi row 54): column radius x1.15/rank, PILLAR_R x (1 + 0.15 x rank) at the commit
 		{ m.hasPrimal += OPT_CLAW[option]; } // Primal Might (Athios row 57) is a PRESENCE switch (2026-11-22 claw-kit law): ON = +1 swing (+2 more while Beastial Rage runs, read at the march); OFF = none. The guard above keeps it at exactly one flip, so this never exceeds 1
 		{ m.bleedSlow += OPT_BLEEDSLOW[option]; } // Haemorrhaging Bleed (Athios row 58) is an OFF/ON switch now: one flip = one 10% slow stamped beside the Bleed (the ON guard ran before the tables)
+		{ m.barrelRank += OPT_BARREL[option]; } // Wider Barrel (Hew row 61) keeps RANK (the claw OFF/ON guard keys on member 11 only): the cannon band widens +16%/rank, reach stays PINNED at 520
+		{ m.vampRank += OPT_VAMP[option]; } // Vampiric Core (Hew row 63) is a presence switch: Martha heals 1% of all party damage (Game.cs reads presence via GetMemberByIndex(12))
+		{ m.exploRank += OPT_EXPLO[option]; } // Explosive Finale (Hew row 64) keeps rank: Hew/Martha kills blast 25/50/75% of the kill damage (Game.cs kill attribution)
 		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
 						 OPT_LABEL[option] + " x" + _pickRank[option];
 		GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +

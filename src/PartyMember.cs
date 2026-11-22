@@ -199,6 +199,8 @@ public partial class PartyMember : Godot.Node2D
 
 	Godot.Control[] _beamFx = null; // 4 slots: TextureRect on the art rail, ColorRect fallback when the art is absent (Control is the shared base so both ride the same draw lane)
 
+	Godot.ColorRect _cannonFx = null; // Hew Thunder Cannon flash band: ONE slot, pure ColorRect (no art-rail lane shipped for the kit yet)
+
 	// Keeko kit fields: ranks ride Game's OPT_BEAM/OPT_REACH rows (50-wide tables, rows 45-49) exactly
 	// like the axe/shield lanes ride their own columns; px maths live at the commit site.
 
@@ -564,6 +566,14 @@ public partial class PartyMember : Godot.Node2D
 	public int clawSwings = 0;   // strikes THIS march runs (clawStrikes + Primal presence + rage pair): stamped when it opens
 	public Vector2 clawAim = new Vector2(1.0f, 0.0f); // the ONE throw line the whole march keeps, frozen at the open
 		public long clawLastId = -1L; // v5 RETARGET ledger: the body the PREVIOUS strike raked (GetInstanceId is ulong, the ledger stays long like the bee ledger)
+
+		// Hew "Thunder Cannon" kit fields (user 2026-11-22): the card ranks live here and read the
+		// new OPT_BARREL/OPT_VAMP/OPT_EXPLO columns; px maths live at the commit site.
+		public int barrelRank = 0;  // Wider Barrel ranks: the beam lane widens its band per rank
+		public double vampRank = 0.0; // Vampiric Core ranks (1%/rank heals Martha per damage dealt)
+		public int exploRank = 0;   // Explosive Finale ranks: 25/50/75% blast on Hew/Martha kills
+		static readonly double CANNON_BAND_PX = 14.0;  // half-width of the cannon beam lane (retune by eye)
+		static readonly double CANNON_SPLASH_PX = 40.0; // splash radius around the MAIN cannon target (retune by eye)
 
 	// Alvora "Guardian Awakening" (user 2026-10-26): ring reach x2 MULTIPLIED after the
 
@@ -968,6 +978,17 @@ public partial class PartyMember : Godot.Node2D
 				miniScale = 0.38f;
 				miniRim = 31.0f;
 			}
+			// 2026-11-22: Hew art probe (256x256 canvas - the user's high-quality drop). 256 px x 0.35 =
+			// ~90 px, the same stage read Athios gets at 0.38 on its 235 px sheet; rim 34 is the base-plate
+			// band centre read from the canvas bottom (assistant pick, retune by eye at hand-play; the SEL
+			// lane has its OWN 0.46 knob)
+			else if (displayName == "Hew")
+			{
+				// class's 78-98 W x 114-121 H). 256 px x 0.35 = ~90 px (assistant pick, retune by eye)
+				miniPath = "res://art/characters/hew.png";
+				miniScale = 0.35f;
+				miniRim = 34.0f;
+			}
 
 		if (miniPath != "")
 
@@ -1181,6 +1202,19 @@ public partial class PartyMember : Godot.Node2D
 
 			}
 
+		}
+
+		// Hew Thunder Cannon flash band: ONE ColorRect slot (no art-rail lane shipped for the kit
+		// yet - the ColorRect fallback idiom); the draw lane restretches it muzzle->prey per volley.
+		if (weaponKit == "cannon")
+		{
+			_cannonFx = new Godot.ColorRect();
+			_cannonFx.Color = new Color(1.0f, 0.55f, 0.2f, 0.9f); // ember-orange blast band (assistant pick, retune by eye)
+			_cannonFx.Position = new Vector2(0.0f, -20.0f); // muzzle origin: just above the body line (retune by eye)
+			_cannonFx.Size = new Vector2(0.0f, (float)(CANNON_BAND_PX * 2.0)); // built at the band width (the draw lane restretches per volley)
+			_cannonFx.ZIndex = 3; // above the horde bodies, below the chip UI
+			_cannonFx.Visible = false;
+			AddChild(_cannonFx);
 		}
 
 
@@ -1548,6 +1582,10 @@ public partial class PartyMember : Godot.Node2D
 		if (displayName == "Hapi")
 
 				return 11; // Bring Out Yer Dead! (window on convT; rises + leader halves live on Game)
+		// Hew "Maximum Firepower!" (user 2026-11-22): seat 13. The clock lives HERE (ultT); Martha's
+		// half of the ult (invulnerable +25% dmg +25% attack speed) lives on Game reading Hew's ultT.
+		if (displayName == "Hew")
+			return 13; // Maximum Firepower! (10 s window on ultT; Martha's half lives on Game)
 		return 0; // other PCs: no ultimate authored yet (future lanes land here)
 
 	}
@@ -1868,6 +1906,18 @@ public partial class PartyMember : Godot.Node2D
 			GD.Print("[10thAge] (ult) Beastial Rage: the squad takes half damage and attacks 50% faster with +1 attack for 10 s, gate " + (int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
 			return true;
 		}
+		// Hew "Maximum Firepower!" (user 2026-11-22): 10 s on OWN clocks - Hew takes +25% damage
+		// (RollDamage's 1.25 cannon term) and +50% beam radius (cannon lane's x1.5); the reach stays
+		// pinned (EffRange). Martha's half (invulnerable +25% dmg +25% attack speed) is GAME-side,
+		// reading this ultT through GetMemberByIndex(12); ULT_SPD is deliberately NOT paid here:
+		// Hew's own ult grants no speed, only Martha's half does.
+		else if (ultKey() == 13)
+		{
+			ultCdT = ULT_CD_BASE / stat[StatTags.ULT];
+			ultT = ULT_LASTS;
+			GD.Print("[10thAge] (ult) Maximum Firepower!: Hew +25% damage and +50% beam area, Martha invulnerable +25% damage +25% attack speed for 10 s, gate " + (int)(ULT_CD_BASE / stat[StatTags.ULT]) + " s");
+			return true;
+		}
 		// GD.Print("[10thAge] (ult) " + displayName + " has no ultimate yet");
 
 		return false;
@@ -1914,6 +1964,10 @@ public partial class PartyMember : Godot.Node2D
 
 			spd = 0.05; // clamp: stacked speed cards can't drive the timer to zero
 
+		// Hew "Thunder Cannon" (user 2026-11-22): the attack can NEVER be faster than its base
+		// 2.0 - speed bonuses instead buy damage in RollDamage, at HALF rate.
+		if (weaponKit == "cannon")
+			return cooldown;
 		return cooldown / spd;
 
 	}
@@ -1936,7 +1990,7 @@ public partial class PartyMember : Godot.Node2D
 
 	/** Authored reach scaled by the AREA tag (Bruno lead: +15%). */
 
-	public double EffRange() { return range * stat[StatTags.AREA] * (ultT > 0.0 ? ULT_RANGE : 1.0) * (awaT > 0.0 ? AWA_RANGE : 1.0) * LeaderAreaMul() * (1.0 + beamReach); } // awakening widens too | Bruno lead widens too | Keeko Arcane Reach +10%/rank (factor 1 for every other kit)
+	public double EffRange() { return weaponKit == "cannon" ? range : range * stat[StatTags.AREA] * (ultT > 0.0 ? ULT_RANGE : 1.0) * (awaT > 0.0 ? AWA_RANGE : 1.0) * LeaderAreaMul() * (1.0 + beamReach); } // awakening widens too | Bruno lead widens too | Keeko Arcane Reach +10%/rank (factor 1 for every other kit) | Hew (user 2026-11-22): reach is PINNED like Asper's base - radius upgrades widen the BAND at the commit site, never the shot
 
 	/** Authored maxHp plus the additive HEALTH tag (points). */
 
@@ -1990,7 +2044,7 @@ public partial class PartyMember : Godot.Node2D
 
 		if (ultT > 0.0)
 
-			amount *= ULT_DMG;
+			amount *= (weaponKit == "cannon" ? 1.25 : ULT_DMG); // Hew (user 2026-11-22): Maximum Firepower! is +25% damage, not the shared +50%
 
 		if (insT > 0.0)
 
@@ -2003,6 +2057,16 @@ public partial class PartyMember : Godot.Node2D
 		if (elixBoldT > 0.0)
 
 			amount *= 1.10; // Boldness elixir: +10% on every hit while brewed
+
+		// Hew "Thunder Cannon" (user 2026-11-22): attack-speed bonuses convert to DAMAGE at HALF
+		// rate instead of speeding the blast (EffCooldown pins the 2.0 cadence). The ult's +25%
+		// speed is AUTHORED in the 1.25 above and never re-counted here.
+		if (weaponKit == "cannon")
+		{
+			double asSpd = stat[StatTags.ATTACK_SPEED] * (insT > 0.0 ? INS_SPD : 1.0) * (rageT > 0.0 ? RAGE_SPD : 1.0) * LeaderAtkSpdMul();
+			if (asSpd > 1.0)
+				amount *= 1.0 + 0.5 * (asSpd - 1.0);
+		}
 
 		// multistrike CHANCE (Brook's lucky-strikes card + Assassination window): on a proc THIS
 
@@ -2398,6 +2462,8 @@ public partial class PartyMember : Godot.Node2D
 			if (_beamFx != null)
 				foreach (Godot.Control bx in _beamFx)
 					bx.Visible = false; // beams die with the body too
+			if (_cannonFx != null)
+				_cannonFx.Visible = false; // cannon flash dies with the body too
 			if (_cresFx != null)
 				 foreach (Godot.Sprite2D sx in _cresFx)
 					 sx.Visible = false;
@@ -2566,6 +2632,9 @@ public partial class PartyMember : Godot.Node2D
 					foreach (Godot.Control bx in _beamFx)
 
 						bx.Visible = false; // instant beams ride the same commit-flash beat
+
+				if (_cannonFx != null)
+					_cannonFx.Visible = false; // cannon flash rides the same commit-flash beat
 
 				for (int sk = 0; sk < _shldT.Length; sk++)
 				{
@@ -3333,6 +3402,9 @@ public partial class PartyMember : Godot.Node2D
 		// Brook's twin daggers (user 2026-10-31): the SIXTH verb, a same-line double jab
 
 		bool daggerKit = weaponKit == "dagger";
+
+		// Hew "Thunder Cannon" kit key (user 2026-11-22): a hitscan blast lane, pierces the rank
+		bool cannonKit = weaponKit == "cannon";
 
 		if (auraKit)
 
@@ -4244,7 +4316,7 @@ public partial class PartyMember : Godot.Node2D
 
 		// whatever way it faces, so the lane gate stays lane-only.
 
-		Godot.Node2D best = PickPrey(pg, enemies, p, reach, false, false, isLeader && !cleaver && !shotKit && !beamKit && !pillarKit, facing, arcEff);
+		Godot.Node2D best = PickPrey(pg, enemies, p, reach, false, false, isLeader && !cleaver && !shotKit && !beamKit && !pillarKit && !cannonKit, facing, arcEff);
 
 		// bestD answers the chosen body's distance; the empty-clearing guard below stands
 
@@ -4574,6 +4646,73 @@ public partial class PartyMember : Godot.Node2D
 
 				}
 
+		}
+
+		// Hew "Thunder Cannon" (user 2026-11-22): the blast is ONE hitscan lane at the prey - it
+		// pierces and wounds EVERY body it passes, plus a small splash around the MAIN target.
+		// The band widens with radius upgrades (AREA stat, Wider Barrel ranks, lead bonus, ult);
+		// reach never lengthens (EffRange pins the cannon). Assistant picks (retune by eye):
+		// band half-width CANNON_BAND_PX, splash CANNON_SPLASH_PX, muzzle origin (0,-20).
+		else if (cannonKit)
+		{
+			// band half-width: base x Wider Barrel ranks x the shared radius dials (x1.5 while ult runs)
+			double band = CANNON_BAND_PX * (1.0 + 0.16 * (double)barrelRank) * stat[StatTags.AREA] * LeaderAreaMul();
+			if (ultT > 0.0)
+				band *= 1.5; // Maximum Firepower!: +50% beam radius/area (the ult's AUTHORED number)
+			Vector2 e = pg.WrapDelta(p, best.GlobalPosition);
+			float segLen = e.Length();
+			if (segLen >= 0.001f)
+			{
+				Vector2 dir = e.Normalized();
+				for (int i2 = 0; i2 < enemies.Count; i2++)
+				{
+					Godot.Node2D c = enemies[i2];
+					Combatant nc = (Combatant)c;
+					if (nc == null || nc.kind == "dead")
+						continue;
+					Vector2 r = pg.WrapDelta(p, c.GlobalPosition);
+					float along = r.X * dir.X + r.Y * dir.Y;
+					if (along < 0.0f - nc.hitR || along > segLen + nc.hitR)
+						continue; // only bodies between the muzzle and the prey get punched
+					float perp = (float)System.Math.Abs(r.X * dir.Y - r.Y * dir.X);
+					if (perp > (float)band + nc.hitR)
+						continue; // the cannon band: what the blast actually sweeps
+					nc.TakeDamage(dmg * Strikes()); // MULTISTRIKE repeats the whole blast, like every verb
+
+					// Vampiric Core + Explosive Finale (Hew cards) ride the PIERCED bodies too: she drinks what
+					// her blast bites, and one of its kills detonates the ring
+					pg.MarthaVampSip(dmg * Strikes());
+					if (nc.hp <= 0.0f)
+					pg.ExplosiveFinale(c.GlobalPosition, dmg * Strikes());
+					pg.TryChainLightning(c); // Baldrun seat: the hit may loose a chain
+					if (fireDps > 0.0)
+						nc.Burn(fireDps, 5.0); // fire rune rides any kit, same 5 s window as the fan
+				}
+				for (int i2 = 0; i2 < enemies.Count; i2++)
+				{
+					Godot.Node2D c = enemies[i2];
+					Combatant nc = (Combatant)c;
+					if (nc == null || nc.kind == "dead")
+						continue;
+					Vector2 r2 = pg.WrapDelta(best.GlobalPosition, c.GlobalPosition);
+					if (r2.Length() - nc.hitR > CANNON_SPLASH_PX)
+						continue; // outside the splash ring around the MAIN target
+					nc.TakeDamage(dmg * 0.5); // the spec's small splash: half the blast on the ring bodies
+
+					// ditto on the splash ring: the half-blast is her damage as well
+					pg.MarthaVampSip(dmg * 0.5);
+					if (nc.hp <= 0.0f)
+					pg.ExplosiveFinale(c.GlobalPosition, dmg * 0.5);
+				}
+			}
+			if (_cannonFx != null)
+			{
+				Vector2 bv = e - new Vector2(0.0f, -20.0f); // muzzle origin: the flash band runs gun->prey
+				_cannonFx.Position = new Vector2(0.0f, -20.0f);
+				_cannonFx.Size = new Vector2(segLen, (float)(band * 2.0)); // full band width (Size is the box, maths used the half)
+				_cannonFx.Set("rotation", (float)System.Math.Atan2(bv.Y, bv.X));
+				_cannonFx.Visible = true;
+			}
 		}
 
 		else if (cleaver)
