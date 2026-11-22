@@ -177,10 +177,12 @@ maxHp = 80.0
 baseSpeed = 130.0
 weaponDamage = 8.0
 cooldown = 0.9
-range = 110.0
+range = 120.0
 weaponKit = "claw"
 meleeFxArt = "res://art/fx/claw.png"
-baseEvasion = 0.05
+baseEvasion = 0.1
+baseCrit = 0.05
+clawStrikes = 2
 class_ = "Beastlord"
 
 [node name="BossMini" type="Node2D" parent="." unique_id=321225898]

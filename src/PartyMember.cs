@@ -231,8 +231,8 @@ public partial class PartyMember : Godot.Node2D
 
 	// 8 claw strike slots: Athios's CLAW LINE rides its own set, so the stamps never fight _meleeFx or
 	// the crescent set for a slot (fx-feel law, Bruno's _cresFx precedent: a variable-size march never
-	// shares a slot for a frame's placement). 8 = max strikes: 2 base + 4 Primal Might ranks + 1 Beastial
-	// Rage strike, with one slot of headroom the clamp can never exceed.
+	// shares a slot for a frame's placement). 8 = headroom over the OFF/ON law ceiling: clawStrikes 2 (authored
+	// on the node) + 1 Primal Might presence + 2 Beastial Rage = 5 max, so the clamp never comes close.
 	static readonly int RAKE_SLOTS = 8;
 	Godot.Sprite2D[] _rakeFx = null;
 
@@ -406,6 +406,7 @@ public partial class PartyMember : Godot.Node2D
 	[Export] public double poisonDur = 0.0;   // seconds the poison runs; lingering venom raises it
 
 	[Export] public double baseEvasion = 0.0; // per-PC authored evasion seeded into the EVASION tag (Brook 10%)
+	[Export] public double baseCrit = 0.0;    // per-PC authored crit seeded into the CRIT_CHANCE tag (Athios claw kit: +5 on the BASE 5 seed = 10 total, user 2026-11-22 kit law)
 	[Export] public double necroDps = 0.0;   // Hapi flame: damage/sec the column stamps (authored 1.0 on the node)
 
 	[Export] public double necroDur = 0.0;   // Hapi flame: seconds the column runs (authored 5.0; Plague ranks lengthen it)
@@ -445,14 +446,15 @@ public partial class PartyMember : Godot.Node2D
 	// their attacks stuck to them. Let's just go back to the earlier concept", then "similar to Brook's daggers. Two rapid
 	// strikes initially, increasing to more with the skill rank and his ultimate, but with a short delay (I think Brook's is
 	// 0.4, so Athios can be 0.2), and each claw can retarget to hit another enemy if there is one in range"): the volley is
-	// TWO rapid strikes + one per Primal Might rank + one under Beastial Rage, the strikes ride the MEMBER (v4's frozen
+	// the NODE-AUTHORED clawStrikes (2) rapid strikes + 1 while Primal Might is ON + 2 more while Beastial Rage runs (2026-11-22
+	// OFF/ON law: "no scaling with card rank - these are just off/on switches now"), the strikes ride the MEMBER (v4's frozen
 	// clawAnchor + per-frame re-anchor lane are DELETED, so the magnet closes BY CONSTRUCTION), every beat aims FRESH at
 	// the nearest live body and RETARGETS away from the previous strike's victim when another body is in reach (clawLastId
 	// ledger), and the art always rides FULL reach like the daggers' jabLen law. v3's and v4's march knobs are gone:
 
 			static readonly double CLAW_STAGGER = 0.2;  // v5 gap between strikes (USER number: "Brook's is 0.4, so Athios can be 0.2")
 
-			static readonly double CLAW_BAND = 0.17;    // v5 strike corridor half-width as a fraction of reach (reach 110 = ~19 px: v4's bite band kept)
+			static readonly double CLAW_BAND = 0.17;    // v5 strike corridor half-width as a fraction of reach (reach 120 = ~20 px: v4's bite band kept, reach re-authored on the node 2026-11-22)
 
 			static readonly double CLAW_RAKE = 0.62;    // v5 art pivot as a fraction of reach - the daggers' jabLen number: the rake always rides maximum distance
 
@@ -556,9 +558,10 @@ public partial class PartyMember : Godot.Node2D
 	// ranks and Beastial Rage LENGTHEN the march, they never widen a fan or turn it
 	public int clawBeat = 0;       // swings landed in the current combo (0 = combo idle)
 	public double clawRoll = 0.0;  // one crit/roll SHARED across the whole combo (like twinDmg)
-	public int clawHits = 0;       // Primal Might: +1 claw swing per rank (OPT_CLAW)
+	[Export] public int clawStrikes = 2; // combo strike count AUTHORED ON THE NODE (2026-11-22 placement law: kit numbers live on Main.tscn's Athios, not in code): the march reads this instead of a hardcoded 2
+	public double hasPrimal = 0.0; // Primal Might OFF/ON PRESENCE switch (2026-11-22 law: "off/on switches now"): ON = +1 swing, +2 more while Beastial Rage runs; one flip, never per rank
 	public double bleedSlow = 0.0; // Haemorrhaging Bleed: slow strength stamped with each bleed (OPT_BLEEDSLOW)
-	public int clawSwings = 0;   // strikes THIS march runs (2 + Primal ranks, +1 raged): stamped when it opens
+	public int clawSwings = 0;   // strikes THIS march runs (clawStrikes + Primal presence + rage pair): stamped when it opens
 	public Vector2 clawAim = new Vector2(1.0f, 0.0f); // the ONE throw line the whole march keeps, frozen at the open
 		public long clawLastId = -1L; // v5 RETARGET ledger: the body the PREVIOUS strike raked (GetInstanceId is ulong, the ledger stays long like the bee ledger)
 
@@ -793,6 +796,16 @@ public partial class PartyMember : Godot.Node2D
 	Vector2 _lastMovePos = new Vector2();
 
 	float _moveSpeed = 0.0f;
+
+	// PLAYER-FACING law (user 2026-11-22 hand-play: "players should flip based on the
+	// movement of left/right"). The horde got the ALWAYS-FACE lane on 2026-11-12; the
+	// party never did because the shipped cast is painted front-on (the rig comment
+	// called that "flip-free"), so this is the party's own mirror: the mini flips on
+	// the SIGN of its ACTUAL horizontal travel - same post-fold sample as the shuffle
+	// clock, so the wrap seam can never whip the art around, and a dead zone keeps
+	// nudge-jitter or a stopped mini from strobing. 1.0 = the untouched sheet
+
+	float _face = 1.0f; // the mini's current facing sign
 
 	// real painted mini (user 2026-10-21): hangs on the rig and replaces the placeholder
 
@@ -1881,6 +1894,8 @@ public partial class PartyMember : Godot.Node2D
 
 	 stat[StatTags.EVASION] += baseEvasion;    // authored dodge lands on the store
 
+	 stat[StatTags.CRIT_CHANCE] += baseCrit;   // authored crit lands on the store (BASE seeds every PC 0.05; Athios rides +0.05 on the node = 0.10 total)
+
 	}
 
 	/** Authored weaponDamage scaled by the ATTACK_DAMAGE tag. */
@@ -2288,6 +2303,21 @@ public partial class PartyMember : Godot.Node2D
 				Vector2 gp = GlobalPosition;
 
 				float moved = gp.DistanceTo(_lastMovePos);
+
+				// PLAYER-FACING law (user 2026-11-22 hand-play: "players should flip based on
+				// the movement of left/right"): mirror the mini on the SIGN of its own
+				// horizontal travel off this SAME post-fold sample - a wrap seam shows up
+				// as a >400 px jump so it can never whip the art around, and the ~10 px/s
+				// dead zone keeps a stopped mini or a nudge-jitter from strobing the sheet
+			 float dx = gp.X - _lastMovePos.X;
+
+			 if ((float)System.Math.Abs(dx) > 10.0f * delta && (float)System.Math.Abs(dx) < 400.0f)
+
+						_face = dx < 0.0f ? -1.0f : 1.0f; // a real step this frame: face the way we went
+
+			 if (_mini != null)
+
+						_mini.Scale = new Vector2(_mini.Scale.Y * _face, _mini.Scale.Y); // the mirror rides X; Y keeps the setup scale, so the flip recomputes every frame and can never stack
 
 				_lastMovePos = gp;
 
@@ -3907,7 +3937,7 @@ public partial class PartyMember : Godot.Node2D
 			// Let's just go back to the earlier concept". The earlier concept is the DAGGER cadence, and the user pinned it:
 			// "similar to Brook's daggers. Two rapid strikes initially, increasing to more with the skill rank and his
 			// ultimate, but with a short delay (I think Brook's is 0.4, so Athios can be 0.2), and each claw can retarget
-			// to hit another enemy if there is one in range". So: strikes = 2 + clawHits (+1 under Beastial Rage, clamped
+			// to hit another enemy if there is one in range". So: strikes = clawStrikes (node) + 1 while Primal Might is ON (+2 more while Beastial Rage runs, clamped
 			// to RAKE_SLOTS); mid-march cdTimer = CLAW_STAGGER, the USER's 0.2 s gap. Every beat aims FRESH at the nearest
 			// live body, and when that nearest body is the PREVIOUS strike's victim AND another body is in reach the beat
 			// RETARGETS to the nearest body that is NOT (clawLastId ledger: GetInstanceId is ulong, the ledger stays long
@@ -3929,15 +3959,19 @@ public partial class PartyMember : Godot.Node2D
 				if (clawKit)
 				{
 
-				int strikes = 2 + clawHits; // base TWO rapid strikes (the user's claw law), +1 per Primal Might rank (OPT_CLAW)
+				int strikes = clawStrikes; // combo strikes AUTHORED ON THE NODE (user kit law: "2 attacks in the combo (same as Baldrun)")
 
-				if (rageT > 0.0)
+				if (hasPrimal > 0.0)
 
-				strikes += 1; // Beastial Rage: one more strike in the volley for the ult window
+				strikes += 1; // Primal Might ON (OFF/ON PRESENCE switch law, 2026-11-22): +1 swing, never a per-rank count
+
+				if (hasPrimal > 0.0 && rageT > 0.0)
+
+				strikes += 2; // "Primal Might should also add 2 swings while his ultimate is up" (user kit law, read at the march)
 
 				if (strikes > RAKE_SLOTS)
 
-				strikes = RAKE_SLOTS; // clamp: four Primal Might ranks + rage can never stretch the volley past the stamp set
+				strikes = RAKE_SLOTS; // clamp: OFF/ON ceiling is clawStrikes 2 + 1 Primal + 2 raged = 5, the 8-slot stamp set can never come close to overflowing
 
 				if (clawBeat >= clawSwings)
 
@@ -4141,8 +4175,16 @@ public partial class PartyMember : Godot.Node2D
 				// ALTERNATING vertical flip (user 2026-11-23: "use that for attack 1, then flip it vertically for attack 2,
 				// then back to normal for 3, etc."): strike 0 rides the art AS-IS, ODD strikes show its mirrored twin
 							// (clawBeat is 0-based, so every OTHER rake reads belly-up - a two-handed alternating claw)
-							float clawFlipY = (clawBeat % 2 == 1) ? -sm : sm;
-							_rakeFx[clawBeat].Scale = new Vector2(clawAim.X < 0.0f ? -sm : sm, clawFlipY); // X keeps the LEFT-aim mirror (Baldrun's flip idiom), Y carries the per-strike claw alternation
+							// v6 DIRECTION FIX (user 2026-11-22 hand-play: "the claw FX is facing the wrong direction...
+							// when an enemy is behind him"): v5's X mirror DOUBLE-FLIPS here - unlike the crescent/cleaver
+							// lanes that pin Rotation to a fixed pose, this rake rides Rotation = a0, so a LEFT aim already
+							// rotates the art 180 deg and an extra X mirror turns the nose BACK AWAY from the prey (net
+							// Scale(sm,-sm) = upright art aimed left reads nose-right). The mirror that keeps the nose on
+							// the aim line is the PERPENDICULAR axis: X stays positive every beat, and the LEFT-aim
+							// handedness flip rides Y, composed with the per-strike alternation below
+							float aimMirror = (clawAim.X < 0.0f) ? -sm : sm; // LEFT-aim mirror now on Y (the old X idiom is void under Rotation=a0)
+							float clawFlipY = (clawBeat % 2 == 1) ? -aimMirror : aimMirror; // strike 0 rides the art AS-IS, ODD strikes show its mirrored twin
+							_rakeFx[clawBeat].Scale = new Vector2(sm, clawFlipY);
 
 				_rakeFx[clawBeat].Modulate = new Color(1.0f, 1.0f, 1.0f, SWEEP_ART_ALPHA);
 

@@ -249,12 +249,12 @@ public partial class Game : Godot.Node2D
 		"Lucky Stabs (+5% Crit Chance)", "Sneak Attack (+5% Multistrike Chance)",
 											   "Fire Rune (+1 Burn Damage/sec for 5s)", "Harder Thrusts (+15% Crit Damage)",
 											   "Eagle Eye (+5% Crit Chance)", "Difficult Terrain (10% Slow for 2.5s)",
-											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)", "Overflowing Necrosis (+12% Damage)", "Swift Curse (+16% Attack Speed)", "Multi-Flame (+1 Pillar Target)", "Necrotic Plague (Flame DoT passes on touch)", "Greater Pestilence (+15% Pillar Radius)" , "Sharper Claws (+12% Damage, +12% Crit)", "Savage Attacks (+16% Attack Speed)", "Primal Might (+1 Claw Attack)", "Haemorrhaging Bleed (Bleed also slows 10%/rank)", "Longer Claws (+15% Range)" };
+											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)", "Overflowing Necrosis (+12% Damage)", "Swift Curse (+16% Attack Speed)", "Multi-Flame (+1 Pillar Target)", "Necrotic Plague (Flame DoT passes on touch)", "Greater Pestilence (+15% Pillar Radius)" , "Sharper Claws (+20% Damage, +20% Crit)", "Savage Attacks (+20% Attack Speed)", "Primal Might (+1 Claw Swing, +2 while Ultimate is up)", "Haemorrhaging Bleed (Bleed slows 10%)", "Longest Claws (+25% Range)" }; // 2026-11-22 claw-kit law: cards are OFF/ON switches with the USER's numbers (hand-play spec quoted verbatim), and "Longest Claws" is the card's name (user renamed it from "Longer Claws")
 	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 0, 1, 2, 3, 4, 9, 9, 9, 9, 9 , 10, 10, 10, 10, 10 , 11, 11, 11, 11, 11 };
-	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f };
-	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.15f };
+	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.833f, 1.0f, 1.0f, 1.0f }; // row 56 Savage Attacks: cd x0.833 = +20% attack speed (user number)
+	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.25f }; // row 59 Longest Claws: +25% range (user number)
 	// user 2026-11-01 audit fix: Stack rows 20/21 were swapped - keener flame carried no bonus at all and quicker fuse carried the damage. damage 1.10 rides row 20, cooldown 0.85 rides row 21.
-	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f };
+	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.20f, 1.0f, 1.0f, 1.0f, 1.0f }; // row 55 Sharper Claws: +20% damage (user number, switch not rank)
 	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // rows 4 + 8: Mosiah deeper thrust / Asper piercing shot (user 2026-10-30)
 	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
 	// guiding light (Alvora): the ring MARKS caught bodies for +10%/rank incoming damage
@@ -270,7 +270,7 @@ public partial class Game : Godot.Node2D
 	// drag <= 0.75 at rank 3, crit <= 0.05 + 3 x 0.08 = 0.29.
 	// OPT_SLOW = drag strength/rank (Baldrun row 18); OPT_CRIT = crit points/rank (Mosiah row 19).
 	static readonly double[] OPT_SLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0.12, 0, 0, 0, 0 };
+	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0.2, 0, 0, 0, 0 }; // row 55 Sharper Claws: +20 CRIT_CHANCE points on the store (switch, one flip only)
 	// firebolt kit cards (Stack, user 2026-10-30): OPT_BURN = +2 s of linger per rank onto
 	// PartyMember.burnDur; OPT_CINDER = cinder bloom rank: a body that dies STILL burning bursts
 	// in CINDER_R px, scorching the live horde bodies in the blast for 25/50/75% of the firebolt's
@@ -338,14 +338,17 @@ public partial class Game : Godot.Node2D
 	static readonly int[] OPT_PILLAR = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 , 0, 0, 0, 0, 0 };
 	static readonly int[] OPT_PLAGUE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 , 0, 0, 0, 0, 0 };
 	static readonly int[] OPT_PEST = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 , 0, 0, 0, 0, 0 };
-	// Athios claw kit cards (user 2026-11-19): rows 55-59, tables now 60-wide. Sharper Claws rides the
-	// shared OPT_DMG (1.12) + OPT_CRIT (0.12) lanes, Savage Attacks the shared OPT_CD 0.86 cadence, Longer
-	// Claws the shared OPT_RANGE 1.15 area lane (assistant pick: +15% reach, matching Longer Reach). These
-	// two columns are NEW: OPT_CLAW = Primal Might one more claw swing per rank (the claw kit's two-beat
-	// stagger reads 2 + clawHits swings); OPT_BLEEDSLOW = Haemorrhaging Bleed slow strength/rank spent via
-	// Combatant.Slowed beside the Bleed stamp on every claw hit.
+	// Athios claw kit cards (user 2026-11-19; OFF/ON law 2026-11-22: "no scaling with card rank - these
+	// are just off/on switches now", spec verbatim "Sharper Claws: +20% damage, +20% crit. Savage Attacks:
+	// +20% attack speed. Primal Might: +1 claw attack. Haemorrhaging Bleed: Bleed slows 10%. Longest Claws:
+	// +25% range. Primal Might should also add 2 swings while his ultimate is up"). Rows 55-59 of the 60-wide
+	// tables ride SHARED lanes with the user's numbers: Sharper Claws OPT_DMG 1.20 + OPT_CRIT 0.2, Savage
+	// Attacks OPT_CD 0.833 (cd x0.833 = +20% speed), Longest Claws OPT_RANGE 1.25 (user renamed the card).
+	// Two columns are NEW: OPT_CLAW = Primal Might PRESENCE switch (ON = +1 swing, +2 more while Beastial
+	// Rage runs, read at the march); OPT_BLEEDSLOW = one 10% slow stamped beside the Bleed via Combatant.Slowed.
+	// OPT_MEMBER 11 gates the rows to Athios; the picker + ApplyUpgrade guards flip each card exactly once.
 	static readonly int[] OPT_CLAW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 };
-	static readonly double[] OPT_BLEEDSLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0, 0 };
+	static readonly double[] OPT_BLEEDSLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0 }; // 10%/rank, matching the card text (user 2026-11-22 hand-play: the old 1.0 was a decimal-point typo - rank 1 parked bodies (speed * (1-1)) outright and rank 2 flipped them to NEGATIVE speed, fleeing at full run; the Slowed lane itself is fine, Keeko's freeze was a red herring)
 
 
 	int[] _pickRank = new int[OPT_LABEL.Length];
@@ -453,6 +456,13 @@ public partial class Game : Godot.Node2D
 		Label _selHint = null;            // key-grammar reminder on the card
 		Control[] _selTile = new Control[0];
 		Label[] _selName = new Label[0];
+		// PER-SEAT scaled-card bookkeeping (2026-11-22 hand-play fix): a scaled seat's tile is its
+		// OWN art box, smaller than the slot, so the solid gold _selFrame behind it filled the whole
+		// slot as a big gold plate and the name plate (rides the tile) sat ON the art. The ring now
+		// hugs the seat's own box (half-extents in px kept here) and the plate parks in the gold
+		// band below it; shipped seats keep the slot-frame draw byte-for-byte
+		bool[] _selScaled = new bool[0];
+		float[] _selBoxHalf = new float[0]; // pairs: half-width, half-height of the seat's art box (px)
 		Control _selParty = null;         // party box copy: always up (party-wide meta track)
 		Control _selSheet = null;         // dark plate behind the sheet (box border)
 		Control _selPartyBack = null;     // dark plate behind the party box
@@ -5474,6 +5484,9 @@ private void UpdateSpirits(float delta)
 		// human-test UX: show WHERE a pick lands in the 3-rank track, so a player
 		// reading the card knows one more rank is all the track has before M2's
 		// evolution
+		// claw switch cards ride "(ON)": they flip once and the label IS the whole effect
+		if (OPT_MEMBER[i] == 11)
+			return m.displayName + " " + m.weaponName + ": " + OPT_LABEL[i] + " (ON)";
 		return m.displayName + " " + m.weaponName + ": " + OPT_LABEL[i] +
 			   " (" + (_pickRank[i] + 1) + "/" + PICK_RANK_CAP + ")";
 	}
@@ -5629,6 +5642,7 @@ private void UpdateSpirits(float delta)
 		// The stage mini has its OWN knob (PartyMember.miniScale): 235 px * 0.38 = 89 px, the same
 		// on-stage size the class gets at 0.75. Keep the two lanes' numbers separate on purpose.
 		static readonly float[] SEL_ART_SCALE = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.5f }; // seat 11 Athios: the 175x235 ~2x sheet rides 0.5 for the ~118 px class read (assistant pick, retune by eye)
+		static readonly float SEL_RING_PAD = 6.0f; // scaled-seat gold ring: px of gold around the seat's OWN art box (2026-11-22 hand-play fix: the slot-wide ring turned a small scaled card into a big gold plate)
 		static readonly string[] SEL_BONUS = {
 		"Leader Bonus: Chain Lightning - All attacks have a 5% chance to unleash lightning on 5 targets for 10 damage.",
 		"Leader Bonus: Pierce - All attacks gain +1 Pierce and all allies gain +5% Evasion.",
@@ -5677,6 +5691,10 @@ private void UpdateSpirits(float delta)
 		int n = _party.Count;
 		_selTile = new Control[n];
 		_selName = new Label[n];
+		_selScaled = new bool[n];      // ring + plate ride the seat's OWN box (see field comment)
+		_selBoxHalf = new float[n * 2]; // pairs: half-width, half-height of that box (px)
+		// one slot per seat (rows of three): tile + name plate. A scaled seat parks its OWN
+		// art box at the slot centre and records its half-extents for the gold ring (ShowSelPage)
 		int ti = 0;
 		foreach (PartyMember pm2 in _party)
 		{
@@ -5724,6 +5742,12 @@ private void UpdateSpirits(float delta)
 						tr.Set("offset_right", (float)tex.GetWidth() * artScale * 0.5f);
 						tr.Set("offset_top", -(float)tex.GetHeight() * artScale * 0.5f);
 						tr.Set("offset_bottom", (float)tex.GetHeight() * artScale * 0.5f);
+						// record the box for the ring + plate lane: a scaled seat's gold must hug its
+						// OWN art box, not the slot, or the small card floats in a big gold plate
+						// (user 2026-11-22 hand-play: Athios read as "a big gold rectangle")
+						_selScaled[ti] = true;
+						_selBoxHalf[ti * 2] = (float)tex.GetWidth() * artScale * 0.5f;     // half-width (px)
+						_selBoxHalf[ti * 2 + 1] = (float)tex.GetHeight() * artScale * 0.5f; // half-height (px)
 						// MIPMAP_LINEAR (2): a ~half-size NEAREST draw keeps only every 2nd source pixel
 						// and craters thin features; the shipped cast never needed mips because it is 1:1
 						// on the slot, this one does
@@ -5741,7 +5765,25 @@ private void UpdateSpirits(float delta)
 						SEL_GRID[ti * 4 + 2], SEL_GRID[ti * 4 + 3]);
 				}
 				_selName[ti] = new Label();
-				SetRectSel(_selName[ti], 0.02f, 0.85f, 0.98f, 0.99f); // 2026-11-14 hand-play: the plates sat ON the painted minis - dropped to the slot floor (assistant pick, retune by eye)
+				if (_selScaled[ti])
+				{
+					// scaled seat: plate parks just UNDER the art - anchors at the slot's OWN centre
+					// (same fractions the art box rode) then px offsets, so it rides the seat's box
+					float plateCx = (SEL_GRID[ti * 4] + SEL_GRID[ti * 4 + 2]) * 0.5f;
+					float plateCy = (SEL_GRID[ti * 4 + 1] + SEL_GRID[ti * 4 + 3]) * 0.5f;
+					_selName[ti].SetAnchor(Godot.Side.Left, plateCx);
+					_selName[ti].SetAnchor(Godot.Side.Right, plateCx);
+					_selName[ti].SetAnchor(Godot.Side.Top, plateCy);
+					_selName[ti].SetAnchor(Godot.Side.Bottom, plateCy);
+					_selName[ti].Set("offset_left", _selBoxHalf[ti * 2] - 10.0f);      // plate a touch narrower than the art, centred
+					_selName[ti].Set("offset_right", -(_selBoxHalf[ti * 2] - 10.0f));
+					_selName[ti].Set("offset_top", _selBoxHalf[ti * 2 + 1] + 2.0f);    // starts 2 px under the art's feet...
+					_selName[ti].Set("offset_bottom", _selBoxHalf[ti * 2 + 1] + 24.0f); // ...22 px plate: stays inside the slot
+				}
+				else
+					// SHIPPED seats: byte-for-byte unchanged from the 2026-11-14 hand-play lane.
+					// 2026-11-14 hand-play: the plates sat ON the painted minis - dropped to the slot floor (assistant pick, retune by eye)
+					SetRectSel(_selName[ti], 0.02f, 0.85f, 0.98f, 0.99f);
 				_selName[ti].Text = pm2.displayName + (SEL_LOCKED[ti] ? " (locked)" : "");
 				_selName[ti].Set("horizontal_alignment", 1); // CENTER (string key: binding-safe)
 				_selTile[ti].AddChild(_selName[ti]);
@@ -5827,9 +5869,27 @@ private void UpdateSpirits(float delta)
 			_selFrame.Visible = false; // nothing selected yet: the ring stays away
 			return;
 		}
-		// the ring rides the selected slot: grown +/- 0.02 so its edge frames the tile
-		SetRectSel(_selFrame, SEL_GRID[_selBrowse * 4] - 0.02f, SEL_GRID[_selBrowse * 4 + 1] - 0.02f,
-				SEL_GRID[_selBrowse * 4 + 2] + 0.02f, SEL_GRID[_selBrowse * 4 + 3] + 0.02f);
+		if (_selScaled[_selBrowse])
+		{
+			// scaled seat: gold hugs the seat's OWN art box (pad of SEL_RING_PAD px each side),
+			// not the slot rect - else a half-size card floats in a big gold plate (2026-11-22 hand-play)
+			// px offsets around the slot's centre anchor, same fractions the art box rode
+			float rcx = (SEL_GRID[_selBrowse * 4] + SEL_GRID[_selBrowse * 4 + 2]) * 0.5f;
+			float rcy = (SEL_GRID[_selBrowse * 4 + 1] + SEL_GRID[_selBrowse * 4 + 3]) * 0.5f;
+			_selFrame.SetAnchor(Godot.Side.Left, rcx);
+			_selFrame.SetAnchor(Godot.Side.Right, rcx);
+			_selFrame.SetAnchor(Godot.Side.Top, rcy);
+			_selFrame.SetAnchor(Godot.Side.Bottom, rcy);
+			_selFrame.Set("offset_left", -(_selBoxHalf[_selBrowse * 2] + SEL_RING_PAD));
+			_selFrame.Set("offset_right", _selBoxHalf[_selBrowse * 2] + SEL_RING_PAD);
+			_selFrame.Set("offset_top", -(_selBoxHalf[_selBrowse * 2 + 1] + SEL_RING_PAD));
+			_selFrame.Set("offset_bottom", _selBoxHalf[_selBrowse * 2 + 1] + SEL_RING_PAD + 24.0f); // band dips 24 px to cover the parked name plate too
+		}
+		else
+			// SHIPPED seats: byte-for-byte unchanged (2026-11-14 lane).
+			// the ring rides the selected slot: grown +/- 0.02 so its edge frames the tile
+			SetRectSel(_selFrame, SEL_GRID[_selBrowse * 4] - 0.02f, SEL_GRID[_selBrowse * 4 + 1] - 0.02f,
+					SEL_GRID[_selBrowse * 4 + 2] + 0.02f, SEL_GRID[_selBrowse * 4 + 3] + 0.02f);
 		_selFrame.Visible = true;
 	}
 	// the sheet for the SELECTED slot: name, then the mockup's Base Stats rows (live
@@ -6504,7 +6564,12 @@ private void UpdateSpirits(float delta)
 			// unlocked yet - recruiting IS the weapon unlock, user rule); pass-11 human
 			// QOL: bodies OUT until the next campfire stop leaking too, so level-ups
 			// feed the members that can still save the run
-			open[o] = _pickRank[o] < PICK_RANK_CAP && MemberInPlay(OPT_MEMBER[o]);
+			// CLAW CARDS (Athios rows 55-59, OPT_MEMBER 11) are OFF/ON switches (user 2026-11-22:
+			// "no scaling with card rank - these are just off/on switches now"): once ON they are
+			// never offered again, so a switched kit never pays a second multiply. Normal tracks
+			// keep the 3-rank rule.
+			open[o] = MemberInPlay(OPT_MEMBER[o]) &&
+				(OPT_MEMBER[o] == 11 ? _pickRank[o] == 0 : _pickRank[o] < PICK_RANK_CAP);
 			if (open[o])
 				openCount++;
 		}
@@ -6564,8 +6629,9 @@ private void UpdateSpirits(float delta)
 		for (int k = 0; k < n; k++)
 		{
 			int o = ((seed + k) % n + n) % n;
-			if (_pickRank[o] < PICK_RANK_CAP && OPT_MEMBER[o] < _party.Count
-				&& MemberInPlay(OPT_MEMBER[o]))
+			// claw switches stay out of the seed walk once ON (same law as the open[] filter)
+			if ((OPT_MEMBER[o] == 11 ? _pickRank[o] == 0 : _pickRank[o] < PICK_RANK_CAP)
+				&& OPT_MEMBER[o] < _party.Count && MemberInPlay(OPT_MEMBER[o]))
 				return o;
 		}
 		for (int i = 0; i < n; i++)
@@ -6604,6 +6670,14 @@ private void UpdateSpirits(float delta)
 					 " (evolution is M2)");
 			return;
 		}
+		// claw switches: already ON? the pick is a no-op, never a second multiply (the picker
+		// filters ON rows, so this only guards forced/legacy offers; the rank counter stays 1)
+		if (OPT_MEMBER[option] == 11 && _pickRank[option] >= 1)
+		{
+			GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +
+					 " already ON - claw switches never re-flip");
+			return;
+		}
 		_pickRank[option]++;
 		m.stat[StatTags.ATTACK_DAMAGE] *= OPT_DMG[option];
 		m.stat[StatTags.ATTACK_SPEED] /= OPT_CD[option]; // cd x0.86 == speed /0.86; no-op when 1.0
@@ -6630,8 +6704,8 @@ private void UpdateSpirits(float delta)
 		{ m.pillarTargets += OPT_PILLAR[option]; } // Multi-Flame (Hapi row 52): one more pillar drop per rank (cap 4 = base + 3 ranks)
 		{ m.plagueR += OPT_PLAGUE[option]; } // Necrotic Plague (Hapi row 53): each flame tick rolls 10/20/30% to cough the curse onto a nearby body, and the applier's own stamp runs +2 s/rank longer
 		{ m.pillarR += OPT_PEST[option]; } // Greater Pestilence (Hapi row 54): column radius x1.15/rank, PILLAR_R x (1 + 0.15 x rank) at the commit
-		{ m.clawHits += OPT_CLAW[option]; } // Primal Might (Athios row 57): one more claw swing per rank - the two-beat stagger becomes 2 + clawHits swings
-		{ m.bleedSlow += OPT_BLEEDSLOW[option]; } // Haemorrhaging Bleed (Athios row 58): slow strength per rank spent beside the Bleed stamp via Combatant.Slowed
+		{ m.hasPrimal += OPT_CLAW[option]; } // Primal Might (Athios row 57) is a PRESENCE switch (2026-11-22 claw-kit law): ON = +1 swing (+2 more while Beastial Rage runs, read at the march); OFF = none. The guard above keeps it at exactly one flip, so this never exceeds 1
+		{ m.bleedSlow += OPT_BLEEDSLOW[option]; } // Haemorrhaging Bleed (Athios row 58) is an OFF/ON switch now: one flip = one 10% slow stamped beside the Bleed (the ON guard ran before the tables)
 		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
 						 OPT_LABEL[option] + " x" + _pickRank[option];
 		GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +
@@ -7141,6 +7215,9 @@ private void UpdateSpirits(float delta)
 	// comma-separated segment, then stamp "(rank/cap)" so the cap is visible on the card.
 	private string CondensePick(string label, int o, int rank)
 	{
+			// claw switches: no rank math to compound - the label IS the whole effect, "(ON)" is the state
+			if (OPT_MEMBER[o] == 11)
+				return label + " (ON)";
 			int open = label.IndexOf("(");
 			int close = label.LastIndexOf(")");
 			if (open < 0 || close <= open)
