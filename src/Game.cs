@@ -808,6 +808,15 @@ public partial class Game : Godot.Node2D
 		const double PILLAR_LIFE = 0.5;    // pick: a column reads for half a second then fades
 		public const double PILLAR_R = 28.0; // BASE column radius: PartyMember commits PILLAR_R x (1 + 0.15 x Pest rank)
 		public Godot.Texture2D pillarFxTex = null; // Hapi column art: wired ONCE by the member's _EnterTree gate; null = silent skip
+		// FX-lap (user 2026-11-23, approved as designed): Hew's Upgrades! parts drop a VISIBLE tumbling
+		// cog at the kill site; the numbers are assistant picks, retune by eye.
+		const int COG_POOL = 12;        // part drops are rare (5% a kill): 12 live cogs is generous headroom
+		const double COG_LIFE = 0.8;    // a cog reads ~0.8 s: tumble, drop a little, then fade
+		const double COG_DROP = 10.0;   // px a cog falls over its life (the approved '~10 px' drop)
+		const int MARTHA_SPARK_POOL = 6; // repair crackle slots: never more than six live streaks on the iron
+		const double MARTHA_SPARK_LIFE = 0.25; // a spark reads this long then snaps out (assistant pick)
+		const double MARTHA_SPARK_EVERY = 0.3; // crackle cadence across the whole 20 s broken window (assistant pick)
+		public Godot.Texture2D cogFxTex = null; // Hew gear art: wired ONCE by the member's _EnterTree gate (pillarFxTex idiom); null = ember square falls back
 		Godot.Collections.Array<Godot.Node2D> _undead = new();   // shells: child0 = fallback rect, child1 = art slot
 		Godot.Collections.Array<double> _undHp = new();     // REAL hp: the horde can fell them
 		Godot.Collections.Array<double> _undLife = new();   // seconds left after THEIR OWN rise
@@ -860,6 +869,18 @@ public partial class Game : Godot.Node2D
 		double _marthaSpd = 1.0;          // ditto: bite-speed multiplier
 		double _marthaRad = 1.0;          // ditto: reach multiplier (her bite's touch band)
 		double _marthaArm = 0.0;          // ditto: flat armour points on top of her 3
+		Godot.Sprite2D _biteFx = null;       // FX-lap: her chomp stamp, ONE slot, child of the body (built art-null-safe at the first commit)
+		double _marthaFxT = 0.0;            // FX-lap: bite-stamp life clock (0 = stamp off)
+		Godot.Collections.Array<Godot.Node2D> _sparkN = new();    // FX-lap: repair crackle slots (children of her body; lazy-built on the first upkeep tick)
+		Godot.Collections.Array<Godot.Sprite2D> _sparkS = new();  // the static art slot per crackle
+		Godot.Collections.Array<Godot.ColorRect> _sparkR = new(); // the electric-blue streak fallback per crackle
+		Godot.Collections.Array<double> _sparkLife = new();       // seconds left per crackle
+		double _marthaSparkDelay = 0.0;     // FX-lap: crackle cadence while broken (0 = loose the next one)
+		Godot.Collections.Array<Godot.Node2D> _cogN = new();      // FX-lap: Hew's part-drop cogs (pooled world slots, like cinders and bolts)
+		Godot.Collections.Array<Godot.Sprite2D> _cogS = new();    // the gear art slot per cog
+		Godot.Collections.Array<Godot.ColorRect> _cogR = new();   // the ember-square fallback per cog (paints only while the rail is absent)
+		Godot.Collections.Array<double> _cogLife = new();         // seconds left per cog
+		Godot.Collections.Array<double> _cogSpin = new();         // tumble rad/s per slot (alternates: two drops never read the same way)
 		double _marthaHpBonus = 0.0;      // ditto: flat hp points on top of her 40
 		double _marthaVamp = 0.0;         // Vampiric Core (Hew card): hp she has drunk this run, clamped to her own ceiling
 		const double EXPLO_BLAST = 60.0; // assistant pick (retunable): px ring an Explosive Finale kill detonates into
@@ -1287,7 +1308,7 @@ public partial class Game : Godot.Node2D
 				break; // exactly one awakening owner per kill
 			}
 		}
-		UpgradePartDrop(); // Hew's Upgrades! lane: a 5% part on this kill, before the body leaves the registry
+		UpgradePartDrop(c.GlobalPosition); // Hew's Upgrades! lane: a 5% part ON this kill — the site rides in so the approved FX can drop a cog where it landed
 		SpawnGem(c.GlobalPosition, ((Enemy)c).xpValue);
 		MaybeDropPickup(c); // rare kill drop, before the body leaves the registry
 		c.kind = "dead"; // drop the registry entry in the kill scan
@@ -2786,6 +2807,28 @@ public void RegisterEnemy(Combatant e)
 			_boltLife.Add(0.0);
 			_boltDelay.Add(0.0);
 		}
+		// Hew gear/cog pool (FX-lap law): part drops tumble a cog AT the kill site, spin + fall + fade
+		// in UpdateCogFx. Pooled exactly like the bolts and cinders above; art-null-safe via cogFxTex.
+		for (int i = 0; i < COG_POOL; i++)
+		{
+			Godot.Node2D gn = new Godot.Node2D();
+			Godot.Sprite2D gs = new Godot.Sprite2D();
+			gs.Set("texture_filter", 0); // NEAREST like every other pool sprite
+			gs.Scale = new Vector2(0.5f, 0.5f); // assistant pick (retune by eye): a dropped cog reads small
+			gn.AddChild(gs);
+			Godot.ColorRect gr = new Godot.ColorRect();
+			gr.Size = new Vector2(7.0f, 7.0f); // cog-sized ember square (the art-absent fallback)
+			gr.Position = new Vector2(-3.5f, -3.5f); // centred under the node (Control origin = corner)
+			gr.Color = new Color(0.85f, 0.6f, 0.25f, 1.0f); // brass: a cog is hardware, not ember-orange
+			gn.AddChild(gr);
+			gn.GlobalPosition = new Vector2(-9000.0f, -9000.0f); // free-slot sentinel (same as every pool)
+			AddChild(gn);
+			_cogN.Add(gn);
+			_cogS.Add(gs);
+			_cogR.Add(gr);
+			_cogLife.Add(0.0);
+			_cogSpin.Add(i % 2 == 0 ? 5.0 : -5.0); // rad/s tumble, alternating direction (assistant pick)
+		}
 		// Yu's familiars: pooled like the bolts and the gems, so a rank-3 multiattack ritual
 
 		// never allocates a node mid-horde. Shell-first so the creature reads as a body; the
@@ -3697,6 +3740,8 @@ public void RegisterEnemy(Combatant e)
 		UpdateSummons(delta); // Yu's familiars: run at prey, detonate on contact OR on the fuse
 		UpdateCinderFx(delta); // cinder blooms: the pops the last CinderBurst loosed, grow + fade
 		UpdateChainFx(delta); // fx-feel9: chain bolts reveal + fade (Baldrun leader-bonus streaks)
+		UpdateCogFx(delta); // FX-lap: Hew's part cogs tumble, fall and fade at the drop site
+		UpdateMarthaFx(delta); // FX-lap: Martha's bite stamp decays and her broken iron crackles on its own cadence
 		UpdatePuffs(delta); // grit on foot plants: the map finally reads the horde as walking (user 2026-11-09)
 
 		UpdateHelpers(delta); // leader-bonus lane (user 2026-10-25): Alvora regen, Asper insects, Yu spirits
@@ -4740,7 +4785,7 @@ public void RegisterEnemy(Combatant e)
 			if (_marthaBody.GetChildCount() > 0)
 			{
 				// dim tint: a hand-play can SEE why she is out, and the tint fades back as she knits
-				((Godot.Sprite2D)_marthaBody.GetChild(0)).Modulate = new Color(0.5f, 0.5f, 0.6f, 0.45f + 0.55f * (float)(1.0 - _marthaT / MARTHA_BREAK));
+				((Godot.Sprite2D)_marthaBody.GetChild(0)).Modulate = new Color(0.5f, 0.5f, 0.6f, (0.45f + 0.55f * (float)(1.0 - _marthaT / MARTHA_BREAK)) * (0.92f + 0.08f * (float)System.Math.Abs(System.Math.Sin(_marthaT * 9.0)))); // FX-lap: the tint BREATHES while she knits - a dim static pulse on the flicker beat
 			}
 			if (_marthaT <= 0.0)
 			{
@@ -4805,6 +4850,23 @@ public void RegisterEnemy(Combatant e)
 					MarthaVampSip(dealt); // Vampiric Core (Hew card): she drinks what she bites
 					if (pc.hp <= 0.0f || pc.kind == "dead")
 						ExplosiveFinale(pn.GlobalPosition, dealt); // Explosive Finale: HER kill detonates the ring
+					// FX-lap chomp stamp: ONE Sprite2D child of her body, posed toward the prey she just
+					// bit (the bite's OWN wrap delta off is already in hand - body-anchored like the claw v5,
+					// so the fold never drags the stamp). Null art = blank sprite draws nothing: the damage
+					// and the pilot read survive the greybox exactly like every other FX lane.
+					if (_biteFx == null)
+					{
+						_biteFx = new Godot.Sprite2D();
+						_biteFx.Texture = GD.Load("res://art/fx/martha_bite.png") as Godot.Texture2D; // rail art lands this lap; absent = invisible stamp
+						_biteFx.Set("texture_filter", 0); // NEAREST like every other pool sprite
+						_biteFx.Set("z_index", 4); // over her body (2): the chomp reads ON the prey, not behind the iron
+						_marthaBody.AddChild(_biteFx); // rides her fold-follow for free: a body child
+					}
+					_biteFx.Position = off; // body->prey local seat: the same delta the touch test used
+					_biteFx.Set("rotation", (float)System.Math.Atan2(off.Y, off.X)); // chomp aimed down the bite line
+					_biteFx.Scale = new Vector2(0.6f, 0.6f); // assistant pick (retune by eye): fangs read at prey scale
+					_biteFx.Visible = true;
+					_marthaFxT = 0.18; // the stamp's own ~0.18 s life: UpdateMarthaFx drops it off-beat
 				}
 			}
 		}
@@ -4895,7 +4957,7 @@ public void RegisterEnemy(Combatant e)
 //T// pick - the user left stacking open and a flat 5% read as a snowball). Bosses never feed the lane:
 //T// OnEnemyKilled returns before this call for them. Downed bodies DO take parts (they are still on
 //T// the field); eliminated ones do not, and every character reads the SAME run-wide tally.
-	private void UpgradePartDrop()
+	private void UpgradePartDrop(Vector2 at) // FX-lap: the kill site rides in so the part can DROP visibly
 	{
 		if (LeaderBonusKey() != 13)
 			return; // the seat is not Hew's: the bonus is inert under every other leader
@@ -4919,6 +4981,7 @@ public void RegisterEnemy(Combatant e)
 		string[] tag = { "damage", "attack speed", "radius", "armour", "hp" }; // pilot read only
 		if (_pilot)
 			GD.Print("[10thAge] (upgrades) part: " + tag[kind] + " x" + tally + " (dim " + (float)damp + ")");
+		DropCogFx(at); // FX-lap: the part the roll granted, DROPS visibly - a cog tumbles where the kill fell
 		foreach (PartyMember m in _party)
 		{
 			if (m.eliminated)
@@ -4954,6 +5017,134 @@ public void RegisterEnemy(Combatant e)
 			_marthaHpBonus += 5.0 * damp;
 			if (_marthaHp > 0.0)
 				_marthaHp += 5.0 * damp; // a standing Martha gets the weld right now
+		}
+	}
+	// FX-lap (user 2026-11-23, approved as designed): Hew's part drops tumble visible cogs; Martha's
+	// broken iron crackles. Both ride the cinder/bolt pool pattern: fixed slots, life clocks in the
+	// Update pass, world-parked when idle. Numbers are assistant picks, retune by eye.
+	private void DropCogFx(Vector2 at)
+	{
+		// first free slot looses a cog AT the drop site; art when the rail wired one, ember square when
+		// not - the greybox never depends on the art (same contract as the bolt paint above).
+		for (int i = 0; i < _cogLife.Count; i++)
+		{
+			if (_cogLife[i] > 0.0)
+				continue; // live cogs keep their own frames
+			_cogLife[i] = COG_LIFE;
+			Godot.Node2D gn = _cogN[i];
+			gn.GlobalPosition = at;
+			gn.Position = new Vector2(0.0f, 0.0f); // the fall below drives Position: clear any banked offset
+			_cogS[i].Texture = cogFxTex; // null art: the sprite draws nothing, the square below takes the paint
+			_cogS[i].Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
+			_cogR[i].Modulate = new Color(1.0f, 1.0f, 1.0f, cogFxTex == null ? 1.0f : 0.0f); // fallback paints only while the rail is absent
+			_cogS[i].Visible = true;
+			_cogR[i].Visible = true;
+			break; // ONE cog per part: the part count and the cog count stay equal
+		}
+	}
+	private void UpdateCogFx(float delta)
+	{
+		// cogs tumble (rotation on the slot node), fall COG_DROP px over their life, and fade in the
+		// last half: the world clock like every pool above (soft-pause discipline, no real-time leak).
+		for (int i = 0; i < _cogLife.Count; i++)
+		{
+			if (_cogLife[i] <= 0.0)
+				continue; // idle slot: hidden and parked already
+			_cogLife[i] -= delta;
+			Godot.Node2D gn = _cogN[i];
+			if (_cogLife[i] <= 0.0)
+			{
+				_cogLife[i] = 0.0;
+				_cogS[i].Visible = false;
+				_cogR[i].Visible = false;
+				gn.GlobalPosition = new Vector2(-9000.0f, -9000.0f); // free-slot sentinel like every pool
+				continue;
+			}
+			gn.Set("rotation", (float)(gn.GetRotation() + _cogSpin[i] * delta)); // tumble on the slot node so art AND fallback read it
+			gn.Position = new Vector2(gn.Position.X, gn.Position.Y + (float)(COG_DROP * delta / COG_LIFE)); // the approved fall: ~10 px over the life
+			float a = _cogLife[i] > COG_LIFE * 0.5 ? 1.0f : (float)(_cogLife[i] / (COG_LIFE * 0.5)); // fade only in the back half: the drop stays crisp
+			_cogS[i].Modulate = new Color(1.0f, 1.0f, 1.0f, a);
+			if (cogFxTex == null)
+				_cogR[i].Modulate = new Color(1.0f, 1.0f, 1.0f, a); // the square follows the same fade beat
+		}
+	}
+	private void UpdateMarthaFx(float delta)
+	{
+		// Martha's stamp clocks: the bite chomp decays on its own ~0.18 s, and the broken iron looses
+		// an electric crackle every MARTHA_SPARK_EVERY across the WHOLE 20 s window (the approved
+		// "looseled ~0.25 s across the window" read). Stamps ride HER BODY as children, so the fold-follow
+		// is free and the pool is lazy: BuildMartha can art-less return early, so the first upkeep tick
+		// past the seat builds the crackle slots.
+		if (_marthaBody == null)
+			return; // off-field: nothing to tick, same read as every lane above
+		if (_sparkN.Count == 0)
+		{
+			for (int i = 0; i < MARTHA_SPARK_POOL; i++)
+			{
+				Godot.Node2D sn = new Godot.Node2D();
+				Godot.Sprite2D ss = new Godot.Sprite2D();
+				ss.Texture = GD.Load("res://art/fx/static_martha.png") as Godot.Texture2D; // rail art lands this lap; absent = invisible, the streak paints instead
+				ss.Set("texture_filter", 0); // NEAREST like every other pool sprite
+				ss.Set("z_index", 5); // crackle over her body (2) and her chomp (4)
+				sn.AddChild(ss);
+				Godot.ColorRect sr = new Godot.ColorRect();
+				sr.Size = new Vector2(9.0f, 4.0f); // short electric streak: the bolt lane's shape, Martha-sized
+				sr.Position = new Vector2(-4.5f, -2.0f); // centred under the node (Control origin = corner)
+				sr.Color = new Color(0.45f, 0.7f, 1.0f, 1.0f); // electric blue: same read as the chain bolts
+				sn.AddChild(sr);
+				sn.Visible = false;
+				_marthaBody.AddChild(sn); // body child: rides her fold-follow for free
+				_sparkN.Add(sn);
+				_sparkS.Add(ss);
+				_sparkR.Add(sr);
+				_sparkLife.Add(0.0);
+			}
+			_marthaSparkDelay = 0.0;
+		}
+		if (_marthaFxT > 0.0)
+		{
+			_marthaFxT -= delta;
+			if (_marthaFxT <= 0.0)
+			{
+				_marthaFxT = 0.0;
+				if (_biteFx != null)
+					_biteFx.Visible = false; // the chomp drops off-beat, ~0.18 s after the commit
+			}
+		}
+		_marthaSparkDelay -= delta;
+		if (_marthaT > 0.0 && _marthaSparkDelay <= 0.0)
+		{
+			_marthaSparkDelay = MARTHA_SPARK_EVERY; // the crackle cadence, kept out of the BROKEN lane itself
+			for (int i = 0; i < _sparkLife.Count; i++)
+			{
+				if (_sparkLife[i] > 0.0)
+					continue; // live sparks keep their own frames
+				_sparkLife[i] = MARTHA_SPARK_LIFE;
+				Godot.Node2D sn = _sparkN[i];
+				float jr = Rng != null ? (float)Rng.Randf() : 0.5f; // loose jitter around her chassis: assistant pick (retune by eye)
+				sn.Position = new Vector2((float)(jr * 52.0 - 26.0), (float)(((i * 7 + (int)(jr * 9)) % 11) * 5.0f - 25.0f)); // local seat: no art needed to spread the crackle
+				sn.Set("rotation", (float)(jr * 3.14159 * 2.0 - 3.14159)); // streak aimed loose, like a bolt that found no second body
+				sn.Visible = true;
+				_sparkS[i].Visible = _sparkS[i].Texture != null; // static art paints only once the rail has loaded
+				_sparkR[i].Visible = true;
+				break; // one spark per crackle beat
+			}
+		}
+		for (int i = 0; i < _sparkLife.Count; i++)
+		{
+			if (_sparkLife[i] <= 0.0)
+				continue;
+			_sparkLife[i] -= delta;
+			float a = _sparkLife[i] > MARTHA_SPARK_LIFE * 0.6 ? 1.0f : (float)(_sparkLife[i] / (MARTHA_SPARK_LIFE * 0.6)); // sparks SNAP: most of the read is full-bright, the fade is a blink
+			_sparkS[i].Modulate = new Color(1.0f, 1.0f, 1.0f, a);
+			_sparkR[i].Modulate = new Color(1.0f, 1.0f, 1.0f, a);
+			if (_sparkLife[i] <= 0.0)
+			{
+				_sparkLife[i] = 0.0;
+				_sparkN[i].Visible = false;
+				_sparkS[i].Visible = false;
+				_sparkR[i].Visible = false;
+			}
 		}
 	}
 // Yu seat upkeep (user 2026-11-02 rework): kindness spirits now RIDE like the gem pickups -

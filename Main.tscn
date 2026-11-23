@@ -199,6 +199,10 @@ weaponKit = "cannon"
 baseEvasion = 0.05
 baseCrit = 0.05
 class_ = "Gunner"
+cannonFxArt = "res://art/fx/hew_cannon.png"
+splashFxArt = "res://art/fx/hew_splash.png"
+flashFxArt = "res://art/fx/hew_flash.png"
+cogFxArt = "res://art/fx/hew_gear.png"
 
 [node name="BossMini" type="Node2D" parent="." unique_id=321225898]
 position = Vector2(0, -500)

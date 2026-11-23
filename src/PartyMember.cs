@@ -237,6 +237,10 @@ public partial class PartyMember : Godot.Node2D
 	// on the node) + 3 Primal Might ranks + 1 Beastial Rage = 6 max, so the clamp never comes close.
 	static readonly int RAKE_SLOTS = 8;
 	Godot.Sprite2D[] _rakeFx = null;
+	Godot.Sprite2D _muzzleFx = null; // Thunder cannon muzzle stamp: cannonFxArt lane; null = ember ColorRect band is the whole shot (assistant pick, retune by eye)
+	Godot.Sprite2D[] _splashFx = null; // Thunder-puff splash stamps at the prey (claw-v5 member-anchored pattern: slots are children of the body, the hook stamps the world coord)
+	Godot.Sprite2D _flashFx = null; // Muzzle BURST at the muzzle (SEPARATE art: the beam's Scale.x stretch would smear a welded flash); null = beam alone is the whole shot
+	float _splashT = 0.0f; // splash stamp visibility timer: own clock, the cannon kit never arms _fxT
 
 	float _fxT = 0.0f; // commit-fx visibility timer: decays with the world clock, hides sprites off-beat
 
@@ -414,6 +418,10 @@ public partial class PartyMember : Godot.Node2D
 	[Export] public double necroDur = 0.0;   // Hapi flame: seconds the column runs (authored 5.0; Plague ranks lengthen it)
 
 	[Export] public string pillarFxArt = ""; // Hapi column sprite: loaded ONCE into the shared Game.pillarFxTex
+	[Export] public string cannonFxArt = "";  // Hew muzzle stamp sprite (cannon kit; "" art = ember ColorRect band only)
+	[Export] public string splashFxArt = "";  // Hew thunder-puff splash stamp sprite ("" art = splash ring bites with no paint)
+	[Export] public string flashFxArt = "";  // Hew muzzle burst sprite ("" art = the beam is the whole shot, no muzzle stamp)
+	[Export] public string cogFxArt = "";     // Hew cog drop sprite: loaded ONCE into shared Game.cogFxTex
 
 	public double multiChance = 0.0;  // lucky strikes card: +0.05/rank chance a hit deals damage TWICE
 
@@ -576,6 +584,7 @@ public partial class PartyMember : Godot.Node2D
 		public double vampRank = 0.0; // Vampiric Core ranks (1%/rank heals Martha per damage dealt)
 		public int exploRank = 0;   // Explosive Finale ranks: 25/50/75% blast on Hew/Martha kills
 		static readonly double CANNON_BAND_PX = 14.0;  // half-width of the cannon beam lane (retune by eye)
+		static readonly double CANNON_BEAM_ART_PX = 73.0;  // rail law: art = 146x36 = transparent pad 73 + LANCE 73 = this span denominator
 		static readonly double CANNON_SPLASH_PX = 40.0; // splash radius around the MAIN cannon target (retune by eye)
 
 	// Alvora "Guardian Awakening" (user 2026-10-26): ring reach x2 MULTIPLIED after the
@@ -1218,6 +1227,68 @@ public partial class PartyMember : Godot.Node2D
 			_cannonFx.ZIndex = 3; // above the horde bodies, below the chip UI
 			_cannonFx.Visible = false;
 			AddChild(_cannonFx);
+		}
+
+		// Thunder-cannon BEAM art lane (lap-6 FX v3 - user backpedal: "the flash and the beam SHOULD be separate
+		// because of scaling in-game"): this rail = the LANCE ALONE + a transparent LEFT pad as wide as the lance,
+		// so the TEXTURE-CENTER pivot parks the flare's left edge AT the seat and the volley's Scale.x stretch
+		// reaches gun->prey. Rail law: art = 146x36 = pad 73 + lance 73. "" art keeps the ember ColorRect band
+		// the whole shot (the approved fallback contract).
+		if (cannonFxArt != "")
+		{
+			Godot.Texture2D mfx = GD.Load(cannonFxArt) as Godot.Texture2D;
+			if (mfx != null)
+			{
+				_muzzleFx = new Godot.Sprite2D();
+				_muzzleFx.Texture = mfx;
+				_muzzleFx.Set("texture_filter", 0); // NEAREST like the painted minis: hard edges
+				_muzzleFx.Position = new Vector2(0.0f, -20.0f); // muzzle seat (the band's own line)
+				_muzzleFx.ZIndex = 4; // above the band, below the chip UI
+				_muzzleFx.Visible = false;
+				AddChild(_muzzleFx);
+			}
+		}
+		// Thunder-puff SPLASH stamps (lap-6 FX): 4-slot star posed at the prey on the claw-v5 member-anchored lane
+		// (the slots are children of the body, the hook stamps at the world coord). "" art = the ring still bites, no paint.
+		if (splashFxArt != "")
+		{
+			Godot.Texture2D sfx = GD.Load(splashFxArt) as Godot.Texture2D;
+			if (sfx != null)
+			{
+				_splashFx = new Godot.Sprite2D[4];
+				for (int f2 = 0; f2 < 4; f2++)
+				{
+					_splashFx[f2] = new Godot.Sprite2D();
+					_splashFx[f2].Texture = sfx;
+					_splashFx[f2].Set("texture_filter", 0); // NEAREST like the painted minis: hard edges
+					_splashFx[f2].Visible = false;
+					AddChild(_splashFx[f2]);
+				}
+			}
+		}
+		// Thunder muzzle BURST (lap-6 FX v3 - separate art again, per the user's scaling verdict): one Sprite2D stamped
+		// NATIVE at the muzzle seat per volley; "" art = the stretched beam alone is the whole shot. Circle rides
+		// NO rotation (symmetric). The burst art is the full beam generation's LEFT burst cropped out of it.
+		if (flashFxArt != "")
+		{
+			Godot.Texture2D ffx = GD.Load(flashFxArt) as Godot.Texture2D;
+			if (ffx != null)
+			{
+				_flashFx = new Godot.Sprite2D();
+				_flashFx.Texture = ffx;
+				_flashFx.Set("texture_filter", 0); // NEAREST like the painted minis: hard edges
+				_flashFx.Position = new Vector2(0.0f, -20.0f); // muzzle seat (the beam flare's own point)
+				_flashFx.ZIndex = 5; // above the beam flare so the burst reads as the shot's origin
+				_flashFx.Visible = false;
+				AddChild(_flashFx);
+			}
+		}
+		// Hew cog drop art (lap-6 FX): ONE load at tree entry wires shared Game.cogFxTex the world cog pool paints (mirrors the pillar gate)
+		if (cogFxArt != "")
+		{
+			Game hcg = GetParent() as Game;
+			if (hcg != null)
+				hcg.cogFxTex = GD.Load(cogFxArt) as Godot.Texture2D;
 		}
 
 
@@ -2477,6 +2548,14 @@ public partial class PartyMember : Godot.Node2D
 					bx.Visible = false; // beams die with the body too
 			if (_cannonFx != null)
 				_cannonFx.Visible = false; // cannon flash dies with the body too
+			if (_muzzleFx != null)
+				_muzzleFx.Visible = false; // muzzle stamp dies with the body too
+			if (_flashFx != null)
+				_flashFx.Visible = false; // muzzle burst dies with the body too
+			if (_splashFx != null)
+				 foreach (Godot.Sprite2D sx in _splashFx)
+					 sx.Visible = false; // thunder-puff never lingers on a downed body
+			_splashT = 0.0f;
 			if (_cresFx != null)
 				 foreach (Godot.Sprite2D sx in _cresFx)
 					 sx.Visible = false;
@@ -2616,6 +2695,22 @@ public partial class PartyMember : Godot.Node2D
 
 		}
 
+		// Thunder-puff decay (lap-6 FX): the splash star and muzzle stamp live ~0.18 s then drop; own clock
+		// because the cannon kit never arms _fxT (world clock: soft-pause discipline, no real-time leak)
+		if (_splashT > 0.0f)
+		{
+			_splashT -= delta;
+			if (_splashT <= 0.0f)
+			{
+				if (_splashFx != null)
+					foreach (Godot.Sprite2D sx in _splashFx)
+						sx.Visible = false;
+				if (_muzzleFx != null)
+					_muzzleFx.Visible = false; // muzzle flash decays on the same beat
+				if (_flashFx != null)
+					_flashFx.Visible = false; // muzzle burst decays on the same beat too
+			}
+		}
 		// fx art decay: commit flashes live ~0.15 s then drop; while the spin clock runs, the
 
 		// spin block re-places the blade slots every frame, so this decay only hunts crescent,
@@ -4737,13 +4832,37 @@ public partial class PartyMember : Godot.Node2D
 					pg.ExplosiveFinale(c.GlobalPosition, dmg * 0.5);
 				}
 			}
+			// flash band RETIRED per user request 2026-11-23: the beam-art lane carries the whole shot now
 			if (_cannonFx != null)
+				_cannonFx.Visible = false; // never draws again (the node stays built so every hide lane keeps compiling)
+			if (_muzzleFx != null)
 			{
-				Vector2 bv = e - new Vector2(0.0f, -20.0f); // muzzle origin: the flash band runs gun->prey
-				_cannonFx.Position = new Vector2(0.0f, -20.0f);
-				_cannonFx.Size = new Vector2(segLen, (float)(band * 2.0)); // full band width (Size is the box, maths used the half)
-				_cannonFx.Set("rotation", (float)System.Math.Atan2(bv.Y, bv.X));
-				_cannonFx.Visible = true;
+				Vector2 mv = e - new Vector2(0.0f, -20.0f); // muzzle->prey line: the beam runs gun->prey, the Keeko tome->prey span idiom
+				_muzzleFx.Position = new Vector2(0.0f, -20.0f); // muzzle seat (the padded art pivots at the flare)
+				_muzzleFx.Set("rotation", (float)System.Math.Atan2(mv.Y, mv.X)); // nose rides the shot line
+				_muzzleFx.Scale = new Vector2((float)System.Math.Max(8.0f, mv.Length()) / (float)CANNON_BEAM_ART_PX, 1.0f); // span stretch to REACH the prey (Sprite2D.Scale is the proven resize lane); flare stays pinned at the seat
+				_muzzleFx.Visible = true;
+				_splashT = 0.18f; // decays muzzle + splash on one beat (assistant pick, retune by eye)
+			}
+			if (_flashFx != null)
+			{
+				_flashFx.Position = new Vector2(0.0f, -20.0f); // seat the burst ON the muzzle: the shot starts with a bang (user ask)
+				_flashFx.Scale = new Vector2(0.5f, 0.5f); // ~16 px disc ~= beam band thickness (assistant pick, retune by eye)
+				_flashFx.Visible = true; // decays with the shared _splashT beat below
+			}
+			if (_splashFx != null)
+			{
+				Vector2 sp = p + e; // thunder-puff rides the WRAPPED world coord of the MAIN prey (claw-v5 anchor discipline)
+				_splashFx[0].GlobalPosition = sp;
+				_splashFx[1].GlobalPosition = sp + new Vector2(16.0f, 0.0f);
+				_splashFx[2].GlobalPosition = sp + new Vector2(-16.0f, 0.0f);
+				_splashFx[3].GlobalPosition = sp + new Vector2(0.0f, -14.0f);
+				for (int f2 = 0; f2 < _splashFx.Length; f2++)
+				{
+					_splashFx[f2].Visible = true;
+					_splashFx[f2].Scale = new Vector2(0.6f, 0.6f); // puff scale knob (assistant pick, retune by eye)
+				}
+				_splashT = 0.18f;
 			}
 		}
 
