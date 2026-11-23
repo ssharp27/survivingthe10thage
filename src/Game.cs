@@ -479,13 +479,16 @@ public partial class Game : Godot.Node2D
 		Label _selHint = null;            // key-grammar reminder on the card
 		Control[] _selTile = new Control[0];
 		Label[] _selName = new Label[0];
-		// PER-SEAT scaled-card bookkeeping (2026-11-22 hand-play fix): a scaled seat's tile is its
-		// OWN art box, smaller than the slot, so the solid gold _selFrame behind it filled the whole
-		// slot as a big gold plate and the name plate (rides the tile) sat ON the art. The ring now
-		// hugs the seat's own box (half-extents in px kept here) and the plate parks in the gold
-		// band below it; shipped seats keep the slot-frame draw byte-for-byte
-		bool[] _selScaled = new bool[0];
-		float[] _selBoxHalf = new float[0]; // pairs: half-width, half-height of the seat's art box (px)
+		// PAGE SCROLL (user 2026-11-23 hand-play: "the mouse wheel just scrolls between characters,
+		// but it should be scrolling the page/screen up or down to select characters as eventually
+		// we're going to have a lot more"): the wheel no longer steps the browse ring - it slides
+		// the WHOLE board inside its window. The shift is kept as a FRACTION of the page height so
+		// one number drives the rows, the gold ring and the click map alike; rows parked past the
+		// window edge hide, and the clamp range is wide enough to bring any parked row back.
+		// (the 2026-11-22 _selScaled/_selBoxHalf lane is gone: sizing is the SLOT RECT's job now)
+		// Positive rides the board DOWN (the wheel-up flick); SEL_SCROLL_HOME centres the board on
+		// its own content so the current roster all reads inside the window at rest
+		float _selScroll = 0.0f;
 		Control _selParty = null;         // party box copy: always up (party-wide meta track)
 		Control _selSheet = null;         // dark plate behind the sheet (box border)
 		Control _selPartyBack = null;     // dark plate behind the party box
@@ -6024,22 +6027,35 @@ private void UpdateSpirits(float delta)
 		0.04f, 0.72f, 0.30f, 0.93f, 0.35f, 0.72f, 0.61f, 0.93f, 0.66f, 0.72f, 0.96f, 0.93f,
 		0.04f, 0.95f, 0.30f, 1.16f }; // board fractions (assistant re-grid pick: 12 rects on 4 rows - retune by eye). 13th rect (seat 12 Hew): the page-bottom LEFT strip under row 4, clear of the CONFIRM plate at root-local 0.32-0.58 x 0.88-0.96 (page fractions run past 1.0 down there; existing 12 stay byte-identical, retune by eye)
 	static readonly float[] SEL_PAGE = { 0.05f, 0.14f, 0.60f, 0.86f }; // the board window the build draws AND the click maps into
+	// wheel-scroll law (2026-11-23 hand-play): all fractions of the PAGE height. The rows ride this
+	// shift inside the window, the gold ring rides the same shift, and the click map undoes it - so
+	// a scrolled row is clicked where it is DRAWN, never where it was built.
+	static readonly float SEL_SCROLL_HOME = -0.07f; // the board opens centred on its own content (rows run 0.03..1.16 of the page): the 13th seat's parked row reads just inside the window bottom instead of under CONFIRM (assistant pick, retune by eye)
+	// one wheel flick steps SEL_SCROLL_STEP page heights; the clamp lets a parked row come all the
+	// way into the window and back out again (room for the future bigger roster)
+	// wheel-up flicks bring the TOP rows in (the page rides down)
+	static readonly float SEL_SCROLL_STEP = 0.14f;
+	static readonly float SEL_SCROLL_MAX = 0.34f;
+	static readonly float SEL_PARK_EDGE = 0.12f; // a row's centre may overshoot the window by this page fraction before it parks hidden (about half a slot: a row at the edge still reads)
 	static readonly bool[] SEL_LOCKED = { false, false, false, false, false, false, false, false, false, false, false, false, false }; // 13 seats (seat 12 Hew joins at parity)
 	static readonly float[] SEL_CONFIRM = { 0.32f, 0.88f, 0.58f, 0.96f };
 	// painted mini art per roster seat (index = memberIndex: 0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash | 7 Bruno | 8 Brook)
 		// art reorganised 2026-11-08 (user: "move all the current characters into the character folder")
 		// - portraits now live under res://art/characters/ alongside the art/enemies/ tree
 		static readonly string[] SEL_ART = { "res://art/characters/baldrun.png", "res://art/characters/mosiah.png", "res://art/characters/asper.png", "res://art/characters/alvora.png", "res://art/characters/yu.png", "res://art/characters/stack.png", "res://art/characters/wash.png", "res://art/characters/bruno.png", "res://art/characters/brook.png", "res://art/characters/keeko.png", "res://art/characters/hapi.png", "res://art/characters/athios.png", "res://art/characters/hew.png" };
-		// PER-SEAT select-card scale (2026-11-19, the 2x-art law): the user is shipping ~2x canvases
-		// now (Athios 175x235 against the 78-98 W x 114-121 H class) and plans to rework the shipped
-		// cast to that quality, so the select lane needs a SCALE ANSWER, not a pre-shrunk PNG - the
-		// Keeko law (box-downscale then palette-snap) exists only because there was no knob; it cost
-		// quality. 1.0 keeps the SHIPPED draw untouched. Card target = the class read (~118 px tall),
-		// so a 2x sheet rides 0.5. Index = memberIndex; out-of-range seats default to 1.
-		// The stage mini has its OWN knob (PartyMember.miniScale): 235 px * 0.38 = 89 px, the same
-		// on-stage size the class gets at 0.75. Keep the two lanes' numbers separate on purpose.
-		static readonly float[] SEL_ART_SCALE = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.5f, 0.46f }; // seat 11 Athios: the 175x235 ~2x sheet rides 0.5 for the ~118 px class read (assistant pick, retune by eye). Seat 12 Hew: the 256x256 canvas rides 0.46 for the ~118 px read (assistant pick)
-		static readonly float SEL_RING_PAD = 6.0f; // scaled-seat gold ring: px of gold around the seat's OWN art box (2026-11-22 hand-play fix: the slot-wide ring turned a small scaled card into a big gold plate)
+		// PER-SEAT select-card scale is RETIRED (2026-11-23 hand-play, user: "Athios and Hew are
+		// selectable but their art is too big. Look at the other characters art as a reference for
+		// how it should look"): that lane pinned a px box AROUND the art's own native size and
+		// bypassed the slot rect, so the 175x235 / 256x256 sheets landed ~native on a card sized
+		// for the 78-98 W x 114-121 H class. One draw for EVERY seat now: the slot rect with
+		// STRETCH_KEEP_ASPECT_CENTERED, which aspect-FITS the art to the slot's own height - the
+		// big sheets get the same class read as the rest of the cast for free, nothing distorts
+		// and nothing clips. The only per-seat answer left is the FILTER, and only where the draw
+		// SHRINKS (a 2x sheet losing source pixels at NEAREST): LINEAR there, NEAREST for the 1:1-
+		// up cast so the user's 2026-10-28 "not stretched" hard-edge law keeps its teeth.
+		// The stage mini keeps its OWN knob (PartyMember.miniScale: 235 px * 0.38 = 89 px against
+		// the class's 118 * 0.75 = 88 px) - the two lanes' numbers stay separate on purpose.
+		static readonly float SEL_RING_PAD = 6.0f; // gold-ring px around the browsed slot (kept: the ring chrome, not the art lane)
 		static readonly string[] SEL_BONUS = {
 		"Leader Bonus: Chain Lightning - All attacks have a 5% chance to unleash lightning on 5 targets for 10 damage.",
 		"Leader Bonus: Pierce - All attacks gain +1 Pierce and all allies gain +5% Evasion.",
@@ -6090,10 +6106,8 @@ private void UpdateSpirits(float delta)
 		int n = _party.Count;
 		_selTile = new Control[n];
 		_selName = new Label[n];
-		_selScaled = new bool[n];      // ring + plate ride the seat's OWN box (see field comment)
-		_selBoxHalf = new float[n * 2]; // pairs: half-width, half-height of that box (px)
-		// one slot per seat (rows of three): tile + name plate. A scaled seat parks its OWN
-		// art box at the slot centre and records its half-extents for the gold ring (ShowSelPage)
+		// one slot per seat (rows of three): tile + name plate. The slot rect IS the card box for
+		// every seat now (the 2026-11-22 scaled-box lane is gone: sizing rides the slot via stretch)
 		int ti = 0;
 		foreach (PartyMember pm2 in _party)
 		{
@@ -6102,7 +6116,6 @@ private void UpdateSpirits(float delta)
 			if (pm2.memberIndex >= 0 && pm2.memberIndex < SEL_ART.Length)
 			{
 				Godot.Texture2D tex = GD.Load(SEL_ART[pm2.memberIndex]) as Godot.Texture2D; // PM-verified load idiom
-				bool scaled = false; // does this seat ride SEL_ART_SCALE instead of the slot rect?
 				if (tex == null)
 				{				Godot.ColorRect ph = new ColorRect();
 					ph.Color = new Color(0.16f, 0.15f, 0.18f, 1.0f); // placeholder block (framework)
@@ -6113,76 +6126,32 @@ private void UpdateSpirits(float delta)
 				else
 				{
 					Godot.TextureRect tr = new Godot.TextureRect(); tr.Texture = tex; // Control-friendly: anchor rects ride it
-					float artScale = (pm2.memberIndex < SEL_ART_SCALE.Length) ? SEL_ART_SCALE[pm2.memberIndex] : 1.0f;
-					scaled = (artScale != 1.0f);
-					// s == 1 keeps the SHIPPED draw exactly: STRETCH_KEEP_CENTERED (3 in 4.7's renumbered
-					// enum, probed headless) paints native pixels centered, the user's 2026-10-28 "not
-					// stretched" pick. The hazard that pick hides: TextureRect's DEFAULT expand_mode is
-					// EXPAND_CLIP, so art bigger than the slot is CLIPPED to it - a 235 px sheet in the
-					// ~274 x 163 px slot loses its feet outright. The scaled branch stops leaning on the
-					// slot rect for exactly that reason.
-					if (!scaled)
-					{
-						tr.Set("stretch_mode", 3);
-						tr.Set("texture_filter", 0); // NEAREST like the stage minis (hard painted edges)
-					}
-					else
-					{
-						// STRETCH_SCALE (0) + a box pinned to the art's OWN native*scale px around the
-						// SLOT CENTRE: anchors at the slot's own centre read off SEL_GRID, then offsets +/- (native*scale)/2.
-						// The box carries the art aspect BY CONSTRUCTION, so nothing distorts and nothing clips, and the px
-						// math never needs the window size (offsets ride the slot's centre, not the page's)
-						tr.Set("stretch_mode", 0);
-						float slotCx = (SEL_GRID[ti * 4] + SEL_GRID[ti * 4 + 2]) * 0.5f;   // the slot's own centre, page fractions
-						float slotCy = (SEL_GRID[ti * 4 + 1] + SEL_GRID[ti * 4 + 3]) * 0.5f; // ditto, down the page
-						tr.SetAnchor(Godot.Side.Left, slotCx); tr.SetAnchor(Godot.Side.Right, slotCx);
-						tr.SetAnchor(Godot.Side.Top, slotCy); tr.SetAnchor(Godot.Side.Bottom, slotCy);
-						tr.Set("offset_left", -(float)tex.GetWidth() * artScale * 0.5f);
-						tr.Set("offset_right", (float)tex.GetWidth() * artScale * 0.5f);
-						tr.Set("offset_top", -(float)tex.GetHeight() * artScale * 0.5f);
-						tr.Set("offset_bottom", (float)tex.GetHeight() * artScale * 0.5f);
-						// record the box for the ring + plate lane: a scaled seat's gold must hug its
-						// OWN art box, not the slot, or the small card floats in a big gold plate
-						// (user 2026-11-22 hand-play: Athios read as "a big gold rectangle")
-						_selScaled[ti] = true;
-						_selBoxHalf[ti * 2] = (float)tex.GetWidth() * artScale * 0.5f;     // half-width (px)
-						_selBoxHalf[ti * 2 + 1] = (float)tex.GetHeight() * artScale * 0.5f; // half-height (px)
-						// MIPMAP_LINEAR (2): a ~half-size NEAREST draw keeps only every 2nd source pixel
-						// and craters thin features; the shipped cast never needed mips because it is 1:1
-						// on the slot, this one does
-						tr.Set("texture_filter", 2);
-					}
+					// ONE draw for EVERY seat (the slot-rect sizing law below SEL_PAGE): the slot rect
+					// plus STRETCH_KEEP_ASPECT_CENTERED (5 in the 4.x enum order: 3 = KEEP_CENTERED the
+					// shipped cast rode, 4 = KEEP_ASPECT, 5 = this contain-fit) aspect-FITS the sheet to
+					// the slot's own box - the 175x235 athios and 256x256 hew sheets get the same card
+					// read as the 78-98 W x 114-121 H class cast for free (user 2026-11-23 hand-play:
+					// "their art is too big ... look at the other characters art as a reference"). Nothing
+					// distorts and nothing clips: a CONTAINED draw can never leave the rect, so EXPAND_CLIP
+					// cannot bite (the old hazard was a 235 px sheet losing its feet in the ~163 px slot).
+					// The 2026-11-22 scaled lane (native*scale px pinned around the slot centre) is gone:
+					// sizing is the SLOT RECT's job, so one draw serves the whole cast.
+					tr.Set("stretch_mode", 5);
+					// NEAREST (0) pins pixels: the ~1:1 cast keeps the user's 2026-10-28 "not stretched"
+					// hard painted edges. The only shrinking lane here is the tall sheets (athios 235, hew
+					// 234 into the ~163 px slot): NEAREST at ~0.7 keeps every third source pixel and craters
+					// thin features, so those read LINEAR (1). Assistant pick, retune by eye at hand-play.
+					tr.Set("texture_filter", tex.GetHeight() > 140.0f ? 1 : 0);
 					_selTile[ti] = tr;
 				}
-				// the slot rect owns the tile ONLY for native seats: a scaled seat already pinned its own
-				// slot-centred box, and SetRectSel would pin those offsets back to 0 and crush it to
-				// the slot. The name plate still rides the tile below, so a scaled seat's plate lands on
-				// the ART's own floor (retune by eye at hand-play)
-				if (!scaled)
-				{
-					SetRectSel(_selTile[ti], SEL_GRID[ti * 4], SEL_GRID[ti * 4 + 1],
-						SEL_GRID[ti * 4 + 2], SEL_GRID[ti * 4 + 3]);
-				}
+				// the slot rect owns the tile for EVERY seat now (no scaled branch to dodge it):
+				// the art draw rides stretch inside the slot, so pinning the tile is always safe
+				SetRectSel(_selTile[ti], SEL_GRID[ti * 4], SEL_GRID[ti * 4 + 1],
+					SEL_GRID[ti * 4 + 2], SEL_GRID[ti * 4 + 3]);
 				_selName[ti] = new Label();
-				if (_selScaled[ti])
-				{
-					// scaled seat: plate parks just UNDER the art - anchors at the slot's OWN centre
-					// (same fractions the art box rode) then px offsets, so it rides the seat's box
-					float plateCx = (SEL_GRID[ti * 4] + SEL_GRID[ti * 4 + 2]) * 0.5f;
-					float plateCy = (SEL_GRID[ti * 4 + 1] + SEL_GRID[ti * 4 + 3]) * 0.5f;
-					_selName[ti].SetAnchor(Godot.Side.Left, plateCx);
-					_selName[ti].SetAnchor(Godot.Side.Right, plateCx);
-					_selName[ti].SetAnchor(Godot.Side.Top, plateCy);
-					_selName[ti].SetAnchor(Godot.Side.Bottom, plateCy);
-					_selName[ti].Set("offset_left", _selBoxHalf[ti * 2] - 10.0f);      // plate a touch narrower than the art, centred
-					_selName[ti].Set("offset_right", -(_selBoxHalf[ti * 2] - 10.0f));
-					_selName[ti].Set("offset_top", _selBoxHalf[ti * 2 + 1] + 2.0f);    // starts 2 px under the art's feet...
-					_selName[ti].Set("offset_bottom", _selBoxHalf[ti * 2 + 1] + 24.0f); // ...22 px plate: stays inside the slot
-				}
-				else
-					// SHIPPED seats: byte-for-byte unchanged from the 2026-11-14 hand-play lane.
-					// 2026-11-14 hand-play: the plates sat ON the painted minis - dropped to the slot floor (assistant pick, retune by eye)
-					SetRectSel(_selName[ti], 0.02f, 0.85f, 0.98f, 0.99f);
+				// SHIPPED plate law for the WHOLE cast (2026-11-14 hand-play: plates dropped to the
+				// slot floor). Every seat's box IS its slot now, so one plate draw serves the card.
+				SetRectSel(_selName[ti], 0.02f, 0.85f, 0.98f, 0.99f);
 				_selName[ti].Text = pm2.displayName + (SEL_LOCKED[ti] ? " (locked)" : "");
 				_selName[ti].Set("horizontal_alignment", 1); // CENTER (string key: binding-safe)
 				_selTile[ti].AddChild(_selName[ti]);
@@ -6236,9 +6205,10 @@ private void UpdateSpirits(float delta)
 		_selRoot.AddChild(_selConfirmLabel);
 		_selHint = new Label();
 		SetRectSel(_selHint, 0.06f, 0.04f, 0.98f, 0.10f); // title strip: the click grammar
-		_selHint.Text = "PRE-RUN: click a portrait to select, click CONFIRM to seat the Leader";
+		_selHint.Text = "PRE-RUN: click a portrait to select, wheel scrolls the page up/down, click CONFIRM to seat the Leader"; // wheel grammar spelled out (user 2026-11-23 hand-play ask)
 		_selRoot.AddChild(_selHint);
 		_selBrowse = _selDemo ? -1 : 0; // humans open boxed on the roster head
+		_selScroll = SEL_SCROLL_HOME; // the board opens centred on its own content: the whole current roster reads inside the window at rest, the wheel walks it after
 		ShowBreakdown(0); // the sheet opens on the roster head
 		ShowSelPage();
 	}
@@ -6255,41 +6225,37 @@ private void UpdateSpirits(float delta)
 		node.Set("offset_right", 0.0f);  // newly selected slot) never moved. Pin offsets to 0 so
 		node.Set("offset_bottom", 0.0f); // the rect IS the anchor rect (build nodes ride it too)
 	}
-	// one board, one page: the gold ring rides the selected slot (its rect grown
-	// +/- 0.02 so the edge reads as a frame AROUND the tile); nothing selected parks
-	// it hidden. (the framework pass's blocks-of-four paging is gone: rows of three
-	// hold all five seats, so no slot ever parks off-page)
+	// one board, one page: every tile AND the gold ring ride the PAGE SCROLL - their rects
+	// shift by _selScroll page fractions (re-anchoring: SetRectSel pins offsets to 0, so
+	// the anchor IS the rect and fractions can run past 1.0 down there). Rows whose centre
+	// overshoots the window by SEL_PARK_EDGE park hidden; the gold frames only DRAWN rows.
+	// (the 2026-11-22 scaled-seat ring branch is gone: every seat's box IS its slot now,
+	// so one ring draw serves the whole cast)
+	// CONFIRM stays live on a PARKED row - the scroll moves the view, not the roster.
 	private void ShowSelPage()
 	{
 		for (int k = 0; k < _selTile.Length; k++)
-			_selTile[k].Visible = true; // all five seats stand: no page-two tail
+		{
+			// the scroll rides the anchors: same fractions the click map undoes
+			SetRectSel(_selTile[k], SEL_GRID[k * 4], SEL_GRID[k * 4 + 1] + _selScroll,
+				SEL_GRID[k * 4 + 2], SEL_GRID[k * 4 + 3] + _selScroll);
+			// park rows past the window edge (half a slot of grace so an edge row still reads)
+			// a scrolled-out row draws NOTHING: future bigger rosters page in from off-window
+			// the name plate rides the tile (its child), so parking hides both together
+			float cy = (SEL_GRID[k * 4 + 1] + SEL_GRID[k * 4 + 3]) * 0.5f + _selScroll;
+			_selTile[k].Visible = (cy >= -SEL_PARK_EDGE && cy <= 1.0f + SEL_PARK_EDGE);
+		}
 		if (_selBrowse < 0 || _selBrowse >= _selTile.Length)
 		{
 			_selFrame.Visible = false; // nothing selected yet: the ring stays away
 			return;
 		}
-		if (_selScaled[_selBrowse])
-		{
-			// scaled seat: gold hugs the seat's OWN art box (pad of SEL_RING_PAD px each side),
-			// not the slot rect - else a half-size card floats in a big gold plate (2026-11-22 hand-play)
-			// px offsets around the slot's centre anchor, same fractions the art box rode
-			float rcx = (SEL_GRID[_selBrowse * 4] + SEL_GRID[_selBrowse * 4 + 2]) * 0.5f;
-			float rcy = (SEL_GRID[_selBrowse * 4 + 1] + SEL_GRID[_selBrowse * 4 + 3]) * 0.5f;
-			_selFrame.SetAnchor(Godot.Side.Left, rcx);
-			_selFrame.SetAnchor(Godot.Side.Right, rcx);
-			_selFrame.SetAnchor(Godot.Side.Top, rcy);
-			_selFrame.SetAnchor(Godot.Side.Bottom, rcy);
-			_selFrame.Set("offset_left", -(_selBoxHalf[_selBrowse * 2] + SEL_RING_PAD));
-			_selFrame.Set("offset_right", _selBoxHalf[_selBrowse * 2] + SEL_RING_PAD);
-			_selFrame.Set("offset_top", -(_selBoxHalf[_selBrowse * 2 + 1] + SEL_RING_PAD));
-			_selFrame.Set("offset_bottom", _selBoxHalf[_selBrowse * 2 + 1] + SEL_RING_PAD + 24.0f); // band dips 24 px to cover the parked name plate too
-		}
-		else
-			// SHIPPED seats: byte-for-byte unchanged (2026-11-14 lane).
-			// the ring rides the selected slot: grown +/- 0.02 so its edge frames the tile
-			SetRectSel(_selFrame, SEL_GRID[_selBrowse * 4] - 0.02f, SEL_GRID[_selBrowse * 4 + 1] - 0.02f,
-					SEL_GRID[_selBrowse * 4 + 2] + 0.02f, SEL_GRID[_selBrowse * 4 + 3] + 0.02f);
-		_selFrame.Visible = true;
+		_selFrame.Visible = _selTile[_selBrowse].Visible; // the gold only frames rows that are DRAWN
+		// the ring rides the selected slot: grown +/- 0.02 so its edge frames the tile
+		// (byte-for-byte the shipped draw PLUS the same _selScroll shift the rows ride)
+		// a parked browsed row parks its gold too - CONFIRM still works on it
+		SetRectSel(_selFrame, SEL_GRID[_selBrowse * 4] - 0.02f, SEL_GRID[_selBrowse * 4 + 1] + _selScroll - 0.02f,
+				SEL_GRID[_selBrowse * 4 + 2] + 0.02f, SEL_GRID[_selBrowse * 4 + 3] + _selScroll + 0.02f);
 	}
 	// the sheet for the SELECTED slot: name, then the mockup's Base Stats rows (live
 	// off the roster block so the numbers can never drift) each with its "(+0)"
@@ -6347,39 +6313,30 @@ private void UpdateSpirits(float delta)
 			CloseSelect(true);
 			return;
 		}
-		// wheel rail (user 2026-11-23 hand-play: "this area also needs to be scrollable, either by click
-		// and drag or mouse wheel"): one notch steps the gold browse ring one LIVE slot; click browse
-		// is the first rail, the wheel is the second, and the beat clock stops one flick from fanning
-		// the ring. The pilot clock drives the bench itself, so it never reads the wheel.
+		// wheel rail (user 2026-11-23 hand-play, the full ask: "the mouse wheel just scrolls between
+		// characters, but it should be scrolling the page/screen up or down to select characters as
+		// eventually we're going to have a lot more"): the wheel no longer steps the browse ring -
+		// it slides the WHOLE board inside its window (the PAGE SCROLL law by the fields). The click
+		// stays the browse/selection rail; the wheel only moves the VIEW, so every seat is always
+		// reachable by clicking wherever it is DRAWN. The beat clock keeps one flick from fanning
+		// the scroll. The pilot clock drives the bench itself, so it never reads the wheel.
 		_selWheelCd -= d;
 		int wheel = _selWheel; // WHEEL READ: 4.7 dropped Input.get_wheel_direction, so _Input captures WHEEL_UP/WHEEL_DOWN into this one-shot
 		_selWheel = 0;         // consumed EVERY frame (pilot frames too): an out-of-beat flick is dropped, not banked
-		if (!_pilot)
+		if (!_pilot && wheel != 0 && _selWheelCd <= 0.0)
 		{
-			if (wheel != 0 && _selWheelCd <= 0.0)
-			{
-				_selWheelCd = 0.25; // assistant pick (retunable): one notch per quarter second
-				int ring = _selTile.Length;
-				int step = wheel > 0 ? 1 : -1;
-				int want = _selBrowse;
-				for (int s = 0; s < ring; s++)
-				{
-					want += step;
-					if (want < 0)
-						want = ring - 1; // the ring wraps both ways
-					if (want >= ring)
-						want = 0;
-					if (want >= 0 && want < _party.Count && !SEL_LOCKED[want])
-						break; // first LIVE seat going that way takes the gold
-				}
-				if (want >= 0 && want < _party.Count && !SEL_LOCKED[want] && want != _selBrowse)
-				{
-					_selBrowse = want;
-					ShowSelPage();
-					ShowBreakdown(_selBrowse);
-					GD.Print("[10thAge] (select) wheel browse: " + _party[_selBrowse].displayName);
-				}
-			}
+			_selWheelCd = 0.25; // assistant pick (retunable): one notch per quarter second
+			// wheel-UP flicks bring the TOP rows into view: the board rides DOWN (+scroll);
+			// the clamp keeps every seat reachable for the future bigger roster
+			_selScroll += (wheel > 0 ? 1.0f : -1.0f) * SEL_SCROLL_STEP;
+			if (_selScroll > SEL_SCROLL_MAX)
+				_selScroll = SEL_SCROLL_MAX;
+			if (_selScroll < -SEL_SCROLL_MAX)
+				_selScroll = -SEL_SCROLL_MAX;
+			ShowSelPage(); // the rows, the ring and the park flags all move in one beat
+			// scroll gate line: percent of the page (headless benches have no pointer so this
+			// print only shows when a flick is simulated; a human sees the board slide)
+			GD.Print("[10thAge] (select) wheel scroll: " + (int)(_selScroll * 100.0f + 0.5f) + "% of page");
 		}
 		// human card: waits for a real click forever (no timeout)
 		return;
@@ -6410,11 +6367,15 @@ private void UpdateSpirits(float delta)
 				GD.Print("[10thAge] (select) confirm click with nothing selected: default seat stands");
 			return;
 		}
-		// slots next (page-local fractions)
+		// slots next (page-local fractions UNDOING the page scroll: ShowSelPage re-anchored
+		// every tile at SEL_GRID + _selScroll, so a scrolled row is clicked where it is DRAWN,
+		// never where it was built)
 		float px = (fx - SEL_PAGE[0]) / (SEL_PAGE[2] - SEL_PAGE[0]);
-		float py = (fy - SEL_PAGE[1]) / (SEL_PAGE[3] - SEL_PAGE[1]);
+		float py = (fy - SEL_PAGE[1]) / (SEL_PAGE[3] - SEL_PAGE[1]) - _selScroll;
 		for (int k = 0; k < _selTile.Length; k++)
 		{
+			if (!_selTile[k].Visible)
+				continue; // parked rows are not clickable anywhere: the window is the door
 			if (px < SEL_GRID[k * 4] || px > SEL_GRID[k * 4 + 2] ||
 				py < SEL_GRID[k * 4 + 1] || py > SEL_GRID[k * 4 + 3])
 				continue;
