@@ -233,8 +233,8 @@ public partial class PartyMember : Godot.Node2D
 
 	// 8 claw strike slots: Athios's CLAW LINE rides its own set, so the stamps never fight _meleeFx or
 	// the crescent set for a slot (fx-feel law, Bruno's _cresFx precedent: a variable-size march never
-	// shares a slot for a frame's placement). 8 = headroom over the OFF/ON law ceiling: clawStrikes 2 (authored
-	// on the node) + 1 Primal Might presence + 2 Beastial Rage = 5 max, so the clamp never comes close.
+	// shares a slot for a frame's placement). 8 = headroom over the per-rank ceiling: clawStrikes 2 (authored
+	// on the node) + 3 Primal Might ranks + 1 Beastial Rage = 6 max, so the clamp never comes close.
 	static readonly int RAKE_SLOTS = 8;
 	Godot.Sprite2D[] _rakeFx = null;
 
@@ -448,8 +448,9 @@ public partial class PartyMember : Godot.Node2D
 	// their attacks stuck to them. Let's just go back to the earlier concept", then "similar to Brook's daggers. Two rapid
 	// strikes initially, increasing to more with the skill rank and his ultimate, but with a short delay (I think Brook's is
 	// 0.4, so Athios can be 0.2), and each claw can retarget to hit another enemy if there is one in range"): the volley is
-	// the NODE-AUTHORED clawStrikes (2) rapid strikes + 1 while Primal Might is ON + 2 more while Beastial Rage runs (2026-11-22
-	// OFF/ON law: "no scaling with card rank - these are just off/on switches now"), the strikes ride the MEMBER (v4's frozen
+	// the NODE-AUTHORED clawStrikes (2) rapid strikes + one per Primal Might RANK (0..3: the claw cards ride the
+	// same x/3 track as every other character - user law 2026-11-23: "any characters we build follow the same
+	// formula of 3 skill ranks for all upgrades") + 1 while Beastial Rage runs, the strikes ride the MEMBER
 	// clawAnchor + per-frame re-anchor lane are DELETED, so the magnet closes BY CONSTRUCTION), every beat aims FRESH at
 	// the nearest live body and RETARGETS away from the previous strike's victim when another body is in reach (clawLastId
 	// ledger), and the art always rides FULL reach like the daggers' jabLen law. v3's and v4's march knobs are gone:
@@ -563,9 +564,9 @@ public partial class PartyMember : Godot.Node2D
 	public int clawBeat = 0;       // swings landed in the current combo (0 = combo idle)
 	public double clawRoll = 0.0;  // one crit/roll SHARED across the whole combo (like twinDmg)
 	[Export] public int clawStrikes = 2; // combo strike count AUTHORED ON THE NODE (2026-11-22 placement law: kit numbers live on Main.tscn's Athios, not in code): the march reads this instead of a hardcoded 2
-	public double hasPrimal = 0.0; // Primal Might OFF/ON PRESENCE switch (2026-11-22 law: "off/on switches now"): ON = +1 swing, +2 more while Beastial Rage runs; one flip, never per rank
+	public double hasPrimal = 0.0; // Primal Might RANK COUNT (user brief seq 129914: "+1 claw attack ... per level"; user law 2026-11-23: "3 skill ranks for all upgrades ... may be reworked down the line, but for now this is law"): 0..3, and the march adds (int)hasPrimal swings
 	public double bleedSlow = 0.0; // Haemorrhaging Bleed: slow strength stamped with each bleed (OPT_BLEEDSLOW)
-	public int clawSwings = 0;   // strikes THIS march runs (clawStrikes + Primal presence + rage pair): stamped when it opens
+	public int clawSwings = 0;   // strikes THIS march runs (clawStrikes + Primal ranks + 1 while raged): stamped when it opens
 	public Vector2 clawAim = new Vector2(1.0f, 0.0f); // the ONE throw line the whole march keeps, frozen at the open
 		public long clawLastId = -1L; // v5 RETARGET ledger: the body the PREVIOUS strike raked (GetInstanceId is ulong, the ledger stays long like the bee ledger)
 
@@ -972,16 +973,16 @@ public partial class PartyMember : Godot.Node2D
 			miniPath = "res://art/characters/hapi.png";
 			else if (displayName == "Athios")
 			{
-				// 2026-11-19: Athios art probe (175x235 canvas - the user's ~2x-quality drop, against the
-				// class's 78-98 W x 114-121 H). 235 px x 0.38 = 89 px, the same stage read the class gets
-				// at its default 0.75 on ~118 px sheets; rim 31 is the base-band centre read from the canvas
-				// bottom (assistant pick, retune by eye at hand-play; the SEL lane has its OWN 0.5 knob)
+				// 2026-11-19 probe / 2026-11-23 size pass (user: raise the in-game read toward 0.5): Athios art probe
+				// (175x235 canvas - the user's ~2x-quality drop, against the class's 78-98 W x 114-121 H). 235 px x 0.5
+				// = ~118 px stage, a shade taller than the class read (~88 px at the default 0.75 on ~118 px sheets);
+				// rim 31 is the base-band centre read from the canvas bottom (assistant pick, retune by eye at hand-play)
 				miniPath = "res://art/characters/athios.png";
-				miniScale = 0.38f;
+				miniScale = 0.5f;
 				miniRim = 31.0f;
 			}
 			// 2026-11-22: Hew art probe (256x256 canvas - the user's high-quality drop). 256 px x 0.35 =
-			// ~90 px, the same stage read Athios gets at 0.38 on its 235 px sheet; rim 34 is the base-plate
+			// ~90 px (Athios now reads ~118 px at 0.5); rim 34 is the base-plate
 			// band centre read from the canvas bottom (assistant pick, retune by eye at hand-play; the SEL
 			// lane has its OWN 0.46 knob)
 			else if (displayName == "Hew")
@@ -4021,8 +4022,8 @@ public partial class PartyMember : Godot.Node2D
 			// Let's just go back to the earlier concept". The earlier concept is the DAGGER cadence, and the user pinned it:
 			// "similar to Brook's daggers. Two rapid strikes initially, increasing to more with the skill rank and his
 			// ultimate, but with a short delay (I think Brook's is 0.4, so Athios can be 0.2), and each claw can retarget
-			// to hit another enemy if there is one in range". So: strikes = clawStrikes (node) + 1 while Primal Might is ON (+2 more while Beastial Rage runs, clamped
-			// to RAKE_SLOTS); mid-march cdTimer = CLAW_STAGGER, the USER's 0.2 s gap. Every beat aims FRESH at the nearest
+			// to hit another enemy if there is one in range". So: strikes = clawStrikes (node) + (int)hasPrimal ranks (2026-11-23 restore: the claw cards ride the same x/3 track as every other character) + 1 while Beastial Rage runs, clamped to RAKE_SLOTS;
+			// mid-march cdTimer = CLAW_STAGGER, the USER's 0.2 s gap. Every beat aims FRESH at the nearest
 			// live body, and when that nearest body is the PREVIOUS strike's victim AND another body is in reach the beat
 			// RETARGETS to the nearest body that is NOT (clawLastId ledger: GetInstanceId is ulong, the ledger stays long
 			// like the bee ledger in Enemy.cs). The scan is hand-rolled rather than PickPrey because the beat needs TWO
@@ -4045,17 +4046,15 @@ public partial class PartyMember : Godot.Node2D
 
 				int strikes = clawStrikes; // combo strikes AUTHORED ON THE NODE (user kit law: "2 attacks in the combo (same as Baldrun)")
 
-				if (hasPrimal > 0.0)
+				strikes += (int)hasPrimal; // Primal Might PER RANK (user brief seq 129914: "Primal Might - +1 claw attack ... per level, as they have always been for all characters"; user law 2026-11-23: "any characters we build follow the same formula of 3 skill ranks for all upgrades - this may be reworked down the line, but for now this is law"): hasPrimal is a 0..3 rank count, so a maxed card pays +3 swings
 
-				strikes += 1; // Primal Might ON (OFF/ON PRESENCE switch law, 2026-11-22): +1 swing, never a per-rank count
+				if (rageT > 0.0)
 
-				if (hasPrimal > 0.0 && rageT > 0.0)
-
-				strikes += 2; // "Primal Might should also add 2 swings while his ultimate is up" (user kit law, read at the march)
+				strikes += 1; // Beastial Rage (user 2026-11-19 kit brief: "attack 50% faster and have +1 attack for 10s") adds its OWN swing, gated on the rage window ALONE - an older "+2 while Primal is ON and the ultimate is up" clause was assistant-authored, never user (zero user-role hits for it in the session store)
 
 				if (strikes > RAKE_SLOTS)
 
-				strikes = RAKE_SLOTS; // clamp: OFF/ON ceiling is clawStrikes 2 + 1 Primal + 2 raged = 5, the 8-slot stamp set can never come close to overflowing
+				strikes = RAKE_SLOTS; // clamp: per-rank ceiling is clawStrikes 2 (authored on the node) + 3 Primal Might ranks + 1 Beastial Rage = 6, so the 8-slot stamp set can never come close to overflowing
 
 				if (clawBeat >= clawSwings)
 

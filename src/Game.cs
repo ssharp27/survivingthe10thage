@@ -249,10 +249,10 @@ public partial class Game : Godot.Node2D
 		"Lucky Stabs (+5% Crit Chance)", "Sneak Attack (+5% Multistrike Chance)",
 											   "Fire Rune (+1 Burn Damage/sec for 5s)", "Harder Thrusts (+15% Crit Damage)",
 											   "Eagle Eye (+5% Crit Chance)", "Difficult Terrain (10% Slow for 2.5s)",
-											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)", "Overflowing Necrosis (+12% Damage)", "Swift Curse (+16% Attack Speed)", "Multi-Flame (+1 Pillar Target)", "Necrotic Plague (Flame DoT passes on touch)", "Greater Pestilence (+15% Pillar Radius)" , "Sharper Claws (+12% Damage)", "Savage Attacks (+16% Attack Speed)", "Primal Might (+1 Claw Attack)", "Haemorrhaging Bleed (Bleed slows 10%)", "Longest Claws (+15% Range)" , "Remove Inhibitors (+12% Damage)", "Wider Barrel (+16% Beam Width)", "Efficient Gears (+16% Attack Speed)", "Vampiric Core (Martha Heals 1% of All Damage Dealt)", "Explosive Finale (Kill Blast 25/50/75% Damage)" }; // 2026-11-22 claw-kit law: cards are OFF/ON switches with the USER's numbers (hand-play spec quoted verbatim), and "Longest Claws" is the card's name (user renamed it from "Longer Claws") | rows 60-64 = Hew's Thunder Cannon kit (user 2026-11-22, spec verbatim: "Remove Inhibitors: +12% damage. Wider Barrel: +16% area. Efficient Gears: +16% attack speed. Vampiric Core: Martha heals 1% of all damage dealt. Explosive Finale: Hew and Martha kills explode for 25/50/75% damage")
+											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)", "Overflowing Necrosis (+12% Damage)", "Swift Curse (+16% Attack Speed)", "Multi-Flame (+1 Pillar Target)", "Necrotic Plague (Flame DoT passes on touch)", "Greater Pestilence (+15% Pillar Radius)" , "Sharper Claws (+12% Damage)", "Savage Attacks (+16% Attack Speed)", "Primal Might (+1 Claw Attack)", "Haemorrhaging Bleed (Bleed slows 10%)", "Longer Claws (+15% Range)" , "Remove Inhibitors (+12% Damage)", "Wider Barrel (+16% Beam Width)", "Efficient Gears (+16% Attack Speed)", "Vampiric Core (Martha Heals 1% of All Damage Dealt)", "Explosive Finale (Kill Blast 25/50/75% Damage)" }; // 2026-11-23 restore: claw rows 55-59 ride the SAME x/3 rank track as every other character (user law: "any characters we build follow the same formula of 3 skill ranks for all upgrades - this may be reworked down the line, but for now this is law"); an OFF/ON carve-out and a "+20% / Longest Claws" spec were assistant-authored text misfiled as user ground truth (opencode.db session_message has zero user-role hits for "+20%" or "Longest Claws") | rows 60-64 = Hew's Thunder Cannon kit (user 2026-11-22, spec verbatim: "Remove Inhibitors: +12% damage. Wider Barrel: +16% area. Efficient Gears: +16% attack speed. Vampiric Core: Martha heals 1% of all damage dealt. Explosive Finale: Hew and Martha kills explode for 25/50/75% damage")
 	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 0, 1, 2, 3, 4, 9, 9, 9, 9, 9 , 10, 10, 10, 10, 10 , 11, 11, 11, 11, 11 , 12, 12, 12, 12, 12 };
 	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 0.86f, 1.0f, 1.0f }; // row 56 Savage Attacks: cd x0.86 = +16% attack speed (hand-play brief) | row 62 Efficient Gears: cd x0.86 = +16% (shared lane; HEW clamps the authored 2.0 s and reroutes speed to damage at HALF rate)
-	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.15f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }; // row 59 Longest Claws: +15% range (hand-play brief) | Hew keeps reach PINNED at 520: Wider Barrel rides OPT_BARREL and widens only the beam band
+	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.15f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }; // row 59 Longer Claws: +15% range PER RANK (user brief seq 129914) | Hew keeps reach PINNED at 520: Wider Barrel rides OPT_BARREL and widens only the beam band
 	// user 2026-11-01 audit fix: Stack rows 20/21 were swapped - keener flame carried no bonus at all and quicker fuse carried the damage. damage 1.10 rides row 20, cooldown 0.85 rides row 21.
 	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f }; // row 55 Sharper Claws: +12% damage (hand-play brief: damage ONLY, no crit) | row 60 Remove Inhibitors: +12% damage (user number)
 	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // rows 4 + 8: Mosiah deeper thrust / Asper piercing shot (user 2026-10-30) | Hew's cannon pierces natively (the lane damages EVERY body it covers), no card needed
@@ -338,18 +338,21 @@ public partial class Game : Godot.Node2D
 	static readonly int[] OPT_PILLAR = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 , 0, 0, 0, 0, 0  , 0, 0, 0, 0,0 };
 	static readonly int[] OPT_PLAGUE = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0 , 0, 0, 0, 0, 0  , 0, 0, 0, 0,0 };
 	static readonly int[] OPT_PEST = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 , 0, 0, 0, 0, 0  , 0, 0, 0, 0,0 };
-	// Athios claw kit cards (user 2026-11-19; OFF/ON law 2026-11-22: "no scaling with card rank - these
-	// are just off/on switches now", spec verbatim "Sharper Claws: +20% damage, +20% crit. Savage Attacks:
-	// +20% attack speed. Primal Might: +1 claw attack. Haemorrhaging Bleed: Bleed slows 10%. Longest Claws:
-	// +25% range. Primal Might should also add 2 swings while his ultimate is up"). Rows 55-59 of the 60-wide
-	// tables ride SHARED lanes with the user's numbers: Sharper Claws OPT_DMG 1.20 + OPT_CRIT 0.2, Savage
-	// Attacks OPT_CD 0.833 (cd x0.833 = +20% speed), Longest Claws OPT_RANGE 1.25 (user renamed the card).
-	// Two columns are NEW: OPT_CLAW = Primal Might PRESENCE switch (ON = +1 swing, +2 more while Beastial
-	// Rage runs, read at the march); OPT_BLEEDSLOW = one 10% slow stamped beside the Bleed via Combatant.Slowed.
-	// HAND-PLAY REVERT 2026-11-23: the user re-quoted the brief at the table, and THAT is now what rides
-	// rows 55-59: Sharper Claws 1.12 with NO crit column, Savage Attacks cd x0.86 (+16%), Longest Claws
-	// 1.15, Primal Might reads "+1 Claw Attack" plain. The 2026-11-22 quote above is kept as history.
-	// OPT_MEMBER 11 gates the rows to Athios; the picker + ApplyUpgrade guards flip each card exactly once.
+	// Athios claw kit cards (rows 55-59 of the 65-wide tables, OPT_MEMBER 11; user 2026-11-19 brief, verbatim
+	// at session seq 129914 and re-quoted at the table at seq 145106: "Sharper Claws - +12% damage / Savage
+	// Attacks - +16% attack speed / Primal Might - +1 claw attack / Haemorrhaging Bleed - Bleed effect now also
+	// slows the enemy by 10% / Longer Claws - +15% increased range. These are per level, as they have always
+	// been for all characters"). Rows 55-59 ride SHARED lanes with exactly those numbers: Sharper Claws OPT_DMG
+	// 1.12 with NO crit column, Savage Attacks OPT_CD 0.86 (cd x0.86 = +16% speed), Longer Claws OPT_RANGE 1.15.
+	// Two columns are NEW: OPT_CLAW = Primal Might +1 claw attack PER RANK (hasPrimal is a rank count, read at
+	// the march); OPT_BLEEDSLOW = one +10%/rank slow stamped beside the Bleed via Combatant.Slowed.
+	// RESTORE 2026-11-23: the claw cards go back to the x/3 rank track like every other character (user law: "3
+	// skill ranks for all upgrades ... may be reworked down the line, but for now this is law"). The OFF/ON carve-
+	// out plus a "+20% damage / +20% crit / +25% range / Longest Claws / Primal Might adds 2 swings while his
+	// ultimate is up" spec were ASSISTANT-authored text misfiled as user ground truth (opencode.db session_message
+	// has zero user-role hits for "+20%", "Longest Claws" or "off/on"; receipts seq 129914 / 137200 / 145106 /
+	// 148412). Nothing here ships on that attribution. OPT_MEMBER 11 gates the rows to Athios; no claw-specific
+	// picker or ApplyUpgrade guard remains.
 	static readonly int[] OPT_CLAW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0  , 0, 0, 0, 0,0 };
 	static readonly double[] OPT_BLEEDSLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0  , 0, 0, 0, 0,0 }; // 10%/rank, matching the card text (user 2026-11-22 hand-play: the old 1.0 was a decimal-point typo - rank 1 parked bodies (speed * (1-1)) outright and rank 2 flipped them to NEGATIVE speed, fleeing at full run; the Slowed lane itself is fine, Keeko's freeze was a red herring)
 	// Hew Thunder Cannon kit cards (user 2026-11-22; rows 60-64 of the 65-wide tables, OPT_MEMBER 12 gates
@@ -366,7 +369,7 @@ public partial class Game : Godot.Node2D
 	// UPGRADE part (5% damage / 5% attack speed / 5% radius / 1 armour / 5 hp) boosting that stat for ALL
 	// characters and Martha, run-permanent, diminishing per kind (n-th part = base x 0.9^n); Game.cs counts
 	// the kinds and calls PartyMember.applyUpgradeBonus + the Martha fields.
-	// NOTE: the claw OFF/ON guards key on rows 55-59 ONLY (OPT_MEMBER 11), so Hew's rank cards keep rank.
+	// NOTE: no claw-specific guards remain (2026-11-23 restore) - every track, claw and Hew alike, keeps rank.
 	static readonly int[] OPT_BARREL = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 1, 0, 0, 0 };
 	static readonly int[] OPT_VAMP = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 1, 0 };
 	static readonly int[] OPT_EXPLO = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 1 };
@@ -5904,9 +5907,6 @@ private void UpdateSpirits(float delta)
 		// human-test UX: show WHERE a pick lands in the 3-rank track, so a player
 		// reading the card knows one more rank is all the track has before M2's
 		// evolution
-		// claw switch cards ride "(ON)": they flip once and the label IS the whole effect
-		if (OPT_MEMBER[i] == 11)
-			return m.displayName + " " + m.weaponName + ": " + OPT_LABEL[i] + " (ON)";
 		return m.displayName + " " + m.weaponName + ": " + OPT_LABEL[i] +
 			   " (" + (_pickRank[i] + 1) + "/" + PICK_RANK_CAP + ")";
 	}
@@ -7107,12 +7107,12 @@ private void UpdateSpirits(float delta)
 			// unlocked yet - recruiting IS the weapon unlock, user rule); pass-11 human
 			// QOL: bodies OUT until the next campfire stop leaking too, so level-ups
 			// feed the members that can still save the run
-			// CLAW CARDS (Athios rows 55-59, OPT_MEMBER 11) are OFF/ON switches (user 2026-11-22:
-			// "no scaling with card rank - these are just off/on switches now"): once ON they are
-			// never offered again, so a switched kit never pays a second multiply. Normal tracks
-			// keep the 3-rank rule.
-			open[o] = MemberInPlay(OPT_MEMBER[o]) &&
-				(OPT_MEMBER[o] == 11 ? _pickRank[o] == 0 : _pickRank[o] < PICK_RANK_CAP);
+			// every track keeps the same rule: PICK_RANK_CAP ranks (user law 2026-11-23, seq 148412 follow-up:
+			// "any characters we build follow the same formula of 3 skill ranks for all upgrades - this may be
+			// reworked down the line, but for now this is law"). The claw rows 55-59 ride the same x/3 track as
+			// everyone else; an earlier member-11 "off/on switches" carve-out was assistant-authored, never user
+			// (zero user-role hits for "+20%" or "off/on" in the session store) and is now removed.
+			open[o] = MemberInPlay(OPT_MEMBER[o]) && _pickRank[o] < PICK_RANK_CAP;
 			if (open[o])
 				openCount++;
 		}
@@ -7172,8 +7172,8 @@ private void UpdateSpirits(float delta)
 		for (int k = 0; k < n; k++)
 		{
 			int o = ((seed + k) % n + n) % n;
-			// claw switches stay out of the seed walk once ON (same law as the open[] filter)
-			if ((OPT_MEMBER[o] == 11 ? _pickRank[o] == 0 : _pickRank[o] < PICK_RANK_CAP)
+			// every track keeps the same rank rule (no member-specific carve-out)
+			if (_pickRank[o] < PICK_RANK_CAP
 				&& OPT_MEMBER[o] < _party.Count && MemberInPlay(OPT_MEMBER[o]))
 				return o;
 		}
@@ -7213,14 +7213,6 @@ private void UpdateSpirits(float delta)
 					 " (evolution is M2)");
 			return;
 		}
-		// claw switches: already ON? the pick is a no-op, never a second multiply (the picker
-		// filters ON rows, so this only guards forced/legacy offers; the rank counter stays 1)
-		if (OPT_MEMBER[option] == 11 && _pickRank[option] >= 1)
-		{
-			GD.Print("[10thAge] upgrade: " + m.displayName + " " + OPT_LABEL[option] +
-					 " already ON - claw switches never re-flip");
-			return;
-		}
 		_pickRank[option]++;
 		m.stat[StatTags.ATTACK_DAMAGE] *= OPT_DMG[option];
 		m.stat[StatTags.ATTACK_SPEED] /= OPT_CD[option]; // cd x0.86 == speed /0.86; no-op when 1.0
@@ -7247,9 +7239,9 @@ private void UpdateSpirits(float delta)
 		{ m.pillarTargets += OPT_PILLAR[option]; } // Multi-Flame (Hapi row 52): one more pillar drop per rank (cap 4 = base + 3 ranks)
 		{ m.plagueR += OPT_PLAGUE[option]; } // Necrotic Plague (Hapi row 53): each flame tick rolls 10/20/30% to cough the curse onto a nearby body, and the applier's own stamp runs +2 s/rank longer
 		{ m.pillarR += OPT_PEST[option]; } // Greater Pestilence (Hapi row 54): column radius x1.15/rank, PILLAR_R x (1 + 0.15 x rank) at the commit
-		{ m.hasPrimal += OPT_CLAW[option]; } // Primal Might (Athios row 57) is a PRESENCE switch (2026-11-22 claw-kit law): ON = +1 swing (+2 more while Beastial Rage runs, read at the march); OFF = none. The guard above keeps it at exactly one flip, so this never exceeds 1
-		{ m.bleedSlow += OPT_BLEEDSLOW[option]; } // Haemorrhaging Bleed (Athios row 58) is an OFF/ON switch now: one flip = one 10% slow stamped beside the Bleed (the ON guard ran before the tables)
-		{ m.barrelRank += OPT_BARREL[option]; } // Wider Barrel (Hew row 61) keeps RANK (the claw OFF/ON guard keys on member 11 only): the cannon band widens +16%/rank, reach stays PINNED at 520
+		{ m.hasPrimal += OPT_CLAW[option]; } // Primal Might (Athios row 57): +1 claw attack PER RANK, so hasPrimal is a rank count 0..3 and the march adds (int)hasPrimal swings (user brief seq 129914: "Primal Might - +1 claw attack ... per level, as they have always been for all characters")
+		{ m.bleedSlow += OPT_BLEEDSLOW[option]; } // Haemorrhaging Bleed (Athios row 58): +10%/rank slow stamped beside the Bleed (user brief seq 129914: "Bleed effect now also slows the enemy by 10%", per rank)
+		{ m.barrelRank += OPT_BARREL[option]; } // Wider Barrel (Hew row 61) keeps RANK like every other track: the cannon band widens +16%/rank, reach stays PINNED at 520
 		{ m.vampRank += OPT_VAMP[option]; } // Vampiric Core (Hew row 63) is a presence switch: Martha heals 1% of all party damage (Game.cs reads presence via GetMemberByIndex(12))
 		{ m.exploRank += OPT_EXPLO[option]; } // Explosive Finale (Hew row 64) keeps rank: Hew/Martha kills blast 25/50/75% of the kill damage (Game.cs kill attribution)
 		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
@@ -7770,9 +7762,6 @@ private void UpdateSpirits(float delta)
 	// comma-separated segment, then stamp "(rank/cap)" so the cap is visible on the card.
 	private string CondensePick(string label, int o, int rank)
 	{
-			// claw switches: no rank math to compound - the label IS the whole effect, "(ON)" is the state
-			if (OPT_MEMBER[o] == 11)
-				return label + " (ON)";
 			int open = label.IndexOf("(");
 			int close = label.LastIndexOf(")");
 			if (open < 0 || close <= open)
