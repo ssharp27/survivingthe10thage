@@ -479,6 +479,10 @@ public partial class Game : Godot.Node2D
 		Label _selHint = null;            // key-grammar reminder on the card
 		Control[] _selTile = new Control[0];
 		Label[] _selName = new Label[0];
+		// per-seat ART box in page fractions (sizing v2): the tile rects ride this - an aspect-
+		// correct box computed at build from each canvas's real dims, default = the slot rect for
+		// placeholder seats; the click map keeps riding the SLOT (the box lives inside it)
+		float[] _selBox = new float[0];
 		// PAGE SCROLL (user 2026-11-23 hand-play: "the mouse wheel just scrolls between characters,
 		// but it should be scrolling the page/screen up or down to select characters as eventually
 		// we're going to have a lot more"): the wheel no longer steps the browse ring - it slides
@@ -489,6 +493,15 @@ public partial class Game : Godot.Node2D
 		// Positive rides the board DOWN (the wheel-up flick); SEL_SCROLL_HOME centres the board on
 		// its own content so the current roster all reads inside the window at rest
 		float _selScroll = 0.0f;
+		// SMOOTH SCROLL companion (user hand-play lap 2: "can you make it a smooth scrolling?"):
+		// the wheel nudges the TARGET; _selScroll chases it exponentially in the card's beat
+		float _selTarget = 0.0f;
+		// content clamp band (user hand-play lap 2: "it's possible to scroll up beyond the
+		// characters ... It shouldn't be able to do that"): computed once per card build from the
+		// ACTUAL art boxes (ComputeSelClamp): exactly enough wheel room to bring the first/last
+		// row flush to the window edge and NO further, so no blank band can appear
+		float _selClampLo = 0.0f;
+		float _selClampHi = 0.0f;
 		Control _selParty = null;         // party box copy: always up (party-wide meta track)
 		Control _selSheet = null;         // dark plate behind the sheet (box border)
 		Control _selPartyBack = null;     // dark plate behind the party box
@@ -6034,8 +6047,17 @@ private void UpdateSpirits(float delta)
 	// one wheel flick steps SEL_SCROLL_STEP page heights; the clamp lets a parked row come all the
 	// way into the window and back out again (room for the future bigger roster)
 	// wheel-up flicks bring the TOP rows in (the page rides down)
-	static readonly float SEL_SCROLL_STEP = 0.14f;
-	static readonly float SEL_SCROLL_MAX = 0.34f;
+		static readonly float SEL_SCROLL_STEP = 0.08f; // one flick nudges the TARGET this much (the
+		// old 0.14 JUMP every quarter second read stiff to hand-play lap 2: smaller nudges + the
+		// chase below blend consecutive flicks into one glide). SMOOTH SCROLL glide speed (user
+		// lap 2: "The scrolling is also really stiff, can you make it a smooth scrolling?"): the
+		// page catches up SEL_SCROLL_CHASE page heights per SECOND toward the target (about 0.13
+		// s to arrive at 60 fps, capped at half the gap per frame). The OLD SEL_SCROLL_MAX
+		// CONSTANT clamp is GONE: the band is content-derived (ComputeSelClamp + _selClampLo/
+		// _selClampHi) so a fully scrolled page ends FLUSH with the roster and no blank band can
+		// ever show (user lap 2: "it's possible to scroll up beyond the characters ... It
+		// shouldn't be able to do that")
+		static readonly float SEL_SCROLL_CHASE = 8.0f; // assistant pick, retune at hand-play
 	static readonly float SEL_PARK_EDGE = 0.12f; // a row's centre may overshoot the window by this page fraction before it parks hidden (about half a slot: a row at the edge still reads)
 	static readonly bool[] SEL_LOCKED = { false, false, false, false, false, false, false, false, false, false, false, false, false }; // 13 seats (seat 12 Hew joins at parity)
 	static readonly float[] SEL_CONFIRM = { 0.32f, 0.88f, 0.58f, 0.96f };
@@ -6056,6 +6078,10 @@ private void UpdateSpirits(float delta)
 		// The stage mini keeps its OWN knob (PartyMember.miniScale: 235 px * 0.38 = 89 px against
 		// the class's 118 * 0.75 = 88 px) - the two lanes' numbers stay separate on purpose.
 		static readonly float SEL_RING_PAD = 6.0f; // gold-ring px around the browsed slot (kept: the ring chrome, not the art lane)
+		// shared art-box PIXEL height for the whole cast (sizing v2): class sheets are ~114-121 px
+		// tall natively and drew native on the card (the look the user called the reference), so
+		// every seat draws THIS height; width follows each canvas aspect exactly
+		static readonly float SEL_ART_BOX_PX = 118.0f; // assistant pick from the PNG IHDRs, retune by eye
 		static readonly string[] SEL_BONUS = {
 		"Leader Bonus: Chain Lightning - All attacks have a 5% chance to unleash lightning on 5 targets for 10 damage.",
 		"Leader Bonus: Pierce - All attacks gain +1 Pierce and all allies gain +5% Evasion.",
@@ -6106,6 +6132,9 @@ private void UpdateSpirits(float delta)
 		int n = _party.Count;
 		_selTile = new Control[n];
 		_selName = new Label[n];
+		_selBox = new float[n * 4]; // per-seat ART box in page fractions (sizing v2, law below)
+		for (int bi = 0; bi < _selBox.Length; bi++)
+			_selBox[bi] = bi < SEL_GRID.Length ? SEL_GRID[bi] : 0.0f; // default = the slot rect: placeholder seats ride it, art seats overwrite it
 		// one slot per seat (rows of three): tile + name plate. The slot rect IS the card box for
 		// every seat now (the 2026-11-22 scaled-box lane is gone: sizing rides the slot via stretch)
 		int ti = 0;
@@ -6126,32 +6155,54 @@ private void UpdateSpirits(float delta)
 				else
 				{
 					Godot.TextureRect tr = new Godot.TextureRect(); tr.Texture = tex; // Control-friendly: anchor rects ride it
-					// ONE draw for EVERY seat (the slot-rect sizing law below SEL_PAGE): the slot rect
-					// plus STRETCH_KEEP_ASPECT_CENTERED (5 in the 4.x enum order: 3 = KEEP_CENTERED the
-					// shipped cast rode, 4 = KEEP_ASPECT, 5 = this contain-fit) aspect-FITS the sheet to
-					// the slot's own box - the 175x235 athios and 256x256 hew sheets get the same card
-					// read as the 78-98 W x 114-121 H class cast for free (user 2026-11-23 hand-play:
-					// "their art is too big ... look at the other characters art as a reference"). Nothing
-					// distorts and nothing clips: a CONTAINED draw can never leave the rect, so EXPAND_CLIP
-					// cannot bite (the old hazard was a 235 px sheet losing its feet in the ~163 px slot).
-					// The 2026-11-22 scaled lane (native*scale px pinned around the slot centre) is gone:
-					// sizing is the SLOT RECT's job, so one draw serves the whole cast.
-					tr.Set("stretch_mode", 5);
-					// NEAREST (0) pins pixels: the ~1:1 cast keeps the user's 2026-10-28 "not stretched"
-					// hard painted edges. The only shrinking lane here is the tall sheets (athios 235, hew
-					// 234 into the ~163 px slot): NEAREST at ~0.7 keeps every third source pixel and craters
-					// thin features, so those read LINEAR (1). Assistant pick, retune by eye at hand-play.
+					// ONE draw for EVERY seat, sizing v2 (user 2026-11-23 hand-play lap 2: "Athios and
+					// Hew are still too big"; the lap-1 screenshots proved EVERY tile still drew at its
+					// NATIVE canvas size, so v1's tr.Set("stretch_mode", 5) never aspect-fit - 4.7's
+					// enum is NOT the 4.x order, and the only stretch value PROVEN in this codebase is
+					// 0 = STRETCH_SCALE (the PartyMember lance draws through it), which FILLS the rect
+					// exactly. So sizing rides the RECT: compute each seat's aspect-correct box in
+					// PAGE PX terms from its OWN canvas (tex.GetWidth/GetHeight at build: the box can
+					// never lie about the art) and centre it in the slot. Height law SEL_ART_BOX_PX
+					// reproduces the reference look the user pointed at ("look at the other characters
+					// art": class sheets are ~114-121 px tall natively and drew native on the card):
+					// every seat draws the SAME pixel height - athios 175x235 reads ~88x118, hew
+					// 256x256 ~118x118, alvora 94x119 ~93x118. Nothing distorts (W follows the canvas
+					// aspect exactly) and nothing clips. Fractions need the page's real px aspect:
+					// _visHalf is measured every frame (default 960x540 is the sane fallback).
+					float aw = (float)tex.GetWidth();
+					float ah = (float)tex.GetHeight();
+					float pagW = (SEL_PAGE[2] - SEL_PAGE[0]) * _visHalf.X * 2.0f; // page px W
+					float pagH = (SEL_PAGE[3] - SEL_PAGE[1]) * _visHalf.Y * 2.0f; // page px H
+					float boxH = SEL_ART_BOX_PX / pagH; // shared px height as a page-H fraction
+					float boxW = SEL_ART_BOX_PX * aw / ah / pagW; // canvas aspect: never distorts
+					float bcx = (SEL_GRID[ti * 4] + SEL_GRID[ti * 4 + 2]) * 0.5f; // box centred on its slot
+					float bcy = (SEL_GRID[ti * 4 + 1] + SEL_GRID[ti * 4 + 3]) * 0.5f;
+					_selBox[ti * 4] = bcx - boxW * 0.5f;
+					_selBox[ti * 4 + 1] = bcy - boxH * 0.5f;
+					_selBox[ti * 4 + 2] = bcx + boxW * 0.5f;
+					_selBox[ti * 4 + 3] = bcy + boxH * 0.5f;
+					tr.Set("stretch_mode", 0); // STRETCH_SCALE: the PROVEN mode; the box above carries the aspect
+					// NEAREST (0) keeps the user's 2026-10-28 "not stretched" hard edges where the box
+					// is ~1:1 with the canvas (the class cast); only tall sheets shrink hard (athios
+					// 235 -> ~118 px = 2x) and NEAREST there craters thin features, so those read
+					// LINEAR (1). Assistant pick, retune by eye at hand-play.
 					tr.Set("texture_filter", tex.GetHeight() > 140.0f ? 1 : 0);
 					_selTile[ti] = tr;
 				}
-				// the slot rect owns the tile for EVERY seat now (no scaled branch to dodge it):
-				// the art draw rides stretch inside the slot, so pinning the tile is always safe
-				SetRectSel(_selTile[ti], SEL_GRID[ti * 4], SEL_GRID[ti * 4 + 1],
-					SEL_GRID[ti * 4 + 2], SEL_GRID[ti * 4 + 3]);
+				// sizing v2 owns the tile: art seats ride their aspect BOX (computed in the art
+				// branch above); the PLACEHOLDER seats keep the default _selBox = the slot copy. The
+				// click map stays on the SLOT: the box lives inside the slot rect (and the plate
+				// strip hangs at its foot), so the hit area is unchanged and a scrolled row is still
+				// clicked where it is DRAWN (the map undoes _selScroll off the same slot fractions)
+				SetRectSel(_selTile[ti], _selBox[ti * 4], _selBox[ti * 4 + 1], _selBox[ti * 4 + 2], _selBox[ti * 4 + 3]);
 				_selName[ti] = new Label();
-				// SHIPPED plate law for the WHOLE cast (2026-11-14 hand-play: plates dropped to the
-				// slot floor). Every seat's box IS its slot now, so one plate draw serves the card.
-				SetRectSel(_selName[ti], 0.02f, 0.85f, 0.98f, 0.99f);
+				// name plate law v2 (user 2026-11-23 hand-play lap 2: "names are overlapping with
+				// character models too"): the plate used to ride y 0.85..0.99 INSIDE the tile - safe
+				// when the tile rect WAS the slot, but the tile is the ART BOX now, so an inside
+				// anchor sits ON the canvas. The plate now hangs BELOW the box: anchors past 1.0 are
+				// legal (SetRectSel pins offsets to 0 so the anchor IS the rect) and ShowSelPage
+				// parks whole tiles together with their plate children
+				SetRectSel(_selName[ti], -0.10f, 1.01f, 1.10f, 1.18f);
 				_selName[ti].Text = pm2.displayName + (SEL_LOCKED[ti] ? " (locked)" : "");
 				_selName[ti].Set("horizontal_alignment", 1); // CENTER (string key: binding-safe)
 				_selTile[ti].AddChild(_selName[ti]);
@@ -6208,7 +6259,13 @@ private void UpdateSpirits(float delta)
 		_selHint.Text = "PRE-RUN: click a portrait to select, wheel scrolls the page up/down, click CONFIRM to seat the Leader"; // wheel grammar spelled out (user 2026-11-23 hand-play ask)
 		_selRoot.AddChild(_selHint);
 		_selBrowse = _selDemo ? -1 : 0; // humans open boxed on the roster head
+		ComputeSelClamp(); // content band BEFORE home is applied: home rides inside it
 		_selScroll = SEL_SCROLL_HOME; // the board opens centred on its own content: the whole current roster reads inside the window at rest, the wheel walks it after
+		if (_selScroll < _selClampLo)
+			_selScroll = _selClampLo;
+		if (_selScroll > _selClampHi)
+			_selScroll = _selClampHi;
+		_selTarget = _selScroll; // SMOOTH law: the target starts exactly where the board does
 		ShowBreakdown(0); // the sheet opens on the roster head
 		ShowSelPage();
 	}
@@ -6225,6 +6282,39 @@ private void UpdateSpirits(float delta)
 		node.Set("offset_right", 0.0f);  // newly selected slot) never moved. Pin offsets to 0 so
 		node.Set("offset_bottom", 0.0f); // the rect IS the anchor rect (build nodes ride it too)
 	}
+
+	// content-derived wheel clamp (user 2026-11-23 hand-play lap 2: "it's possible to scroll up
+	// beyond the characters as seen in the second screenshot. It shouldn't be able to do that"):
+	// the OLD law clamped +/- a CONSTANT page fraction (0.34), wide enough that a flicked-past
+	// page showed a whole blank band over the roster. This law reads the ACTUAL art boxes once
+	// per card build: the wheel can only push the FIRST box's top down to the window top, or
+	// lift the LAST box's bottom up to the window bottom, so a fully scrolled page ends with
+	// content FLUSH to the edge - no blank band above or below can ever appear - and a future
+	// bigger roster automatically gets proportionally more room. Fractions of the page height:
+	// content top+s <= 0 needs s <= -top, content bottom+s >= 1 needs s >= 1 - bot. Today
+	// top 0.03, bottom ~1.13 -> band ~[-0.13, -0.03]; HOME -0.07 sits inside.
+	private void ComputeSelClamp()
+	{
+		if (_selTile.Length == 0)
+		{
+			_selClampLo = SEL_SCROLL_HOME;
+			_selClampHi = SEL_SCROLL_HOME;
+			return; // card never built: a point band at HOME keeps any stray read sane
+		}
+		float top = 10.0f;
+		float bot = -10.0f;
+		for (int k = 0; k < _selTile.Length; k++)
+		{
+			if (_selBox[k * 4 + 1] < top)
+				top = _selBox[k * 4 + 1];
+			if (_selBox[k * 4 + 3] > bot)
+				bot = _selBox[k * 4 + 3];
+		}
+		_selClampHi = -top;
+		_selClampLo = 1.0f - bot;
+		if (_selClampLo > _selClampHi)
+			_selClampLo = _selClampHi = -top; // roster shorter than the window: flush-top rest only
+	}
 	// one board, one page: every tile AND the gold ring ride the PAGE SCROLL - their rects
 	// shift by _selScroll page fractions (re-anchoring: SetRectSel pins offsets to 0, so
 	// the anchor IS the rect and fractions can run past 1.0 down there). Rows whose centre
@@ -6237,8 +6327,8 @@ private void UpdateSpirits(float delta)
 		for (int k = 0; k < _selTile.Length; k++)
 		{
 			// the scroll rides the anchors: same fractions the click map undoes
-			SetRectSel(_selTile[k], SEL_GRID[k * 4], SEL_GRID[k * 4 + 1] + _selScroll,
-				SEL_GRID[k * 4 + 2], SEL_GRID[k * 4 + 3] + _selScroll);
+			SetRectSel(_selTile[k], _selBox[k * 4], _selBox[k * 4 + 1] + _selScroll,
+				_selBox[k * 4 + 2], _selBox[k * 4 + 3] + _selScroll); // rows ride their ART box (sizing v2)
 			// park rows past the window edge (half a slot of grace so an edge row still reads)
 			// a scrolled-out row draws NOTHING: future bigger rosters page in from off-window
 			// the name plate rides the tile (its child), so parking hides both together
@@ -6254,8 +6344,8 @@ private void UpdateSpirits(float delta)
 		// the ring rides the selected slot: grown +/- 0.02 so its edge frames the tile
 		// (byte-for-byte the shipped draw PLUS the same _selScroll shift the rows ride)
 		// a parked browsed row parks its gold too - CONFIRM still works on it
-		SetRectSel(_selFrame, SEL_GRID[_selBrowse * 4] - 0.02f, SEL_GRID[_selBrowse * 4 + 1] + _selScroll - 0.02f,
-				SEL_GRID[_selBrowse * 4 + 2] + 0.02f, SEL_GRID[_selBrowse * 4 + 3] + _selScroll + 0.02f);
+		SetRectSel(_selFrame, _selBox[_selBrowse * 4] - 0.02f, _selBox[_selBrowse * 4 + 1] + _selScroll - 0.02f,
+						_selBox[_selBrowse * 4 + 2] + 0.02f, _selBox[_selBrowse * 4 + 3] + _selScroll + 0.02f); // ring frames the ART box, not the slot
 	}
 	// the sheet for the SELECTED slot: name, then the mockup's Base Stats rows (live
 	// off the roster block so the numbers can never drift) each with its "(+0)"
@@ -6328,15 +6418,38 @@ private void UpdateSpirits(float delta)
 			_selWheelCd = 0.25; // assistant pick (retunable): one notch per quarter second
 			// wheel-UP flicks bring the TOP rows into view: the board rides DOWN (+scroll);
 			// the clamp keeps every seat reachable for the future bigger roster
-			_selScroll += (wheel > 0 ? 1.0f : -1.0f) * SEL_SCROLL_STEP;
-			if (_selScroll > SEL_SCROLL_MAX)
-				_selScroll = SEL_SCROLL_MAX;
-			if (_selScroll < -SEL_SCROLL_MAX)
-				_selScroll = -SEL_SCROLL_MAX;
-			ShowSelPage(); // the rows, the ring and the park flags all move in one beat
-			// scroll gate line: percent of the page (headless benches have no pointer so this
-			// print only shows when a flick is simulated; a human sees the board slide)
-			GD.Print("[10thAge] (select) wheel scroll: " + (int)(_selScroll * 100.0f + 0.5f) + "% of page");
+			// SMOOTH law: the flick moves the TARGET only; the board chases it in the easing block
+			// below the if, so a flick reads as a glide, not a jump
+			_selTarget += (wheel > 0 ? 1.0f : -1.0f) * SEL_SCROLL_STEP;
+			// CONTENT-DERIVED clamp (user lap 2: "it's possible to scroll up beyond the characters
+			// as seen in the second screenshot. It shouldn't be able to do that"): the OLD constant
+			// +/- 0.34 band let a flicked-past page show a whole blank band over the roster. The
+			// band now comes from the ACTUAL art boxes (ComputeSelClamp at card build): the wheel
+			// may only push the first box top down to the window top or lift the last box bottom
+			// up to the window bottom, so a fully scrolled page ends FLUSH with the roster and a
+			// future bigger roster automatically gets proportionally more room
+			if (_selTarget > _selClampHi)
+				_selTarget = _selClampHi;
+			if (_selTarget < _selClampLo)
+				_selTarget = _selClampLo;
+			// scroll gate line: percent of the page toward the TARGET (the board glides toward it;
+			// headless benches have no pointer so this only prints when a flick is simulated)
+			GD.Print("[10thAge] (select) wheel scroll: " + (int)(_selTarget * 100.0f + 0.5f) + "% of page");
+		}
+		// SMOOTH SCROLL (user 2026-11-23 hand-play lap 2: "The scrolling is also really stiff,
+		// can you make it a smooth scrolling?"): the flick above only nudged _selTarget; the board
+		// CHASES that target exponentially every frame here, so consecutive flicks blend into one
+		// gliding motion instead of teleporting a whole step on a quarter-second beat. k =
+		// SEL_SCROLL_CHASE * dt (about 0.13 s to arrive at 60 fps), capped at half the gap so a
+		// long frame cannot skip past the target; both ends of the chase sit inside the content
+		// clamp, so the band can never be escaped. Card-only: the pilot clock never reaches here.
+		if (_selScroll != _selTarget)
+		{
+			float k = SEL_SCROLL_CHASE * (float)d;
+			if (k > 0.5f)
+				k = 0.5f;
+			_selScroll += (_selTarget - _selScroll) * k;
+			ShowSelPage(); // rows, ring and park flags ride the same beat (one anchor pass)
 		}
 		// human card: waits for a real click forever (no timeout)
 		return;
