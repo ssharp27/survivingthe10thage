@@ -483,6 +483,14 @@ public partial class Game : Godot.Node2D
 		// correct box computed at build from each canvas's real dims, default = the slot rect for
 		// placeholder seats; the click map keeps riding the SLOT (the box lives inside it)
 		float[] _selBox = new float[0];
+		// sizing v3 (hand-play lap 4, THE sizing law): TextureRect draw sizing is DEAD in this
+		// 4.7.2 C# build - no stretch_mode value ever resized a seat (lap 4 saw athios/hew STILL
+		// native huge after two stretch attempts). Art rides the PROVEN Sprite2D + explicit .Scale
+		// lane under each slot WRAPPER; _selArt keeps the frame handle (null = placeholder seat)
+		// and _selArtH the native canvas height (the scale denominator). The click map and the
+		// park-hide still ride the WRAPPER (a Control), unchanged.
+		Godot.Sprite2D[] _selArt = new Godot.Sprite2D[0]; // per-seat Sprite2D art child
+		float[] _selArtH = new float[0]; // per-seat native canvas height
 		// PAGE SCROLL (user 2026-11-23 hand-play: "the mouse wheel just scrolls between characters,
 		// but it should be scrolling the page/screen up or down to select characters as eventually
 		// we're going to have a lot more"): the wheel no longer steps the browse ring - it slides
@@ -6133,14 +6141,16 @@ private void UpdateSpirits(float delta)
 		_selTile = new Control[n];
 		_selName = new Label[n];
 		_selBox = new float[n * 4]; // per-seat ART box in page fractions (sizing v2, law below)
+		_selArt = new Godot.Sprite2D[n]; // sizing v3: art-child handles (ShowSelPage refits them)
+		_selArtH = new float[n]; // native canvas heights: the scale denominators
 		for (int bi = 0; bi < _selBox.Length; bi++)
 			_selBox[bi] = bi < SEL_GRID.Length ? SEL_GRID[bi] : 0.0f; // default = the slot rect: placeholder seats ride it, art seats overwrite it
 		// one slot per seat (rows of three): tile + name plate. The slot rect IS the card box for
-		// every seat now (the 2026-11-22 scaled-box lane is gone: sizing rides the slot via stretch)
+		// every seat now (v3: the WRAPPER rides the box; the ART child scales on itself)
 		int ti = 0;
 		foreach (PartyMember pm2 in _party)
 		{
-			// one slot: painted mini (TextureRect, aspect-kept, NEAREST like the stage
+			// one slot: painted mini (Sprite2D child of a transparent wrapper, aspect-kept, NEAREST like the stage
 			// minis) inside a name plate; page-parked by hiding when off-page (ShowSelPage)
 			if (pm2.memberIndex >= 0 && pm2.memberIndex < SEL_ART.Length)
 			{
@@ -6154,21 +6164,19 @@ private void UpdateSpirits(float delta)
 				}
 				else
 				{
-					Godot.TextureRect tr = new Godot.TextureRect(); tr.Texture = tex; // Control-friendly: anchor rects ride it
-					// ONE draw for EVERY seat, sizing v2 (user 2026-11-23 hand-play lap 2: "Athios and
-					// Hew are still too big"; the lap-1 screenshots proved EVERY tile still drew at its
-					// NATIVE canvas size, so v1's tr.Set("stretch_mode", 5) never aspect-fit - 4.7's
-					// enum is NOT the 4.x order, and the only stretch value PROVEN in this codebase is
-					// 0 = STRETCH_SCALE (the PartyMember lance draws through it), which FILLS the rect
-					// exactly. So sizing rides the RECT: compute each seat's aspect-correct box in
-					// PAGE PX terms from its OWN canvas (tex.GetWidth/GetHeight at build: the box can
-					// never lie about the art) and centre it in the slot. Height law SEL_ART_BOX_PX
-					// reproduces the reference look the user pointed at ("look at the other characters
-					// art": class sheets are ~114-121 px tall natively and drew native on the card):
-					// every seat draws the SAME pixel height - athios 175x235 reads ~88x118, hew
-					// 256x256 ~118x118, alvora 94x119 ~93x118. Nothing distorts (W follows the canvas
-					// aspect exactly) and nothing clips. Fractions need the page's real px aspect:
-					// _visHalf is measured every frame (default 960x540 is the sane fallback).
+					// sizing v3 (user 2026-11-23 hand-play lap 4: "Nothing seems to have changed. Both
+					// are still too big" - laps 2-3 proved the draw NEVER resized: stretch 5 never fit,
+					// stretch 0 never FILLED. LAW: NO stretch_mode value resizes a TextureRect in this
+					// 4.7.2 C# build; art always paints at its NATIVE canvas size and the rect only places
+					// it. The class cast read right BY LUCK (native ~114-121 px = the box law); athios
+					// 175x235 and hew 256x256 stayed native huge. The PROVEN resize lane in this codebase
+					// is Sprite2D + explicit .Scale (PartyMember.cs _mini/_bookFx draw byte-identical).
+					// So: the tile is a transparent ColorRect WRAPPER (the anchor rect, park-hide handle,
+					// plate child all ride it exactly as before), and the art is its Sprite2D CHILD,
+					// refitted to the box in live px every frame in ShowSelPage.
+					Godot.ColorRect wr = new Godot.ColorRect(); // wrapper: draws NOTHING (alpha 0)
+					wr.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f);
+					Godot.Sprite2D sp = new Godot.Sprite2D(); sp.Texture = tex;
 					float aw = (float)tex.GetWidth();
 					float ah = (float)tex.GetHeight();
 					float pagW = (SEL_PAGE[2] - SEL_PAGE[0]) * _visHalf.X * 2.0f; // page px W
@@ -6181,13 +6189,18 @@ private void UpdateSpirits(float delta)
 					_selBox[ti * 4 + 1] = bcy - boxH * 0.5f;
 					_selBox[ti * 4 + 2] = bcx + boxW * 0.5f;
 					_selBox[ti * 4 + 3] = bcy + boxH * 0.5f;
-					tr.Set("stretch_mode", 0); // STRETCH_SCALE: the PROVEN mode; the box above carries the aspect
-					// NEAREST (0) keeps the user's 2026-10-28 "not stretched" hard edges where the box
-					// is ~1:1 with the canvas (the class cast); only tall sheets shrink hard (athios
-					// 235 -> ~118 px = 2x) and NEAREST there craters thin features, so those read
-					// LINEAR (1). Assistant pick, retune by eye at hand-play.
-					tr.Set("texture_filter", tex.GetHeight() > 140.0f ? 1 : 0);
-					_selTile[ti] = tr;
+					// NEAREST keeps the hard edges where the fit is ~1:1 (the class cast); LINEAR for the
+					// hard 2x shrink (athios 235 -> 118 px) where NEAREST craters thin features (assistant
+					// pick, retune by eye at hand-play)
+					sp.Set("texture_filter", tex.GetHeight() > 140.0f ? 1 : 0);
+					// honest first fit (ShowSelPage keeps it live against the window): box px H IS
+					// SEL_ART_BOX_PX by the box law, box px W follows the canvas aspect exactly
+					sp.Position = new Vector2(SEL_ART_BOX_PX * aw / ah * 0.5f, SEL_ART_BOX_PX * 0.5f); // centred on the box
+					sp.Scale = new Vector2(SEL_ART_BOX_PX / ah, SEL_ART_BOX_PX / ah); // uniform: never distorts
+					wr.AddChild(sp);
+					_selTile[ti] = wr;
+					_selArt[ti] = sp; // refit handle (null = placeholder seat)
+					_selArtH[ti] = ah; // scale denominator
 				}
 				// sizing v2 owns the tile: art seats ride their aspect BOX (computed in the art
 				// branch above); the PLACEHOLDER seats keep the default _selBox = the slot copy. The
@@ -6202,7 +6215,14 @@ private void UpdateSpirits(float delta)
 				// anchor sits ON the canvas. The plate now hangs BELOW the box: anchors past 1.0 are
 				// legal (SetRectSel pins offsets to 0 so the anchor IS the rect) and ShowSelPage
 				// parks whole tiles together with their plate children
-				SetRectSel(_selName[ti], -0.10f, 1.01f, 1.10f, 1.18f);
+				// sizing v3 plate law (user 2026-11-23 hand-play lap 4: "names are still getting
+				// cut by the selection box" - CONFIRMED by math: the ring grows the box +/- 0.02 PAGE
+				// fractions = ~+/-10-12 px on a ~605 px page, but the v2 top anchor 1.01 sat only +1.2
+				// px below the box: the label STRADDLED the gold's bottom edge). 1.14 of the box height
+				// = ~+17 px: clears the pad by a ~5 px breathing gap; 1.30 keeps the strip's own height.
+				// Placeholder seats ride the same anchors on their slot rect: the plate just hangs lower,
+				// still inside the click map (which rides the SLOT, untouched).
+				SetRectSel(_selName[ti], -0.10f, 1.14f, 1.10f, 1.30f);
 				_selName[ti].Text = pm2.displayName + (SEL_LOCKED[ti] ? " (locked)" : "");
 				_selName[ti].Set("horizontal_alignment", 1); // CENTER (string key: binding-safe)
 				_selTile[ti].AddChild(_selName[ti]);
@@ -6329,6 +6349,22 @@ private void UpdateSpirits(float delta)
 			// the scroll rides the anchors: same fractions the click map undoes
 			SetRectSel(_selTile[k], _selBox[k * 4], _selBox[k * 4 + 1] + _selScroll,
 				_selBox[k * 4 + 2], _selBox[k * 4 + 3] + _selScroll); // rows ride their ART box (sizing v2)
+			// sizing v3 refit (THE sizing law): TextureRect stretch never resized a single seat in
+			// this build (lap 4 CONFIRMED: art paints at NATIVE size, the rect only PLACES it), so
+			// the Sprite2D CHILD rides the box in REAL px, re-fit every frame against the live _visHalf
+			// exactly as the box fractions the wrapper above just got. Position is wrapper-LOCAL px
+			// (wrapper top-left = box top-left AFTER the scroll anchors) -> no scroll term here,
+			// only the box's own px size from the same page formula the build used.
+			if (_selArt[k] != null)
+			{
+				float pw = (SEL_PAGE[2] - SEL_PAGE[0]) * _visHalf.X * 2.0f; // page px W this frame
+				float ph = (SEL_PAGE[3] - SEL_PAGE[1]) * _visHalf.Y * 2.0f; // page px H this frame
+				float bw = (_selBox[k * 4 + 2] - _selBox[k * 4]) * pw; // this row's ART box in px
+				float bh = (_selBox[k * 4 + 3] - _selBox[k * 4 + 1]) * ph;
+				_selArt[k].Position = new Vector2(bw * 0.5f, bh * 0.5f); // a Sprite2D is CENTRED on its position
+				float sc = bh / _selArtH[k]; // uniform scale: box px H / native canvas H: never distorts
+				_selArt[k].Scale = new Vector2(sc, sc); // the PROVEN PartyMember.cs FX-minis resize lane
+			}
 			// park rows past the window edge (half a slot of grace so an edge row still reads)
 			// a scrolled-out row draws NOTHING: future bigger rosters page in from off-window
 			// the name plate rides the tile (its child), so parking hides both together
