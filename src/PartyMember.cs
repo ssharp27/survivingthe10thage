@@ -460,6 +460,8 @@ public partial class PartyMember : Godot.Node2D
 
 			static readonly double CLAW_RAKE = 0.62;    // v5 art pivot as a fraction of reach - the daggers' jabLen number: the rake always rides maximum distance
 
+			static readonly double HEW_FIRE_LEASH = 260.0;   // v5 close-engage gate (assistant pick, retunable): the cannon SEES at the PINNED 520 but only fires this close to its own body (hand-play 2026-11-23: advance and attack when close enough to hit)
+
 	// Yu's familiars (M2, user dictation 2026-10-22): the fuse is the summon's LIFETIME, and
 
 	// the familiar detonates on contact with prey OR when that fuse burns out - the fuse is
@@ -1952,9 +1954,9 @@ public partial class PartyMember : Godot.Node2D
 
 	public double EffDamage() { return weaponDamage * stat[StatTags.ATTACK_DAMAGE]; }
 
-	/** Authored cooldown divided by the ATTACK_SPEED tag (higher = faster attacks). */
+	/** THE attack-speed read: ATTACK_SPEED tag x kit/ult/rage multipliers x leader bonus (clamped). */
 
-	public double EffCooldown()
+	public double AtkSpdMul()
 
 	{
 
@@ -1964,11 +1966,21 @@ public partial class PartyMember : Godot.Node2D
 
 			spd = 0.05; // clamp: stacked speed cards can't drive the timer to zero
 
+		return spd;
+
+	}
+
+	/** Authored cooldown divided by AtkSpdMul (higher = faster attacks). */
+
+	public double EffCooldown()
+
+	{
+
 		// Hew "Thunder Cannon" (user 2026-11-22): the attack can NEVER be faster than its base
 		// 2.0 - speed bonuses instead buy damage in RollDamage, at HALF rate.
 		if (weaponKit == "cannon")
 			return cooldown;
-		return cooldown / spd;
+		return cooldown / AtkSpdMul(); // now reads the SHARED multiplier (the claw stagger divides by it too)
 
 	}
 
@@ -4206,6 +4218,14 @@ public partial class PartyMember : Godot.Node2D
 				hitN++;
 
 				}
+				// MELEE MISSILE SMASH (dagger law): the claw strike shatters what its FRESH line sweeps
+
+				int clawSmashN = pg.SmashBulletsCorridor(p, clawAim, reach, band);
+
+				if (clawSmashN > 0)
+
+					GD.Print("[10thAge] (smash) " + displayName + " claws shatter " + clawSmashN + " missiles"); // bench audit
+
 
 				_atkFlash = 0.08f; // same commit-frame flash discipline as every other verb
 
@@ -4270,7 +4290,7 @@ public partial class PartyMember : Godot.Node2D
 
 				{
 
-				cdTimer = (float)CLAW_STAGGER; // the USER's 0.2 s gap between claw strikes (v5 law: "Brook's is 0.4, so Athios can be 0.2")
+				cdTimer = (float)(CLAW_STAGGER / AtkSpdMul()); // the USER's 0.2 s gap DIVIDED by attack speed - the raw constant is why Savage Attacks read dead (hand-play 2026-11-23)
 
 				GD.Print("[10thAge] (claw) " + displayName + " strike " + clawBeat + "/" + clawSwings + " (" + hitN + " bodies raked, fresh aim)");
 
@@ -4327,6 +4347,19 @@ public partial class PartyMember : Godot.Node2D
 			return;
 
 		cdTimer = (float)EffCooldown();
+		// HEW CLOSE-ENGAGE GATE (user 2026-11-23 hand-play: "Hew and Martha are both attacking from
+
+		// way too far away still... advance and attack when a monster is close enough to hit"). The
+
+		// cannon SEES at the PINNED 520 but only fires inside HEW_FIRE_LEASH, so the march walks up
+
+		// instead of sniping; cdTimer never burns, so an out-of-leash frame is a pure walk frame.
+
+
+		if (cannonKit && bestD > HEW_FIRE_LEASH)
+
+			return; // too far to hit: close in on the next frame
+
 
 		Vector2 to = best.GlobalPosition - p;
 

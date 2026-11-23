@@ -249,12 +249,12 @@ public partial class Game : Godot.Node2D
 		"Lucky Stabs (+5% Crit Chance)", "Sneak Attack (+5% Multistrike Chance)",
 											   "Fire Rune (+1 Burn Damage/sec for 5s)", "Harder Thrusts (+15% Crit Damage)",
 											   "Eagle Eye (+5% Crit Chance)", "Difficult Terrain (10% Slow for 2.5s)",
-											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)", "Overflowing Necrosis (+12% Damage)", "Swift Curse (+16% Attack Speed)", "Multi-Flame (+1 Pillar Target)", "Necrotic Plague (Flame DoT passes on touch)", "Greater Pestilence (+15% Pillar Radius)" , "Sharper Claws (+20% Damage, +20% Crit)", "Savage Attacks (+20% Attack Speed)", "Primal Might (+1 Claw Swing, +2 while Ultimate is up)", "Haemorrhaging Bleed (Bleed slows 10%)", "Longest Claws (+25% Range)" , "Remove Inhibitors (+12% Damage)", "Wider Barrel (+16% Beam Width)", "Efficient Gears (+16% Attack Speed)", "Vampiric Core (Martha Heals 1% of All Damage Dealt)", "Explosive Finale (Kill Blast 25/50/75% Damage)" }; // 2026-11-22 claw-kit law: cards are OFF/ON switches with the USER's numbers (hand-play spec quoted verbatim), and "Longest Claws" is the card's name (user renamed it from "Longer Claws") | rows 60-64 = Hew's Thunder Cannon kit (user 2026-11-22, spec verbatim: "Remove Inhibitors: +12% damage. Wider Barrel: +16% area. Efficient Gears: +16% attack speed. Vampiric Core: Martha heals 1% of all damage dealt. Explosive Finale: Hew and Martha kills explode for 25/50/75% damage")
+											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)", "Overflowing Necrosis (+12% Damage)", "Swift Curse (+16% Attack Speed)", "Multi-Flame (+1 Pillar Target)", "Necrotic Plague (Flame DoT passes on touch)", "Greater Pestilence (+15% Pillar Radius)" , "Sharper Claws (+12% Damage)", "Savage Attacks (+16% Attack Speed)", "Primal Might (+1 Claw Attack)", "Haemorrhaging Bleed (Bleed slows 10%)", "Longest Claws (+15% Range)" , "Remove Inhibitors (+12% Damage)", "Wider Barrel (+16% Beam Width)", "Efficient Gears (+16% Attack Speed)", "Vampiric Core (Martha Heals 1% of All Damage Dealt)", "Explosive Finale (Kill Blast 25/50/75% Damage)" }; // 2026-11-22 claw-kit law: cards are OFF/ON switches with the USER's numbers (hand-play spec quoted verbatim), and "Longest Claws" is the card's name (user renamed it from "Longer Claws") | rows 60-64 = Hew's Thunder Cannon kit (user 2026-11-22, spec verbatim: "Remove Inhibitors: +12% damage. Wider Barrel: +16% area. Efficient Gears: +16% attack speed. Vampiric Core: Martha heals 1% of all damage dealt. Explosive Finale: Hew and Martha kills explode for 25/50/75% damage")
 	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 0, 1, 2, 3, 4, 9, 9, 9, 9, 9 , 10, 10, 10, 10, 10 , 11, 11, 11, 11, 11 , 12, 12, 12, 12, 12 };
-	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.833f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 0.86f, 1.0f, 1.0f }; // row 56 Savage Attacks: cd x0.833 = +20% attack speed (user number) | row 62 Efficient Gears: cd x0.86 = +16% (shared lane; HEW clamps the authored 2.0 s and reroutes speed to damage at HALF rate)
-	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.25f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }; // row 59 Longest Claws: +25% range (user number) | Hew keeps reach PINNED at 520: Wider Barrel rides OPT_BARREL and widens only the beam band
+	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 0.86f, 1.0f, 1.0f }; // row 56 Savage Attacks: cd x0.86 = +16% attack speed (hand-play brief) | row 62 Efficient Gears: cd x0.86 = +16% (shared lane; HEW clamps the authored 2.0 s and reroutes speed to damage at HALF rate)
+	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.15f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }; // row 59 Longest Claws: +15% range (hand-play brief) | Hew keeps reach PINNED at 520: Wider Barrel rides OPT_BARREL and widens only the beam band
 	// user 2026-11-01 audit fix: Stack rows 20/21 were swapped - keener flame carried no bonus at all and quicker fuse carried the damage. damage 1.10 rides row 20, cooldown 0.85 rides row 21.
-	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.20f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f }; // row 55 Sharper Claws: +20% damage (user number, switch not rank) | row 60 Remove Inhibitors: +12% damage (user number)
+	static readonly float[] OPT_DMG = { 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.10f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.10f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f , 1.12f, 1.0f, 1.0f, 1.0f, 1.0f }; // row 55 Sharper Claws: +12% damage (hand-play brief: damage ONLY, no crit) | row 60 Remove Inhibitors: +12% damage (user number)
 	static readonly int[] OPT_PIERCE = { 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // rows 4 + 8: Mosiah deeper thrust / Asper piercing shot (user 2026-10-30) | Hew's cannon pierces natively (the lane damages EVERY body it covers), no card needed
 	static readonly int[] OPT_SHOTS = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0  , 0, 0, 0, 0,0 }; // multishot rank: for Yu it is the MULTIATTACK rank - one more familiar per ritual
 	// guiding light (Alvora): the ring MARKS caught bodies for +10%/rank incoming damage
@@ -270,7 +270,7 @@ public partial class Game : Godot.Node2D
 	// drag <= 0.75 at rank 3, crit <= 0.05 + 3 x 0.08 = 0.29.
 	// OPT_SLOW = drag strength/rank (Baldrun row 18); OPT_CRIT = crit points/rank (Mosiah row 19).
 	static readonly double[] OPT_SLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 };
-	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0.2, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // row 55 Sharper Claws: +20 CRIT_CHANCE points on the store (switch, one flip only)
+	static readonly double[] OPT_CRIT = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.08, 0, 0, 0, 0.08, 0, 0, 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 , 0, 0, 0, 0, 0 }; // row 55 Sharper Claws: NO crit - the hand-play brief carries damage ONLY (reverted 2026-11-23)
 	// firebolt kit cards (Stack, user 2026-10-30): OPT_BURN = +2 s of linger per rank onto
 	// PartyMember.burnDur; OPT_CINDER = cinder bloom rank: a body that dies STILL burning bursts
 	// in CINDER_R px, scorching the live horde bodies in the blast for 25/50/75% of the firebolt's
@@ -346,6 +346,9 @@ public partial class Game : Godot.Node2D
 	// Attacks OPT_CD 0.833 (cd x0.833 = +20% speed), Longest Claws OPT_RANGE 1.25 (user renamed the card).
 	// Two columns are NEW: OPT_CLAW = Primal Might PRESENCE switch (ON = +1 swing, +2 more while Beastial
 	// Rage runs, read at the march); OPT_BLEEDSLOW = one 10% slow stamped beside the Bleed via Combatant.Slowed.
+	// HAND-PLAY REVERT 2026-11-23: the user re-quoted the brief at the table, and THAT is now what rides
+	// rows 55-59: Sharper Claws 1.12 with NO crit column, Savage Attacks cd x0.86 (+16%), Longest Claws
+	// 1.15, Primal Might reads "+1 Claw Attack" plain. The 2026-11-22 quote above is kept as history.
 	// OPT_MEMBER 11 gates the rows to Athios; the picker + ApplyUpgrade guards flip each card exactly once.
 	static readonly int[] OPT_CLAW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0  , 0, 0, 0, 0,0 };
 	static readonly double[] OPT_BLEEDSLOW = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.10, 0  , 0, 0, 0, 0,0 }; // 10%/rank, matching the card text (user 2026-11-22 hand-play: the old 1.0 was a decimal-point typo - rank 1 parked bodies (speed * (1-1)) outright and rank 2 flipped them to NEGATIVE speed, fleeing at full run; the Slowed lane itself is fine, Keeko's freeze was a red herring)
@@ -465,6 +468,8 @@ public partial class Game : Godot.Node2D
 		string _selWant = "";             // bench's wanted seat name (resolved at confirm)
 		double _selWait = 0.0;            // card clock: feeds ONLY the pilot auto door
 		int _selBrowse = -1;              // slot the card currently reads (-1 = nothing)
+		double _selWheelCd = 0.0;         // wheel beat clock: one browse notch per 0.25 s (assistant pick, retunable)
+		int _selWheel = 0;                // one-shot wheel scroll stamped by _Input (+1 up / -1 down); PollSelect reads and zeroes it
 		Godot.CanvasLayer _selLayer = null;
 		Control _selRoot = null;          // full-rect anchor parent for every piece
 		ColorRect _selBack = null;        // full-rect cover: the card hides the world frame
@@ -817,7 +822,9 @@ public partial class Game : Godot.Node2D
 		const double MARTHA_LEASH = 120.0; // assistant pick (retunable): px past which she runs back to Hew by the shortest (wrap) route
 		const double MARTHA_PULL = 140.0;  // assistant pick (mirrors TAUNT_PULL): how far the horde notices her at all
 		const double MARTHA_FIND = 620.0;  // assistant pick (mirrors UNDEAD_FIND): she chews live prey this far
+		const double MARTHA_HUNT = 200.0;  // assistant pick (retunable): px around HEW inside which prey counts as HERS (flank guard: she guards the squad, not the map - hand-play 2026-11-23)
 		const float MARTHA_RADIUS = 12.0f; // assistant pick: her hit core, same read as MEMBER_RADIUS / UNDEAD_RADIUS
+		const double MARTHA_VITALS = 20.0;  // assistant pick (retunable): durability bonus ON the HP ceiling (hand-play recheck: 40 was chewed too fast behind the 3-armour soak)
 		Godot.Node2D _marthaBody = null;   // her singleton node (null until BuildMartha seats her)
 		double _marthaHp = 0.0;            // REAL hp: the horde can fell her (mirrors _undHp)
 		double _marthaT = 0.0;            // BROKEN countdown: > 0 = she is repairing, never biting
@@ -4689,12 +4696,12 @@ public void RegisterEnemy(Combatant e)
 		{
 			// FIRST tick after he joins: seat her at his flank. The lazy seat is why she needs no join
 			// hook at all - the stage-1 lottery can fire on any frame.
-			_marthaHp = MARTHA_HP + _marthaHpBonus;
+			_marthaHp = MARTHA_HP + _marthaHpBonus + MARTHA_VITALS;
 			_marthaT = 0.0;
 			_marthaCd = 0.5; // a half-second wind-up, then the bite clock
 			_marthaBody.GlobalPosition = WrapNearCamera(hew.GlobalPosition + new Vector2(-40.0f, 0.0f));
 			if (_pilot)
-				GD.Print("[10thAge] (martha) Martha crawls out beside Hew (40 hp / 3 armour, 10 px bite)");
+				GD.Print("[10thAge] (martha) Martha crawls out beside Hew (" + (MARTHA_HP + MARTHA_VITALS) + " hp / 3 armour, 10 px bite)");
 		}
 		_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition); // fold-follow like every pool
 		// BROKEN lane (user: at 0 hp she is broken 20 s and repairs herself). The countdown runs 2x while
@@ -4711,7 +4718,7 @@ public void RegisterEnemy(Combatant e)
 			if (_marthaT <= 0.0)
 			{
 				_marthaT = 0.0;
-				_marthaHp = MARTHA_HP + _marthaHpBonus; // knitted back to her OWN ceiling, parts included
+				_marthaHp = MARTHA_HP + _marthaHpBonus + MARTHA_VITALS; // knitted back to her OWN ceiling, parts included
 				_marthaCd = 0.5; // the fresh line bites after a wind-up, not straight out of the yard
 				if (_pilot)
 					GD.Print("[10thAge] (martha) Martha knits herself back to full"); // the 20 s done
@@ -4728,6 +4735,12 @@ public void RegisterEnemy(Combatant e)
 			Combatant nc = (Combatant)n;
 			if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
 				continue; // dead bodies are not prey
+			// HUNT GATE (user 2026-11-23 hand-play: "Martha should be trying to stay close while still
+			// running in to attack enemies"): prey only counts when it is within MARTHA_HUNT px of HEW,
+			// so she never sprints off the flank after a straggler - attackers on Hew are her prey as always.
+			Vector2 hoff = WrapDelta(hew.GlobalPosition, n.GlobalPosition); // prey distance FROM Hew
+			if (hoff.X * hoff.X + hoff.Y * hoff.Y > MARTHA_HUNT * MARTHA_HUNT)
+				continue; // flank guard: out of Hew's guard ring - hold the line, do not chase
 			Vector2 off = WrapDelta(_marthaBody.GlobalPosition, n.GlobalPosition);
 			double d2 = off.X * off.X + off.Y * off.Y;
 			if (d2 < best)
@@ -4817,7 +4830,7 @@ public void RegisterEnemy(Combatant e)
 		PartyMember hew = FindHew();
 		if (hew == null || hew.vampRank <= 0.0 || _marthaT > 0.0)
 			return; // no card, no lane
-		double cap = MARTHA_HP + _marthaHpBonus;
+		double cap = MARTHA_HP + _marthaHpBonus + MARTHA_VITALS;
 		if (_marthaHp >= cap)
 			return; // already at the ceiling: a sip is never wasted on a full pool
 		_marthaHp += dealt * 0.01 * hew.vampRank;
@@ -6334,6 +6347,40 @@ private void UpdateSpirits(float delta)
 			CloseSelect(true);
 			return;
 		}
+		// wheel rail (user 2026-11-23 hand-play: "this area also needs to be scrollable, either by click
+		// and drag or mouse wheel"): one notch steps the gold browse ring one LIVE slot; click browse
+		// is the first rail, the wheel is the second, and the beat clock stops one flick from fanning
+		// the ring. The pilot clock drives the bench itself, so it never reads the wheel.
+		_selWheelCd -= d;
+		int wheel = _selWheel; // WHEEL READ: 4.7 dropped Input.get_wheel_direction, so _Input captures WHEEL_UP/WHEEL_DOWN into this one-shot
+		_selWheel = 0;         // consumed EVERY frame (pilot frames too): an out-of-beat flick is dropped, not banked
+		if (!_pilot)
+		{
+			if (wheel != 0 && _selWheelCd <= 0.0)
+			{
+				_selWheelCd = 0.25; // assistant pick (retunable): one notch per quarter second
+				int ring = _selTile.Length;
+				int step = wheel > 0 ? 1 : -1;
+				int want = _selBrowse;
+				for (int s = 0; s < ring; s++)
+				{
+					want += step;
+					if (want < 0)
+						want = ring - 1; // the ring wraps both ways
+					if (want >= ring)
+						want = 0;
+					if (want >= 0 && want < _party.Count && !SEL_LOCKED[want])
+						break; // first LIVE seat going that way takes the gold
+				}
+				if (want >= 0 && want < _party.Count && !SEL_LOCKED[want] && want != _selBrowse)
+				{
+					_selBrowse = want;
+					ShowSelPage();
+					ShowBreakdown(_selBrowse);
+					GD.Print("[10thAge] (select) wheel browse: " + _party[_selBrowse].displayName);
+				}
+			}
+		}
 		// human card: waits for a real click forever (no timeout)
 		return;
 	}
@@ -7378,6 +7425,15 @@ private void UpdateSpirits(float delta)
 	// so a click lands on the card/banner, never on the walk.
 	public override void _Input(InputEvent ev)
 	{
+		// WHEEL PICKUP (user 2026-11-23 hand-play: "this area also needs to be scrollable, either
+		// by click and drag or mouse wheel"): 4.7 DROPPED the Input.get_wheel_direction read and has
+		// no wheel event class at all; viewport.cpp lands the wheel here as an InputEventMouseButton
+		// whose ButtonIndex is MouseButton.WheelUp/WheelDown (press side only; releases carry
+		// Pressed=false). PollSelect consumes _selWheel on the next frame, and the beat clock turns
+		// one flick into one ring notch.
+		if (ev is Godot.InputEventMouseButton mw && mw.Pressed &&
+			(mw.ButtonIndex == Godot.MouseButton.WheelUp || mw.ButtonIndex == Godot.MouseButton.WheelDown))
+			_selWheel = (mw.ButtonIndex == Godot.MouseButton.WheelUp) ? 1 : -1;
 		if (ev is Godot.InputEventMouseButton mb && mb.ButtonIndex == Godot.MouseButton.Left
 			&& mb.Pressed)
 		{
