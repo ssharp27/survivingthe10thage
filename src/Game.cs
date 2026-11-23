@@ -554,6 +554,18 @@ public partial class Game : Godot.Node2D
 	Godot.Collections.Array<Godot.ColorRect> _hpFill = new();
 	Godot.Collections.Array<Godot.ColorRect> _hpDot = new();
 	bool _hpStripsBuilt = false;
+	// Martha mini HUD strip (user 2026-11-23): she is NOT a PartyMember, so a 40x5 bar + number
+	// rides Hew's strip row instead of a slot of its own.
+	Godot.Label _marthaHpN = null;
+	Godot.ColorRect _marthaHpBg = null;
+	Godot.ColorRect _marthaHpF = null;
+	// Martha gait rig (user 2026-11-23: "the same movement animation as the enemies") - the Enemy.cs
+	// sway law odometer + eased px/s live here; the rig Node2D swings her art, never the hit core.
+	Godot.Node2D _marthaRig = null;
+	double _marthaBobT = 0.0;
+	double _marthaMoveSpd = 0.0;
+	Vector2 _marthaLastMove = new Vector2(0.0f, 0.0f);
+	bool _marthaMovePrimed = false;
 	string _pickerCard = "LEVEL UP";      // what the picker is offering (level-up / camp gift)
 	double _pickerNoticeT = 0.0;          // "every rank capped - xp banked" notice countdown
 	Godot.Collections.Array<PartyMember> _party = new();
@@ -4725,6 +4737,11 @@ public void RegisterEnemy(Combatant e)
 		_marthaT = 0.0;
 		_marthaCd = 0.0;
 		AddChild(_marthaBody); // persistent: never pooled, never QueueFreed
+		// Gait rig: her art + FX stamps ride this Node2D, UpdateMarthaFx swings it with the ENEMY sway
+		// law. The BODY node stays the hit core, so the sway never nudges anything the horde reads.
+		_marthaRig = new Godot.Node2D();
+		_marthaRig.Name = "Gait";
+		_marthaBody.AddChild(_marthaRig);
 		Godot.Texture2D tex = GD.Load("res://art/characters/martha.png") as Godot.Texture2D; // 104x97 sheet, on the user's WIP rail
 		if (tex == null)
 			return; // greybox: she still bites, still gets chewed, she just has no sheet
@@ -4736,7 +4753,7 @@ public void RegisterEnemy(Combatant e)
 		art.Scale = new Vector2((float)ms, (float)ms);
 		// rim 0: her base band sits at the canvas bottom, so pin the sheet bottom to the node origin
 		art.Position = new Vector2(0.0f, (float)(-(tex.GetHeight() * 0.5) * ms));
-		_marthaBody.AddChild(art);
+		_marthaRig.AddChild(art); // art rides the gait rig: the swing animates the sheet, not the hit core
 	}
 //T// The Hew member, or null while he is off-field (never joined / eliminated). He is the ONLY seat
 //T// Martha listens to: no Hew = no body on the field, and every lane below keeps that read.
@@ -4860,7 +4877,7 @@ public void RegisterEnemy(Combatant e)
 						_biteFx.Texture = GD.Load("res://art/fx/martha_bite.png") as Godot.Texture2D; // rail art lands this lap; absent = invisible stamp
 						_biteFx.Set("texture_filter", 0); // NEAREST like every other pool sprite
 						_biteFx.Set("z_index", 4); // over her body (2): the chomp reads ON the prey, not behind the iron
-						_marthaBody.AddChild(_biteFx); // rides her fold-follow for free: a body child
+						(_marthaRig != null ? _marthaRig : _marthaBody).AddChild(_biteFx); // rides her fold-follow AND her gait: the chomp swings with the body
 					}
 					_biteFx.Position = off; // body->prey local seat: the same delta the touch test used
 					_biteFx.Set("rotation", (float)System.Math.Atan2(off.Y, off.X)); // chomp aimed down the bite line
@@ -5093,13 +5110,47 @@ public void RegisterEnemy(Combatant e)
 				sr.Color = new Color(0.45f, 0.7f, 1.0f, 1.0f); // electric blue: same read as the chain bolts
 				sn.AddChild(sr);
 				sn.Visible = false;
-				_marthaBody.AddChild(sn); // body child: rides her fold-follow for free
+				(_marthaRig != null ? _marthaRig : _marthaBody).AddChild(sn); // rides her fold-follow AND her gait
 				_sparkN.Add(sn);
 				_sparkS.Add(ss);
 				_sparkR.Add(sr);
 				_sparkLife.Add(0.0);
 			}
 			_marthaSparkDelay = 0.0;
+		}
+		// Gait (user 2026-11-23: "the same movement animation as the enemies"): the Enemy.cs sway law -
+		// an odometer of what she ACTUALLY moved, an eased px/s, lateral sway + half-rate dip + a lean
+		// that trails the sway, cadence scaled by that speed, set-down when she stops. Her 130 px/s
+		// scuttle IS the enemy SWAY_REF, so a full gallop swings at the creature cadence (12/s), not
+		// the party 7.2. Visuals only: the BODY node is the hit core the horde reads.
+		{
+			Vector2 gp = _marthaBody.GlobalPosition;
+			float moved = _marthaMovePrimed ? WrapDelta(_marthaLastMove, gp).Length() : 0.0f;
+			_marthaLastMove = gp;
+			_marthaMovePrimed = true;
+			if (moved > 400.0f)
+				moved = 0.0f; // wrap-fold frame, not motion (the party guard)
+			float inst = delta > 0.001f ? moved / delta : (float)_marthaMoveSpd;
+			_marthaMoveSpd += (inst - _marthaMoveSpd) * (1.0 - (float)System.Math.Exp(-8.0 * delta));
+			if (_marthaRig != null)
+			{
+				if (_marthaMoveSpd > 30.0) // striding (enemy SWAY_MIN)
+				{
+					double ratio = _marthaMoveSpd / 130.0; // enemy SWAY_REF
+					ratio = ratio < 0.35 ? 0.35 : (ratio > 1.4 ? 1.4 : ratio);
+					_marthaBobT += delta * 12.0 * ratio; // enemy SWAY_RATE: the creature cadence, not the party 7.2
+					float ph = (float)_marthaBobT; // solo: no per-body phase, she is one of one
+					float sw = (float)System.Math.Sin(ph) * 3.4f; // enemy SWAY_AMP
+					_marthaRig.Position = new Vector2(sw, -(float)System.Math.Abs((float)System.Math.Sin(ph * 0.5)) * 1.2f); // side to side + half-rate dip
+					_marthaRig.Rotation = sw * 0.017f; // the lean trails the sway (party constant)
+				}
+				else
+				{
+					float ease = 1.0f - (float)System.Math.Exp(-9.0 * delta); // set-down, not a jolt (party law)
+					_marthaRig.Position += -_marthaRig.Position * ease;
+					_marthaRig.Rotation += -_marthaRig.Rotation * ease;
+				}
+			}
 		}
 		if (_marthaFxT > 0.0)
 		{
@@ -5122,7 +5173,7 @@ public void RegisterEnemy(Combatant e)
 				_sparkLife[i] = MARTHA_SPARK_LIFE;
 				Godot.Node2D sn = _sparkN[i];
 				float jr = Rng != null ? (float)Rng.Randf() : 0.5f; // loose jitter around her chassis: assistant pick (retune by eye)
-				sn.Position = new Vector2((float)(jr * 52.0 - 26.0), (float)(((i * 7 + (int)(jr * 9)) % 11) * 5.0f - 25.0f)); // local seat: no art needed to spread the crackle
+				sn.Position = new Vector2((float)(jr * 44.0 - 22.0), (float)(((i * 7 + (int)(jr * 9)) % 11) * 4.0f - 55.0f)); // local seat (user 2026-11-23: "higher up to be on her body"): the crackle walks her torso + head, never under her base
 				sn.Set("rotation", (float)(jr * 3.14159 * 2.0 - 3.14159)); // streak aimed loose, like a bolt that found no second body
 				sn.Visible = true;
 				_sparkS[i].Visible = _sparkS[i].Texture != null; // static art paints only once the rail has loaded
@@ -6158,7 +6209,22 @@ private void UpdateSpirits(float delta)
 				_hudLayer.AddChild(dot);
 				_hpDot.Add(dot);
 			}
+			// Martha's mini strip: a 40x5 bar + number built once, hidden until it anchors to Hew's row
+			_marthaHpN = new Godot.Label();
+			_marthaHpN.ZIndex = 12;
+			_hudLayer.AddChild(_marthaHpN);
+			_marthaHpBg = new Godot.ColorRect();
+			_marthaHpBg.Size = new Vector2(40.0f, 5.0f);
+			_marthaHpBg.Color = new Color(0.12f, 0.11f, 0.10f, 0.0f);
+			_marthaHpBg.ZIndex = 12;
+			_hudLayer.AddChild(_marthaHpBg);
+			_marthaHpF = new Godot.ColorRect();
+			_marthaHpF.Size = new Vector2(0.0f, 5.0f);
+			_marthaHpF.Color = new Color(0.55f, 0.60f, 0.72f, 1.0f); // steel sheen: her iron, not the party brass
+			_marthaHpF.ZIndex = 13;
+			_hudLayer.AddChild(_marthaHpF);
 		}
+		float hewRowY = -1000.0f; // the row Martha's mini strip anchors to
 		for (int i = 0; i < _hpName.Count; i++)
 		{
 			Godot.Label n = _hpName[i];
@@ -6182,6 +6248,8 @@ private void UpdateSpirits(float delta)
 				continue;
 			}
 			bool isOut = m.eliminated; // "out" is a reserved word in C# (the parameter modifier)
+			if (m.displayName == "Hew")
+				hewRowY = 60.0f + i * 32.0f; // Martha's mini strip rides Hew's row (user 2026-11-23)
 			bool down = m.downed && !isOut;
 			float frac = m.EffMaxHp() > 0.0 ? (float)(m.hp / m.EffMaxHp()) : 0.0f;
 			if (frac < 0.0f)
@@ -6207,6 +6275,23 @@ private void UpdateSpirits(float delta)
 			dot.Color = stranded ? CHIP_AMBER
 								: (isOut ? CHIP_GREY
 									   : (down ? (m.stable ? CHIP_AMBER : CHIP_BLOOD) : CHIP_SAGE));
+		}
+		// Martha mini strip draw: anchored beside Hew's bar, hidden while she is off-field (user 2026-11-23)
+		if (hewRowY > -500.0f && _marthaBody != null && FindHew() != null)
+		{
+			double mcap = MARTHA_HP + _marthaHpBonus + MARTHA_VITALS;
+			_marthaHpN.Position = new Vector2(152.0f, hewRowY + 6.0f);
+			_marthaHpN.Text = _marthaHp <= 0.0 ? "Martha DOWN" : "Martha " + (int)_marthaHp + "/" + (int)mcap;
+			_marthaHpBg.Position = new Vector2(152.0f, hewRowY + 21.0f);
+			_marthaHpBg.Color = new Color(0.12f, 0.11f, 0.10f, 0.9f);
+			_marthaHpF.Position = new Vector2(152.0f, hewRowY + 21.0f);
+			_marthaHpF.Size = new Vector2(mcap > 0.0 ? (float)(_marthaHp / mcap) * 40.0f : 0.0f, 5.0f); // floors at 0: overkill never poisons the bar
+		}
+		else if (_marthaHpN != null)
+		{
+			_marthaHpN.Text = "";
+			_marthaHpBg.Color = new Color(0.12f, 0.11f, 0.10f, 0.0f);
+			_marthaHpF.Size = new Vector2(0.0f, 5.0f);
 		}
 	}
 

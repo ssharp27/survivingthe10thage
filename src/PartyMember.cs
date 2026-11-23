@@ -238,7 +238,7 @@ public partial class PartyMember : Godot.Node2D
 	static readonly int RAKE_SLOTS = 8;
 	Godot.Sprite2D[] _rakeFx = null;
 	Godot.Sprite2D _muzzleFx = null; // Thunder cannon muzzle stamp: cannonFxArt lane; null = ember ColorRect band is the whole shot (assistant pick, retune by eye)
-	Godot.Sprite2D[] _splashFx = null; // Thunder-puff splash stamps at the prey (claw-v5 member-anchored pattern: slots are children of the body, the hook stamps the world coord)
+	Godot.Sprite2D[] _splashFx = null; // Thunder EXPLOSION stamp at the prey (single slot now: the blob art scales to the blast ring - user 2026-11-23: "it shouldn't be a star... just scaling up the current FX"; claw-v5 member-anchored: the slot stays a body child, the hook stamps the world coord)
 	Godot.Sprite2D _flashFx = null; // Muzzle BURST at the muzzle (SEPARATE art: the beam's Scale.x stretch would smear a welded flash); null = beam alone is the whole shot
 	float _splashT = 0.0f; // splash stamp visibility timer: own clock, the cannon kit never arms _fxT
 
@@ -585,7 +585,7 @@ public partial class PartyMember : Godot.Node2D
 		public int exploRank = 0;   // Explosive Finale ranks: 25/50/75% blast on Hew/Martha kills
 		static readonly double CANNON_BAND_PX = 14.0;  // half-width of the cannon beam lane (retune by eye)
 		static readonly double CANNON_BEAM_ART_PX = 73.0;  // rail law: art = 146x36 = transparent pad 73 + LANCE 73 = this span denominator
-		static readonly double CANNON_SPLASH_PX = 40.0; // splash radius around the MAIN cannon target (retune by eye)
+		static readonly double CANNON_SPLASH_PX = 40.0; // BASE splash radius: the damage ring + the painted blob widen with the area dials at the commit site (user 2026-11-23: "the explosion radius... gets increased with upgrades")
 
 	// Alvora "Guardian Awakening" (user 2026-10-26): ring reach x2 MULTIPLIED after the
 
@@ -1248,15 +1248,15 @@ public partial class PartyMember : Godot.Node2D
 				AddChild(_muzzleFx);
 			}
 		}
-		// Thunder-puff SPLASH stamps (lap-6 FX): 4-slot star posed at the prey on the claw-v5 member-anchored lane
-		// (the slots are children of the body, the hook stamps at the world coord). "" art = the ring still bites, no paint.
+		// Thunder EXPLOSION stamp (lap-6 FX v2 - user 2026-11-23: "it should be an explosion... just scaling up
+		// the current FX to the size of the blast ring"): ONE blob child of the body; the commit hook scales it to the ring. "" art = the ring still bites, no paint.
 		if (splashFxArt != "")
 		{
 			Godot.Texture2D sfx = GD.Load(splashFxArt) as Godot.Texture2D;
 			if (sfx != null)
 			{
-				_splashFx = new Godot.Sprite2D[4];
-				for (int f2 = 0; f2 < 4; f2++)
+				_splashFx = new Godot.Sprite2D[1]; // ONE blob: the hook scales it to the blast ring
+				for (int f2 = 0; f2 < 1; f2++)
 				{
 					_splashFx[f2] = new Godot.Sprite2D();
 					_splashFx[f2].Texture = sfx;
@@ -4776,16 +4776,22 @@ public partial class PartyMember : Godot.Node2D
 		}
 
 		// Hew "Thunder Cannon" (user 2026-11-22): the blast is ONE hitscan lane at the prey - it
-		// pierces and wounds EVERY body it passes, plus a small splash around the MAIN target.
+		// pierces and wounds EVERY body it passes, plus a blast ring around the MAIN target that widens with the SAME upgrades the band rides (user 2026-11-23)
 		// The band widens with radius upgrades (AREA stat, Wider Barrel ranks, lead bonus, ult);
 		// reach never lengthens (EffRange pins the cannon). Assistant picks (retune by eye):
-		// band half-width CANNON_BAND_PX, splash CANNON_SPLASH_PX, muzzle origin (0,-20).
+		// band half-width AND splash ring ride those dials now (the damage ring widens too - see below), muzzle origin (0,-20).
 		else if (cannonKit)
 		{
 			// band half-width: base x Wider Barrel ranks x the shared radius dials (x1.5 while ult runs)
 			double band = CANNON_BAND_PX * (1.0 + 0.16 * (double)barrelRank) * stat[StatTags.AREA] * LeaderAreaMul();
 			if (ultT > 0.0)
 				band *= 1.5; // Maximum Firepower!: +50% beam radius/area (the ult's AUTHORED number)
+			// splash ring: the SAME dials the band just read. The user's ask (2026-11-23): the explosion
+			// "gets increased with upgrades" - so the DAMAGE ring and the painted blob scale together (flagged
+			// gameplay change: the ring was flat 40 px before; it now widens with Wider Barrel ranks / AREA / lead).
+			double splashR = CANNON_SPLASH_PX * (1.0 + 0.16 * (double)barrelRank) * stat[StatTags.AREA] * LeaderAreaMul();
+			if (ultT > 0.0)
+				splashR *= 1.5; // Maximum Firepower!: the blast ring widens under the ult too
 			Vector2 e = pg.WrapDelta(p, best.GlobalPosition);
 			float segLen = e.Length();
 			if (segLen >= 0.001f)
@@ -4822,8 +4828,8 @@ public partial class PartyMember : Godot.Node2D
 					if (nc == null || nc.kind == "dead")
 						continue;
 					Vector2 r2 = pg.WrapDelta(best.GlobalPosition, c.GlobalPosition);
-					if (r2.Length() - nc.hitR > CANNON_SPLASH_PX)
-						continue; // outside the splash ring around the MAIN target
+					if (r2.Length() - nc.hitR > (float)splashR)
+						continue; // outside the (upgrade-widened) splash ring around the MAIN target
 					nc.TakeDamage(dmg * 0.5); // the spec's small splash: half the blast on the ring bodies
 
 					// ditto on the splash ring: the half-blast is her damage as well
@@ -4852,17 +4858,12 @@ public partial class PartyMember : Godot.Node2D
 			}
 			if (_splashFx != null)
 			{
-				Vector2 sp = p + e; // thunder-puff rides the WRAPPED world coord of the MAIN prey (claw-v5 anchor discipline)
+				Vector2 sp = p + e; // thunder-blast rides the WRAPPED world coord of the MAIN prey (claw-v5 anchor discipline)
 				_splashFx[0].GlobalPosition = sp;
-				_splashFx[1].GlobalPosition = sp + new Vector2(16.0f, 0.0f);
-				_splashFx[2].GlobalPosition = sp + new Vector2(-16.0f, 0.0f);
-				_splashFx[3].GlobalPosition = sp + new Vector2(0.0f, -14.0f);
-				for (int f2 = 0; f2 < _splashFx.Length; f2++)
-				{
-					_splashFx[f2].Visible = true;
-					_splashFx[f2].Scale = new Vector2(0.6f, 0.6f); // puff scale knob (assistant pick, retune by eye)
-				}
-				_splashT = 0.18f;
+				float puff = (float)(2.0 * splashR / 32.0); // the blob art is 32 px across: draw it SPANNING the damage ring, art and ring stay honest
+				_splashFx[0].Scale = new Vector2(puff, puff); // one scaled blob, not a star (user 2026-11-23: "it should be an explosion... just scaling up the current FX")
+				_splashFx[0].Visible = true;
+				_splashT = 0.18f; // decays muzzle + burst + blast on one beat (assistant pick, retune by eye)
 			}
 		}
 
