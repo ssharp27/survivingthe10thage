@@ -4837,9 +4837,11 @@ public void RegisterEnemy(Combatant e)
 		// frees the cog herself, and never rides it.
 		if (_marthaBody != null && _marthaHp > 0.0 && _marthaT <= 0.0)
 		{
-			foreach (Godot.Node2D nd in GetChildren())
+			// the standing child-walk idiom: Godot.Node, never Godot.Node2D - the scene carries
+			// Control children and an implicit Node2D cast THROWS InvalidCast per frame (PD229)
+			foreach (Godot.Node nd in GetChildren())
 			{
-				Pickup pc3 = nd as Pickup;
+				Pickup pc3 = nd as Pickup; // null for every non-cog child, so no cast throws
 				if (pc3 != null && pc3.pk == 3 && WrapDelta(pc3.GlobalPosition, _marthaBody.GlobalPosition).Length() < 18.0f)
 				{
 					CollectGearPart(pc3.gearKind, pc3.GlobalPosition); // shared weld math (damp/tally inside)
