@@ -20,8 +20,9 @@ using Godot;
 /// </summary>
 public partial class Pickup : Godot.Node2D
 {
-    public int pk = 0; // 0 heal | 1 magnet | 2 rage
+    public int pk = 0; // 0 heal | 1 magnet | 2 rage | 3 gear part (ROUND 8: Hew's Upgrades! weld rides the field)
     private double _life = 0.0;
+    public int gearKind = 0; // ROUND 8: pk 3 part kind the Game.CollectGearPart weld applies: 0 dmg | 1 spd | 2 rad | 3 arm | 4 hp
     private float _bobT = 0.0f;
     Godot.ColorRect _orb;
     // 2026-11-08 art pass (user-approved sprites): healing potion / arcane orb / rage flame per flavour;
@@ -29,6 +30,7 @@ public partial class Pickup : Godot.Node2D
     static Godot.Texture2D _artHeal = null;
     static Godot.Texture2D _artOrb = null;
     static Godot.Texture2D _artRage = null;
+    static Godot.Texture2D _artGear = null; // ROUND 8: pk 3 cog (hew_gear.png, the approved weld art)
     static bool _artTried = false;
     static readonly float PICKUP_ART_S = 0.42f; // 40 px art -> ~16 px: a touch over the 12 px shell (assistant pick)
     // assistant-picked knobs (hand-test retunes)
@@ -46,6 +48,7 @@ public partial class Pickup : Godot.Node2D
         _orb.Position = -_orb.Size * 0.5f;
         _orb.Color = pk == 0 ? new Color(0.25f, 0.85f, 0.35f) // heal orb green
                        : pk == 1 ? new Color(0.95f, 0.75f, 0.25f) // magnet gold
+                       : pk == 3 ? new Color(0.55f, 0.55f, 0.58f) // gear cog iron grey (ROUND 8)
                        : new Color(0.90f, 0.20f, 0.20f); // rage vial red
         if (!_artTried)
         {
@@ -53,8 +56,9 @@ public partial class Pickup : Godot.Node2D
             _artHeal = GD.Load("res://art/pickups/potion.png") as Godot.Texture2D; // red flask (user swapped the heart concept)
             _artOrb = GD.Load("res://art/pickups/orb.png") as Godot.Texture2D;
             _artRage = GD.Load("res://art/pickups/rage_flame.png") as Godot.Texture2D;
+            _artGear = GD.Load("res://art/fx/hew_gear.png") as Godot.Texture2D; // ROUND 8: field cogs wear the weld's own cog art
         }
-        Godot.Texture2D atx = pk == 0 ? _artHeal : pk == 1 ? _artOrb : _artRage;
+        Godot.Texture2D atx = pk == 0 ? _artHeal : pk == 1 ? _artOrb : pk == 3 ? _artGear : _artRage;
         if (atx != null)
         {
             Godot.Sprite2D asp = new Godot.Sprite2D();
@@ -83,8 +87,9 @@ public partial class Pickup : Godot.Node2D
         _bobT += delta;
         if (_orb != null)
             _orb.Position = new Vector2(-6.0f, -6.0f - 4.0f * (float)System.Math.Sin((double)_bobT * 5.0f)); // 4 px hover (assistant pick)
-        _life -= delta;
-        if (_life <= 0.0)
+        if (pk != 3)
+            _life -= delta; // ROUND 8: cogs do NOT expire - a part waits until someone claims it
+        if (pk != 3 && _life <= 0.0)
         {
             QueueFree(); // nobody grabbed it in time: it dims out
             return;
@@ -130,6 +135,10 @@ public partial class Pickup : Godot.Node2D
         {
             g._magnetT = MAGNET_T; // UpdateGems reads this clock: bubble becomes whole-field
             GD.Print("[10thAge] (pickup) xp magnet: whole-field gem vacuum for 6 s");
+        }
+        else if (pk == 3)
+        {
+            g.CollectGearPart(gearKind, GlobalPosition); // ROUND 8: the ground half of Hew's Upgrades! weld - the shared math prints the part read
         }
         else
         {

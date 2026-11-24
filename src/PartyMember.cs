@@ -476,7 +476,7 @@ public partial class PartyMember : Godot.Node2D
 			static readonly double CLAW_RAKE = 0.62;    // v5 art pivot as a fraction of reach - the daggers' jabLen number: the rake always rides maximum distance
 
 			static readonly double HEW_FIRE_LEASH = 260.0;   // v5 close-engage gate (assistant pick, retunable): the cannon SEES at the PINNED 520 but only fires this close to its own body (hand-play 2026-11-23: advance and attack when close enough to hit)
-			static readonly double HEW_BLAST_DELAY = 0.2;   // user 2026-11-24 (round 7): the pending-blast beat - the ring damage and the painted blob land ~0.2 s AFTER the beam fires so the shot reads hit > explosion (their "maybe 0.2 s", retune by eye)
+			static readonly double HEW_BLAST_DELAY = 0.1;   // user 2026-11-24 (round 8): the pending-blast beat TIGHTENED to 0.1 s - the ring damage and the painted blob land ~0.1 s AFTER the beam fires so the shot reads hit > explosion (their "0.1 s", retune by eye)
 
 	// Yu's familiars (M2, user dictation 2026-10-22): the fuse is the summon's LIFETIME, and
 
@@ -990,22 +990,22 @@ public partial class PartyMember : Godot.Node2D
 			else if (displayName == "Athios")
 			{
 				// 2026-11-19 probe / 2026-11-23 size pass (user: raise the in-game read toward 0.5): Athios art probe
-				// (175x235 canvas - the user's ~2x-quality drop, against the class's 78-98 W x 114-121 H). 235 px x 0.5
-				// = ~118 px stage, a shade taller than the class read (~88 px at the default 0.75 on ~118 px sheets);
+				// (175x235 canvas - the user's ~2x-quality drop, against the class's 78-98 W x 114-121 H). 235 px x 0.45 (ROUND 8, user: a little bigger than regular)
+				// = ~106 px stage, a bit taller than the class read (~88 px at the default 0.75 on ~118 px sheets);
 				// rim 31 is the base-band centre read from the canvas bottom (assistant pick, retune by eye at hand-play)
 				miniPath = "res://art/characters/athios.png";
-				miniScale = 0.5f;
+				miniScale = 0.45f; // ROUND 8 (user: a little bigger than regular): ~106 px vs the ~88 px class read
 				miniRim = 31.0f;
 			}
-			// 2026-11-22: Hew art probe (256x256 canvas - the user's high-quality drop). 256 px x 0.35 =
-			// ~90 px (Athios now reads ~118 px at 0.5); rim 34 is the base-plate
+			// 2026-11-22: Hew art probe (256x256 canvas - the user's high-quality drop). 256 px x 0.30 =
+			// ~77 px (Athios now reads ~106 px at 0.45); rim 34 is the base-plate
 			// band centre read from the canvas bottom (assistant pick, retune by eye at hand-play; the SEL
 			// lane has its OWN 0.46 knob)
 			else if (displayName == "Hew")
 			{
-				// class's 78-98 W x 114-121 H). 256 px x 0.35 = ~90 px (assistant pick, retune by eye)
+				// class's 78-98 W x 114-121 H). 256 px x 0.30 = ~77 px (ROUND 8, user: a little smaller than regular; assistant pick, retune by eye)
 				miniPath = "res://art/characters/hew.png";
-				miniScale = 0.35f;
+				miniScale = 0.30f; // ROUND 8 (user: a little smaller than regular): ~77 px vs the ~88 px class read
 				miniRim = 34.0f;
 			}
 
@@ -4891,7 +4891,7 @@ public partial class PartyMember : Godot.Node2D
 							_blastNodes[bn++] = cn; // live snapshot: the resolve re-tests life on its own beat
 					}
 					_blastPending = true;
-					_blastT = HEW_BLAST_DELAY;      // ~0.2 s beat (assistant fill of the user "maybe 0.2 s", retune by eye)
+					_blastT = HEW_BLAST_DELAY;      // ROUND 8: the tightened 0.1 s beat (user "0.1 s"), damage lands just after the beam fires
 					_blastHalf = dmg * 0.5;         // the spec small splash: half the blast, paid at the beat (GAMEPLAY: same numbers, one beat late)
 					_blastR = splashR;              // the upgrade-widened ring, captured at the shot
 					_blastPos = best.GlobalPosition; // the MAIN prey world coord: the ring rides the fold

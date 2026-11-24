@@ -854,6 +854,15 @@ public partial class Game : Godot.Node2D
 		int _upRadN = 0;
 		int _upArmN = 0;
 		int _upHpN = 0;
+		int _upGearN = 0;   // ROUND 8: gear parts that WELDED this run (pilot read only)
+		int _upGearLoose = 0; // ROUND 8: of the granted parts, how many became a REAL field cog instead
+		// ROUND 8 (user 2026-11-24: "make hews gear parts drop like xp would and make it stay on the
+		// ground until picked up"): the user's 2.5% of the parts Hew's bonus roll grants loosen as a
+		// Pickup node (pk 3) instead of welding into the squad on the spot. One drop, ONE route: the
+		// roll either looses a field cog (this const) or welds instantly (the round-6 path, unchanged
+		// for the other 97.5%). The cog never expires - unlike the three other flavours, whose 18 s
+		// lifetime is the "grabbing it is a choice" law - the user asked for it to sit until grabbed.
+		const double GEAR_PART_CH = 0.025; // user: 2.5% of Hew's part drops become a field cog
 		// MARTHA (user 2026-11-22, Hew's companion): a dedicated PERSISTENT Node2D singleton, NOT a
 		// PartyMember and NOT a risen shell - own bite lane, own damage route, never despawns. She IS
 		// the horde's other player character: the Enemy chase already walks a Node2D quarry (GetTauntBody)
@@ -898,6 +907,42 @@ public partial class Game : Godot.Node2D
 		Godot.Collections.Array<double> _cogSpin = new();         // tumble rad/s per slot (alternates: two drops never read the same way)
 		double _marthaHpBonus = 0.0;      // ditto: flat hp points on top of her 40
 		double _marthaVamp = 0.0;         // Vampiric Core (Hew card): hp she has drunk this run, clamped to her own ceiling
+		// ROUND 8 (user 2026-11-24, round 8: "she collects xp and such for the player, and will also
+		// benefit from ultimates and passives that buff allies / party members (treat it like she is
+		// another party member)"): she is NOT a PartyMember and NOT in _party, so none of the party
+		// buff clocks - Athios Beastial Rage, Alvora Awaken, Brook Insight, the six Experimental Elixir
+		// buffs, Oakhollow Assemble, an ally's own ultimate - can land on her the way they land on the
+		// squad. Rather than duplicate every reader, she SAMPLES them: MirrorPartyBuffs() below takes
+		// the STRONGEST live clock of each kind across the standing squad every UpdateMartha frame, so
+		// a member standing in the same room as a buff and her get it alike. She never decays a mirror
+		// (the PM _Process owns every countdown), so nothing can leak past its owner's expiry, and Hew's
+		// OWN ult is excluded: her bite + soak lanes already read hew.ultT directly, and stacking the
+		// same window twice would double-count Maximum Firepower!.
+		double _muUltT = 0.0;           // mirrored ALLY ult window (never Hew's: see the exclusion above)
+		double _muInsT = 0.0;           // Inquisitive Mind (Brook): +25% dealt, +25% attack speed
+		// ROUND 8: she never decays a mirror (the PM _Process owns every countdown), so nothing can
+		// leak past its owner's expiry. Hew's OWN ult is excluded from _muUltT (her lanes already
+		// read hew.ultT directly; double-counting Maximum Firepower! would be wrong). The mirror SET
+		// is the damage/move/defence/collect family - the four healing ults (Mending Tide, Tidebreak
+		// Guard's revive shield, Vantage HP bump, Rootstalker Echo revive) ride HP/shield lanes with
+		// no her-side analogue except HP regen, so they fold through _muOakT's regen tick when their
+		// caster also runs Assemble-style sustain; assistant pick, retunable by hand.
+		// (mirrors: max of the LIVE clocks across STANDING members, recomputed each UpdateMartha frame)
+		double _muRageT = 0.0;          // Beastial Rage (Athios): +50% attack speed, half incoming
+		double _muAwaT = 0.0;           // Awaken (Alvora): +25% dealt, double reach
+		double _muOakT = 0.0;           // Assemble (Oakh): +5 armour, +25% move, regen tick
+		double _muElixHealT = 0.0;      // Menders Brew (any member): regen while brewed
+		// (clones the PM regen lane: max hp x 1% per second while brewed)
+		double _muElixSwiftT = 0.0;     // Alacrity elixir (any member): +10% move
+		// (clones SwiftfootElixirMoveMul = 1.10 on move)
+		double _muElixHardT = 0.0;      // Resilience elixir (any member): 10% less incoming
+		// (clones ResilienceElixirDamageMul = 0.90 in TakeHit)
+		double _muElixBoldT = 0.0;      // Boldness elixir (any member): +10% dealt
+		// (clones BoldnessElixirMul = 1.10 on dealt)
+		double _muElixPrecT = 0.0;      // Precision elixir (any member): +10% crit
+		// (clones PrecisionElixirCrit = 0.10 added to the crit chance)
+		double _muElixMagT = 0.0;       // Wildcraft elixir (any member): her bubble +10%
+		// (clones the +10% the brew puts on the leader's collection bubble - her own 110 px)
 		const double EXPLO_BLAST = 60.0; // assistant pick (retunable): px ring an Explosive Finale kill detonates into
 		// The Kaka (Yu ult, user 2026-10-26): six EMPOWERED copies of the ritual familiars -
 		// same pool, steering, fuse and no-split blast, only doubled reach and bite. The x2
@@ -1498,14 +1543,15 @@ public partial class Game : Godot.Node2D
 		SpawnPickup(c.GlobalPosition, pk);
 	}
 	
-	public void SpawnPickup(Vector2 pos, int pk)
+	public void SpawnPickup(Vector2 pos, int pk, int kind = 0)
 	{
 		Pickup p = new Pickup(); // allocated per drop, like a horde body: pickups are rare
 		p.pk = pk;
+		p.gearKind = kind; // ROUND 8: which Hew gear the pk 3 cog is (0 dmg | 1 spd | 2 rad | 3 arm | 4 hp); 0 for the other three flavours
 		AddChild(p);
 		p.GlobalPosition = pos; // drops where the body died; Pickup.cs folds it like the gems
 		p.InitVisuals();
-		string label = pk == 0 ? "heal orb" : (pk == 1 ? "xp magnet" : "rage vial");
+		string label = pk == 0 ? "heal orb" : pk == 1 ? "xp magnet" : pk == 3 ? "gear part" : "rage vial"; // ROUND 8: the gear cog flavour joins the read
 		GD.Print("[10thAge] (pickup) " + label + " drops on the field");
 	}
 	
@@ -4773,8 +4819,34 @@ public void RegisterEnemy(Combatant e)
 //T// bites, leashes home, knits when broken. She is NOT a PartyMember, so none of the party lanes
 //T// see her; the horde instead reaches her through GetTauntBody / UndeadAt / UndeadHitBy, which is
 //T// what "enemies attack her as another player character" needs - and no Enemy.cs edit at all.
+	// ROUND 8 party mirror (user: "treat her like she is another party member"): MirrorPartyBuffs
+	// re-reads the standing squad's live buff clocks into the _mu* windows every frame (it NEVER
+	// decrements - the PMs own their decay). Every lane under this call folds those windows onto
+	// her at the PMs' OWN numbers; where a kit law has no her-side read the fold is an assistant
+	// pick, retune by hand. (round-8 draft)
 	private void UpdateMartha(float delta)
 	{
+		MirrorPartyBuffs();
+		// ROUND 8 move fold (assistant pick, retune): the party's move lanes - Alacrity elixir
+		// (+10%) and Assemble (+25%) - ride her scuttle, rally rush and leash alike. Awaken's
+		// double lane is REACH (her bite band), not a walk lane.
+		double mvf = (_muElixSwiftT > 0.0 ? 1.1 : 1.0) * (_muOakT > 0.0 ? 1.25 : 1.0);
+		// ROUND 8 gear rail GROUND half (user: "make it stay on the ground until picked up"): a
+		// walker welds a cog on her own at the same 18 px contact band the Pickup rail uses. She
+		// is no member, so the Pickup's own member census can never reach her: she welds here,
+		// frees the cog herself, and never rides it.
+		if (_marthaBody != null && _marthaHp > 0.0 && _marthaT <= 0.0)
+		{
+			foreach (Godot.Node2D nd in GetChildren())
+			{
+				Pickup pc3 = nd as Pickup;
+				if (pc3 != null && pc3.pk == 3 && WrapDelta(pc3.GlobalPosition, _marthaBody.GlobalPosition).Length() < 18.0f)
+				{
+					CollectGearPart(pc3.gearKind, pc3.GlobalPosition); // shared weld math (damp/tally inside)
+					pc3.QueueFree(); // the cog is spent: nobody welds it twice
+				}
+			}
+		}
 		PartyMember hew = FindHew();
 		// off-field: park her and drop every timer, so a later join cannot burst banked time (the same
 		// drain-to-0 discipline the Yu spirit clock uses for a downed seat)
@@ -4818,6 +4890,19 @@ public void RegisterEnemy(Combatant e)
 			}
 			return; // broken: nothing else this frame
 		}
+		// ROUND 8 regen fold (PM lane read, numbers THEIRS): Menders Brew and Assemble each knit
+		// 1% of her OWN ceiling per second while any member runs them - the same EffMaxHp*0.01/s
+		// law the PMs pay, never while broken (the lane above already returned).
+		{
+			double regenCap = MARTHA_HP + _marthaHpBonus + MARTHA_VITALS;
+			double rate = (_muElixHealT > 0.0 ? 1.0 : 0.0) + (_muOakT > 0.0 ? 1.0 : 0.0);
+			if (rate > 0.0 && _marthaHp < regenCap)
+			{
+				_marthaHp += regenCap * 0.01 * rate * delta;
+				if (_marthaHp > regenCap)
+					_marthaHp = regenCap; // clamp at her own ceiling like every other heal lane
+			}
+		}
 		// RALLY (user 2026-11-24 round 7): after a revive she is FULL hp at the fell (G6 knits her back to her OWN
 		// ceiling, parts included) and RUNS back to Hew BEFORE the seek>kill lanes below resume - while the flag
 		// rides, closing only stops the rush once she is inside a 42 px flank seat (assistant fill of their "rush":
@@ -4828,7 +4913,7 @@ public void RegisterEnemy(Combatant e)
 			Vector2 rush = WrapDelta(hew.GlobalPosition, _marthaBody.GlobalPosition); // her offset FROM Hew
 			if (rush.Length() > 42.0f)
 			{
-				_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition - rush.Normalized() * (float)(MARTHA_SPEED * 2.0 * delta)); // the rush: homing idiom at 2x her scuttle
+				_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition - rush.Normalized() * (float)(MARTHA_SPEED * 2.0 * mvf * delta)); // the rush: homing idiom at 2x her scuttle
 				return; // hunt lanes stay closed until she is back beside Hew (user law: rush BEFORE resuming seek>kill)
 			}
 			_marthaRally = false; // on his flank: the seek>kill resumes on THIS frame
@@ -4869,7 +4954,7 @@ public void RegisterEnemy(Combatant e)
 			if (d2 > touch * touch)
 			{
 				// chomp band not reached yet: scuttle along the SHORTEST (wrap) route toward the prey
-				_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition + off.Normalized() * (float)(MARTHA_SPEED * delta));
+				_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition + off.Normalized() * (float)(MARTHA_SPEED * mvf * delta));
 				_marthaCd = 0.0; // re-set, not banked: she only bites from a standstill inside the band
 			}
 			else
@@ -4877,10 +4962,18 @@ public void RegisterEnemy(Combatant e)
 				_marthaCd -= delta;
 				if (_marthaCd <= 0.0)
 				{
-					double spd = _marthaSpd * (ult ? 1.25 : 1.0);
+					// ROUND 8 bite folds (PM kit laws read; the compound is an assistant pick, retune):
+					// cadence rides Beastial Rage (+50% attack speed) and Inquisitive Mind (+25%) like the
+					// PMs' own readers - no multistrike lane exists for her. DEALT adds a running ALLY ult
+					// (Maximum Firepower x1.5: MirrorPartyBuffs EXCLUDES Hew, so her own ult is ONLY the
+					// 1.25 above, never double-counted), Inquisitive Mind (+25%), Awaken (+25%; its double
+					// REACH has no clean her-side band, skipped) and Boldness (+10%); Precision widens the
+					// crit odds +10% (the PM crit reader). Rage is NOT a damage term (their TakeHit lane
+					// halves INCOMING instead - folded there).
+					double spd = _marthaSpd * (ult ? 1.25 : 1.0) * (_muRageT > 0.0 ? 1.5 : 1.0) * (_muInsT > 0.0 ? 1.25 : 1.0);
 					_marthaCd = MARTHA_BITE_EVERY / spd; // 1.5 s cadence, attack-speed parts and the ult on top
-					double dealt = MARTHA_BITE * _marthaDmg * (ult ? 1.25 : 1.0);
-					if (Rng != null && Rng.Randf() < MARTHA_CRIT)
+					double dealt = MARTHA_BITE * _marthaDmg * (ult ? 1.25 : 1.0) * (_muUltT > 0.0 ? 1.5 : 1.0) * (_muInsT > 0.0 ? 1.25 : 1.0) * (_muAwaT > 0.0 ? 1.25 : 1.0) * (_muElixBoldT > 0.0 ? 1.10 : 1.0);
+					if (Rng != null && Rng.Randf() < MARTHA_CRIT + (_muElixPrecT > 0.0 ? 0.10 : 0.0))
 						dealt *= 1.5; // her crit mirrors the engine's CRIT_DAMAGE base (1.5x)
 					pc.TakeDamage(dealt);
 					MarthaVampSip(dealt); // Vampiric Core (Hew card): she drinks what she bites
@@ -4893,7 +4986,7 @@ public void RegisterEnemy(Combatant e)
 					if (_biteFx == null)
 					{
 						_biteFx = new Godot.Sprite2D();
-						_biteFx.Texture = GD.Load("res://art/fx/martha_bite.png") as Godot.Texture2D; // rail art lands this lap; absent = invisible stamp
+						_biteFx.Texture = artOrNull("res://art/fx/martha_bite.png"); // rail art lands this lap; absent = invisible stamp
 						_biteFx.Set("texture_filter", 0); // NEAREST like every other pool sprite
 						_biteFx.Set("z_index", 4); // over her body (2): the chomp reads ON the prey, not behind the iron
 						(_marthaRig != null ? _marthaRig : _marthaBody).AddChild(_biteFx); // rides her fold-follow AND her gait: the chomp swings with the body
@@ -4911,7 +5004,7 @@ public void RegisterEnemy(Combatant e)
 			// nothing in find range: run home by the shortest route once she strays past the leash
 			Vector2 home = WrapDelta(hew.GlobalPosition, _marthaBody.GlobalPosition); // her offset FROM Hew
 			if (home.Length() > MARTHA_LEASH)
-				_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition - home.Normalized() * (float)(MARTHA_SPEED * delta));
+				_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition - home.Normalized() * (float)(MARTHA_SPEED * mvf * delta));
 			_marthaCd = 0.0;
 		}
 	}
@@ -4929,13 +5022,20 @@ public void RegisterEnemy(Combatant e)
 				GD.Print("[10thAge] (martha) Maximum Firepower!: Martha is invulnerable while the ult runs");
 			return; // user: the ult makes her INVULNERABLE for its 10 s
 		}
-		if (Rng != null && Rng.Randf() < MARTHA_EVA)
+		// ROUND 8 evade fold: the leader's evasion aura (Inquisitive Mind / Gekkota / Pride - the
+		// user's "all allies" law) scales her pool. Kit-tag dodge lanes (Brook's EVASION stat) are
+		// NOT mirrored per-kit - assistant pick, retune.
+		if (Rng != null && Rng.Randf() < MARTHA_EVA * LeaderEvaMul())
 		{
 			if (_pilot)
 				GD.Print("[10thAge] (martha) Martha twists out of the bite"); // her 5% evasion
 			return;
 		}
-		double soak = dmg - (MARTHA_ARMOUR + _marthaArm);
+		// ROUND 8 soak fold (PM kit laws read): Resilience elixir takes x0.90 incoming (the TakeHit
+		// law), Beastial Rage HALVES incoming (their kit law, same read), and Assemble's oak iron
+		// adds its flat +5 armour on top of her parts. The 1-floor below still owns the never-fence
+		// law (user round 7).
+		double soak = dmg * (_muElixHardT > 0.0 ? 0.9 : 1.0) * (_muRageT > 0.0 ? 0.5 : 1.0) - (MARTHA_ARMOUR + _marthaArm + (_muOakT > 0.0 ? 5.0 : 0.0));
 		if (soak < 1.0)
 			soak = 1.0;
 		_marthaHp -= soak;
@@ -5004,6 +5104,27 @@ public void RegisterEnemy(Combatant e)
 		int kind = (int)(Rng.Randf() * 5.0); // one of five stats, uniform (the user asked for RANDOM)
 		if (kind > 4)
 			kind = 4; // belt-and-braces: Randf is < 1
+		// ROUND 8 GEAR RAIL (user: "make hews gear parts drop like xp would and make it stay on the
+		// ground until picked up"): 2.5% of the GRANTED parts do not weld on the spot - they become
+		// a real cog Pickup (pk=3) parked at the kill site, which never times out and welds only
+		// when someone walks over it. The weld half is shared (ApplyGearPart below), so a ground
+		// part is IDENTICAL to an instant one except for the wait. Pilot census kept for the smoke.
+		if (Rng.Randf() < GEAR_PART_CH)
+		{
+			_upGearLoose++; // pilot census: loose cogs vs welds
+			SpawnPickup(at, 3, kind); // pk=3: the gear cog; kind travels on the pickup
+			DropCogFx(at); // the same tumble the instant lane plays: the cog lands, it does not fuse
+			return; // NO instant weld: the part waits on the ground until someone walks over it
+		}
+		ApplyGearPart(kind, at);
+	}
+	// ROUND 8: the weld half split out so the gear rail GROUND lane can re-enter it: identical
+	// damp/tally math, squad loop and Martha mirror. `at` only feeds the visible cog puff.
+	// A ground cog re-enters through CollectGearPart below: the landed cog carries the landing
+	// read and the walk-over re-puffs the fuse - like XP and every other Pickup, a walker hears
+	// BOTH the drop and the fuse. (round-8 draft, retune by hand)
+	private void ApplyGearPart(int kind, Vector2 at)
+	{
 		double damp; // the n-th part of THIS kind applies at base x 0.9^n
 		int tally; // how many of this kind have landed (the pilot read only)
 		if (kind == 0)
@@ -5059,9 +5180,58 @@ public void RegisterEnemy(Combatant e)
 				_marthaHp += 5.0 * damp; // a standing Martha gets the weld right now
 		}
 	}
+	// ROUND 8: the gear rail's GROUND re-entry: a picked-up cog welds EXACTLY like a rolled one
+	// (shared damp/tally math through ApplyGearPart). Called by the Pickup rail (pk=3), which
+	// passes the cog's spot so the fuse puffs where the walker found it.
+	public void CollectGearPart(int kind, Vector2 at)
+	{
+		ApplyGearPart(kind, at);
+	}
+	// ROUND 8 (user: "treat Martha like another party member" for ally/party buffs): she is not in
+	// _party, so she SAMPLES the standing squad's buff clocks at the top of every Martha tick. She
+	// takes the MAX over live bodies: one shared window while any source holds it up (a healed ally
+	// refreshes the party's clocks - the mirror just reads whatever the squad is holding now). Clocks
+	// decay in each PartyMember._Process, NEVER here. Hew's OWN ult is EXCLUDED (his Thunder Cannon
+	// rework is not an ally buff; Martha already folds his ult on her bite). Every other kit window
+	// counts FOR Hew: Gekkota Training, Beastial Fury, Battery of Small Magic are his party lanes.
+	// Reader lanes (round-8 draft, retune by hand): Might -> bite x1.5 + cadence x2/3; Inspire ->
+	// bite x1.25 + proc + dodge; Rage -> cadence x2/3 + half soak; Awaken -> bite x1.25 + bubble;
+	// Oak -> armour +0.25 soak + dodge +0.25 + move x1.25 + regen tick; elixirs -> Bold x1.10 dealt,
+	// Prec +0.10 crit, Swift x1.10 move, Hard -> soak x1/1.10, Mag -> bubble x1.10, Heal -> regen tick.
+	private void MirrorPartyBuffs()
+	{
+		_muUltT = 0.0; _muInsT = 0.0; _muRageT = 0.0; _muAwaT = 0.0; _muOakT = 0.0;
+		_muElixHealT = 0.0; _muElixSwiftT = 0.0; _muElixHardT = 0.0; _muElixBoldT = 0.0; _muElixPrecT = 0.0; _muElixMagT = 0.0;
+		foreach (PartyMember m in _party)
+		{
+			if (!m.joined)
+				continue; // a body not on the run yet holds no party
+			if (m.displayName != "Hew")
+				_muUltT = System.Math.Max(_muUltT, m.ultT);
+			_muInsT = System.Math.Max(_muInsT, m.insT);
+			_muRageT = System.Math.Max(_muRageT, m.rageT);
+			_muAwaT = System.Math.Max(_muAwaT, m.awaT);
+			_muOakT = System.Math.Max(_muOakT, m.oakT);
+			_muElixHealT = System.Math.Max(_muElixHealT, m.elixHealT);
+			_muElixSwiftT = System.Math.Max(_muElixSwiftT, m.elixSwiftT);
+			_muElixHardT = System.Math.Max(_muElixHardT, m.elixHardT);
+			_muElixBoldT = System.Math.Max(_muElixBoldT, m.elixBoldT);
+			_muElixPrecT = System.Math.Max(_muElixPrecT, m.elixPrecT);
+			_muElixMagT = System.Math.Max(_muElixMagT, m.elixMagT);
+		}
+	}
+
 	// FX-lap (user 2026-11-23, approved as designed): Hew's part drops tumble visible cogs; Martha's
 	// broken iron crackles. Both ride the cinder/bolt pool pattern: fixed slots, life clocks in the
 	// Update pass, world-parked when idle. Numbers are assistant picks, retune by eye.
+	private Godot.Texture2D artOrNull(string path)
+	{
+		// GD.Load THROWS GodotException on missing / unimported art (proven live 2026-11-24: an
+		// unimported rail png threw EVERY frame from UpdateMarthaFx, killing _Process past it and
+		// freezing input - the human-lane freeze). The null-safe the "absent = invisible" comments
+		// always promised: no throw, no spam, the fallback paints instead.
+		try { return GD.Load(path) as Godot.Texture2D; } catch { return null; }
+	}
 	private void DropCogFx(Vector2 at)
 	{
 		// first free slot looses a cog AT the drop site; art when the rail wired one, ember square when
@@ -5123,7 +5293,7 @@ public void RegisterEnemy(Combatant e)
 			{
 				Godot.Node2D sn = new Godot.Node2D();
 				Godot.Sprite2D ss = new Godot.Sprite2D();
-				ss.Texture = GD.Load("res://art/fx/static_martha.png") as Godot.Texture2D; // rail art lands this lap; absent = invisible, the streak paints instead
+				ss.Texture = artOrNull("res://art/fx/static_martha.png"); // rail art lands this lap; absent = invisible, the streak paints instead
 				ss.Set("texture_filter", 0); // NEAREST like every other pool sprite
 				ss.Set("z_index", 5); // crackle over her body (2) and her chomp (4)
 				sn.AddChild(ss);
@@ -5324,6 +5494,34 @@ private void UpdateSpirits(float delta)
 		// XP magnet (rare kill drop): the clock drains once per frame here, and the bubble test
 		// below widens to whole-field while it runs. The vacuum itself is UNCHANGED: gems still
 		// ride the 380 px/s stream and pay their own XP_PCT math at pickup.
+		// ROUND 8 mirror clocks live here for her bubble: MirrorPartyBuffs recomputes them at the top of
+		// UpdateMartha, which runs AFTER this gem lane, so her Magnetism half lags ONE frame - noted,
+		// harmless.
+		// ROUND 8: Martha's OWN gem lane (user: "she collects xp... treat it like she is another party
+		// member"). She is not in _party, so the puller census below cannot see her: her bubble is the
+		// flat class band 110 px x the leader's collection bubble (x 1.10 while a magnetised party member
+		// runs Magnetism - she pays the leader's own elixir math, not a member's), gems ride her at the
+		// SAME 380 px/s, and she takes contact at the same 14 px the puller lane uses. She has NO XP_PCT
+		// tag, so the value lane pays LeaderXpMul only. The magnet clock widens her lane too.
+		// UpdateGems runs BEFORE UpdateMartha this frame, so the mirror lanes above lag ONE frame: noted,
+		// harmless.
+		if (_marthaBody != null && _marthaHp > 0.0 && _marthaT <= 0.0)
+		{
+			for (int i = 0; i < _gems.Count; i++)
+			{
+				Godot.Node2D gem = _gems[i];
+				if (gem.GlobalPosition.X < -8000.0f)
+					continue;
+				Vector2 mt = _marthaBody.GlobalPosition - gem.GlobalPosition;
+				float md = mt.Length();
+				if (md < 110.0f * (float)LeaderCollectMul() * (_muElixMagT > 0.0 ? 1.10f : 1.0f) || _magnetT > 0.0)
+				{
+					gem.GlobalPosition += mt.Normalized() * 380.0f * delta;
+					if (md < 14.0f)
+						CollectGem(i, _marthaBody.GlobalPosition, null); // null member: NO XP_PCT math, and CollectGem's base law already pays LeaderXpMul - exactly the value the puller lane would grant a member without the tag
+				}
+			}
+		}
 		if (_magnetT > 0.0)
 			_magnetT -= delta;
 		for (int i = 0; i < _gems.Count; i++)
@@ -5364,6 +5562,18 @@ private void UpdateSpirits(float delta)
 				}
 			}
 		}
+	}
+
+	// ROUND 8: the gem hand-in Martha's own lane above shares with the puller lane below: null
+	// puller means NO XP_PCT tag math (she has none), LeaderXpMul still pays - exactly the value
+	// the puller lane grants a member without the tag. pos is the hand-in seat, kept for FX readers.
+	private void CollectGem(int i, Vector2 pos, PartyMember puller)
+	{
+		if (puller != null)
+			AddXp(_gemVals[i] * (1.0 + puller.stat[StatTags.XP_PCT]) * LeaderXpMul());
+		else
+			AddXp(_gemVals[i] * LeaderXpMul());
+		DespawnGem(i);
 	}
 
 	private void DespawnGem(int i)
