@@ -4878,8 +4878,14 @@ public void RegisterEnemy(Combatant e)
 			_marthaT -= delta * (WrapDelta(hew.GlobalPosition, _marthaBody.GlobalPosition).Length() <= MARTHA_NEAR ? 2.0 : 1.0);
 			if (_marthaBody.GetChildCount() > 0)
 			{
-				// dim tint: a hand-play can SEE why she is out, and the tint fades back as she knits
-				((Godot.Sprite2D)_marthaBody.GetChild(0)).Modulate = new Color(0.5f, 0.5f, 0.6f, (0.45f + 0.55f * (float)(1.0 - _marthaT / MARTHA_BREAK)) * (0.92f + 0.08f * (float)System.Math.Abs(System.Math.Sin(_marthaT * 9.0)))); // FX-lap: the tint BREATHES while she knits - a dim static pulse on the flicker beat
+				// dim tint: a hand-play can SEE why she is out, and the tint fades back as she knits.
+				// PD231 FIX: since the FX-2 gait lap the art Sprite rides INSIDE the "Gait" Node2D rig,
+				// so body's child 0 is the rig and a hard Sprite2D cast THREW InvalidCast per broken frame
+				// (never seen before: the bare-pilot seats never left Martha BROKEN; a Hew-led seat does).
+				// ride the art through a safe `as` (null in the greybox with no sheet -> skip the tint)
+				Godot.Sprite2D tint = _marthaRig != null ? _marthaRig.GetChild(0) as Godot.Sprite2D : _marthaBody.GetChild(0) as Godot.Sprite2D;
+				if (tint != null)
+					tint.Modulate = new Color(0.5f, 0.5f, 0.6f, (0.45f + 0.55f * (float)(1.0 - _marthaT / MARTHA_BREAK)) * (0.92f + 0.08f * (float)System.Math.Abs(System.Math.Sin(_marthaT * 9.0)))); // FX-lap: the tint BREATHES while she knits - a dim static pulse on the flicker beat
 			}
 			if (_marthaT <= 0.0)
 			{
