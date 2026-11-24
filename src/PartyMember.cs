@@ -241,6 +241,12 @@ public partial class PartyMember : Godot.Node2D
 	Godot.Sprite2D[] _splashFx = null; // Thunder EXPLOSION stamp at the prey (single slot now: the blob art scales to the blast ring - user 2026-11-23: "it shouldn't be a star... just scaling up the current FX"; claw-v5 member-anchored: the slot stays a body child, the hook stamps the world coord)
 	Godot.Sprite2D _flashFx = null; // Muzzle BURST at the muzzle (SEPARATE art: the beam's Scale.x stretch would smear a welded flash); null = beam alone is the whole shot
 	float _splashT = 0.0f; // splash stamp visibility timer: own clock, the cannon kit never arms _fxT
+	Godot.Node2D[] _blastNodes = null; // pending-blast snapshot: the live bodies the splash ring may punch (user 2026-11-24)
+	bool _blastPending = false;      // a blast is armed and waiting for its resolve beat in _Process
+	double _blastT = 0.0;            // the pending blast countdown (seconds)
+	double _blastHalf = 0.0;         // the ring damage at the beat: half the blast, captured at the shot
+	double _blastR = 0.0;            // the upgrade-widened ring radius, captured at the shot
+	Vector2 _blastPos = new Vector2(); // the MAIN prey world coord the ring is centered on (captured at the shot)
 
 	float _fxT = 0.0f; // commit-fx visibility timer: decays with the world clock, hides sprites off-beat
 
@@ -470,6 +476,7 @@ public partial class PartyMember : Godot.Node2D
 			static readonly double CLAW_RAKE = 0.62;    // v5 art pivot as a fraction of reach - the daggers' jabLen number: the rake always rides maximum distance
 
 			static readonly double HEW_FIRE_LEASH = 260.0;   // v5 close-engage gate (assistant pick, retunable): the cannon SEES at the PINNED 520 but only fires this close to its own body (hand-play 2026-11-23: advance and attack when close enough to hit)
+			static readonly double HEW_BLAST_DELAY = 0.2;   // user 2026-11-24 (round 7): the pending-blast beat - the ring damage and the painted blob land ~0.2 s AFTER the beam fires so the shot reads hit > explosion (their "maybe 0.2 s", retune by eye)
 
 	// Yu's familiars (M2, user dictation 2026-10-22): the fuse is the summon's LIFETIME, and
 
@@ -2695,6 +2702,46 @@ public partial class PartyMember : Godot.Node2D
 
 		}
 
+		// Pending-blast resolve (user 2026-11-24 round 7): ~0.2 s after the cannon fires, the ring damage and
+		// the blob land. Bodies are RE-TESTED on the beat (spent entries take nothing), and the ring is re-cut
+		// against the live pool with the wrap law, so a fold between shot and beat never drags the blast.
+		if (_blastPending)
+		{
+			_blastT -= delta;
+			if (_blastT <= 0.0)
+			{
+				_blastPending = false;
+				Game pgb = GetParent() as Game;
+				if (pgb != null && _blastNodes != null)
+				{
+					for (int bi = 0; bi < _blastNodes.Length; bi++)
+					{
+						Godot.Node2D c = _blastNodes[bi];
+						if (c == null)
+							continue; // trailing snapshot slots past the count
+						Combatant nc = (Combatant)c;
+						if (nc == null || nc.kind == "dead" || nc.hp <= 0.0f)
+							continue; // bodies spent before the blast landed take nothing
+						Vector2 r2 = pgb.WrapDelta(_blastPos, c.GlobalPosition);
+						if (r2.Length() - nc.hitR > (float)_blastR)
+							continue; // outside the (upgrade-widened) splash ring at the beat
+						nc.TakeDamage(_blastHalf); // the spec small splash, one beat late (user 2026-11-24)
+						pgb.MarthaVampSip(_blastHalf); // ditto on the splash ring: the half-blast is her drink too
+						if (nc.hp <= 0.0f)
+							pgb.ExplosiveFinale(c.GlobalPosition, _blastHalf);
+					}
+					_blastNodes = null; // one blast per snapshot
+					if (_splashFx != null)
+					{
+						_splashFx[0].GlobalPosition = _blastPos; // thunder-blast rides the WRAPPED world coord of the MAIN prey (claw-v5 anchor discipline)
+						float puff = (float)(2.0 * _blastR / 32.0); // the blob art is 32 px across: draw it spanning the damage ring, art and ring stay honest
+						_splashFx[0].Scale = new Vector2(puff, puff); // one scaled blob, not a star (user 2026-11-23)
+						_splashFx[0].Visible = true; // the blob now paints on THIS beat, after the beam hit (user 2026-11-24)
+						_splashT = 0.18f; // the blob's own beat: decay below hides muzzle/flash/blob off it
+					}
+				}
+			}
+		}
 		// Thunder-puff decay (lap-6 FX): the splash star and muzzle stamp live ~0.18 s then drop; own clock
 		// because the cannon kit never arms _fxT (world clock: soft-pause discipline, no real-time leak)
 		if (_splashT > 0.0f)
@@ -4435,6 +4482,16 @@ public partial class PartyMember : Godot.Node2D
 		// bestD answers the chosen body's distance; the empty-clearing guard below stands
 
 		float bestD = PickPreyD;
+		// FIRE-LEASH RE-PICK (user 2026-11-24 round 7 BUG: "furthest enemy targeting - Hew attacks nothing at all"):
+		// the furthest-mode pick can land a body PAST the 260 px fire leash, and the close-engage gate below
+		// then aborts the whole shot every frame, so a distant furthest prey LOCKS the cannon for the run. When
+		// the chosen prey is past the leash, retarget the CLOSEST body inside it: the cannon still fires, the
+		// furthest law just degrades to on-leash prey while a body is close.
+		if (cannonKit && bestD > HEW_FIRE_LEASH)
+		{
+			best = PickPrey(pg, enemies, p, (float)HEW_FIRE_LEASH, false, false, false, facing, arcEff);
+			bestD = PickPreyD; // closest-inside-leash (or empty = 1e9, which the guard below walks on)
+		}
 
 		if (best == null || bestD > reach)
 
@@ -4821,22 +4878,23 @@ public partial class PartyMember : Godot.Node2D
 					if (fireDps > 0.0)
 						nc.Burn(fireDps, 5.0); // fire rune rides any kit, same 5 s window as the fan
 				}
-				for (int i2 = 0; i2 < enemies.Count; i2++)
-				{
-					Godot.Node2D c = enemies[i2];
-					Combatant nc = (Combatant)c;
-					if (nc == null || nc.kind == "dead")
-						continue;
-					Vector2 r2 = pg.WrapDelta(best.GlobalPosition, c.GlobalPosition);
-					if (r2.Length() - nc.hitR > (float)splashR)
-						continue; // outside the (upgrade-widened) splash ring around the MAIN target
-					nc.TakeDamage(dmg * 0.5); // the spec's small splash: half the blast on the ring bodies
-
-					// ditto on the splash ring: the half-blast is her damage as well
-					pg.MarthaVampSip(dmg * 0.5);
-					if (nc.hp <= 0.0f)
-					pg.ExplosiveFinale(c.GlobalPosition, dmg * 0.5);
-				}
+					// BLAST PENDING (user 2026-11-24 round 7): the ring damage + the blob paint ~0.2 s AFTER the beam fires,
+					// so the shot reads hit > explosion. We snapshot the live bodies and the ring dials at the shot;
+					// the resolve beat above the thunder-puff decay in _Process pays the damage and paints the blob.
+					_blastNodes = new Godot.Node2D[enemies.Count];
+					int bn = 0;
+					for (int i2 = 0; i2 < enemies.Count; i2++)
+					{
+						Godot.Node2D cn = enemies[i2];
+						Combatant nc2 = (Combatant)cn;
+						if (nc2 != null && nc2.kind != "dead")
+							_blastNodes[bn++] = cn; // live snapshot: the resolve re-tests life on its own beat
+					}
+					_blastPending = true;
+					_blastT = HEW_BLAST_DELAY;      // ~0.2 s beat (assistant fill of the user "maybe 0.2 s", retune by eye)
+					_blastHalf = dmg * 0.5;         // the spec small splash: half the blast, paid at the beat (GAMEPLAY: same numbers, one beat late)
+					_blastR = splashR;              // the upgrade-widened ring, captured at the shot
+					_blastPos = best.GlobalPosition; // the MAIN prey world coord: the ring rides the fold
 			}
 			// flash band RETIRED per user request 2026-11-23: the beam-art lane carries the whole shot now
 			if (_cannonFx != null)
@@ -4856,15 +4914,8 @@ public partial class PartyMember : Godot.Node2D
 				_flashFx.Scale = new Vector2(0.5f, 0.5f); // ~16 px disc ~= beam band thickness (assistant pick, retune by eye)
 				_flashFx.Visible = true; // decays with the shared _splashT beat below
 			}
-			if (_splashFx != null)
-			{
-				Vector2 sp = p + e; // thunder-blast rides the WRAPPED world coord of the MAIN prey (claw-v5 anchor discipline)
-				_splashFx[0].GlobalPosition = sp;
-				float puff = (float)(2.0 * splashR / 32.0); // the blob art is 32 px across: draw it SPANNING the damage ring, art and ring stay honest
-				_splashFx[0].Scale = new Vector2(puff, puff); // one scaled blob, not a star (user 2026-11-23: "it should be an explosion... just scaling up the current FX")
-				_splashFx[0].Visible = true;
-				_splashT = 0.18f; // decays muzzle + burst + blast on one beat (assistant pick, retune by eye)
-			}
+			// Blob MOVED to the pending-blast resolve (user 2026-11-24 round 7): the thunder puff paints ~0.2 s
+			// after the beam fires so the shot reads hit > explosion; the muzzle + flash above stay instant.
 		}
 
 		else if (cleaver)

@@ -249,7 +249,7 @@ public partial class Game : Godot.Node2D
 		"Lucky Stabs (+5% Crit Chance)", "Sneak Attack (+5% Multistrike Chance)",
 											   "Fire Rune (+1 Burn Damage/sec for 5s)", "Harder Thrusts (+15% Crit Damage)",
 											   "Eagle Eye (+5% Crit Chance)", "Difficult Terrain (10% Slow for 2.5s)",
-											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)", "Overflowing Necrosis (+12% Damage)", "Swift Curse (+16% Attack Speed)", "Multi-Flame (+1 Pillar Target)", "Necrotic Plague (Flame DoT passes on touch)", "Greater Pestilence (+15% Pillar Radius)" , "Sharper Claws (+12% Damage)", "Savage Attacks (+16% Attack Speed)", "Primal Might (+1 Claw Attack)", "Haemorrhaging Bleed (Bleed slows 10%)", "Longer Claws (+15% Range)" , "Remove Inhibitors (+12% Damage)", "Wider Barrel (+16% Beam Width)", "Efficient Gears (+16% Attack Speed)", "Vampiric Core (Martha Heals 1% of All Damage Dealt)", "Explosive Finale (Kill Blast 25/50/75% Damage)" }; // 2026-11-23 restore: claw rows 55-59 ride the SAME x/3 rank track as every other character (user law: "any characters we build follow the same formula of 3 skill ranks for all upgrades - this may be reworked down the line, but for now this is law"); an OFF/ON carve-out and a "+20% / Longest Claws" spec were assistant-authored text misfiled as user ground truth (opencode.db session_message has zero user-role hits for "+20%" or "Longest Claws") | rows 60-64 = Hew's Thunder Cannon kit (user 2026-11-22, spec verbatim: "Remove Inhibitors: +12% damage. Wider Barrel: +16% area. Efficient Gears: +16% attack speed. Vampiric Core: Martha heals 1% of all damage dealt. Explosive Finale: Hew and Martha kills explode for 25/50/75% damage")
+											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)", "Overflowing Necrosis (+12% Damage)", "Swift Curse (+16% Attack Speed)", "Multi-Flame (+1 Pillar Target)", "Necrotic Plague (Flame DoT passes on touch)", "Greater Pestilence (+15% Pillar Radius)" , "Sharper Claws (+12% Damage)", "Savage Attacks (+16% Attack Speed)", "Primal Might (+1 Claw Attack)", "Haemorrhaging Bleed (Bleed slows 10%)", "Longer Claws (+15% Range)" , "Remove Inhibitors (+12% Damage)", "Wider Barrel (+16% Beam Width)", "Efficient Gears (+16% Attack Speed)", "Vampiric Core (Martha Heals 5% of All Damage Dealt)", "Explosive Finale (Kill Blast 25/50/75% Damage)" }; // 2026-11-23 restore: claw rows 55-59 ride the SAME x/3 rank track as every other character (user law: "any characters we build follow the same formula of 3 skill ranks for all upgrades - this may be reworked down the line, but for now this is law"); an OFF/ON carve-out and a "+20% / Longest Claws" spec were assistant-authored text misfiled as user ground truth (opencode.db session_message has zero user-role hits for "+20%" or "Longest Claws") | rows 60-64 = Hew's Thunder Cannon kit (user 2026-11-22, spec verbatim: "Remove Inhibitors: +12% damage. Wider Barrel: +16% area. Efficient Gears: +16% attack speed. Vampiric Core: Martha heals 1% of all damage dealt. Explosive Finale: Hew and Martha kills explode for 25/50/75% damage")
 	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 0, 1, 2, 3, 4, 9, 9, 9, 9, 9 , 10, 10, 10, 10, 10 , 11, 11, 11, 11, 11 , 12, 12, 12, 12, 12 };
 	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 0.86f, 1.0f, 1.0f }; // row 56 Savage Attacks: cd x0.86 = +16% attack speed (hand-play brief) | row 62 Efficient Gears: cd x0.86 = +16% (shared lane; HEW clamps the authored 2.0 s and reroutes speed to damage at HALF rate)
 	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.15f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }; // row 59 Longer Claws: +15% range PER RANK (user brief seq 129914) | Hew keeps reach PINNED at 520: Wider Barrel rides OPT_BARREL and widens only the beam band
@@ -362,7 +362,7 @@ public partial class Game : Godot.Node2D
 	// does NOT ride OPT_RANGE - Hew's reach is PINNED at the authored 520 and only the beam BAND widens.
 	// THREE new columns carry the bespoke kits: OPT_BARREL = Wider Barrel presence switch (band x1.16/rank
 	// at the cannon march; radius upgrades widen the beam too, spec "the beam gets wider with radius upgrades"),
-	// OPT_VAMP = Vampiric Core presence (Martha heals 1% of ALL damage dealt by the party, capped at her 40 hp
+	// OPT_VAMP = Vampiric Core presence (Martha heals 5% of ALL damage dealt by the party, capped at her 40 hp
 	// pool), OPT_EXPLO = Explosive Finale presence (Hew and Martha kills explode for 25/50/75% of the kill's
 	// damage by rank, ~60 px blast at the corpse).
 	// The Leader Bonus lane is separate: every defeated enemy while Hew leads has a 5% chance to drop an
@@ -559,6 +559,9 @@ public partial class Game : Godot.Node2D
 	Godot.Label _marthaHpN = null;
 	Godot.ColorRect _marthaHpBg = null;
 	Godot.ColorRect _marthaHpF = null;
+	Godot.ColorRect _marthaRepairBg = null; // repair gauge BG (user 2026-11-24 round 7): a thin bar UNDER Martha's mini strip
+	Godot.ColorRect _marthaRepairF = null;  // ditto: fills as the 20 s yard-time knits while she is broken
+	bool _marthaRally = false;              // ditto: after a revive she RUSHES to Hew's flank before the hunt lanes reopen
 	// Martha gait rig (user 2026-11-23: "the same movement animation as the enemies") - the Enemy.cs
 	// sway law odometer + eased px/s live here; the rig Node2D swings her art, never the hit core.
 	Godot.Node2D _marthaRig = null;
@@ -4808,11 +4811,27 @@ public void RegisterEnemy(Combatant e)
 			{
 				_marthaT = 0.0;
 				_marthaHp = MARTHA_HP + _marthaHpBonus + MARTHA_VITALS; // knitted back to her OWN ceiling, parts included
+				_marthaRally = true; // revived: the RALLY below makes her run back to Hew before the hunt resumes (user 2026-11-24 round 7)
 				_marthaCd = 0.5; // the fresh line bites after a wind-up, not straight out of the yard
 				if (_pilot)
 					GD.Print("[10thAge] (martha) Martha knits herself back to full"); // the 20 s done
 			}
 			return; // broken: nothing else this frame
+		}
+		// RALLY (user 2026-11-24 round 7): after a revive she is FULL hp at the fell (G6 knits her back to her OWN
+		// ceiling, parts included) and RUNS back to Hew BEFORE the seek>kill lanes below resume - while the flag
+		// rides, closing only stops the rush once she is inside a 42 px flank seat (assistant fill of their "rush":
+		// 2x her scuttle + the seat, retune by eye). The broken lane above returned early every knitting frame, so
+		// the rush starts the frame the yard-time finishes; knit-speed still doubles as she closes inside MARTHA_NEAR.
+		if (_marthaRally)
+		{
+			Vector2 rush = WrapDelta(hew.GlobalPosition, _marthaBody.GlobalPosition); // her offset FROM Hew
+			if (rush.Length() > 42.0f)
+			{
+				_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition - rush.Normalized() * (float)(MARTHA_SPEED * 2.0 * delta)); // the rush: homing idiom at 2x her scuttle
+				return; // hunt lanes stay closed until she is back beside Hew (user law: rush BEFORE resuming seek>kill)
+			}
+			_marthaRally = false; // on his flank: the seek>kill resumes on THIS frame
 		}
 		// hunt: nearest live prey within MARTHA_FIND, wrap-squared, with the SAME body skip the risen
 		// scan uses (dead / spent entries are not prey). Bosses ARE prey: she is a chomper, not a bolt.
@@ -4922,13 +4941,15 @@ public void RegisterEnemy(Combatant e)
 		_marthaHp -= soak;
 		if (_marthaHp <= 0.0)
 		{
-			_marthaHp = 0.0;
+			_marthaHp = MARTHA_HP + _marthaHpBonus + MARTHA_VITALS; // REVIVE AT FULL HP (user 2026-11-24 round 7): the feller who
+				// takes her down does not drain her further - the 20 s in the yard IS the repair, and the strip + the
+				// repair gauge below read a full pool under the knitting iron
 			_marthaT = MARTHA_BREAK; // BROKEN for 20 s: the upkeep lane knits her back (2x while Hew is close)
 			if (_pilot)
 				GD.Print("[10thAge] (martha) Martha is DOWN - she spends 20 s in the yard knitting");
 		}
 	}
-//T// Vampiric Core (Hew's card): she heals 1% of ALL damage she deals per rank, clamped to her own
+//T// Vampiric Core (Hew's card): she heals 5% of ALL damage she deals per rank (user round 7: 5/10/15%), clamped to her own
 //T// ceiling (assistant pick: the cap keeps a lucky sip lane from trading whole pools into free
 //T// healing). No sip while broken - she is not biting, so there is nothing to drink.
 	public void MarthaVampSip(double dealt)
@@ -4939,7 +4960,7 @@ public void RegisterEnemy(Combatant e)
 		double cap = MARTHA_HP + _marthaHpBonus + MARTHA_VITALS;
 		if (_marthaHp >= cap)
 			return; // already at the ceiling: a sip is never wasted on a full pool
-		_marthaHp += dealt * 0.01 * hew.vampRank;
+		_marthaHp += dealt * 0.05 * hew.vampRank; // round 7 (user 2026-11-24): ranks drink 5/10/15% of the damage she deals
 		if (_marthaHp > cap)
 			_marthaHp = cap;
 	}
@@ -5015,9 +5036,11 @@ public void RegisterEnemy(Combatant e)
 			else
 			{
 				// +5 hp raises the CEILING and the line: the part is a weld, not a promise
-				double before = m.EffMaxHp();
 				m.stat[StatTags.HEALTH] += 5.0 * damp;
-				m.hp += (float)(m.EffMaxHp() - before);
+					// the CURRENT line follows through the PM _hpMaxSeen tracker (PartyMember.cs lifts hp 1:1 when
+					// EffMaxHp rises). The old bump HERE double-lifted and let hp ride past the cap (user 2026-11-24
+					// round 7: "the party HP upgrade should raise MAX hp too" - it now raises the ceiling and hp
+					// follows exactly once).
 			}
 		}
 		// Martha is not in _party, so she reads the SAME tally through her own fields
@@ -6223,6 +6246,17 @@ private void UpdateSpirits(float delta)
 			_marthaHpF.Color = new Color(0.55f, 0.60f, 0.72f, 1.0f); // steel sheen: her iron, not the party brass
 			_marthaHpF.ZIndex = 13;
 			_hudLayer.AddChild(_marthaHpF);
+			// Repair gauge (user 2026-11-24 round 7): built with the mini strip; hidden until broken
+			_marthaRepairBg = new Godot.ColorRect();
+			_marthaRepairBg.Size = new Vector2(40.0f, 4.0f);
+			_marthaRepairBg.Color = new Color(0.12f, 0.11f, 0.10f, 0.0f);
+			_marthaRepairBg.ZIndex = 12;
+			_hudLayer.AddChild(_marthaRepairBg);
+			_marthaRepairF = new Godot.ColorRect();
+			_marthaRepairF.Size = new Vector2(0.0f, 4.0f);
+			_marthaRepairF.Color = new Color(0.85f, 0.62f, 0.25f, 1.0f); // brass: the weld seam she is laying
+			_marthaRepairF.ZIndex = 13;
+			_hudLayer.AddChild(_marthaRepairF);
 		}
 		float hewRowY = -1000.0f; // the row Martha's mini strip anchors to
 		for (int i = 0; i < _hpName.Count; i++)
@@ -6280,18 +6314,26 @@ private void UpdateSpirits(float delta)
 		if (hewRowY > -500.0f && _marthaBody != null && FindHew() != null)
 		{
 			double mcap = MARTHA_HP + _marthaHpBonus + MARTHA_VITALS;
-			_marthaHpN.Position = new Vector2(152.0f, hewRowY + 6.0f);
-			_marthaHpN.Text = _marthaHp <= 0.0 ? "Martha DOWN" : "Martha " + (int)_marthaHp + "/" + (int)mcap;
+			_marthaHpN.Position = new Vector2(152.0f, hewRowY + 2.0f); // round-7 nudge (user 2026-11-24): her name was clipping the hp bar - it rides two px higher
+			_marthaHpN.Text = (_marthaHp <= 0.0 || _marthaT > 0.0) ? "Martha DOWN" : "Martha " + (int)_marthaHp + "/" + (int)mcap; // round-7 re-key (user 2026-11-24): the fell no longer drains her - DOWN rides the 20 s yard-time too
 			_marthaHpBg.Position = new Vector2(152.0f, hewRowY + 21.0f);
 			_marthaHpBg.Color = new Color(0.12f, 0.11f, 0.10f, 0.9f);
 			_marthaHpF.Position = new Vector2(152.0f, hewRowY + 21.0f);
 			_marthaHpF.Size = new Vector2(mcap > 0.0 ? (float)(_marthaHp / mcap) * 40.0f : 0.0f, 5.0f); // floors at 0: overkill never poisons the bar
+			// Repair gauge draw (user 2026-11-24 round 7): under her strip, fills as the yard-time knits.
+			// MARTHA_BREAK is 20 s; the doubled tick is proximity to Hew, not this gauge.
+			_marthaRepairBg.Position = new Vector2(152.0f, hewRowY + 30.0f);
+			_marthaRepairBg.Color = new Color(0.12f, 0.11f, 0.10f, 0.9f);
+			_marthaRepairF.Position = new Vector2(152.0f, hewRowY + 30.0f);
+			_marthaRepairF.Size = new Vector2(_marthaT > 0.0 ? (float)(1.0 - _marthaT / 20.0) * 40.0f : 0.0f, 4.0f);
 		}
 		else if (_marthaHpN != null)
 		{
 			_marthaHpN.Text = "";
 			_marthaHpBg.Color = new Color(0.12f, 0.11f, 0.10f, 0.0f);
 			_marthaHpF.Size = new Vector2(0.0f, 5.0f);
+			_marthaRepairBg.Color = new Color(0.12f, 0.11f, 0.10f, 0.0f); // gauge hidden with the strip
+			_marthaRepairF.Size = new Vector2(0.0f, 4.0f);
 		}
 	}
 
