@@ -220,6 +220,7 @@ public partial class Director : Godot.Node2D
             fe.contactDamage = 3.0f; // USER number
             fe.xpValue = 2.0f;       // USER number
             fe.GlobalPosition = pos;
+            fe._spawnStamp(g, true); // ROUND 14: no-op for tier-1 fodder, one law for every lane
             g.RegisterEnemy(fe);
             g.AddChild(fe);
             return;
@@ -248,6 +249,7 @@ public partial class Director : Godot.Node2D
         e.contactDamage = wolf3 ? 4.0f : (wolf ? 3.0f : (hob ? 3.0f : 2.0f)); // wolf3 bites harder (USER); Goblin 2 chips 2 like the clump (USER)
         e.xpValue = wolf3 ? 3.0f : (wolf ? 2.0f : (hob ? 3.0f : 1.0f)); // wolf3 carries the heavier 3 xp gem (USER); Goblin 2 carries the same 1 xp gem (USER)
         e.GlobalPosition = pos;
+        e._spawnStamp(g, true); // ROUND 14: tier-2 wolf3 / wolves charge with the clock from the 420 s tier-2 mark; tier-1 goblins stay flat (the stamp reads its own tier)
         g.RegisterEnemy(e);
         g.AddChild(e);
         // fx-feel10 (user 2026-11-03: mages spawn early and never attack): hobs run from tier 2,
@@ -293,6 +295,7 @@ public partial class Director : Godot.Node2D
             e2.rangedDamage = sword ? 0.0f : 3.0f; // USER number (bow rider)
             e2.xpValue = 5.0f;   // USER number
             e2.GlobalPosition = p2;
+            e2._spawnStamp(g, true); // ROUND 14: tier-3 riders charge from the 420 s tier-3 mark (the bow's 3 xp damage rides the same step)
             g.RegisterEnemy(e2);
             g.AddChild(e2);
         }
@@ -314,6 +317,7 @@ public partial class Director : Godot.Node2D
         e2.rangedDamage = 6.0f;  // USER number
         e2.xpValue = 6.0f;     // USER number
         e2.GlobalPosition = p2;
+        e2._spawnStamp(g, true); // ROUND 14: tier-3 mage/mage2 charge from the 420 s tier-3 mark (the 6 xp spike rides the same step)
         g.RegisterEnemy(e2);
         g.AddChild(e2);
         GD.Print("[10thAge] (mage) " + e2.kind + " slips in after the second hobgoblin (mage2 looses three ice spikes)");
@@ -339,6 +343,7 @@ public partial class Director : Godot.Node2D
             e2.contactDamage = 4.0f; // USER number
             e2.xpValue = 2.0f;       // USER number
             e2.GlobalPosition = p2;
+            e2._spawnStamp(g, true); // ROUND 14: tier-2 wolf2 charges from the 420 s tier-2 mark
             g.RegisterEnemy(e2);
             g.AddChild(e2);
         }
@@ -348,16 +353,23 @@ public partial class Director : Godot.Node2D
     // TIER-4 OGRE (user 2026-11-05): "big, slow, and a lot of HP". HP/speed/contact/XP are
     // assistant picks (the user dictated the SLAM numbers, not the body): HP 220 (x horde
     // scale like every other body), speed 55 lumber, contact 4 if walked into, XP 10 bounty.
+    // ROUND 14 REBALANCE (user 2026-11-25: "the ogres are a bit too easy to deal with"): ogre 220 ->
+    // 660 HP / contact 4 -> 8, ogre2 220 -> 440 HP (the escort keeps the same contact and plate, the
+    // user split the HP across the pair), XP 10 unchanged, and 2 armour plate on BOTH tiers-4 bodies
+    // - the plate is the tier-4 law inside _spawnStamp, so the number lives in ONE place (Enemy.cs).
+    // SPEED IS UNTOUCHED (user lock: "we won't mess with enemy speed as I think that's in a good
+    // place"), and the plate pays in Enemy.cs' TakeDamage override, so nothing else has to know it.
     private void SpawnOgre(Game g, Vector2 at, float hordeScale)
     {
         Enemy e = new Enemy();
         e.kind = "ogre";
-        e.maxHp = 220.0f * hordeScale; // assistant pick: the map's fattest body
+        e.maxHp = 660.0f * hordeScale; // ROUND 14: 220 -> 660 (user rebalance)
         e.hp = e.maxHp;
         e.speed = 55.0f;     // assistant pick: slowest body on the map
-        e.contactDamage = 4.0f; // assistant pick: brute body, but the slam is its threat
+        e.contactDamage = 8.0f; // ROUND 14: 4 -> 8 (user rebalance)
         e.xpValue = 10.0f;   // assistant pick: tier-4 bounty
         e.GlobalPosition = at;
+        e._spawnStamp(g, true); // ROUND 14: tier-4 clock charge from the 840 s ogre anchor (and the 2 plate the user asked for, which the stamp owns as the tier-4 law)
         g.RegisterEnemy(e);
         g.AddChild(e);
         GD.Print("[10thAge] (ogre) tier-4 ogre lumbers in");
@@ -367,12 +379,13 @@ public partial class Director : Godot.Node2D
         // ogre (USER: same stats); the escort owns the goblin-hurl lane in Enemy.cs.
         Enemy o2 = new Enemy();
         o2.kind = "ogre2";
-        o2.maxHp = 220.0f * hordeScale; // SAME card as the ogre (USER)
+        o2.maxHp = 440.0f * hordeScale; // ROUND 14: 220 -> 440 (user rebalance: HP split across the pair)
         o2.hp = o2.maxHp;
         o2.speed = 55.0f;
-        o2.contactDamage = 4.0f;
+        o2.contactDamage = 8.0f; // ROUND 14: 4 -> 8 (user rebalance)
         o2.xpValue = 10.0f;
         o2.GlobalPosition = at + new Vector2(80.0f, 60.0f); // assistant pick: stride apart, same fold
+        o2._spawnStamp(g, true); // ROUND 14: the escort rides the same tier-4 clock + plate law
         g.RegisterEnemy(o2);
         g.AddChild(o2);
         GD.Print("[10thAge] (ogre) the ogre escort lumbers in beside it");
@@ -446,7 +459,8 @@ public partial class Director : Godot.Node2D
             else if (k == "rider") { hp = 140.0f; spd = 110.0f; contact = 4.0f; xp = 5.0f; } // 2026-11-09 retuned mount card (USER)
             else if (k == "riderbow") { hp = 80.0f; spd = 110.0f; contact = 4.0f; ranged = 3.0f; xp = 5.0f; }
             else if (k == "mage" || k == "mage2") { hp = 40.0f; spd = 70.0f; contact = 4.0f; ranged = 6.0f; xp = 6.0f; }
-            else if (k == "ogre" || k == "ogre2") { hp = 220.0f; spd = 55.0f; contact = 4.0f; xp = 10.0f; }
+            else if (k == "ogre") { hp = 660.0f; spd = 55.0f; contact = 8.0f; xp = 10.0f; }        // ROUND 14 rebalance: matches SpawnOgre's ogre card
+            else if (k == "ogre2") { hp = 440.0f; spd = 55.0f; contact = 8.0f; xp = 10.0f; }       // ROUND 14 rebalance: matches SpawnOgre's ogre2 card (the plate is the stamp's law, not this card's)
             e.kind = k; // HORDE MIX LAW body: pool-picked kind on its own card (first swarm stays pure tier-1)
             e.maxHp = hp * hordeScale; // each body on its ordinary stat card, rest chips fatten it like ordinary spawns
             e.hp = e.maxHp;
@@ -455,6 +469,7 @@ public partial class Director : Godot.Node2D
             e.xpValue = xp; // the user's "chance to gain a lot more XP": clean bodies = a fat purse
             e.rangedDamage = ranged; // bow riders + mages keep their ranged card inside the swarm
             e.GlobalPosition = pos;
+            e._spawnStamp(g, true); // ROUND 14: swarm bodies ride the SAME clock law as ordinary spawns (so a bonus swarm late in the run is a real threat)
             g.RegisterHordeBody(e); // budget-free lane: never counted, exactly like the boss nodes
             g.AddChild(e);
         }
@@ -504,11 +519,11 @@ public partial class Director : Godot.Node2D
         else if (kind == "goblin2") { hp = 25.0f; spd = 100.0f; contact = 2.0f; xp = 1.0f; }
         else if (kind == "fastgoblin") { hp = 40.0f; spd = 110.0f; contact = 3.0f; xp = 2.0f; }
         else if (kind == "hobgoblin") { hp = 60.0f; spd = 100.0f; contact = 3.0f; xp = 3.0f; }
-        else if (kind == "rider") { hp = 100.0f; spd = 110.0f; contact = 4.0f; xp = 5.0f; }
-        else if (kind == "riderbow") { hp = 60.0f; spd = 110.0f; contact = 4.0f; ranged = 3.0f; xp = 5.0f; }
+        else if (kind == "rider") { hp = 140.0f; spd = 110.0f; contact = 4.0f; xp = 5.0f; }      // ROUND 14: the OLD 100 here was already out of step with SpawnRiderPack's retuned mount card
+        else if (kind == "riderbow") { hp = 80.0f; spd = 110.0f; contact = 4.0f; ranged = 3.0f; xp = 5.0f; } // ROUND 14: the OLD 60 here was already out of step with SpawnRiderPack
         else if (kind == "mage" || kind == "mage2") { hp = 40.0f; spd = 70.0f; contact = 4.0f; ranged = 6.0f; xp = 6.0f; }
-        else if (kind == "ogre") { hp = 220.0f; spd = 55.0f; contact = 4.0f; xp = 10.0f; }
-        else if (kind == "ogre2") { hp = 220.0f; spd = 55.0f; contact = 4.0f; xp = 10.0f; } // SAME card as the ogre (USER)
+        else if (kind == "ogre") { hp = 660.0f; spd = 55.0f; contact = 8.0f; xp = 10.0f; }        // ROUND 14 rebalance
+        else if (kind == "ogre2") { hp = 440.0f; spd = 55.0f; contact = 8.0f; xp = 10.0f; }      // ROUND 14 rebalance (the HP split the user set across the pair)
         e.maxHp = hp * hordeScale;
         e.hp = e.maxHp;
         e.speed = spd;
@@ -516,6 +531,7 @@ public partial class Director : Godot.Node2D
         e.rangedDamage = ranged;
         e.xpValue = xp;
         e.GlobalPosition = at;
+        e._spawnStamp(g, true); // ROUND 14: the room shows the SAME clock charge + elite roll the stage rolls, so what the user watches is what ships
         g.RegisterEnemy(e);
         g.AddChild(e);
     }

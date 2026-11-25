@@ -28,6 +28,46 @@ public partial class Enemy : Combatant
     public float rangedDamage = 0.0f; // bow 3 / mage 6 = USER numbers (set by Director)
     private float _shotCd = 0.0f;
 
+    // ---------- ROUND 14: TIME-KEYED SCALING (user 2026-11-25: "we won't mess with enemy speed
+    // as I think that's in a good place"; "Tier 1 enemies can stay as fodder"; "anything tier 2
+    // and above can scale HP and damage over time, based on when they are introduced"). ONE stat
+    // law, in _spawnStamp below, read by EVERY spawn lane right after its stat card lands (the
+    // Director's ordinary / rider / mage / wolf-pack / ogre / bonus-swarm / test lanes + the Game
+    // escort lane): HP and damage charge with the RUN CLOCK from the moment their TIER joined the
+    // stage, so a wolf that enters at 800 s is fatter than the same wolf at 430 s. The read is
+    // taken AT SPAWN and never re-read, so the x1.20-per-rest camp inflation the caller already
+    // baked into the card keeps stacking ON TOP and is never double-counted here. SPEED IS
+    // UNTOUCHED (user lock) and tier-1 stays flat fodder. ----------
+    public int tier = 1;         // bestiary band this kind belongs to (set by _spawnStamp)
+    public double anchorT = 0.0; // seconds into the run at which that tier JOINS the stage
+    public int armour = 0;       // flat incoming soak, paid in the TakeDamage override below
+    public bool elite = false;   // ROUND 14 ELITE lane (user: 2.5% of spawned bodies)
+    // Tier gates mirror the beat table (Game.BEAT_T / BEAT_TIER): the tier-3 gate moved 540 ->
+    // 420 s, so tier 2 and tier 3 share the 420 s anchor; the ogres (tier 4) anchor 840 s.
+    private static double T23_ANCHOR = 420.0; // tier-2/3 entry mark (USER gate move)
+    private static double T4_ANCHOR = 840.0;  // the ogre beat (mini2 leg)
+    private const double HP_SLOPE = 0.25;     // +25% HP per MINUTE past the anchor
+    private const double HP_CAP_T2 = 2.5;     // tier 2 tops out at +150% (the 1260 s finale step)
+    private const double HP_CAP_T34 = 3.0;    // tier 3/4 top out at the user's +200% (900 s mark)
+    private const double DMG_STEP_T2 = 0.25;  // tier 2 rides HALF the damage step
+    private const double DMG_STEP_T34 = 0.5;  // +0.5 contact damage per minute past the anchor
+    private const double DMG_CAP_T2 = 2.0;    // +2 flat at the 1260 s finale
+    private const double DMG_CAP_T34 = 4.0;   // the user's +4 flat at the 900 s mark
+    private const int ARMOUR_T4 = 2;          // ogre plate (user: "a bit too easy to deal with")
+    private const double SOAK_MIN_HIT = 1.0;  // the plate soaks weapon bites, never a per-frame DoT tick
+    public const float ELITE_CH = 0.025f;     // USER number: 2.5% of spawned bodies enter elite
+    private const double ELITE_HP_MUL = 2.0;  // USER numbers: elite HP / contact damage
+    private const double ELITE_DMG_MUL = 2.0;
+    // The ELITE XP x2 is NOT a constant here: the gem is doubled at the KILL site in Game.cs
+    // (the only read of xpValue in the project), so a stamped body can never pay x4.
+    // ELITE MARK: the blue glowing outline is a copy of the body's OWN canvas, ~7% bigger and
+    // drawn BEHIND it (ZIndex -1), so only the blue rim peeks out = a silhouette halo with zero
+    // new art. Greybox branch keeps a blue rim rect instead. Assistant pick - retune by eye.
+    Godot.Sprite2D _halo;
+    Godot.ColorRect _haloRect;
+    float _haloT = 0.0f;
+    private const float ELITE_HALO_PAD = 1.07f;
+
     // fx-feel10 audit: did this body ever loose a shot? first loose prints once,
     // so the bench counts loosed lanes instead of spamming the horde.
     bool _firedShot = false;
@@ -163,6 +203,78 @@ public partial class Enemy : Combatant
     bool _movePrimed = false;             // the first frame has no previous checkpoint
     float _moveSpd = 0.0f;                // eased px/s: drives cadence + amplitude
 
+    // ONE stat law for the whole bestiary (see the ROUND 14 header above). Call it from a spawn
+    // lane AFTER the lane has written its stat card: it multiplies what the card left behind, so
+    // every kind keeps its authored base and only the clock charge moves.
+    public void _spawnStamp(Game g, bool allowElite)
+    {
+        tier = TierOf(kind);
+        if (tier <= 1)
+        {
+            anchorT = 0.0;
+            return; // fodder stays fodder (user rule): tier-1 pays no clock, rolls no elite
+        }
+        anchorT = tier >= 4 ? T4_ANCHOR : T23_ANCHOR;
+        double mins = System.Math.Max(0.0, (double)g.GetRunTime() - anchorT) / 60.0;
+        double hpMul = 1.0 + HP_SLOPE * mins;
+        double hpCap = tier == 2 ? HP_CAP_T2 : HP_CAP_T34;
+        if (hpMul > hpCap)
+            hpMul = hpCap;
+        double dmgAdd = (tier == 2 ? DMG_STEP_T2 : DMG_STEP_T34) * mins;
+        double dmgCap = tier == 2 ? DMG_CAP_T2 : DMG_CAP_T34;
+        if (dmgAdd > dmgCap)
+            dmgAdd = dmgCap;
+        maxHp = (float)((double)maxHp * hpMul);
+        hp = maxHp;
+        contactDamage += (float)dmgAdd;
+        if (rangedDamage > 0.0f)
+            rangedDamage += (float)dmgAdd; // the bow rider + mage spike ride the same step
+        if (tier >= 4)
+            armour = ARMOUR_T4;
+        // the elite lane: 2.5% per SPAWNED BODY, one Rng draw per body like every other proc.
+        // HP + contact multiply AFTER the clock charge (an elite late in the run is a real
+        // threat, not a fresh fodder body with double HP). XP x2 is read at the KILL site, never
+        // here, so a stamped body can never pay x4. Escort goblins never roll elite (the caller
+        // passes allowElite = false: the rescue cage must stay readable at every beat).
+        if (allowElite && (float)GD.Randf() < ELITE_CH)
+        {
+            elite = true;
+            maxHp = (float)((double)maxHp * ELITE_HP_MUL);
+            hp = maxHp;
+            contactDamage = (float)((double)contactDamage * ELITE_DMG_MUL);
+        }
+    }
+    // BESTIARY BANDS. Unknown kinds fall back to tier 1: nothing that was never stamped can
+    // silently fatten itself, so a creature added later enters flat until it is banded here.
+    private static int TierOf(string k)
+    {
+        if (k == "wolf" || k == "wolf2" || k == "wolf3")
+            return 2;
+        if (k == "rider" || k == "riderbow" || k == "mage" || k == "mage2")
+            return 3;
+        if (k == "ogre" || k == "ogre2")
+            return 4;
+        return 1; // goblin / goblin2 / fastgoblin / hobgoblin = the fodder band (USER: stays flat)
+    }
+    // ROUND 14 armour rail: flat incoming soak on ENEMY bodies only (the ogres carry 2). Bosses
+    // and the party ride the untouched Combatant rail, so the plate is a creature-surface law.
+    // Soak pays BEFORE the shared rail, so a guiding-light mark and the DoT crossfire scale what
+    // is LEFT through the plate; the floor keeps armour from ever making a body attack-proof.
+    public override void TakeDamage(double amount)
+    {
+        // SOAK MINIMUM: the plate is ARMOUR, it soaks WEAPON BITES. DoT ticks ride this same rail
+        // at tiny per-frame amounts (dps x delta << 1), and a floor on those would turn a 3 dps
+        // burn into ~60 damage a second, so sub-hit amounts pass through the plate untouched. One
+        // threshold, so a weak weapon hit already under the plate is left alone too.
+        if (armour > 0 && amount >= SOAK_MIN_HIT)
+        {
+            amount -= (double)armour;
+            if (amount < 1.0)
+                amount = 1.0; // floor: plate soaks, it never closes the fight out
+        }
+        TakeDamageRail(amount); // the untouched Combatant rail under the plate: vuln / crossfire / hurt flash still ride. No super. here: this compiler front-end rejects base-call keywords (CS0103 even in a clean SDK scratch), and calling TakeDamage again would recurse through the dispatch, so the rail lives in Combatant's protected non-virtual helper
+    }
+
     // Visuals are built after spawn parameters land (Director sets kind/hp/speed post-new()),
     // so this runs on demand rather than in _EnterTree.
     public void InitVisuals()
@@ -268,6 +380,35 @@ public partial class Enemy : Combatant
                 _body.Visible = false; // greybox stands only while the art is missing
             }
         }
+        // ROUND 14 ELITE MARK (user 2026-11-25: elites get a blue glowing outline). Built AFTER
+        // the art / greybox branch so it copies whatever body this kind actually drew, and BEHIND
+        // it (ZIndex -1): a ~7% bigger blue copy of the body's own canvas leaves only a glowing
+        // rim around the silhouette, so the mark costs zero new art and never hides the creature.
+        // The halo flag was stamped at spawn before this first ran, and the mirror + pulse live
+        // in _Process below.
+        if (elite && _halo == null)
+        {
+            if (_spr != null && _spr.Texture != null)
+            {
+                Godot.Sprite2D h = new Godot.Sprite2D();
+                h.Texture = _spr.Texture;
+                h.Name = "EliteHalo";
+                h.ZIndex = -1; // under the body: the rim peeks, the creature stays readable
+                h.Scale = new Vector2(_artSc * ELITE_HALO_PAD, _artSc * ELITE_HALO_PAD);
+                _rig.AddChild(h);
+                _halo = h;
+            }
+            else
+            {
+                Godot.ColorRect rim = new Godot.ColorRect(); // greybox fallback: a blue frame
+                rim.Name = "EliteHalo";
+                rim.Size = _body.Size * 1.18f;
+                rim.Position = -rim.Size * 0.5f;
+                rim.ZIndex = -1;
+                _rig.AddChild(rim);
+                _haloRect = rim; // the pulse lane below only touches Modulate, shared by both node kinds
+            }
+        }
     }
     // THE LIFTED QUARRY, re-resolved every frame from the registry by INSTANCE ID: the kill
     // scan QueueFrees a body that dies mid-beat, so holding its node across frames would
@@ -329,6 +470,10 @@ public partial class Enemy : Combatant
                     	_face = fdx > 0.0f ? -1.0f : 1.0f; // ally RIGHT of the body: mirror the left-authored canvas
                 }
                 _spr.Scale = new Vector2(_artSc * _face, _artSc); // re-apply the base scale the art chain set at init
+                // ROUND 14 ELITE MARK: the halo is a copy of the SAME canvas, so it mirrors and
+                // scales with the body every frame - one face law, never two numbers to keep in step.
+                if (_halo != null)
+                    _halo.Scale = new Vector2(_artSc * _face * ELITE_HALO_PAD, _artSc * ELITE_HALO_PAD);
             }
         // monster sway (user 2026-11-08 hand-play: the gait pass that made heads vibrate was
         // SCRAPPED the same day; the user asked for the PLAYER-character language instead).
@@ -818,6 +963,19 @@ public partial class Enemy : Combatant
             _spr.Modulate = new Color(1.0f, 1.0f, 1.0f);
         else
             _body.Modulate = new Color(1.0f, 1.0f, 1.0f);
+        // ROUND 14 ELITE MARK pulse: the blue rim breathes so the mark reads as GLOW, not paint.
+        // Runs AFTER the hurt-flash / frost / white-reset branch, so a body that is frozen or being
+        // hit still shows its elite rim - the user must always be able to see what is elite. The
+        // rim stays blue while everything else tints. Modulate only, never a stat.
+        if (elite)
+        {
+            _haloT += (float)d;
+            float a = 0.55f + 0.3f * Mathf.Sin(_haloT * 3.2f); // assistant pulse pick - retune by eye
+            if (_halo != null)
+                _halo.Modulate = new Color(0.35f, 0.55f, 1.6f, a);
+            if (_haloRect != null)
+                _haloRect.Modulate = new Color(0.35f, 0.55f, 1.6f, a);
+        }
     }
 }
 

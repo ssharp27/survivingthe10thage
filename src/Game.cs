@@ -70,9 +70,17 @@ public partial class Game : Godot.Node2D
 	// ---------- stage beat loop (M2 schedule; user re-locked 2026-11-03 to ~20 min) ----------
 	// The stage is a BEAT TABLE on the run clock, not a fixed state chain. Times are
 	// RUN seconds, so a picker / join / camp pause never burns a beat (pass-22 rule).
-	//   30s ally I | 60s tier-2 gate | 180s mini-boss I | 240s ally II | 360s mid-boss I
-	//   420s ally III | 540s tier-3 gate | 660s mini-boss II | 780s ally IV | 840s tier-4
-	//   gate | 960s mid-boss II (the second boss1 body) | 1200s FINAL boss | 1260s WRAP-UP
+	//   30s ally I | 60s tier-2 gate | 180s mini-boss I | 200s ally II | 360s ally III | 360s
+	//   mid-boss I | 420s tier-3 gate | 480s ally IV | 660s mini-boss II | 840s tier-4 gate |
+	//   960s mid-boss II (the second boss1 body) | 1200s FINAL boss | 1260s WRAP-UP
+	// ROUND 14 retarget (user 2026-11-25: "we can get an ally spawn during a boss, for example",
+	// ally beats at 200 / 360 / 480 s, tier-3 gate moved to 420 s): the allies join INSIDE the
+	// boss pressure instead of in the calm between bosses, and AdvanceBeats no longer holds a
+	// NON-boss row back over a live boss, so an ally beat really does land mid-fight. ally III
+	// sits in the table IMMEDIATELY BEFORE the boss1 row so it fires first on that shared 360 s
+	// mark (rows fire in table order). The 420 s tier-3 gate is also the ANCHOR the tier-2/3 HP
+	// + damage curves count from (Enemy.cs SC_ANCHOR_T2 / SC_ANCHOR_T3), so moving the gate
+	// forward drags those curves forward with it - one lever, never two numbers to keep in step.
 	// The 2026-11-03 lock stretches the whole stage from 420 s to 1260 s (user: "runs are
 	// very difficult now without the right upgrades ... make it around 20 minutes"): the party
 	// gets ~20 minutes of build-up runway, then the Enter-the-Gungeon-style final sits on its
@@ -80,21 +88,21 @@ public partial class Game : Godot.Node2D
 	// before it) survive only as history here - the table below is the truth.
 	// This is the gameplay loop "until times and scaling are changed around" (user rule),
 	// so every number here is data the user can move without touching the sequencer.
-	readonly double[] BEAT_T = { 30.0, 60.0, 180.0, 240.0, 360.0, 420.0, 540.0, 660.0, 780.0, 840.0, 960.0, 1200.0, 1260.0 };
+	readonly double[] BEAT_T = { 30.0, 60.0, 180.0, 200.0, 360.0, 360.0, 420.0, 480.0, 660.0, 840.0, 960.0, 1200.0, 1260.0 };
 	// 0 = ally join beat, 1 = horde tier gate, 2 = mini-boss (its kill opens the camp),
 	// 3 = mid boss (its kill ALSO opens the camp now - user 2026-11-03 wants a campfire after
 	// EVERY boss), 4 = final boss (its kill ALSO opens the camp; the run rolls on),
 	// 5 = WRAP-UP (the run clock lands on it with a clear arena -> VICTORY; a live final
 	// holds the row back until it is resolved)
-	readonly int[] BEAT_KIND = { 0, 1, 2, 0, 3, 0, 1, 2, 0, 1, 3, 4, 5 };
+	readonly int[] BEAT_KIND = { 0, 1, 2, 0, 0, 3, 1, 0, 2, 1, 3, 4, 5 };
 	// the horde tier the stage runs at once that beat lands (0 = leave the tier alone).
 	// This lock puts the tier gates on their OWN rows, so a tier step never hides inside an
-	// ally beat again: tier 2 at 60s, tier 3 at 540s, tier 4 at 840s.
+	// ally beat again: tier 2 at 60s, tier 3 at 420s (moved up from 540s, USER round 14), tier 4 at 840s.
 	readonly int[] BEAT_TIER = { 0, 2, 0, 0, 0, 0, 3, 0, 0, 4, 0, 0, 0 };
 	// boss beats name the Boss node they engage, so a beat is data and the scene owns the
 	// body (five of them now: mini1 / boss1 / mini2 / boss2 / final, parked hidden until
 	// their beat fires)
-	readonly string[] BEAT_BOSS = { "", "", "mini1", "", "boss1", "", "", "mini2", "", "", "boss2", "final", "" };
+	readonly string[] BEAT_BOSS = { "", "", "mini1", "", "", "boss1", "", "", "mini2", "", "boss2", "final", "" };
 	// ally beats recruit whatever the per-run JOIN LOTTERY drew for that slot (user 2026-10-23:
 	// runs are dynamic). The lottery is built at boot from the stage-weighted table below,
 	// drawn without replacement and excluding the run's own leader. A -1 slot (pool
@@ -1408,7 +1416,7 @@ public partial class Game : Godot.Node2D
 			}
 		}
 		UpgradePartDrop(c.GlobalPosition); // Hew's Upgrades! lane: a 5% part ON this kill — the site rides in so the approved FX can drop a cog where it landed
-		SpawnGem(c.GlobalPosition, ((Enemy)c).xpValue);
+		SpawnGem(c.GlobalPosition, ((Enemy)c).xpValue * (((Enemy)c).elite ? 2.0f : 1.0f)); // ROUND 14: ELITE bounty x2 (USER). Read AT THE KILL, never at the spawn stamp, so one law owns the gem and a body can never pay x4
 		MaybeDropPickup(c); // rare kill drop, before the body leaves the registry
 		c.kind = "dead"; // drop the registry entry in the kill scan
 		ReleaseLiveCount((Enemy)c); // ownership-flagged: never double-decrements
@@ -2066,20 +2074,31 @@ public void RegisterEnemy(Combatant e)
 	// ---------- beat scheduler (M2 stage loop) ----------
 	// Rows fire in table order on the RUN clock. A row fires at most once (_nextBeat only
 	// ever moves forward). Two honest stalls keep the loop from stacking on itself:
-	//   * a LIVE boss holds the next row back - the fight must be resolved before the
-	//     stage advances (this is what M1's MINIBOSS/BOSS states did with a state change);
+	//   * a LIVE boss holds the next BOSS row back - a fight never stacks on a fight (this
+	//     is what M1's MINIBOSS/BOSS states did with a state change). ROUND 14 (user 2026-11-25:
+	//     "make events capable of spawning regardless of other events going on. So we can get an
+	//     ally spawn during a boss, for example"): the stall is narrowed to the BOSS rows, so an
+	//     ALLY beat or a TIER GATE now lands while a boss owns the arena. The wrap-up row stays
+	//     held back on the same discipline as before, so "cleared" only ever prints once `final`
+	//     is truly slain - the honesty the user's own rule asked for survives the relaxation;
 	//   * an unresolved escort rescue holds the NEXT ally row back, so two stranded PCs
 	//     never share the one rescue site. ESCORT_GIVEUP is the valve: if the party abandons
 	//     the cage, the PC joins at the floored HP and the stage keeps moving.
+	// A boss row can never be SKIPPED by the relaxation: rows only ever fire in table order and
+	// _nextBeat advances after a row fires, so the fight that follows a mid-fight ally beat is
+	// still the very next boss row (and the engage prints once, never twice).
 	private void AdvanceBeats()
 	{
 		while (_nextBeat < BEAT_T.Length && _runT >= BEAT_T[_nextBeat])
 		{
 			int kind = BEAT_KIND[_nextBeat];
-			if (BossPending())
-				break; // a live (or slain-but-unrouted) boss owns the arena: no new beat over it
+			if (BossPending() && (kind == 2 || kind == 3 || kind == 4 || kind == 5))
+				break; // a live (or slain-but-unrouted) boss owns the ARENA: no NEW fight over it,
+					   // and the wrap-up row waits until the final is truly resolved. Allies and
+					   // tier gates no longer hold back (round 14).
 			if (kind == 0 && _recruitPending != null)
-				break; // an unresolved rescue owns the stage
+				// an unresolved rescue owns the STAGE: no second cage on the same site
+				break;
 			_beatIdx = _nextBeat;
 			_beatT0 = _runT;
 			if (BEAT_TIER[_nextBeat] > 0)
@@ -8164,6 +8183,12 @@ private void UpdateSpirits(float delta)
 			e.contactDamage = 2.0f;
 			e.rangedDamage = 0.0f;
 			e.xpValue = 1.0f;
+			// ROUND 14: the escort cage rides the SAME stat law as every other spawn lane, but
+			// allowElite = false (USER law: recruitment escorts are tier-1 goblins on EVERY ally
+			// beat, no matter how far into the run the beat fires). Tier-1 makes the clock charge a
+			// no-op here; the call stays so the law reads once, and the escort lane can never pick
+			// up elite HP by accident.
+			e._spawnStamp(this, false);
 
 			e.escort = true;
 			double ea = 6.2831853 * i / ESCORT_COUNT + 0.3;

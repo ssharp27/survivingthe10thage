@@ -249,8 +249,19 @@ public partial class Combatant : Godot.Node2D
 		hurtFlash = 0.12f;
 	}
 
+	// ROUND 14 split: the public RAIL everyone rides keeps its exact signature; its body moved
+	// below to TakeDamageRail (protected, NON-virtual) so Enemy.cs' armour override can pay the
+	// plate and then reach this implementation without recursing through the dispatch. NOTE FOR
+	// FUTURE LAPS: this compiler front-end has no base-call keyword - a `super.X` (or a class-
+	// qualified Combatant.X) is rejected CS0103/CS0120 even in a clean SDK scratch, so a delegate
+	// helper is the ONLY honest way down. The DoT tick lines above keep calling the WRAPPER, so
+	// on plated bodies each tick rides the threshold gate before it reaches the rail.
 	public virtual void TakeDamage(double amount)
-{
+	{
+		TakeDamageRail(amount);
+	}
+	protected void TakeDamageRail(double amount) // the shared rail: vuln multiplier, DoT crossfire audit, hp loss, hurt flash
+	{
 		// guiding light: a marked body bites harder against whatever strikes it
 		if (vulnT > 0.0)
 			amount *= (1.0 + vulnMul);
