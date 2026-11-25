@@ -562,6 +562,7 @@ public partial class Game : Godot.Node2D
 	Godot.ColorRect _marthaRepairBg = null; // repair gauge BG (user 2026-11-24 round 7): a thin bar UNDER Martha's mini strip
 	Godot.ColorRect _marthaRepairF = null;  // ditto: fills as the 20 s yard-time knits while she is broken
 	bool _marthaRally = false;              // ditto: after a revive she RUSHES to Hew's flank before the hunt lanes reopen
+	bool _marthaFlee = false;               // ROUND 10 (user 2026-11-25): true from 25% of her pool until she welds back to 75% - she runs HOME to Hew but the bite scan still runs (attacks while moving); the grey weld tint rides this mode too
 	// Martha gait rig (user 2026-11-23: "the same movement animation as the enemies") - the Enemy.cs
 	// sway law odometer + eased px/s live here; the rig Node2D swings her art, never the hit core.
 	Godot.Node2D _marthaRig = null;
@@ -878,6 +879,14 @@ public partial class Game : Godot.Node2D
 		const double MARTHA_BITE_EVERY = 1.5; // assistant pick (retune by eye): her bite cadence
 		const double MARTHA_SPEED = 130.0;   // assistant pick: scuttles a touch faster than Hew (115)
 		const double MARTHA_BREAK = 20.0;    // user: 20 s broken at 0 hp, repairs herself
+		// ROUND 10 repair law (user 2026-11-25 hand-play): she RECOVERS 1 HP/s while near Hew; at
+		// 25% of her pool she RUNS HOME to Hew and welds herself back to 75% before falling in line
+		// again, and STILL chomps anything that comes within band while running back (the BROKEN
+		// yard-time above stays the hard fail - the flee just makes 0 hp a burst-fail route).
+		const double MARTHA_REGEN = 1.0;     // user: 1 hp per second recovered while within MARTHA_NEAR of Hew
+		const double MARTHA_FLEE = 0.25;     // user: pool fraction that sends her home to weld herself
+		const double MARTHA_WELD = 0.75;     // user: pool fraction she welds back to before falling in line
+		const double MARTHA_FLEE_SPD = 2.0;  // assistant pick (retune by eye): home-run speed multiplier while chipped
 		const double MARTHA_NEAR = 100.0;  // assistant pick (retunable): px within which Hew's presence DOUBLES the repair tick
 		const double MARTHA_LEASH = 120.0; // assistant pick (retunable): px past which she runs back to Hew by the shortest (wrap) route
 		const double MARTHA_PULL = 140.0;  // assistant pick (mirrors TAUNT_PULL): how far the horde notices her at all
@@ -4922,14 +4931,51 @@ public void RegisterEnemy(Combatant e)
 		// law the PMs pay, never while broken (the lane above already returned).
 		{
 			double regenCap = MARTHA_HP + _marthaHpBonus + MARTHA_VITALS;
-			double rate = (_muElixHealT > 0.0 ? 1.0 : 0.0) + (_muOakT > 0.0 ? 1.0 : 0.0);
+			double hewDist = WrapDelta(hew.GlobalPosition, _marthaBody.GlobalPosition).Length(); // ROUND 10: the user's constant weld gates on her distance FROM Hew
+		// ROUND 10: the user's law (2026-11-25 hand-play) is a CONSTANT 1 hp/s weld inside MARTHA_NEAR; the ROUND 8 buff knit keeps its EffMaxHp*0.01/s law - assistant fold of the two numbers, retune by eye.
+		 double rate = (_muElixHealT > 0.0 ? 1.0 : 0.0) + (_muOakT > 0.0 ? 1.0 : 0.0);
 			if (rate > 0.0 && _marthaHp < regenCap)
 			{
-				_marthaHp += regenCap * 0.01 * rate * delta;
+				_marthaHp += (regenCap * 0.01 * rate + (hewDist <= MARTHA_NEAR ? MARTHA_REGEN : 0.0)) * delta; // ROUND 10: user's 1 hp/s while within MARTHA_NEAR of Hew, buff knit on top
 				if (_marthaHp > regenCap)
 					_marthaHp = regenCap; // clamp at her own ceiling like every other heal lane
 			}
 		}
+				// ROUND 10 repair law (user 2026-11-25 hand-play: "She recovers 1 HP/s while near Hew. When
+		// she drops to 25%, she will run back to Hew to repair herself until she's back to at least
+		// 75%. She will still attack nearby enemies if they get close enough ... she can still attack
+		// enemies while moving"): FLEE MODE arms on the beat the pool drops to 25% of her OWN ceiling
+		// and disarms at 75%. While it rides the HUNT GATE below rides HER (not Hew's ring) so anything
+		// that comes close to the running body is prey, the SCUTTLE line walks HOME instead of chasing,
+		// and the BITE BAND still chomps - attacks land on the run home. The BROKEN lane above stays
+		// the hard fail (user round 7 law): iron felled to 0 still spends the 20 s yard-time. The 1 hp/s
+		// weld itself rode the regen fold above, gated on MARTHA_NEAR (the user's "near Hew").
+		{
+	 double fleeCap = MARTHA_HP + _marthaHpBonus + MARTHA_VITALS;
+	 if (_marthaHp <= fleeCap * MARTHA_FLEE && _marthaHp > 0.0)
+	 {
+	 if (!_marthaFlee && _pilot)
+	 GD.Print("[10thAge] (martha) Martha is down to a quarter - running home to Hew to weld"); // the 25% beat
+	 _marthaFlee = true; // chipped: the lanes below walk her home (the bite scan still rides)
+	 }
+	 else if (_marthaFlee && _marthaHp >= fleeCap * MARTHA_WELD)
+	 {
+	 _marthaFlee = false; // welded back to three-quarters: the flank line resumes as usual
+	 if (_pilot)
+	 GD.Print("[10thAge] (martha) Martha welds back to three-quarters and falls in line"); // the 75% beat
+	 }
+	 // ROUND 9's grey-while-repairing law now rides the NEW repair mode too (round 10 made repair
+	 // its OWN mode): chipped iron welding on the run home greys - a lighter flat tone than the
+	 // BROKEN breath so a hand-play can tell welding from down (assistant pick, retune by eye).
+	 Godot.Sprite2D weld = _marthaRig != null ? _marthaRig.GetChild(0) as Godot.Sprite2D : _marthaBody.GetChild(0) as Godot.Sprite2D;
+	 if (weld != null)
+	 {
+	 if (_marthaFlee)
+	 weld.Modulate = new Color(0.58f, 0.58f, 0.58f, 1.0f);
+	 else if (_marthaHp >= fleeCap * MARTHA_WELD)
+	 weld.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f); // knitted iron rides clear again
+	 }
+	 }
 		// RALLY (user 2026-11-24 round 7): after a revive she is FULL hp at the fell (G6 knits her back to her OWN
 		// ceiling, parts included) and RUNS back to Hew BEFORE the seek>kill lanes below resume - while the flag
 		// rides, closing only stops the rush once she is inside a 42 px flank seat (assistant fill of their "rush":
@@ -4958,7 +5004,7 @@ public void RegisterEnemy(Combatant e)
 			// HUNT GATE (user 2026-11-23 hand-play: "Martha should be trying to stay close while still
 			// running in to attack enemies"): prey only counts when it is within MARTHA_HUNT px of HEW,
 			// so she never sprints off the flank after a straggler - attackers on Hew are her prey as always.
-			Vector2 hoff = WrapDelta(hew.GlobalPosition, n.GlobalPosition); // prey distance FROM Hew
+			Vector2 hoff = WrapDelta(_marthaFlee ? _marthaBody.GlobalPosition : hew.GlobalPosition, n.GlobalPosition); // ROUND 10: prey distance FROM Hew - FROM HER while welding, so the run home still chomps what comes close (user 2026-11-25)
 			if (hoff.X * hoff.X + hoff.Y * hoff.Y > MARTHA_HUNT * MARTHA_HUNT)
 				continue; // flank guard: out of Hew's guard ring - hold the line, do not chase
 			Vector2 off = WrapDelta(_marthaBody.GlobalPosition, n.GlobalPosition);
@@ -4981,7 +5027,16 @@ public void RegisterEnemy(Combatant e)
 			if (d2 > touch * touch)
 			{
 				// chomp band not reached yet: scuttle along the SHORTEST (wrap) route toward the prey
-				_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition + off.Normalized() * (float)(MARTHA_SPEED * mvf * delta));
+				Vector2 step = off.Normalized(); // ROUND 10: while FLEEING the step flips HOME - she runs back to Hew, not after the prey (the user's flee law), and only the BITE BAND chomps (the user's "if they get close enough")
+		 if (_marthaFlee)
+	 {
+	 Vector2 flee = WrapDelta(hew.GlobalPosition, _marthaBody.GlobalPosition); // her offset FROM Hew
+	 if (flee.Length() > 34.0f)
+	 step = -flee.Normalized(); // the run home replaces the chase step (34 px flank seat, assistant pick)
+	 else
+	 step = new Vector2(0.0f, 0.0f); // on Hew's flank: stand and weld, prey out of band stays out
+	 }
+	 _marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition + step * (float)(MARTHA_SPEED * (_marthaFlee ? MARTHA_FLEE_SPD : 1.0) * mvf * delta));
 				_marthaCd = 0.0; // re-set, not banked: she only bites from a standstill inside the band
 			}
 			else
@@ -5030,7 +5085,11 @@ public void RegisterEnemy(Combatant e)
 		{
 			// nothing in find range: run home by the shortest route once she strays past the leash
 			Vector2 home = WrapDelta(hew.GlobalPosition, _marthaBody.GlobalPosition); // her offset FROM Hew
-			if (home.Length() > MARTHA_LEASH)
+			 // ROUND 10: while FLEEING she walks home at MARTHA_FLEE_SPD from ANY distance (user: at
+ // 25% she runs back to Hew to weld); the old leash rule still governs healthy iron.
+ if (_marthaFlee && home.Length() > 34.0f)
+ _marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition - home.Normalized() * (float)(MARTHA_SPEED * MARTHA_FLEE_SPD * mvf * delta));
+ else if (home.Length() > MARTHA_LEASH)
 				_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition - home.Normalized() * (float)(MARTHA_SPEED * mvf * delta));
 			_marthaCd = 0.0;
 		}

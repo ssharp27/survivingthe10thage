@@ -2670,23 +2670,15 @@ public partial class PartyMember : Godot.Node2D
 
 		}
 
-		else if (_atkFlash > 0.0f)
+		else if (_atkFlash > 0.0f) // ROUND 10 (user 2026-11-25: "Remove the flash from players when they attack...Athios is flashing like crazy"): branch KEPT but NEUTERED - it only ticks the clock down now, it writes NO Modulate anywhere. Setters untouched (several sit in the CLOSED claw-kit rails)
 
 		{
 
-			_atkFlash -= delta;
+			_atkFlash -= delta; // ROUND 10 (user 2026-11-25): clock ONLY ticks down now - the pulse is OFF
 
-			// SWING = ghost-white commit pulse. Modulate only multiplies, so a bright
-
-			// white is impossible on painted art - semi-transparent IS the white read
-
-			if (_mini != null)
-
-				_mini.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.55f);
-
-			else
-
-				_body.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.6f); // placeholder squares ghost alike
+			// ROUND 10: the commit-flash WRITE is gone for every character (Athios's fast swings were
+			// flashing like crazy). Setters stay untouched (several sit in the CLOSED claw-kit rails);
+			// the clock just parks dead. Red harm flash above and the plain-white lane below ride as before.
 
 		}
 
