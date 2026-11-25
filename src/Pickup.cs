@@ -22,7 +22,7 @@ public partial class Pickup : Godot.Node2D
 {
     public int pk = 0; // 0 heal | 1 magnet | 2 rage | 3 gear part (ROUND 8: Hew's Upgrades! weld rides the field)
     private double _life = 0.0;
-    public int gearKind = 0; // ROUND 8: pk 3 part kind the Game.CollectGearPart weld applies: 0 dmg | 1 spd | 2 rad | 3 arm | 4 hp
+    public int gearKind = 0; // ROUND 8: pk 3 part kind the Game.CollectGearPart weld applies: 0 dmg | 1 spd | 2 rad | 3 arm | 4 hp | 5 crit | 6 eva | 7 move speed
     private float _bobT = 0.0f;
     Godot.Sprite2D _artNode = null; // ROUND 9: the flavour art node kept live so the pk 3 cog can SPIN
     Godot.ColorRect _orb;

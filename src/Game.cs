@@ -249,7 +249,7 @@ public partial class Game : Godot.Node2D
 		"Lucky Stabs (+5% Crit Chance)", "Sneak Attack (+5% Multistrike Chance)",
 											   "Fire Rune (+1 Burn Damage/sec for 5s)", "Harder Thrusts (+15% Crit Damage)",
 											   "Eagle Eye (+5% Crit Chance)", "Difficult Terrain (10% Slow for 2.5s)",
-											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)", "Overflowing Necrosis (+12% Damage)", "Swift Curse (+16% Attack Speed)", "Multi-Flame (+1 Pillar Target)", "Necrotic Plague (Flame DoT passes on touch)", "Greater Pestilence (+15% Pillar Radius)" , "Sharper Claws (+12% Damage)", "Savage Attacks (+16% Attack Speed)", "Primal Might (+1 Claw Attack)", "Haemorrhaging Bleed (Bleed slows 10%)", "Longer Claws (+15% Range)" , "Remove Inhibitors (+12% Damage)", "Wider Barrel (+16% Beam Width)", "Efficient Gears (+16% Attack Speed)", "Vampiric Core (Martha Heals 5% of All Damage Dealt)", "Explosive Finale (Kill Blast 25/50/75% Damage)" }; // 2026-11-23 restore: claw rows 55-59 ride the SAME x/3 rank track as every other character (user law: "any characters we build follow the same formula of 3 skill ranks for all upgrades - this may be reworked down the line, but for now this is law"); an OFF/ON carve-out and a "+20% / Longest Claws" spec were assistant-authored text misfiled as user ground truth (opencode.db session_message has zero user-role hits for "+20%" or "Longest Claws") | rows 60-64 = Hew's Thunder Cannon kit (user 2026-11-22, spec verbatim: "Remove Inhibitors: +12% damage. Wider Barrel: +16% area. Efficient Gears: +16% attack speed. Vampiric Core: Martha heals 1% of all damage dealt. Explosive Finale: Hew and Martha kills explode for 25/50/75% damage")
+											   "Echoing Explosions (+5% Multistrike Chance)", "Arcane Power (+12% Damage)", "Faster Channeling (+16% Attack Speed)", "Split Beams (+1 Beam Target)", "Arcane Reach (+10% Beam Range)", "Arcane Echo (+5% Multistrike Chance)", "Overflowing Necrosis (+12% Damage)", "Swift Curse (+16% Attack Speed)", "Multi-Flame (+1 Pillar Target)", "Necrotic Plague (Flame DoT passes on touch)", "Greater Pestilence (+15% Pillar Radius)" , "Sharper Claws (+12% Damage)", "Savage Attacks (+16% Attack Speed)", "Primal Might (+1 Claw Attack)", "Haemorrhaging Bleed (Bleed slows 10%)", "Longer Claws (+15% Range)" , "Remove Inhibitors (+12% Damage)", "Wider Barrel (+16% Beam Width)", "Efficient Gears (+16% Attack Speed)", "Vampiric Core (Martha Heals 2.5% of All Damage Dealt)", "Explosive Finale (Kill Blast 25/50/75% Damage)" }; // 2026-11-23 restore: claw rows 55-59 ride the SAME x/3 rank track as every other character (user law: "any characters we build follow the same formula of 3 skill ranks for all upgrades - this may be reworked down the line, but for now this is law"); an OFF/ON carve-out and a "+20% / Longest Claws" spec were assistant-authored text misfiled as user ground truth (opencode.db session_message has zero user-role hits for "+20%" or "Longest Claws") | rows 60-64 = Hew's Thunder Cannon kit (user 2026-11-22, spec verbatim: "Remove Inhibitors: +12% damage. Wider Barrel: +16% area. Efficient Gears: +16% attack speed. Vampiric Core: Martha heals 1% of all damage dealt. Explosive Finale: Hew and Martha kills explode for 25/50/75% damage")
 	static readonly int[] OPT_MEMBER = { 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 0, 1, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 0, 1, 2, 3, 4, 9, 9, 9, 9, 9 , 10, 10, 10, 10, 10 , 11, 11, 11, 11, 11 , 12, 12, 12, 12, 12 };
 	static readonly float[] OPT_CD = { 1.0f, 1.0f, 0.86f, 0.86f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 0.85f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 0.86f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 0.86f, 1.0f, 1.0f }; // row 56 Savage Attacks: cd x0.86 = +16% attack speed (hand-play brief) | row 62 Efficient Gears: cd x0.86 = +16% (shared lane; HEW clamps the authored 2.0 s and reroutes speed to damage at HALF rate)
 	static readonly float[] OPT_RANGE = { 1.15f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.16f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f , 1.0f, 1.0f, 1.0f, 1.0f, 1.15f , 1.0f, 1.0f, 1.0f, 1.0f, 1.0f }; // row 59 Longer Claws: +15% range PER RANK (user brief seq 129914) | Hew keeps reach PINNED at 520: Wider Barrel rides OPT_BARREL and widens only the beam band
@@ -362,11 +362,11 @@ public partial class Game : Godot.Node2D
 	// does NOT ride OPT_RANGE - Hew's reach is PINNED at the authored 520 and only the beam BAND widens.
 	// THREE new columns carry the bespoke kits: OPT_BARREL = Wider Barrel presence switch (band x1.16/rank
 	// at the cannon march; radius upgrades widen the beam too, spec "the beam gets wider with radius upgrades"),
-	// OPT_VAMP = Vampiric Core presence (Martha heals 5% of ALL damage dealt by the party, capped at her 40 hp
+	// OPT_VAMP = Vampiric Core presence (Martha heals 2.5% of ALL damage dealt by the party (ROUND 12: halved, capped at her 40 hp
 	// pool), OPT_EXPLO = Explosive Finale presence (Hew and Martha kills explode for 25/50/75% of the kill's
 	// damage by rank, ~60 px blast at the corpse).
 	// The Leader Bonus lane is separate: every defeated enemy while Hew leads has a 5% chance to drop an
-	// UPGRADE part (5% damage / 5% attack speed / 5% radius / 1 armour / 5 hp) boosting that stat for ALL
+	// UPGRADE part (5% damage / 5% attack speed / 5% radius / 1 armour / 5 hp / 5% crit / 5% evasion / 5% move speed (ROUND 12 widened the pool from five kinds) boosting that stat for ALL
 	// characters and Martha, run-permanent, diminishing per kind (n-th part = base x 0.9^n); Game.cs counts
 	// the kinds and calls PartyMember.applyUpgradeBonus + the Martha fields.
 	// NOTE: no claw-specific guards remain (2026-11-23 restore) - every track, claw and Hew alike, keeps rank.
@@ -855,6 +855,9 @@ public partial class Game : Godot.Node2D
 		int _upRadN = 0;
 		int _upArmN = 0;
 		int _upHpN = 0;
+		int _upCritN = 0;   // ROUND 12: the widened pool (assistant pick: crit / evasion / move speed)
+		int _upEvaN = 0;
+		int _upMvfN = 0;
 		int _upGearN = 0;   // ROUND 8: gear parts that WELDED this run (pilot read only)
 		int _upGearLoose = 0; // ROUND 8: of the granted parts, how many became a REAL field cog instead
 		// ROUND 8 (user 2026-11-24: "make hews gear parts drop like xp would and make it stay on the
@@ -872,7 +875,7 @@ public partial class Game : Godot.Node2D
 		// knits herself back (the countdown runs 2x while Hew stands close - proximity is an assistant
 		// pick, retunable). Art: res://art/characters/martha.png (104x97 sheet, on the user's WIP rail).
 		const double MARTHA_HP = 40.0;        // user
-		const double MARTHA_ARMOUR = 3.0;  // user
+		const double MARTHA_ARMOUR = 2.0;  // user (ROUND 12: lowered from 3 - she was effectively immortal once vamp rode)
 		const double MARTHA_EVA = 0.05;     // user: 5% evasion
 		const double MARTHA_CRIT = 0.05;   // user: 5% crit chance (her bite rolls it)
 		const double MARTHA_BITE = 10.0;   // user
@@ -916,6 +919,9 @@ public partial class Game : Godot.Node2D
 		Godot.Collections.Array<double> _cogSpin = new();         // tumble rad/s per slot (alternates: two drops never read the same way)
 		double _marthaHpBonus = 0.0;      // ditto: flat hp points on top of her 40
 		double _marthaVamp = 0.0;         // Vampiric Core (Hew card): hp she has drunk this run, clamped to her own ceiling
+		double _marthaCrit = 0.0;    // ROUND 12: flat crit points from gear parts (rides the bite roll below)
+		double _marthaEva = 0.0;     // ROUND 12: flat evasion points from gear parts (then x the leader aura)
+		double _marthaMvf = 1.0;     // ROUND 12: move-speed multiplier from gear parts (her scuttle x)
 		// ROUND 8 (user 2026-11-24, round 8: "she collects xp and such for the player, and will also
 		// benefit from ultimates and passives that buff allies / party members (treat it like she is
 		// another party member)"): she is NOT a PartyMember and NOT in _party, so none of the party
@@ -3892,7 +3898,7 @@ public void RegisterEnemy(Combatant e)
 			return 12; // Spiritmane Pride (user 2026-11-19): the pack is battle-born - +10% move, +10% dodge,
 		// 10% less damage taken party-wide. Readers: LeaderMoveMul / LeaderEvaMul / LeaderPrideDamageMul (below)
 		if (_leader.displayName == "Hew")
-		 return 13; // Upgrades! (user 2026-11-22): every defeated enemy has a 5% chance to drop a part boosting a random stat for ALL characters (and Martha): 5% Damage / 5% Attack Speed / 5% Radius / +1 Armour / +5 HP. Run-permanent; the lane lives on Game.OnEnemyKilled (below), Martha's half on her own upkeep
+		 return 13; // Upgrades! (user 2026-11-22): every defeated enemy has a 5% chance to drop a part boosting a random stat for ALL characters (and Martha): 5% Damage / 5% Attack Speed / 5% Radius / +1 Armour / +5 HP / +5% Crit Chance / +5% Evasion / +5% Move Speed (ROUND 12: eight kinds). Run-permanent; the lane lives on Game.OnEnemyKilled (below), Martha's half on her own upkeep
 		return 0;
 	}
 	
@@ -4883,7 +4889,7 @@ public void RegisterEnemy(Combatant e)
 			_marthaCd = 0.5; // a half-second wind-up, then the bite clock
 			_marthaBody.GlobalPosition = WrapNearCamera(hew.GlobalPosition + new Vector2(-40.0f, 0.0f));
 			if (_pilot)
-				GD.Print("[10thAge] (martha) Martha crawls out beside Hew (" + (MARTHA_HP + MARTHA_VITALS) + " hp / 3 armour, 10 px bite)");
+				GD.Print("[10thAge] (martha) Martha crawls out beside Hew (" + (MARTHA_HP + MARTHA_VITALS) + " hp / 2 armour, 10 px bite)");
 		}
 		_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition); // fold-follow like every pool
 		// BROKEN lane (user: at 0 hp she is broken 20 s and repairs herself). The countdown runs 2x while
@@ -4986,7 +4992,7 @@ public void RegisterEnemy(Combatant e)
 			Vector2 rush = WrapDelta(hew.GlobalPosition, _marthaBody.GlobalPosition); // her offset FROM Hew
 			if (rush.Length() > 42.0f)
 			{
-				_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition - rush.Normalized() * (float)(MARTHA_SPEED * 2.0 * mvf * delta)); // the rush: homing idiom at 2x her scuttle
+				_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition - rush.Normalized() * (float)(MARTHA_SPEED * _marthaMvf * 2.0 * mvf * delta)); // the rush: homing idiom at 2x her scuttle
 				return; // hunt lanes stay closed until she is back beside Hew (user law: rush BEFORE resuming seek>kill)
 			}
 			_marthaRally = false; // on his flank: the seek>kill resumes on THIS frame
@@ -5036,7 +5042,7 @@ public void RegisterEnemy(Combatant e)
 	 else
 	 step = new Vector2(0.0f, 0.0f); // on Hew's flank: stand and weld, prey out of band stays out
 	 }
-	 _marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition + step * (float)(MARTHA_SPEED * (_marthaFlee ? MARTHA_FLEE_SPD : 1.0) * mvf * delta));
+	 _marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition + step * (float)(MARTHA_SPEED * _marthaMvf * (_marthaFlee ? MARTHA_FLEE_SPD : 1.0) * mvf * delta));
 				_marthaCd = 0.0; // re-set, not banked: she only bites from a standstill inside the band
 			}
 			else
@@ -5055,7 +5061,7 @@ public void RegisterEnemy(Combatant e)
 					double spd = _marthaSpd * (ult ? 1.25 : 1.0) * (_muRageT > 0.0 ? 1.5 : 1.0) * (_muInsT > 0.0 ? 1.25 : 1.0);
 					_marthaCd = MARTHA_BITE_EVERY / spd; // 1.5 s cadence, attack-speed parts and the ult on top
 					double dealt = MARTHA_BITE * _marthaDmg * (ult ? 1.25 : 1.0) * (_muUltT > 0.0 ? 1.5 : 1.0) * (_muInsT > 0.0 ? 1.25 : 1.0) * (_muAwaT > 0.0 ? 1.25 : 1.0) * (_muElixBoldT > 0.0 ? 1.10 : 1.0);
-					if (Rng != null && Rng.Randf() < MARTHA_CRIT + (_muElixPrecT > 0.0 ? 0.10 : 0.0))
+					if (Rng != null && Rng.Randf() < MARTHA_CRIT + _marthaCrit + (_muElixPrecT > 0.0 ? 0.10 : 0.0))
 						dealt *= 1.5; // her crit mirrors the engine's CRIT_DAMAGE base (1.5x)
 					pc.TakeDamage(dealt);
 					MarthaVampSip(dealt); // Vampiric Core (Hew card): she drinks what she bites
@@ -5088,9 +5094,9 @@ public void RegisterEnemy(Combatant e)
 			 // ROUND 10: while FLEEING she walks home at MARTHA_FLEE_SPD from ANY distance (user: at
  // 25% she runs back to Hew to weld); the old leash rule still governs healthy iron.
  if (_marthaFlee && home.Length() > 34.0f)
- _marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition - home.Normalized() * (float)(MARTHA_SPEED * MARTHA_FLEE_SPD * mvf * delta));
+ _marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition - home.Normalized() * (float)(MARTHA_SPEED * _marthaMvf * MARTHA_FLEE_SPD * mvf * delta));
  else if (home.Length() > MARTHA_LEASH)
-				_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition - home.Normalized() * (float)(MARTHA_SPEED * mvf * delta));
+				_marthaBody.GlobalPosition = WrapNearCamera(_marthaBody.GlobalPosition - home.Normalized() * (float)(MARTHA_SPEED * _marthaMvf * mvf * delta));
 			_marthaCd = 0.0;
 		}
 	}
@@ -5111,7 +5117,7 @@ public void RegisterEnemy(Combatant e)
 		// ROUND 8 evade fold: the leader's evasion aura (Inquisitive Mind / Gekkota / Pride - the
 		// user's "all allies" law) scales her pool. Kit-tag dodge lanes (Brook's EVASION stat) are
 		// NOT mirrored per-kit - assistant pick, retune.
-		if (Rng != null && Rng.Randf() < MARTHA_EVA * LeaderEvaMul())
+		if (Rng != null && Rng.Randf() < (MARTHA_EVA + _marthaEva) * LeaderEvaMul())
 		{
 			if (_pilot)
 				GD.Print("[10thAge] (martha) Martha twists out of the bite"); // her 5% evasion
@@ -5135,7 +5141,7 @@ public void RegisterEnemy(Combatant e)
 				GD.Print("[10thAge] (martha) Martha is DOWN - she spends 20 s in the yard knitting");
 		}
 	}
-//T// Vampiric Core (Hew's card): she heals 5% of ALL damage she deals per rank (user round 7: 5/10/15%), clamped to her own
+//T// Vampiric Core (Hew's card): she heals 2.5% of ALL damage she deals per rank (ROUND 12: the user halved the round-7 5/10/15% to 2.5/5/7.5%, clamped to her own
 //T// ceiling (assistant pick: the cap keeps a lucky sip lane from trading whole pools into free
 //T// healing). No sip while broken - she is not biting, so there is nothing to drink.
 	public void MarthaVampSip(double dealt)
@@ -5146,7 +5152,7 @@ public void RegisterEnemy(Combatant e)
 		double cap = MARTHA_HP + _marthaHpBonus + MARTHA_VITALS;
 		if (_marthaHp >= cap)
 			return; // already at the ceiling: a sip is never wasted on a full pool
-		_marthaHp += dealt * 0.05 * hew.vampRank; // round 7 (user 2026-11-24): ranks drink 5/10/15% of the damage she deals
+		_marthaHp += dealt * 0.025 * hew.vampRank; // ROUND 12 (user 2026-11-25: "adjust that to 2.5% per level"): ranks drink 2.5/5/7.5% of the damage she deals
 		if (_marthaHp > cap)
 			_marthaHp = cap;
 	}
@@ -5187,9 +5193,9 @@ public void RegisterEnemy(Combatant e)
 			return; // the seat is not Hew's: the bonus is inert under every other leader
 		if (Rng == null || Rng.Randf() >= 0.05)
 			return; // the 5% roll
-		int kind = (int)(Rng.Randf() * 5.0); // one of five stats, uniform (the user asked for RANDOM)
-		if (kind > 4)
-			kind = 4; // belt-and-braces: Randf is < 1
+		int kind = (int)(Rng.Randf() * 8.0); // ROUND 12 (user: "we may add more just to bump the RNG"): EIGHT kinds, uniform
+		if (kind > 7)
+			kind = 7; // belt-and-braces: Randf is < 1
 		// ROUND 8 GEAR RAIL (user: "make hews gear parts drop like xp would and make it stay on the
 		// ground until picked up"): 5% of the GRANTED parts (ROUND 11: was 2.5%) do not weld on the spot - they become
 		// a real cog Pickup (pk=3) parked at the kill site, which never times out and welds only
@@ -5224,9 +5230,15 @@ public void RegisterEnemy(Combatant e)
 		{ damp = System.Math.Pow(0.9, (double)_upRadN); _upRadN++; tally = _upRadN; }
 		else if (kind == 3)
 		{ damp = System.Math.Pow(0.9, (double)_upArmN); _upArmN++; tally = _upArmN; }
-		else
+		else if (kind == 4)
 		{ damp = System.Math.Pow(0.9, (double)_upHpN); _upHpN++; tally = _upHpN; }
-		string[] tag = { "damage", "attack speed", "radius", "armour", "hp" }; // pilot read only
+		else if (kind == 5)
+		{ damp = System.Math.Pow(0.9, (double)_upCritN); _upCritN++; tally = _upCritN; }
+		else if (kind == 6)
+		{ damp = System.Math.Pow(0.9, (double)_upEvaN); _upEvaN++; tally = _upEvaN; }
+		else
+		{ damp = System.Math.Pow(0.9, (double)_upMvfN); _upMvfN++; tally = _upMvfN; }
+		string[] tag = { "damage", "attack speed", "radius", "armour", "hp", "crit", "evasion", "move speed" }; // pilot read only
 		if (_pilot)
 			GD.Print("[10thAge] (upgrades) part: " + tag[kind] + " x" + tally + " (dim " + (float)damp + ")");
 		DropCogFx(at); // FX-lap: the part the roll granted, DROPS visibly - a cog tumbles where the kill fell
@@ -5243,7 +5255,7 @@ public void RegisterEnemy(Combatant e)
 				m.stat[StatTags.AREA] += 0.05 * damp;
 			else if (kind == 3)
 				m.stat[StatTags.ARMOUR] += 1.0 * damp;
-			else
+			else if (kind == 4)
 			{
 				// +5 hp raises the CEILING and the line: the part is a weld, not a promise
 				m.stat[StatTags.HEALTH] += 5.0 * damp;
@@ -5252,6 +5264,12 @@ public void RegisterEnemy(Combatant e)
 					// round 7: "the party HP upgrade should raise MAX hp too" - it now raises the ceiling and hp
 					// follows exactly once).
 			}
+			else if (kind == 5)
+				m.stat[StatTags.CRIT_CHANCE] += 0.05 * damp; // ROUND 12: +5% crit chance (points on the tag store)
+			else if (kind == 6)
+				m.stat[StatTags.EVASION] += 0.05 * damp; // ROUND 12: +5% evasion (points)
+			else
+				m.stat[StatTags.MOVEMENT_SPEED] += 0.05 * damp; // ROUND 12: +5% move (multiplier tag, base 1.0)
 		}
 		// Martha is not in _party, so she reads the SAME tally through her own fields
 		if (kind == 0)
@@ -5262,12 +5280,18 @@ public void RegisterEnemy(Combatant e)
 			_marthaRad *= 1.0 + 0.05 * damp;
 		else if (kind == 3)
 			_marthaArm += 1.0 * damp;
-		else
+		else if (kind == 4)
 		{
 			_marthaHpBonus += 5.0 * damp;
 			if (_marthaHp > 0.0)
 				_marthaHp += 5.0 * damp; // a standing Martha gets the weld right now
 		}
+		else if (kind == 5)
+			_marthaCrit += 0.05 * damp; // ROUND 12: flat crit points (rides MARTHA_CRIT)
+		else if (kind == 6)
+			_marthaEva += 0.05 * damp; // ROUND 12: flat evasion points (x the leader aura after)
+		else
+			_marthaMvf *= 1.0 + 0.05 * damp; // ROUND 12: move multiplier on her scuttle
 	}
 	// ROUND 8: the gear rail's GROUND re-entry: a picked-up cog welds EXACTLY like a rolled one
 	// (shared damp/tally math through ApplyGearPart). Called by the Pickup rail (pk=3), which
@@ -6720,7 +6744,7 @@ private void UpdateSpirits(float delta)
 		"Leader Bonus: Gekkota Training - All allies gain +10% evasion, +10% movement speed and +10% attack speed.",
 		"Leader Bonus: Call of the Grave - Enemies slain while Hapi leads have a 5% chance to rise as undead halves (half stats) that taunt nearby enemies.",
 		"Leader Bonus: Spiritmane Pride - All allies gain +10% Movement Speed and +10% Evasion and take 10% less damage while Athios leads.",
-		"Leader Bonus: Upgrades! - Every defeated enemy has a 5% chance to drop a part that boosts a random stat for ALL characters (and Martha): 5% Damage, 5% Attack Speed, 5% Radius, +1 Armour or +5 HP." };
+		"Leader Bonus: Upgrades! - Every defeated enemy has a 5% chance to drop a part that boosts a random stat for ALL characters (and Martha): 5% Damage, 5% Attack Speed, 5% Radius, +1 Armour or +5 HP, +5% Crit Chance, +5% Evasion or +5% Move Speed (eight kinds)." };
 	static readonly string[] SEL_ULT = {
 		"Ultimate: Giant's Might (R) - Doubles Baldrun's size and reach and grants +50% Damage and Attack Speed for 10s.",
 		"Ultimate: Bardic Inspiration (R) - All allies gain +25% Damage and Attack Speed for 10s",
@@ -7859,7 +7883,7 @@ private void UpdateSpirits(float delta)
 		{ m.hasPrimal += OPT_CLAW[option]; } // Primal Might (Athios row 57): +1 claw attack PER RANK, so hasPrimal is a rank count 0..3 and the march adds (int)hasPrimal swings (user brief seq 129914: "Primal Might - +1 claw attack ... per level, as they have always been for all characters")
 		{ m.bleedSlow += OPT_BLEEDSLOW[option]; } // Haemorrhaging Bleed (Athios row 58): +10%/rank slow stamped beside the Bleed (user brief seq 129914: "Bleed effect now also slows the enemy by 10%", per rank)
 		{ m.barrelRank += OPT_BARREL[option]; } // Wider Barrel (Hew row 61) keeps RANK like every other track: the cannon band widens +16%/rank, reach stays PINNED at 520
-		{ m.vampRank += OPT_VAMP[option]; } // Vampiric Core (Hew row 63) is a presence switch: Martha heals 1% of all party damage (Game.cs reads presence via GetMemberByIndex(12))
+		{ m.vampRank += OPT_VAMP[option]; } // Vampiric Core (Hew row 63) is a presence switch: Martha heals 2.5%/rank of all party damage (ROUND 12: was 1% authored, 5% at round 7) (Game.cs reads presence via GetMemberByIndex(12))
 		{ m.exploRank += OPT_EXPLO[option]; } // Explosive Finale (Hew row 64) keeps rank: Hew/Martha kills blast 25/50/75% of the kill damage (Game.cs kill attribution)
 		m.pickHistory += (m.pickHistory == "" ? "" : ", ") + m.weaponName + " " +
 						 OPT_LABEL[option] + " x" + _pickRank[option];
