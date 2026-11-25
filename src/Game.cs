@@ -858,12 +858,12 @@ public partial class Game : Godot.Node2D
 		int _upGearN = 0;   // ROUND 8: gear parts that WELDED this run (pilot read only)
 		int _upGearLoose = 0; // ROUND 8: of the granted parts, how many became a REAL field cog instead
 		// ROUND 8 (user 2026-11-24: "make hews gear parts drop like xp would and make it stay on the
-		// ground until picked up"): the user's 2.5% of the parts Hew's bonus roll grants loosen as a
+		// ground until picked up"): the user's 5% of the parts Hew's bonus roll grants (ROUND 11: set back from 2.5%) loosen as a
 		// Pickup node (pk 3) instead of welding into the squad on the spot. One drop, ONE route: the
 		// roll either looses a field cog (this const) or welds instantly (the round-6 path, unchanged
-		// for the other 97.5%). The cog never expires - unlike the three other flavours, whose 18 s
+		// for the other 95%). The cog never expires - unlike the three other flavours, whose 18 s
 		// lifetime is the "grabbing it is a choice" law - the user asked for it to sit until grabbed.
-		const double GEAR_PART_CH = 0.025; // user: 2.5% of Hew's part drops become a field cog
+		const double GEAR_PART_CH = 0.05;  // ROUND 11 (user hand-play 2026-11-25: "let's set it back to 5%"): 5% of Hew's part drops become a field cog - the 2.5% nerf was too steep, he is extremely weak early run
 		// MARTHA (user 2026-11-22, Hew's companion): a dedicated PERSISTENT Node2D singleton, NOT a
 		// PartyMember and NOT a risen shell - own bite lane, own damage route, never despawns. She IS
 		// the horde's other player character: the Enemy chase already walks a Node2D quarry (GetTauntBody)
@@ -4933,8 +4933,8 @@ public void RegisterEnemy(Combatant e)
 			double regenCap = MARTHA_HP + _marthaHpBonus + MARTHA_VITALS;
 			double hewDist = WrapDelta(hew.GlobalPosition, _marthaBody.GlobalPosition).Length(); // ROUND 10: the user's constant weld gates on her distance FROM Hew
 		// ROUND 10: the user's law (2026-11-25 hand-play) is a CONSTANT 1 hp/s weld inside MARTHA_NEAR; the ROUND 8 buff knit keeps its EffMaxHp*0.01/s law - assistant fold of the two numbers, retune by eye.
-		 double rate = (_muElixHealT > 0.0 ? 1.0 : 0.0) + (_muOakT > 0.0 ? 1.0 : 0.0);
-			if (rate > 0.0 && _marthaHp < regenCap)
+			double rate = (_muElixHealT > 0.0 ? 1.0 : 0.0) + (_muOakT > 0.0 ? 1.0 : 0.0);
+			if ((rate > 0.0 || hewDist <= MARTHA_NEAR) && _marthaHp < regenCap) // ROUND 11 fix (user hand-play 2026-11-25: "Martha doesn't repair when next to Hew"): the constant weld must ride its OWN beat - the ROUND 8 gate only ran while a buff knit rode
 			{
 				_marthaHp += (regenCap * 0.01 * rate + (hewDist <= MARTHA_NEAR ? MARTHA_REGEN : 0.0)) * delta; // ROUND 10: user's 1 hp/s while within MARTHA_NEAR of Hew, buff knit on top
 				if (_marthaHp > regenCap)
@@ -5191,7 +5191,7 @@ public void RegisterEnemy(Combatant e)
 		if (kind > 4)
 			kind = 4; // belt-and-braces: Randf is < 1
 		// ROUND 8 GEAR RAIL (user: "make hews gear parts drop like xp would and make it stay on the
-		// ground until picked up"): 2.5% of the GRANTED parts do not weld on the spot - they become
+		// ground until picked up"): 5% of the GRANTED parts (ROUND 11: was 2.5%) do not weld on the spot - they become
 		// a real cog Pickup (pk=3) parked at the kill site, which never times out and welds only
 		// when someone walks over it. The weld half is shared (ApplyGearPart below), so a ground
 		// part is IDENTICAL to an instant one except for the wait. Pilot census kept for the smoke.
