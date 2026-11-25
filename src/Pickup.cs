@@ -24,6 +24,7 @@ public partial class Pickup : Godot.Node2D
     private double _life = 0.0;
     public int gearKind = 0; // ROUND 8: pk 3 part kind the Game.CollectGearPart weld applies: 0 dmg | 1 spd | 2 rad | 3 arm | 4 hp
     private float _bobT = 0.0f;
+    Godot.Sprite2D _artNode = null; // ROUND 9: the flavour art node kept live so the pk 3 cog can SPIN
     Godot.ColorRect _orb;
     // 2026-11-08 art pass (user-approved sprites): healing potion / arcane orb / rage flame per flavour;
     // the ColorRect shell stays as the null-safe fallback, same discipline as Enemy.cs
@@ -67,6 +68,7 @@ public partial class Pickup : Godot.Node2D
             asp.Scale = new Vector2(PICKUP_ART_S, PICKUP_ART_S);
             asp.Position = new Vector2(6.0f - (float)atx.GetWidth() * PICKUP_ART_S * 0.5f, 6.0f - (float)atx.GetHeight() * PICKUP_ART_S * 0.5f);
             _orb.AddChild(asp);
+            _artNode = asp; // ROUND 9: keep the live art node - the gear cog spins on it
             _orb.Color = new Color(0.0f, 0.0f, 0.0f, 0.0f); // art rides: the flavour shell stops drawing
         }
         AddChild(_orb);
@@ -87,6 +89,8 @@ public partial class Pickup : Godot.Node2D
         _bobT += delta;
         if (_orb != null)
             _orb.Position = new Vector2(-6.0f, -6.0f - 4.0f * (float)System.Math.Sin((double)_bobT * 5.0f)); // 4 px hover (assistant pick)
+        if (pk == 3 && _artNode != null)
+            _artNode.Rotation = (float)_bobT * 1.9f; // ROUND 9 (user: "just spin around would be a good effect"): the field cog turns ~0.3 rev/s on the same hover clock that drives the bob, so it reads ALIVE - full colour, no fade, and it never expires
         if (pk != 3)
             _life -= delta; // ROUND 8: cogs do NOT expire - a part waits until someone claims it
         if (pk != 3 && _life <= 0.0)

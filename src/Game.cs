@@ -4701,7 +4701,10 @@ public void RegisterEnemy(Combatant e)
 		// Martha answers the intercept too: she IS the horde's other player character, and the same
 		// 12 px bolt core that reaches a risen body reaches her. hp > 0 = standing: broken iron is
 		// not a shot target, so a knitting Martha never eats a bullet that was meant to fly through.
-		if (_marthaBody != null && _marthaHp > 0.0 && _marthaBody.GlobalPosition.X > -8000.0f)
+		// ROUND 9 (user: "enemies should stop attacking her while she's repairing - they just sit
+		// on her when she's down"): the round-7 revive law FILLS her pool at the moment she breaks,
+		// so hp alone no longer reads broken IRON - the _marthaT clock is the standing test now.
+		if (_marthaBody != null && _marthaHp > 0.0 && _marthaT <= 0.0 && _marthaBody.GlobalPosition.X > -8000.0f)
 		{
 			float md = p.DistanceTo(_marthaBody.GlobalPosition);
 			if (md < 12.0f + MARTHA_RADIUS && md < nd)
@@ -4760,7 +4763,11 @@ public void RegisterEnemy(Combatant e)
 		// Martha is the horde's OTHER player character: within MARTHA_PULL she pulls chase exactly like
 		// a risen body, which is why the Enemy needs no edit at all. hp > 0 = standing: a broken body is
 		// iron nobody chews, and a parked one is off-field.
-		if (_marthaBody != null && _marthaHp > 0.0 && _marthaBody.GlobalPosition.X > -8000.0f)
+		// ROUND 9 (user: "enemies should stop attacking her while she's repairing as currently they
+		// just sit on her when she's down"): the round-7 revive law refills her pool THE FRAME SHE
+		// BREAKS, so the horde kept marching onto knitting iron - the _marthaT clock is the standing
+		// test now, matching MarthaHitBy's own "broken iron is already spent" gate below.
+		if (_marthaBody != null && _marthaHp > 0.0 && _marthaT <= 0.0 && _marthaBody.GlobalPosition.X > -8000.0f)
 		{
 			double md = WrapNearCamera(pos).DistanceTo(WrapNearCamera(_marthaBody.GlobalPosition));
 			if (md < MARTHA_PULL && md < nd)
@@ -4885,7 +4892,14 @@ public void RegisterEnemy(Combatant e)
 				// ride the art through a safe `as` (null in the greybox with no sheet -> skip the tint)
 				Godot.Sprite2D tint = _marthaRig != null ? _marthaRig.GetChild(0) as Godot.Sprite2D : _marthaBody.GetChild(0) as Godot.Sprite2D;
 				if (tint != null)
-					tint.Modulate = new Color(0.5f, 0.5f, 0.6f, (0.45f + 0.55f * (float)(1.0 - _marthaT / MARTHA_BREAK)) * (0.92f + 0.08f * (float)System.Math.Abs(System.Math.Sin(_marthaT * 9.0)))); // FX-lap: the tint BREATHES while she knits - a dim static pulse on the flicker beat
+				{
+					// ROUND 9 (user: "she needs to grey out while repairing"): the OLD tint dimmed toward
+					// TRANSPARENCY (alpha 0.45 at the break) which reads as faded flicker, not grey, and
+					// its blue cast banked FOREVER after the first break (nothing reset the modulate).
+					// Knitting iron now rides an OPAQUE desaturated grey on a slow brightness breath.
+					double grey = 0.42 + 0.10 * System.Math.Abs(System.Math.Sin(_marthaT * 1.6)); // slow knit-breath
+					tint.Modulate = new Color((float)grey, (float)grey, (float)grey, 1.0f);
+				}
 			}
 			if (_marthaT <= 0.0)
 			{
@@ -4893,6 +4907,11 @@ public void RegisterEnemy(Combatant e)
 				_marthaHp = MARTHA_HP + _marthaHpBonus + MARTHA_VITALS; // knitted back to her OWN ceiling, parts included
 				_marthaRally = true; // revived: the RALLY below makes her run back to Hew before the hunt resumes (user 2026-11-24 round 7)
 				_marthaCd = 0.5; // the fresh line bites after a wind-up, not straight out of the yard
+				// ROUND 9: the grey must come OFF on the beat she finishes - modulate PERSISTS, so the
+				// old lane left a knitted Martha permanently dimmed after her first break.
+				Godot.Sprite2D knit = _marthaRig != null ? _marthaRig.GetChild(0) as Godot.Sprite2D : _marthaBody.GetChild(0) as Godot.Sprite2D;
+				if (knit != null)
+					knit.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
 				if (_pilot)
 					GD.Print("[10thAge] (martha) Martha knits herself back to full"); // the 20 s done
 			}
@@ -5121,7 +5140,10 @@ public void RegisterEnemy(Combatant e)
 		{
 			_upGearLoose++; // pilot census: loose cogs vs welds
 			SpawnPickup(at, 3, kind); // pk=3: the gear cog; kind travels on the pickup
-			DropCogFx(at); // the same tumble the instant lane plays: the cog lands, it does not fuse
+			// ROUND 9 (user: "cog drops should always stay, like how XP works, and not grey out"):
+			// the FX tumble is REMOVED from the loose lane. It fell and FADED at the same spot the
+			// real cog parked on, so hand-play read the fading grey overlay as the drop vanishing -
+			// the persistent cog itself (full colour, spinning) is now the only thing at the site.
 			return; // NO instant weld: the part waits on the ground until someone walks over it
 		}
 		ApplyGearPart(kind, at);

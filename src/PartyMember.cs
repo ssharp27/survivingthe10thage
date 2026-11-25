@@ -994,7 +994,7 @@ public partial class PartyMember : Godot.Node2D
 				// = ~106 px stage, a bit taller than the class read (~88 px at the default 0.75 on ~118 px sheets);
 				// rim 31 is the base-band centre read from the canvas bottom (assistant pick, retune by eye at hand-play)
 				miniPath = "res://art/characters/athios.png";
-				miniScale = 0.45f; // ROUND 8 (user: a little bigger than regular): ~106 px vs the ~88 px class read
+				miniScale = 0.42f; // ROUND 9 (user: "still a bit too big in-game, needs shrinking just a little more"): 0.45 -> 0.42, ~99 px vs the ~88 px class read
 				miniRim = 31.0f;
 			}
 			// 2026-11-22: Hew art probe (256x256 canvas - the user's high-quality drop). 256 px x 0.30 =
