@@ -850,14 +850,17 @@ public partial class Game : Godot.Node2D
 		// (assistant pick - the user left the stacking open and straight 5% compounding read as a
 		// snowball), so a lucky run still plateaus. Counters are RUN-WIDE: every character reads the
 		// SAME tally, which is what "for ALL characters" means.
-		int _upDmgN = 0;   // parts of each kind dropped this run (drives the 0.9^n dampener)
+		// ROUND 13 (user hand-play 2026-11-25): the pool re-spec'd to SEVEN kinds, so the ROUND 12 ARMOUR /
+		// CRIT / EVASION tallies retired WITH the draw - the tags and the lanes that read them (the soak, the
+		// bite, the dodge) stay exactly where they are: elixirs, leader auras and the cards still feed them.
+		// ROUND 13: collection range and XP joined the pool, so they get their own run-wide tally.
+		int _upHpN = 0;   // ROUND 13: the seven tallies, in the user's own order (hp | damage | attack speed | move speed | radius | collection range | xp)
+		int _upDmgN = 0;  // parts of each kind dropped this run (drives the 0.9^n dampener)
 		int _upSpdN = 0;
-		int _upRadN = 0;
-		int _upArmN = 0;
-		int _upHpN = 0;
-		int _upCritN = 0;   // ROUND 12: the widened pool (assistant pick: crit / evasion / move speed)
-		int _upEvaN = 0;
 		int _upMvfN = 0;
+		int _upRadN = 0;
+		int _upColN = 0;
+		int _upXpN = 0;
 		int _upGearN = 0;   // ROUND 8: gear parts that WELDED this run (pilot read only)
 		int _upGearLoose = 0; // ROUND 8: of the granted parts, how many became a REAL field cog instead
 		// ROUND 8 (user 2026-11-24: "make hews gear parts drop like xp would and make it stay on the
@@ -922,6 +925,11 @@ public partial class Game : Godot.Node2D
 		double _marthaCrit = 0.0;    // ROUND 12: flat crit points from gear parts (rides the bite roll below)
 		double _marthaEva = 0.0;     // ROUND 12: flat evasion points from gear parts (then x the leader aura)
 		double _marthaMvf = 1.0;     // ROUND 12: move-speed multiplier from gear parts (her scuttle x)
+		double _marthaCol = 1.0;   // ROUND 13: collection-range multiplier from gear parts (her gem + cog bubbles x)
+		double _marthaXp = 0.0;    // ROUND 13: XP points from gear parts (paid where her gems land, the 4-arg CollectGem hop)
+		// ROUND 13: _marthaArm / _marthaCrit / _marthaEva are DECLARED and READ above (soak, bite, dodge) but the
+		// gear pool no longer grants those kinds, so only the elixirs and auras move them now - the fields stay
+		// because the lanes that read them are shipped law, not dead code.
 		// ROUND 8 (user 2026-11-24, round 8: "she collects xp and such for the player, and will also
 		// benefit from ultimates and passives that buff allies / party members (treat it like she is
 		// another party member)"): she is NOT a PartyMember and NOT in _party, so none of the party
@@ -1075,6 +1083,22 @@ public partial class Game : Godot.Node2D
 			}
 		}
 		return best;
+	}
+	// ROUND 13 (user hand-play 2026-11-25: "When Martha absorbs pickups of any type, if the player is
+	// between Martha and the pickups, they will kind of hover/magnetise between both and not be collected"):
+	// Pickup.cs needs her, and she is NO member, so these two accessors are the whole census hop - her
+	// standing seat (the SAME gate her weld bite rides: off-field, downed or mid-knock claims nothing) and
+	// her collection bubble RADIUS, in the round-8 class band: 110 px x her OWN collection-range multiplier
+	// (the new pool has an HP/collection-range kind) x the leader aura x her mirrored Elixir of Magnitude.
+	// Radius, not a multiplier: Pickup.cs stays out of her private clocks, and UpdateGems asks the SAME
+	// accessor for her gem bubble, so one source owns both routes.
+	public Godot.Node2D MarthaForRide()
+	{
+		return (_marthaBody != null && _marthaHp > 0.0 && _marthaT <= 0.0) ? _marthaBody : null;
+	}
+	public float MarthaCollectBubble()
+	{
+		return (_marthaBody != null && _marthaHp > 0.0 && _marthaT <= 0.0) ? 110.0f * (float)_marthaCol * (float)LeaderCollectMul() * (_muElixMagT > 0.0 ? 1.10f : 1.0f) : -1.0f;
 	}
 
 	// for contact/projectile damage: downed bodies are hit-able, just never chased
@@ -1562,7 +1586,7 @@ public partial class Game : Godot.Node2D
 	{
 		Pickup p = new Pickup(); // allocated per drop, like a horde body: pickups are rare
 		p.pk = pk;
-		p.gearKind = kind; // ROUND 8: which Hew gear the pk 3 cog is (0 dmg | 1 spd | 2 rad | 3 arm | 4 hp); 0 for the other three flavours
+		p.gearKind = kind; // ROUND 13 table: 0 hp | 1 attack damage | 2 attack speed | 3 move speed | 4 area | 5 collection range | 6 xp; 0 for the other three flavours (ROUND 12's 0 dmg | 1 spd | 2 rad | 3 arm | 4 hp | 5 crit | 6 eva | 7 move is superseded)
 		AddChild(p);
 		p.GlobalPosition = pos; // drops where the body died; Pickup.cs folds it like the gems
 		p.InitVisuals();
@@ -4964,12 +4988,17 @@ public void RegisterEnemy(Combatant e)
 	 GD.Print("[10thAge] (martha) Martha is down to a quarter - running home to Hew to weld"); // the 25% beat
 	 _marthaFlee = true; // chipped: the lanes below walk her home (the bite scan still rides)
 	 }
-	 else if (_marthaFlee && _marthaHp >= fleeCap * MARTHA_WELD)
-	 {
-	 _marthaFlee = false; // welded back to three-quarters: the flank line resumes as usual
-	 if (_pilot)
-	 GD.Print("[10thAge] (martha) Martha welds back to three-quarters and falls in line"); // the 75% beat
-	 }
+	  else if (_marthaFlee && _marthaHp > fleeCap * MARTHA_FLEE) // ROUND 13: the release rides the SAME 25% line that armed it
+	  {
+	   _marthaFlee = false; // ROUND 13 (user: "Martha spent most of the time sitting next to Hew ... When she is
+	  // above 25%, she should always be running out to attack targets within Hew's attack range"): the latch
+	  // used to DISARM only at the 75% WELD line, so anywhere between 25% and 75% she stayed FLEEING, walked
+	  // home and parked inside the 34 px seat, and never hunted a thing. The release is now the SAME 25% line
+	  // that armed it - the user's own number. The 75% line stays exactly where it belongs, as the WELD gate
+	  // at the top of UpdateMartha (that law is not touched).
+	   if (_pilot)
+	  GD.Print("[10thAge] (martha) Martha climbs past a quarter and falls in line"); // ROUND 13: the release beat moved to 25%
+	  }
 	 // ROUND 9's grey-while-repairing law now rides the NEW repair mode too (round 10 made repair
 	 // its OWN mode): chipped iron welding on the run home greys - a lighter flat tone than the
 	 // BROKEN breath so a hand-play can tell welding from down (assistant pick, retune by eye).
@@ -4978,7 +5007,7 @@ public void RegisterEnemy(Combatant e)
 	 {
 	 if (_marthaFlee)
 	 weld.Modulate = new Color(0.58f, 0.58f, 0.58f, 1.0f);
-	 else if (_marthaHp >= fleeCap * MARTHA_WELD)
+	  else if (!_marthaFlee) // ROUND 13: the grey follows the FLEE latch, so knitted iron clears on the 25% line too
 	 weld.Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f); // knitted iron rides clear again
 	 }
 	 }
@@ -5002,6 +5031,13 @@ public void RegisterEnemy(Combatant e)
 		Godot.Collections.Array<Godot.Node2D> enemies = GetEnemies();
 		Godot.Node2D pn = null;
 		double best = MARTHA_FIND * MARTHA_FIND;
+		// ROUND 13 (user: "When she is above 25%, she should always be running out to attack targets
+		// within Hew's attack range"): the guard ring used to be a fixed MARTHA_HUNT (200 px) bubble
+		// around Hew while Hew's cannon out-ranges it by a wide margin, so prey sitting in the ring
+		// OUTSIDE the bubble never became prey and she hugged the seat. The ring now rides Hew's OWN
+		// reach (MAX keeps MARTHA_HUNT as the floor for short-ranged kits): anything he can shoot at
+		// she runs OUT to bite. AREA parts never widen the cannon (EffRange pins it), so this is HIS.
+		double huntRing = System.Math.Max(MARTHA_HUNT, hew.EffRange()); // ROUND 13: her hunt ring IS Hew reach
 		foreach (Godot.Node2D n in enemies)
 		{
 			Combatant nc = (Combatant)n;
@@ -5011,8 +5047,8 @@ public void RegisterEnemy(Combatant e)
 			// running in to attack enemies"): prey only counts when it is within MARTHA_HUNT px of HEW,
 			// so she never sprints off the flank after a straggler - attackers on Hew are her prey as always.
 			Vector2 hoff = WrapDelta(_marthaFlee ? _marthaBody.GlobalPosition : hew.GlobalPosition, n.GlobalPosition); // ROUND 10: prey distance FROM Hew - FROM HER while welding, so the run home still chomps what comes close (user 2026-11-25)
-			if (hoff.X * hoff.X + hoff.Y * hoff.Y > MARTHA_HUNT * MARTHA_HUNT)
-				continue; // flank guard: out of Hew's guard ring - hold the line, do not chase
+			if (hoff.X * hoff.X + hoff.Y * hoff.Y > huntRing * huntRing) // ROUND 13: the gate rides Hew's reach
+				continue; // ROUND 13: outside Hew's OWN reach: he cannot answer for it, so neither can she
 			Vector2 off = WrapDelta(_marthaBody.GlobalPosition, n.GlobalPosition);
 			double d2 = off.X * off.X + off.Y * off.Y;
 			if (d2 < best)
@@ -5193,9 +5229,15 @@ public void RegisterEnemy(Combatant e)
 			return; // the seat is not Hew's: the bonus is inert under every other leader
 		if (Rng == null || Rng.Randf() >= 0.05)
 			return; // the 5% roll
-		int kind = (int)(Rng.Randf() * 8.0); // ROUND 12 (user: "we may add more just to bump the RNG"): EIGHT kinds, uniform
-		if (kind > 7)
-			kind = 7; // belt-and-braces: Randf is < 1
+		// ROUND 13 (user hand-play 2026-11-25): "They will all grant a 5% bonus at base and will be the
+		// following: HP, attack damage, attack speed, move speed, area, collection range, XP. They will
+		// continue their diminishing returns as previously mentioned" - SEVEN kinds, uniform, in the
+		// user's own order: 0 hp | 1 attack damage | 2 attack speed | 3 move speed | 4 area | 5 collection range | 6 xp.
+		// ROUND 12's EIGHT is SUPERSEDED (armour, crit and evasion dropped OUT; collection range and XP came in);
+		// the 5% base is the 0.05 in ApplyGearPart below and the 0.9^n dampener is untouched.
+		// kind travels on the field cog (Pickup.gearKind), so Pickup.cs re-states the same table.
+		int kind = (int)(Rng.Randf() * 7.0); // ROUND 13: SEVEN kinds, uniform
+		// the ROUND 12 belt-and-braces clamp went with the eighth kind: Randf is < 1, so * 7.0 lands 0..6 always
 		// ROUND 8 GEAR RAIL (user: "make hews gear parts drop like xp would and make it stay on the
 		// ground until picked up"): 5% of the GRANTED parts (ROUND 11: was 2.5%) do not weld on the spot - they become
 		// a real cog Pickup (pk=3) parked at the kill site, which never times out and welds only
@@ -5221,77 +5263,93 @@ public void RegisterEnemy(Combatant e)
 	private void ApplyGearPart(int kind, Vector2 at)
 	{
 		double damp; // the n-th part of THIS kind applies at base x 0.9^n
+		// ROUND 13 (user hand-play 2026-11-25): SEVEN kinds now, in the user's own order - 0 hp | 1 attack
+		// damage | 2 attack speed | 3 move speed | 4 area | 5 collection range | 6 xp. "They will continue
+		// their diminishing returns as previously mentioned": the SAME 0.9^n per-kind dampener rides, one
+		// run-wide tally per kind, so a lucky run still plateaus.
 		int tally; // how many of this kind have landed (the pilot read only)
 		if (kind == 0)
-		{ damp = System.Math.Pow(0.9, (double)_upDmgN); _upDmgN++; tally = _upDmgN; }
-		else if (kind == 1)
-		{ damp = System.Math.Pow(0.9, (double)_upSpdN); _upSpdN++; tally = _upSpdN; }
-		else if (kind == 2)
-		{ damp = System.Math.Pow(0.9, (double)_upRadN); _upRadN++; tally = _upRadN; }
-		else if (kind == 3)
-		{ damp = System.Math.Pow(0.9, (double)_upArmN); _upArmN++; tally = _upArmN; }
-		else if (kind == 4)
 		{ damp = System.Math.Pow(0.9, (double)_upHpN); _upHpN++; tally = _upHpN; }
-		else if (kind == 5)
-		{ damp = System.Math.Pow(0.9, (double)_upCritN); _upCritN++; tally = _upCritN; }
-		else if (kind == 6)
-		{ damp = System.Math.Pow(0.9, (double)_upEvaN); _upEvaN++; tally = _upEvaN; }
-		else
+		else if (kind == 1)
+		{ damp = System.Math.Pow(0.9, (double)_upDmgN); _upDmgN++; tally = _upDmgN; }
+		else if (kind == 2)
+		{ damp = System.Math.Pow(0.9, (double)_upSpdN); _upSpdN++; tally = _upSpdN; }
+		else if (kind == 3)
 		{ damp = System.Math.Pow(0.9, (double)_upMvfN); _upMvfN++; tally = _upMvfN; }
-		string[] tag = { "damage", "attack speed", "radius", "armour", "hp", "crit", "evasion", "move speed" }; // pilot read only
+		else if (kind == 4)
+		{ damp = System.Math.Pow(0.9, (double)_upRadN); _upRadN++; tally = _upRadN; }
+		else if (kind == 5)
+		{ damp = System.Math.Pow(0.9, (double)_upColN); _upColN++; tally = _upColN; }
+		else
+		{ damp = System.Math.Pow(0.9, (double)_upXpN); _upXpN++; tally = _upXpN; }
+		// ROUND 13: the ROUND 12 ARMOUR / CRIT / EVASION tallies retired WITH the draw (see the fields
+		// above) - the tags and the lanes that read them stay, the gear just stopped feeding them.
+		string[] tag = { "hp", "damage", "attack speed", "move speed", "radius", "collection range", "xp" }; // pilot read only
 		if (_pilot)
 			GD.Print("[10thAge] (upgrades) part: " + tag[kind] + " x" + tally + " (dim " + (float)damp + ")");
 		DropCogFx(at); // FX-lap: the part the roll granted, DROPS visibly - a cog tumbles where the kill fell
+		// ROUND 13 pool, the user's own order (hand-play 2026-11-25: "HP, attack damage, attack speed, move
+		// speed, area, collection range, XP ... a 5% bonus at base ... continue their diminishing returns"):
+		// the multiplier tags ride base 1.0, so +0.05 x damp IS the +5% read; HEALTH stays flat points
+		// (ROUND 7 law, untouched: the weld raises the ceiling and the PM _hpMaxSeen tracker follows the line once).
+		// ROUND 12's ARMOUR / CRIT / EVASION kinds are GONE from the draw: their tags and the lanes that read
+		// them stay, because the elixirs, leader auras and the cards still feed them - only the gear stopped granting them.
 		foreach (PartyMember m in _party)
 		{
 			if (m.eliminated)
 				continue; // a body off the run takes nothing
-			// the multiplier tags are multipliers (base 1.0); HEALTH and ARMOUR are flat points
 			if (kind == 0)
-				m.stat[StatTags.ATTACK_DAMAGE] += 0.05 * damp;
-			else if (kind == 1)
-				m.stat[StatTags.ATTACK_SPEED] += 0.05 * damp;
-			else if (kind == 2)
-				m.stat[StatTags.AREA] += 0.05 * damp;
-			else if (kind == 3)
-				m.stat[StatTags.ARMOUR] += 1.0 * damp;
-			else if (kind == 4)
 			{
 				// +5 hp raises the CEILING and the line: the part is a weld, not a promise
 				m.stat[StatTags.HEALTH] += 5.0 * damp;
-					// the CURRENT line follows through the PM _hpMaxSeen tracker (PartyMember.cs lifts hp 1:1 when
-					// EffMaxHp rises). The old bump HERE double-lifted and let hp ride past the cap (user 2026-11-24
-					// round 7: "the party HP upgrade should raise MAX hp too" - it now raises the ceiling and hp
-					// follows exactly once).
+				// the CURRENT line follows through the PM _hpMaxSeen tracker (PartyMember.cs lifts hp 1:1 when
+				// EffMaxHp rises). The old bump HERE double-lifted and let hp ride past the cap (user 2026-11-24
+				// round 7: "the party HP upgrade should raise MAX hp too" - it now raises the ceiling and hp
+				// follows exactly once).
 			}
-			else if (kind == 5)
-				m.stat[StatTags.CRIT_CHANCE] += 0.05 * damp; // ROUND 12: +5% crit chance (points on the tag store)
-			else if (kind == 6)
-				m.stat[StatTags.EVASION] += 0.05 * damp; // ROUND 12: +5% evasion (points)
-			else
+			else if (kind == 1)
+				m.stat[StatTags.ATTACK_DAMAGE] += 0.05 * damp; // ROUND 13: +5% attack damage (multiplier tag, base 1.0)
+			else if (kind == 2)
+				m.stat[StatTags.ATTACK_SPEED] += 0.05 * damp;
+			else if (kind == 3)
 				m.stat[StatTags.MOVEMENT_SPEED] += 0.05 * damp; // ROUND 12: +5% move (multiplier tag, base 1.0)
+			else if (kind == 4)
+				m.stat[StatTags.AREA] += 0.05 * damp;
+			else if (kind == 5)
+				m.stat[StatTags.COLLECTION_RANGE] += 0.05 * damp; // ROUND 13: +5% collection range (bubble tag, base 1.0)
+			else
+				m.stat[StatTags.XP_PCT] += 0.05 * damp; // ROUND 13: +5% XP (points on the tag: the gem rail reads 1.0 + this)
 		}
 		// Martha is not in _party, so she reads the SAME tally through her own fields
+		// ROUND 13 (user hand-play 2026-11-25: the pool is now "HP, attack damage, attack speed, move speed,
+		// area, collection range, XP", all at a 5% base): the seven kinds again, in the user's own order.
+		// Her _marthaCol and _marthaXp mirror the squad's COLLECTION_RANGE and XP_PCT tags - she has no stat
+		// row, so the XP points pay where her gems land (the 4-arg CollectGem hop in UpdateGems) and _marthaCol
+		// rides her gem + cog bubbles.
 		if (kind == 0)
-			_marthaDmg *= 1.0 + 0.05 * damp;
-		else if (kind == 1)
-			_marthaSpd *= 1.0 + 0.05 * damp;
-		else if (kind == 2)
-			_marthaRad *= 1.0 + 0.05 * damp;
-		else if (kind == 3)
-			_marthaArm += 1.0 * damp;
-		else if (kind == 4)
 		{
 			_marthaHpBonus += 5.0 * damp;
+			// her ceiling reads MARTHA_HP + _marthaHpBonus + MARTHA_VITALS exactly as the WELD gate and
+			// her soak lane do, so the weld lifts both at once; a standing Martha gets the line today.
 			if (_marthaHp > 0.0)
 				_marthaHp += 5.0 * damp; // a standing Martha gets the weld right now
 		}
-		else if (kind == 5)
-			_marthaCrit += 0.05 * damp; // ROUND 12: flat crit points (rides MARTHA_CRIT)
-		else if (kind == 6)
-			_marthaEva += 0.05 * damp; // ROUND 12: flat evasion points (x the leader aura after)
-		else
+		else if (kind == 1)
+			_marthaDmg *= 1.0 + 0.05 * damp;
+		else if (kind == 2)
+			_marthaSpd *= 1.0 + 0.05 * damp;
+		else if (kind == 3)
 			_marthaMvf *= 1.0 + 0.05 * damp; // ROUND 12: move multiplier on her scuttle
+		else if (kind == 4)
+			_marthaRad *= 1.0 + 0.05 * damp;
+		else if (kind == 5)
+			_marthaCol *= 1.0 + 0.05 * damp; // ROUND 13: collection-range multiplier (her gem + cog bubbles x)
+		else
+			_marthaXp += 0.05 * damp; // ROUND 13: XP points, paid where her gems land (the 4-arg hop)
+		// ROUND 13: ROUND 12's ARMOUR / CRIT / EVASION welds are GONE from the draw - the pool the user
+		// dictated has no armour, and crit/evasion stopped being a gear kind. Her _marthaArm / _marthaCrit
+		// / _marthaEva stay declared and read: the soak, bite and dodge lanes above still fold them for the
+		// elixirs and auras that feed them, they simply never come up from a cog again.
 	}
 	// ROUND 8: the gear rail's GROUND re-entry: a picked-up cog welds EXACTLY like a rolled one
 	// (shared damp/tally math through ApplyGearPart). Called by the Pickup rail (pk=3), which
@@ -5618,23 +5676,21 @@ private void UpdateSpirits(float delta)
 		// tag, so the value lane pays LeaderXpMul only. The magnet clock widens her lane too.
 		// UpdateGems runs BEFORE UpdateMartha this frame, so the mirror lanes above lag ONE frame: noted,
 		// harmless.
-		if (_marthaBody != null && _marthaHp > 0.0 && _marthaT <= 0.0)
-		{
-			for (int i = 0; i < _gems.Count; i++)
-			{
-				Godot.Node2D gem = _gems[i];
-				if (gem.GlobalPosition.X < -8000.0f)
-					continue;
-				Vector2 mt = _marthaBody.GlobalPosition - gem.GlobalPosition;
-				float md = mt.Length();
-				if (md < 110.0f * (float)LeaderCollectMul() * (_muElixMagT > 0.0 ? 1.10f : 1.0f) || _magnetT > 0.0)
-				{
-					gem.GlobalPosition += mt.Normalized() * 380.0f * delta;
-					if (md < 14.0f)
-						CollectGem(i, _marthaBody.GlobalPosition, null); // null member: NO XP_PCT math, and CollectGem's base law already pays LeaderXpMul - exactly the value the puller lane would grant a member without the tag
-				}
-			}
-		}
+		// ROUND 13 (user hand-play 2026-11-25): "When Martha absorbs pickups of any type, if the player is
+		// between Martha and the pickups, they will kind of hover/magnetise between both and not be
+		// collected." Two lanes were dragging the SAME orb every frame - her own bubble lane above and
+		// the party puller census below - so with the player between them the two 380 px/s pulls
+		// cancelled head-on and no 14 px contact was ever reached: the gem hovered and starved. One gem
+		// now has exactly ONE puller per frame: the NEARER of Martha and the nearest living member, and
+		// that owner keeps its own math (a member pays its XP_PCT tag, Martha pays LeaderXpMul only).
+		// ROUND 13: one accessor owns her bubble on BOTH routes - the gems here and the cog ride in Pickup.cs:
+		// 110 px x her OWN collection-range multiplier x the leader's collection aura, x1.10 while her mirrored
+		// Magnetism runs, and the magnet clock still widens it field-wide.
+		// The round-8 lane below is history: she rides the census now, so the one-frame mirror lag stands.
+		// The fold covers XP gems here; the field-stream fold in Pickup.cs and her cog bite in UpdateMartha
+		// carry the same law, so "any type" is covered on all three routes.
+		float marthaGemBubble = MarthaCollectBubble(); // ROUND 13: ONE source for her bubble radius - the Pickup cog rail asks the SAME accessor, // and her collection-range parts (_marthaCol) now widen it
+
 		if (_magnetT > 0.0)
 			_magnetT -= delta;
 		for (int i = 0; i < _gems.Count; i++)
@@ -5649,6 +5705,7 @@ private void UpdateSpirits(float delta)
 			// CLOSEST PC owns the magnet so a gem rides one stream, and pickup
 			// pays that member's own XP_PCT tag (party max 5, gems few: cheap)
 			PartyMember puller = null;
+			Godot.Node2D marthaOwner = null; // ROUND 13: she owns the stream when she is the closer body (the tug-of-war fix)
 			Vector2 to = Vector2.Zero;
 			float dist = 1e30f;
 			foreach (PartyMember mm in _party)
@@ -5662,6 +5719,29 @@ private void UpdateSpirits(float delta)
 					puller = mm;
 					dist = md;
 					to = mt;
+				}
+			}
+			// ROUND 13: she competes in the same census - same class band, LeaderXpMul only, no XP_PCT tag -
+			// and claiming the stream CLEARS any member so exactly one owner drags one gem.
+			if (marthaGemBubble >= 0.0f)
+			{
+				Vector2 mm2 = _marthaBody.GlobalPosition - gem.GlobalPosition;
+				float md2 = mm2.Length();
+				if ((md2 < marthaGemBubble || _magnetT > 0.0) && md2 < dist)
+				{
+					puller = null;
+					marthaOwner = _marthaBody;
+					dist = md2;
+					to = mm2;
+				}
+			}
+			if (marthaOwner != null)
+			{
+				gem.GlobalPosition += to.Normalized() * 380.0f * delta;
+				if (dist < 14.0f)
+				{
+					CollectGem(i, marthaOwner.GlobalPosition, null, _marthaXp); // ROUND 13: the XP kind rides her lane - no stat row, so the points live in _marthaXp
+					continue;
 				}
 			}
 			if (puller != null)
@@ -5680,14 +5760,24 @@ private void UpdateSpirits(float delta)
 	// ROUND 8: the gem hand-in Martha's own lane above shares with the puller lane below: null
 	// puller means NO XP_PCT tag math (she has none), LeaderXpMul still pays - exactly the value
 	// the puller lane grants a member without the tag. pos is the hand-in seat, kept for FX readers.
-	private void CollectGem(int i, Vector2 pos, PartyMember puller)
+	// ROUND 13: the XP kind the user put in the pool (hand-play 2026-11-25: "... area, collection range, XP") has to pay
+	// somewhere for a body with NO stat row, so the hand-in grows a 4-arg shape and the old 3-arg one
+	// just delegates with 0.0 - every caller that had no bonus of its own reads EXACTLY the round-8 way.
+	private void CollectGem(int i, Vector2 pos, PartyMember puller, double xpPts)
 	{
 		if (puller != null)
 			AddXp(_gemVals[i] * (1.0 + puller.stat[StatTags.XP_PCT]) * LeaderXpMul());
 		else
-			AddXp(_gemVals[i] * LeaderXpMul());
+			// ROUND 13: the round-8 null hand was LeaderXpMul only; the XP kind now needs the SAME
+			// points math for a body without a stat row, so the caller carries them (Martha's _marthaXp).
+			// (XP_PCT is points, so 1.0 + xpPts reads exactly the puller lane's math above.)
+			AddXp(_gemVals[i] * (1.0 + xpPts) * LeaderXpMul());
 		DespawnGem(i);
 	}
+	private void CollectGem(int i, Vector2 pos, PartyMember puller)
+	{
+		CollectGem(i, pos, puller, 0.0); // ROUND 13: the old shape, unchanged maths: no bonus of its own
+}
 
 	private void DespawnGem(int i)
 	{

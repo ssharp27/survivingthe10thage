@@ -22,7 +22,7 @@ public partial class Pickup : Godot.Node2D
 {
     public int pk = 0; // 0 heal | 1 magnet | 2 rage | 3 gear part (ROUND 8: Hew's Upgrades! weld rides the field)
     private double _life = 0.0;
-    public int gearKind = 0; // ROUND 8: pk 3 part kind the Game.CollectGearPart weld applies: 0 dmg | 1 spd | 2 rad | 3 arm | 4 hp | 5 crit | 6 eva | 7 move speed
+    public int gearKind = 0; // ROUND 8: pk 3 part kind the Game.CollectGearPart weld applies (ROUND 13 table: 0 hp | 1 attack damage | 2 attack speed | 3 move speed | 4 area | 5 collection range | 6 xp; ROUND 12's 0 dmg | 1 spd | 2 rad | 3 arm | 4 hp | 5 crit | 6 eva | 7 move is superseded)
     private float _bobT = 0.0f;
     Godot.Sprite2D _artNode = null; // ROUND 9: the flavour art node kept live so the pk 3 cog can SPIN
     Godot.ColorRect _orb;
@@ -99,27 +99,62 @@ public partial class Pickup : Godot.Node2D
             return;
         }
         PartyMember m = g.NearestMember(GlobalPosition);
-        if (m == null || !m.joined || m.downed || m.eliminated)
+        // ROUND 13 SINGLE-OWNER LAW (user hand-play 2026-11-25: "When Martha absorbs pickups of any type,
+        // if the player is between Martha and the pickups, they will kind of hover/magnetise between both
+        // and not be collected"): she is no member, so the round-8 census could never reach her, and her
+        // own contact weld in UpdateMartha was a SECOND route the member stream kept yanking the body
+        // against - the stall the user saw. She now rides THIS census through two Game.cs accessors, and
+        // the CLOSER claimant owns BOTH the stream and the 18 px walk-over gate: one body, one stream,
+        // exactly the law UpdateGems runs the gem rail with (the gems stopped hovering the same way).
+        Godot.Node2D mh = g.MarthaForRide(); // her standing seat: null off-field / downed / mid-knock
+        if (m != null && (!m.joined || m.downed || m.eliminated))
+            m = null; // belt-and-braces like the round-8 gate: NearestMember already filters these
+        if (m == null && mh == null)
             return; // no bubble from fallen / stranded bodies, same census as the gem rail
-        // PICKUP RIDE LAW (user 2026-11-12 hand-play: "The health, damage and magnet
-        // pickups should be drawn to the player/party members just like XP is"): all
-        // three flavours mirror the gem magnet law EXACTLY (same 110 x COLLECTION_RANGE
-        // x elixir x LeaderCollectMul bubble) and ride the SAME 380 px/s gem-stream
-        // speed. The PICK_R walk-over gate on the next line still owns the collect -
-        // the ride only ferries the body, nothing new decides who grabs it.
-        Vector2 pull = g.WrapDelta(GlobalPosition, m.GlobalPosition); // wrapped: toward the nearest standing member, like the distance gate below
-        float pd = pull.Length();
-        float bubble = 110.0f * (float)m.stat[StatTags.COLLECTION_RANGE] * (m.elixMagT > 0.0 ? 1.10f : 1.0f) * (float)g.LeaderCollectMul(); // gem rail math, copied not rederived
-        if (pd < bubble)
+        // PICKUP RIDE LAW (user 2026-11-12 hand-play: "The health, damage and magnet pickups should be drawn
+        // to the player/party members just like XP is"): all four flavours mirror the gem magnet law EXACTLY
+        // (same 110 x COLLECTION_RANGE x elixir x LeaderCollectMul bubble) and ride the SAME 380 px/s gem-stream
+        // speed. The PICK_R walk-over gate on the owner still owns the collect - the ride only ferries the
+        // body, nothing new decides who grabs it. ROUND 13: the owner is the closer of the two claimants.
+        float md = 1e30f;
+        if (m != null)
+            md = g.WrapDelta(GlobalPosition, m.GlobalPosition).Length();
+        float hd = 1e30f;
+        if (mh != null)
+            hd = g.WrapDelta(GlobalPosition, mh.GlobalPosition).Length();
+        if (hd < md)
         {
-            float step = 380.0f * delta; // the gem-stream speed
-            if (pd < step)
-                GlobalPosition = m.GlobalPosition; // snap on final approach: no jitter orbit at the feet
-            else
-                GlobalPosition = g.WrapNearCamera(GlobalPosition + pull.Normalized() * step); // fold like the gems do
+            // she claims (strictly closer): her bubble is the SAME accessor UpdateGems asks for the gem lane
+            float mb = g.MarthaCollectBubble();
+            if (hd < mb)
+            {
+                Vector2 pull = g.WrapDelta(GlobalPosition, mh.GlobalPosition);
+                float step = 380.0f * delta; // the gem-stream speed
+                if (hd < step)
+                    GlobalPosition = mh.GlobalPosition; // snap on final approach: no jitter orbit at her feet
+                else
+                    GlobalPosition = g.WrapNearCamera(GlobalPosition + pull.Normalized() * step); // fold like the gems do
+            }
+            if (g.WrapDelta(GlobalPosition, mh.GlobalPosition).Length() > PICK_R)
+                return; // her walk-over gate: the same 18 px band her weld bite rides
         }
-        if (g.WrapDelta(GlobalPosition, m.GlobalPosition).Length() > PICK_R)
-            return;
+        else
+        {
+            // the member owns (m is non-null here: both-empty returned above, she claimed otherwise)
+            Vector2 pull = g.WrapDelta(GlobalPosition, m.GlobalPosition); // wrapped: toward the nearest standing member, like the distance gate below
+            float pd = pull.Length();
+            float bubble = 110.0f * (float)m.stat[StatTags.COLLECTION_RANGE] * (m.elixMagT > 0.0 ? 1.10f : 1.0f) * (float)g.LeaderCollectMul(); // gem rail math, copied not rederived
+            if (pd < bubble)
+            {
+                float step = 380.0f * delta; // the gem-stream speed
+                if (pd < step)
+                    GlobalPosition = m.GlobalPosition; // snap on final approach: no jitter orbit at the feet
+                else
+                    GlobalPosition = g.WrapNearCamera(GlobalPosition + pull.Normalized() * step); // fold like the gems do
+            }
+            if (g.WrapDelta(GlobalPosition, m.GlobalPosition).Length() > PICK_R)
+                return;
+        }
         // walk-over collect: the closest standing member grabs it
         if (pk == 0)
         {
@@ -130,10 +165,16 @@ public partial class Pickup : Godot.Node2D
             PartyMember w = g.LowestHpMember();
             if (w == null)
                 w = m; // safety net: the picker itself is standing, so the census never comes up empty
-            w.hp += HEAL_AMT;
-            if (w.hp > w.EffMaxHp())
-                w.hp = (float)w.EffMaxHp(); // clamp at own cap like every other heal lane
-            GD.Print("[10thAge] (pickup) heal orb: +15 hp on " + w.displayName + " (lowest hp)");
+            if (w != null)
+            {
+                w.hp += HEAL_AMT;
+                if (w.hp > w.EffMaxHp())
+                    w.hp = (float)w.EffMaxHp(); // clamp at own cap like every other heal lane
+                GD.Print("[10thAge] (pickup) heal orb: +15 hp on " + w.displayName + " (lowest hp)");
+            }
+            // ROUND 13: the net can now come up EMPTY - Martha may own the walk-over and she is
+            // no member, so with no standing member on the field the orb is still grabbed, there
+            // is just nothing in the census to drink it.
         }
         else if (pk == 1)
         {

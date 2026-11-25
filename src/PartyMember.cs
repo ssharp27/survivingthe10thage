@@ -298,27 +298,50 @@ public partial class PartyMember : Godot.Node2D
 
 	// Brook's dagger art spans the jab corridor on BOTH jabs; the second repeats the first line
 
-	float _cresDur = 0.0f; // active-volley flag: total flight seconds (0 = no volley flying)
-
-	float _cresT = 0.0f; // flight seconds left on the current volley
-
-	double _cresA0 = 0.0; // prey-line angle: the loop's WIDEST point rides this at mid-flight
-
-	float _cresR = 0.0f; // loop's max radius (mid-flight bulge): rides the prey line, clamped like the rake
-
-	float _cresBand = 0.0f; // blade disc + band depth: grown by the size card
-
-	float _cresLo = 0.0f; // user 2026-11-06: the loop's FLOOR radius (launch + catch frames) - the art never sits at his feet, and the hitbox is a disc at that art
-
-	double _cresDmg = 0.0; // the volley-wide roll the flying blades bite with
-
-	int _cresNC = 0; // crescents flying this volley (base one + extra-axes ranks)
-
-	bool _cresBled = false; // bleed stamp carries onto the flight bites
-
-	int _cresBit = 0; // unique-body tally: printed the moment the flight lands
-
-	int[] _cresMemo = null; // per-body crescent-bite bits (256 = tallied)
+	// ROUND 13 (user: "When Bruno's attack speed is too high ... his axes don't finish their arc and
+	// return before the new ones start they just vanish and start again. This caused him to do no
+	// damage at all at times. His attacks should always finish, even if it means there are axes
+	// constantly flying everywhere"): the crescent volley is no longer ONE record that the next
+	// beat overwrites (that CANCELLED whatever was mid-arc, so a beat that had already rolled its
+	// damage bit for nothing). The volley state is a small RING: overlapping volleys fly and bite
+	// side by side, each record with its own CRESCENT_ART art slots, so a blade is never reparented
+	// to a new throw mid-arc.
+	
+	const int CRESCENT_VOLLEYS = 5; // pipeline depth: flight is 0.85-1.15 s and the fastest observed cadence ~0.35 s needs four deep
+	
+	const int CRESCENT_ART = 5; // blade slots per record (base one axe + the extra-axes ranks)
+	
+	float[] _cresDur = new float[CRESCENT_VOLLEYS]; // active-volley flag PER RECORD: total flight seconds (0 = record empty)
+	
+	float[] _cresT = new float[CRESCENT_VOLLEYS]; // flight seconds left on the current volley
+	
+	double[] _cresA0 = new double[CRESCENT_VOLLEYS]; // prey-line angle: the loop's WIDEST point rides this at mid-flight
+	
+	float[] _cresR = new float[CRESCENT_VOLLEYS]; // loop's max radius (mid-flight bulge): rides the prey line, clamped like the rake
+	
+	float[] _cresBand = new float[CRESCENT_VOLLEYS]; // blade disc + band depth: grown by the size card
+	
+	float[] _cresLo = new float[CRESCENT_VOLLEYS]; // user 2026-11-06: the loop's FLOOR radius (launch + catch frames) - the art never sits at his feet, and the hitbox is a disc
+	
+	double[] _cresDmg = new double[CRESCENT_VOLLEYS]; // the volley-wide roll the flying blades bite with
+	
+	int[] _cresNC = new int[CRESCENT_VOLLEYS]; // crescents flying this volley (base one + extra-axes ranks)
+	
+	bool[] _cresBled = new bool[CRESCENT_VOLLEYS]; // bleed stamp carries onto the flight bites
+	
+	int[] _cresBit = new int[CRESCENT_VOLLEYS]; // unique-body tally: printed the moment the flight lands
+	
+	int[][] _cresMemo = new int[CRESCENT_VOLLEYS][]; // per-body crescent-bite bits (256 = tallied), one map per record
+	
+	// ROUND 13: the crescent art is hidden off-beat only when the WHOLE ring is empty - a flight-clock
+	// guard on ONE record used to clip a second volley that was still mid-spindle.
+	private bool CrescentIdle()
+	{
+		for (int vi = 0; vi < CRESCENT_VOLLEYS; vi++)
+			if (_cresDur[vi] > 0.0f)
+				return false; // a record is still flying: keep its blades on the page
+		return true;
+	}
 
 	// ult fix (user 2026-11-01 follow-up): the spin blades were PERMANENTLY visible
 
@@ -1343,9 +1366,9 @@ public partial class PartyMember : Godot.Node2D
 
 				}
 
-				_cresFx = new Godot.Sprite2D[5]; // fx-feel8: the crescents ride their OWN slots so BOTH arts can be on screen at once
+				_cresFx = new Godot.Sprite2D[CRESCENT_VOLLEYS * CRESCENT_ART]; // ROUND 13: CRESCENT_VOLLEYS sets of CRESCENT_ART slots, so overlapping volleys never fight for a slot
 
-				for (int f2 = 0; f2 < 5; f2++)
+				for (int f2 = 0; f2 < CRESCENT_VOLLEYS * CRESCENT_ART; f2++)
 
 				{
 
@@ -2541,7 +2564,9 @@ public partial class PartyMember : Godot.Node2D
 			// generic for every kit: stab sliver / crescent / axe slots / shield discs (live flight
 			// art drops too; the bullet itself keeps flying on its own node). twinArm=false forfeits
 			// a stale second dagger so a body revived at camp starts a fresh beat instead.
-			_cresDur = 0.0f;
+			for (int vi = 0; vi < CRESCENT_VOLLEYS; vi++) // ROUND 13: a body that died mid-arc retires the
+					_cresDur[vi] = 0.0f; // WHOLE ring: its art is hidden by the sweep below and its bites are
+													// forfeit, exactly like the retired spin and the single-record rail before
 			orbitT = 0.0;
 			twinArm = false;
 			if (_meleeFx != null)
@@ -2796,7 +2821,7 @@ public partial class PartyMember : Godot.Node2D
 
 						sx.Visible = false; // spin slots keep drawing while the spin clock runs (the spin re-arms _fxT every frame)
 
-						if (_cresFx != null && _cresDur <= 0.0f)
+						if (_cresFx != null && CrescentIdle()) // ROUND 13: hide the crescent art only once the WHOLE ring is empty
 
 							foreach (Godot.Sprite2D sx in _cresFx)
 
@@ -3086,13 +3111,21 @@ public partial class PartyMember : Godot.Node2D
 		// one honest bite per blade via the memo below. Same shared roll; print lands when it returns.
 		// hurts. Same shared roll/band disc; the print lands when the blade returns to the throw.
 
-		if (_cresDur > 0.0f) // fx-feel8 (user): the volley TICKS while the spin runs - the default attack keeps biting under the ult
+	// ROUND 13 (user: "His attacks should always finish, even if it means there are axes constantly
+	// flying everywhere"): the flight block ticks EVERY record of the ring, so overlapping volleys
+	// are on the page and hurting at once and a blade never changes hands mid-arc.
+	
+	for (int vi = 0; vi < CRESCENT_VOLLEYS; vi++) // ROUND 13: one pass per record
+	
+	{
+
+		if (_cresDur[vi] > 0.0f) // fx-feel8 (user): the volley TICKS while the spin runs - the default attack keeps biting under the ult
 
 		{
 
-			_cresT -= delta;
+			_cresT[vi] -= delta;
 
-			double progF = 1.0 - (double)_cresT / CRESCENT_FLIGHT; // 0..1 along the OUT-and-BACK loop
+			double progF = 1.0 - (double)_cresT[vi] / CRESCENT_FLIGHT; // 0..1 along the OUT-and-BACK loop
 
 			if (progF > 1.0)
 
@@ -3102,13 +3135,13 @@ public partial class PartyMember : Godot.Node2D
 
 			Godot.Collections.Array<Godot.Node2D> live = wpg != null ? wpg.GetEnemies() : null;
 
-			for (int cc = 0; cc < _cresNC; cc++)
+			for (int cc = 0; cc < _cresNC[vi]; cc++)
 
 			{
 
 				double sgn = (cc % 2) == 0 ? 1.0 : -1.0; // arcs alternate top/bottom like the volley
 
-				double pf = progF - cc * 0.1 / CRESCENT_FLIGHT; if (pf < 0.0) pf = 0.0; if (pf > 1.0) pf = 1.0; double angB = _cresA0 + sgn * System.Math.PI * (2.0 * pf - 1.0); // user 2026-11-02 (b): blade cc runs the SAME full loop ~0.1 s later (launch offset INTO progF, NOT per-blade clocks: one shared volley roll + memo invariant kept); unlaunched blades clamp to 0 = ride at the hands
+				double pf = progF - cc * 0.1 / CRESCENT_FLIGHT; if (pf < 0.0) pf = 0.0; if (pf > 1.0) pf = 1.0; double angB = _cresA0[vi] + sgn * System.Math.PI * (2.0 * pf - 1.0); // user 2026-11-02 (b): blade cc runs the SAME full loop ~0.1 s later (launch offset INTO progF, NOT per-blade clocks: one shared volley roll + memo invariant kept); unlaunched blades clamp to 0 = ride at the hands
 
 				// user 2026-11-07 (converge-on-prey law): the blade SPINS OUT OF HIS HANDS (floor at zero -
 
@@ -3118,7 +3151,7 @@ public partial class PartyMember : Godot.Node2D
 
 				// below is the disc AT this frame's art point, so what is drawn is exactly what hurts.
 
-				float rMul = (float)(_cresLo + (_cresR - _cresLo) * System.Math.Sin(System.Math.PI * pf));
+				float rMul = (float)(_cresLo[vi] + (_cresR[vi] - _cresLo[vi]) * System.Math.Sin(System.Math.PI * pf));
 
 				Godot.Vector2 biteP = GlobalPosition + new Godot.Vector2((float)System.Math.Cos(angB), (float)System.Math.Sin(angB)) * rMul; // the ART position: what is on screen is what hurts
 
@@ -3126,11 +3159,11 @@ public partial class PartyMember : Godot.Node2D
 
 				{
 
-					_cresFx[cc].GlobalPosition = biteP;
+					_cresFx[vi * CRESCENT_ART + cc].GlobalPosition = biteP;
 
-					_cresFx[cc].Rotation = (float)angB + (float)(sgn * 1.5708) + (float)pf * 18.84f; _cresFx[cc].Scale = new Vector2((float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul(), (float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul()); // user 2026-11-02 (a): blade ART rides the SAME size factor the disc + band use ((1+0.25xsize)xareaMul) | (b): tumble per staggered clock
+					_cresFx[vi * CRESCENT_ART + cc].Rotation = (float)angB + (float)(sgn * 1.5708) + (float)pf * 18.84f; _cresFx[vi * CRESCENT_ART + cc].Scale = new Vector2((float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul(), (float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul()); // user 2026-11-02 (a): blade ART rides the SAME size factor the disc + band use ((1+0.25xsize)xareaMul) | (b): tumble per staggered clock
 
-					_cresFx[cc].Visible = true; // fx-feel8: volley blades light on their OWN _cresFx slots (art)
+					_cresFx[vi * CRESCENT_ART + cc].Visible = true; // fx-feel8: volley blades light on their OWN _cresFx slots (art)
 
 				}
 
@@ -3138,7 +3171,7 @@ public partial class PartyMember : Godot.Node2D
 
 					continue; // no world handle: visual-only frame, the volley still completes
 
-				for (int ii = 0; ii < live.Count && ii < _cresMemo.Length; ii++)
+				for (int ii = 0; ii < live.Count && ii < _cresMemo[vi].Length; ii++)
 
 				{
 
@@ -3150,7 +3183,7 @@ public partial class PartyMember : Godot.Node2D
 
 						continue;
 
-					if ((_cresMemo[ii] & (1 << cc)) != 0)
+					if ((_cresMemo[vi][ii] & (1 << cc)) != 0)
 
 						continue; // this blade already bit this body: one honest bite per crescent
 
@@ -3159,24 +3192,24 @@ public partial class PartyMember : Godot.Node2D
 					// prey no blade touched. Only the blade disc at this frame's art point bites (+14 px body
 					// allowance); convergence lives in _cresR (the prey's real distance) + _cresLo = 0 above.
 					Godot.Vector2 bv = wpg.WrapDelta(biteP, en.GlobalPosition); // blade -> body, wrap-short
-					if (bv.Length() > _cresBand + ec.hitR)
+					if (bv.Length() > _cresBand[vi] + ec.hitR)
 						continue; // outside the drawn blade disc this frame (what is painted is what hurts)
 
-					ec.TakeDamage(_cresDmg);
+					ec.TakeDamage(_cresDmg[vi]);
 
-					if (_cresBled)
+					if (_cresBled[vi])
 
 						ec.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 4.0); // same card-scaled stamp as the rake
 
-					_cresMemo[ii] |= (1 << cc) | 256;
+					_cresMemo[vi][ii] |= (1 << cc) | 256;
 
-					_cresBit++;
+					_cresBit[vi]++;
 
 				}
 
 			}
 
-			if (_cresT <= 0.0f)
+			if (_cresT[vi] <= 0.0f)
 
 			{
 
@@ -3186,9 +3219,9 @@ public partial class PartyMember : Godot.Node2D
 
 				{
 
-					for (int cc = 0; cc < _cresNC; cc++)
+					for (int cc = 0; cc < _cresNC[vi]; cc++)
 
-						for (int ii = 0; ii < live.Count && ii < _cresMemo.Length; ii++)
+						for (int ii = 0; ii < live.Count && ii < _cresMemo[vi].Length; ii++)
 
 						{
 
@@ -3200,43 +3233,44 @@ public partial class PartyMember : Godot.Node2D
 
 								continue;
 
-							if ((_cresMemo[ii] & (1 << cc)) != 0)
+							if ((_cresMemo[vi][ii] & (1 << cc)) != 0)
 
 								continue;
 
 							// user 2026-11-07: floor is BACK AT THE HANDS (_cresLo = 0) - the CATCH lands on the
 							// thrower's own spot again (the boomerang comes HOME) and bites prey that walked
 							// up to melee. Same disc law as the flight test above: the drawn blade is what hurts.
-							double catchAng = _cresA0 + ((cc % 2) == 0 ? 1.0 : -1.0) * System.Math.PI;
-							Godot.Vector2 catchP = GlobalPosition + new Godot.Vector2((float)System.Math.Cos(catchAng), (float)System.Math.Sin(catchAng)) * _cresLo;
+							double catchAng = _cresA0[vi] + ((cc % 2) == 0 ? 1.0 : -1.0) * System.Math.PI;
+							Godot.Vector2 catchP = GlobalPosition + new Godot.Vector2((float)System.Math.Cos(catchAng), (float)System.Math.Sin(catchAng)) * _cresLo[vi];
 
-							if (wpg.WrapDelta(catchP, en.GlobalPosition).Length() > _cresBand + ec.hitR)
+							if (wpg.WrapDelta(catchP, en.GlobalPosition).Length() > _cresBand[vi] + ec.hitR)
 
 								continue;
 
-							ec.TakeDamage(_cresDmg);
+							ec.TakeDamage(_cresDmg[vi]);
 
-							if (_cresBled)
+							if (_cresBled[vi])
 
 								ec.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 4.0);
 
-							_cresMemo[ii] |= (1 << cc) | 256;
+							_cresMemo[vi][ii] |= (1 << cc) | 256;
 
-							_cresBit++;
+							_cresBit[vi]++;
 
 						}
 
 				}
 
-				if (_cresBit > 0)
+				if (_cresBit[vi] > 0)
 
-					GD.Print("[10thAge] (axe) " + displayName + " crescents rake " + _cresBit + " bodies");
+					GD.Print("[10thAge] (axe) " + displayName + " crescents rake " + _cresBit[vi] + " bodies");
 
-				_cresDur = 0.0f; // volley done: the _fxT decay hides the blades off the throw
+				_cresDur[vi] = 0.0f; // volley done: the _fxT decay hides the blades off the throw
 
 			}
 
 		}
+	}
 
 		// 2026-11-02 fx-feel6 (user: "the shields go through enemies and seem to bounce at their set
 		// distance instead of hitting the enemy and bouncing. It also applies the damage immediately
@@ -4094,29 +4128,57 @@ public partial class PartyMember : Godot.Node2D
 
 			// that clock expires. Same grown band disc; one bite per body per crescent.
 
-			_cresNC = crescents;
+			// ROUND 13 (user: "When Bruno's attack speed is too high, if he attacks, his axes don't finish their
+			// arc and return before the new ones start they just vanish and start again. This caused him to do
+			// no damage at all at times. His attacks should always finish, even if it means there are axes
+			// constantly flying everywhere"): the beat arms a RECORD of the crescent ring. An empty record is
+			// used straight away, so overlapping volleys fly and bite side by side and nothing mid-arc is ever
+			// overwritten; only a FULL pipeline takes the record CLOSEST to landing, whose arc is nearly done,
+			// so the swap reads as a catch instead of the mid-arc vanishing the user called.
 
-			_cresR = arcR;
+			int vi = 0; // the record this beat arms
+			float least = 1000000000.0f; // flight left on the fullest record seen
 
-			_cresLo = 0.0f; // user 2026-11-07: floor BACK AT THE HANDS - the step-out WAS the minimum-range deadzone the user called "a minimum range to screw him over"; the intended look is axes spinning OUT of his hands. The catch bite lands on his own spot again.
+			for (int vi2 = 0; vi2 < CRESCENT_VOLLEYS; vi2++)
 
-			_cresBand = band;
+			{
 
-			_cresA0 = (double)a0;
+				if (_cresDur[vi2] <= 0.0f)
+					{
+						vi = vi2;
+						break; // a free record: this beat flies alongside everything already out there
+					}
 
-			_cresDmg = axDmg;
+				if (_cresT[vi2] < least)
+					{
+						least = _cresT[vi2];
+						vi = vi2; // the record closest to landing: the fallback slot when the ring is full
+					}
 
-			_cresBled = bled;
+			}
+			_cresNC[vi] = crescents;
 
-			_cresBit = 0;
+			_cresR[vi] = arcR;
 
-			_cresDur = (float)CRESCENT_FLIGHT + (crescents - 1) * 0.1f; // user 2026-11-02 (b): total flight adds ~0.1 s launch stagger per blade so ALL axes are SEEN (ONE shared volley roll + memo bit 1<<cc invariant kept)
+			_cresLo[vi] = 0.0f; // user 2026-11-07: floor BACK AT THE HANDS - the step-out WAS the minimum-range deadzone the user called "a minimum range to screw him over"; the intended look is axes spinning OUT of his hands. The catch bite lands on his own spot again.
 
-			_cresT = _cresDur; // staggered clock: counts down the WHOLE staggered volley (last blade lands when it hits 0)
+			_cresBand[vi] = band;
 
-			_cresMemo = new int[64]; // one bite per body per crescent (bit 256 = tallied)
+			_cresA0[vi] = (double)a0;
 
-			_fxT = _cresDur + 0.06f; // decay hides the blades the moment the LAST staggered blade lands
+			_cresDmg[vi] = axDmg;
+
+			_cresBled[vi] = bled;
+
+			_cresBit[vi] = 0;
+
+			_cresDur[vi] = (float)CRESCENT_FLIGHT + (crescents - 1) * 0.1f; // user 2026-11-02 (b): total flight adds ~0.1 s launch stagger per blade so ALL axes are SEEN (ONE shared volley roll + memo bit 1<<cc invariant kept)
+
+			_cresT[vi] = _cresDur[vi]; // staggered clock: counts down the WHOLE staggered volley (last blade lands when it hits 0)
+
+			_cresMemo[vi] = new int[64]; // one bite per body per crescent (bit 256 = tallied)
+
+			_fxT = _cresDur[vi] + 0.06f; // decay hides the blades the moment the LAST staggered blade lands
 
 			if (_cresFx != null) // fx-feel8: throw frames ride through while the spin runs (each lane owns its slots now)
 
@@ -4126,7 +4188,7 @@ public partial class PartyMember : Godot.Node2D
 
 				{
 
-					_cresFx[c2].Visible = c2 < crescents; // blades light up at the throw start
+					_cresFx[vi * CRESCENT_ART + c2].Visible = c2 < crescents; // blades light up at the throw start
 
 					if (c2 < crescents)
 
@@ -4136,9 +4198,9 @@ public partial class PartyMember : Godot.Node2D
 
 						float ca2 = a0 - sa2 * 3.1416f + sa2 * 0.3f; // first sliver at the DEPARTURE side of the loop
 
-						_cresFx[c2].GlobalPosition = p + new Vector2((float)System.Math.Cos(ca2), (float)System.Math.Sin(ca2)) * (arcR * 0.12f); // first frame AT the hands (sin bulge starts at 0); the tick block takes over
+						_cresFx[vi * CRESCENT_ART + c2].GlobalPosition = p + new Vector2((float)System.Math.Cos(ca2), (float)System.Math.Sin(ca2)) * (arcR * 0.12f); // first frame AT the hands (sin bulge starts at 0); the tick block takes over
 
-						_cresFx[c2].Rotation = ca2 + sa2 * 1.5708f; _cresFx[c2].Scale = new Vector2((float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul(), (float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul()); // user 2026-11-02 (a): throw start frames ride the size factor too
+						_cresFx[vi * CRESCENT_ART + c2].Rotation = ca2 + sa2 * 1.5708f; _cresFx[vi * CRESCENT_ART + c2].Scale = new Vector2((float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul(), (float)(1.0 + 0.25 * (double)axeSize) * (float)LeaderAreaMul()); // user 2026-11-02 (a): throw start frames ride the size factor too
 
 					}
 
