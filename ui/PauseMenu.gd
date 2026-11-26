@@ -10,8 +10,11 @@ extends CanvasLayer
 # so buttons + ESC stay live while the tree is paused, hidden card owns NO input.
 #
 # Built IN CODE so ui/PauseMenu.tscn stays a trivial CanvasLayer + script. Layout
-# follows the user's mockup: dark columns, mini -> name -> TARGET LOGIC -> UPGRADES,
-# over the dimmed, softened arena (pause_blur.gdshader).
+# follows the user's mockup: dark columns, mini -> name -> TARGET LOGIC -> in-run STATS
+# (user 2026-11-25: the card cut 4.5 columns and "varied a lot based on text length" -
+# the UPGRADE block drove both: GridContainer sized columns to the unwrapped Label. Upgrades
+# now leave the card and ride a HOVER TOOLTIP - mouse over a character and its pick list
+# pops above its column; the row itself centres on the viewport and always fits 5).
 
 class_name PauseMenuScreen
 
@@ -56,6 +59,12 @@ var col_mode: Array = []
 var mode_buttons: Array = []
 var _sig: String = ""
 var _open_t: float = 0.0
+# ---------- hover tooltip (user 2026-11-25: upgrades pop over a card on mouse hover) ----------
+var tooltip: PanelContainer = null
+var tooltip_lbl: Label = null
+var upgrade_texts: Array = [] # parallel to cols: each column's upgrade block for the pop-up
+var _cell_w: float = 300.0 # last painted cell width: the tooltip wraps to the card
+var _grid_top: float = 168.0 # last painted strip top: the tooltip sits above the hovered card
 
 func _ready() -> void:
 	set_process_input(true)
@@ -103,6 +112,7 @@ func _process(_d: float) -> void:
 		_close("pilot")
 		_open_t = 0.0
 		return
+	_hover_update()
 	var sig: String = _members_sig()
 	if sig != _sig:
 		# user 2026-11-06 playtest (targeting highlight only refreshed after closing and
@@ -122,6 +132,12 @@ func _members_sig() -> String:
 	for row in members:
 		# the condensed upgrade block is part of the sig: a fresh rank repaints the card
 		s += str(row.get("name", "?")) + "|" + str(row.get("upgrade_block", "")) + "|" + str(row.get("picks", "")) + "|" + str(row.get("target_mode", 0)) + ";"
+		# user 2026-11-25: the card paints the IN-RUN stats now, so the numbers
+		# must count in the sig too - a level-up or fresh gear changes them with
+		# NO roster change, and this signature is the only repaint trigger
+		# str() prints floats as they come: if the box would show a difference,
+		# the sig sees it too, which is exactly honest here
+		s += str(row.get("hp", 0)) + "/" + str(row.get("max_hp", 0)) + "/" + str(row.get("dmg", 0)) + "/" + str(row.get("spd", 0.0)) + "/" + str(row.get("move", 0.0)) + "/" + str(row.get("rng", 0.0)) + "/" + str(row.get("arm", 0)) + ";"
 	return s
 
 func _close(reason: String) -> void:
@@ -199,6 +215,27 @@ func _build() -> void:
 	grid = GridContainer.new()
 	grid.name = "Roster"
 	add_child(grid)
+	# the hover pop-up lives AFTER the grid so it paints OVER the columns (draw order
+	# is child order inside one CanvasLayer); it lives on the ROOT layer, not a nested
+	# one, so the blur field (layer 1) and HUD (layer 2) can never bury it.
+	# mouse_pass_through: the pop-up draping a column must never eat the mode-button
+	# clicks the click router still needs under it.
+	tooltip = PanelContainer.new()
+	tooltip.name = "UpgradeTip"
+	tooltip.visible = false
+	tooltip.mouse_filter = 1 # MOUSE_FILTER_PASS: registers the hit but clicks fall through
+	tooltip.add_theme_stylebox_override("panel", _sb_column())
+	add_child(tooltip)
+	tooltip_lbl = Label.new()
+	tooltip_lbl.name = "TipText"
+	# 4.x keeps these as bare constants (TextWrappedString was the 3.x enum)
+	tooltip_lbl.autowrap_mode = 2 # enum slot: AUTOWRAP_WORD_SMART
+	tooltip_lbl.add_theme_color_override("font_color", PAPER)
+	# scale 0.8 matches the card's own Labels so the pop-up reads at the same size
+	tooltip_lbl.scale = Vector2(0.8, 0.8)
+	tooltip_lbl.position = Vector2(10.0, 8.0)
+	tooltip_lbl.mouse_filter = 1 # the child Label must not block either
+	tooltip.add_child(tooltip_lbl)
 	_paint_columns()
 
 func _paint_blur() -> void:
@@ -273,6 +310,13 @@ func _paint_columns() -> void:
 		gh = 620.0
 	else:
 		gh = 392.0
+	# user 2026-11-25: the IN-RUN STATS box replaces the fluid upgrade block, so the
+	# cell box governs the column width and all 5 recruited cards fit, centred.
+	# The tooltip measures itself off the cell box + strip top so a pop-up wraps to
+	# the card it hovers.
+	upgrade_texts.clear()
+	_cell_w = cell_w
+	_grid_top = top
 	# centred strip: x anchors at 0.5 make the offsets a pixel box around mid-screen,
 	# so a 1280-wide window keeps the dim field showing at the sides (the mockup look)
 	grid.anchor_left = 0.5
@@ -297,7 +341,8 @@ func _paint_columns() -> void:
 		hint.text = "ESC or P closes   -   click a mode to set it"
 
 func _paint_one(row: Dictionary, ci: int, w: float, h: float, big: bool) -> void:
-	# one mockup column: painted mini -> name -> target logic -> upgrades
+	# one mockup column: painted mini -> name -> target logic -> IN-RUN STATS
+	# (upgrades left the column on 2026-11-25: they ride the hover pop-up)
 	var col: PanelContainer = PanelContainer.new()
 	col.name = "Member" + str(ci)
 	col.custom_minimum_size = Vector2(w, h)
@@ -378,24 +423,42 @@ func _paint_one(row: Dictionary, ci: int, w: float, h: float, big: bool) -> void
 		modes.append(bb)
 		_tint_mode(bb, m == md)
 	mode_buttons.append(modes)
-	# ---------- upgrades: the member's own pick line, one row per pick ----------
-	var up_l: Label = Label.new()
-	up_l.name = "Upgrades"
+	# ---------- upgrades LEAVE the card (user 2026-11-25: they ride the pop-up) ----
+	# the pick line stays PARKED per column: _hover_update paints it above the card
+	# the cursor rests on. Keeping it out of the column is what fixes the cut-off -
+	# an unwrapped Label's min width drove the GridContainer wider than the strip,
+	# so the card's length literally decided where the row got sliced.
+	var ublock: String = str(row.get("upgrade_block", ""))
 	# user 2026-11-06 playtest: the C# side sends ONE condensed line per taken track
 	# (newlines already in it), so the card must NOT re-split that text.
 	# the raw picks chain stays only as the fallback for a build that sends no block.
 	# GD's own line-up split would mangle the block: its segments carry commas too.
-	var ublock: String = str(row.get("upgrade_block", ""))
 	if ublock == "":
 		ublock = _upgrade_block(str(row.get("picks", "")))
-	up_l.text = ublock
-	up_l.custom_minimum_size = Vector2(pad, 120.0)
+	upgrade_texts.append(ublock)
+	# ---------- in-run stats: the box under target logic (user 2026-11-25) ----------
+	# HP, damage, attack speed, move, range, armour: every number is Game.cs' live
+	# read, so gear and level bonuses ride with it.
+	# AUTOWRAP is the point: an unwrapped Label reports its whole text as its min
+	# width, and the GridContainer widened every column to that, so the upgrade
+	# length decided where the row was sliced off past the strip's edge. Word-wrap
+	# keeps the Label's min width to the longest word, so the CELL box governs and
+	# the 0.5 anchors centre honestly - five recruited members always fit.
+	# the old clip law carries: a long text stays inside its column.
+	var st_l: Label = Label.new()
+	st_l.name = "Stats"
+	st_l.text = _stat_line(row)
+	# taller band when one strip row owns the box: the stats read on two easy lines
+	var st_h: float = 46.0
 	if not big:
-		up_l.custom_minimum_size = Vector2(pad, 96.0)
-	up_l.size_flags_horizontal = 3
-	up_l.add_theme_color_override("font_color", MUTED)
-	up_l.scale = Vector2(0.8, 0.8)
-	body.add_child(up_l)
+		st_h = 34.0
+	st_l.custom_minimum_size = Vector2(pad, st_h)
+	st_l.size_flags_horizontal = 3
+	st_l.autowrap_mode = 2 # enum slot: AUTOWRAP_WORD_SMART
+	st_l.add_theme_color_override("font_color", MUTED)
+	st_l.scale = Vector2(0.8, 0.8)
+	# scale 0.8 is applied to the Label, so the clip box follows the drawn node
+	body.add_child(st_l)
 
 func _upgrade_block(picks: String) -> String:
 	# Game.cs sends pickHistory as "a, b, c"; the mockup reads one upgrade per row.
@@ -514,3 +577,141 @@ func _was_click_on(b: Button, ev: InputEvent) -> bool:
 		if lr.has_point(b.get_local_mouse_position()):
 			return true
 	return false
+
+func _was_hover_on(c: Control, ev: Vector2) -> bool:
+	# the hover twin of _was_click_on: 4.7 keeps dropping hit-test helpers, and the
+	# camp card needed THREE spaces to agree before a cursor counted on a node - the
+	# global rect vs the global mouse, the global rect vs the raw point, then the
+	# node's own local rect vs its local mouse. Same geometry, no InputEvent.
+	# the local check is what follows the GridContainer's own transform, so a
+	# centred strip still reports the right column at any window width.
+	var gr: Rect2 = c.get_global_rect()
+	# the pop-up is mouse_pass_through, so the hovered column still gets the
+	# cursor even when the panel drapes it - the hover never hides a click
+	if gr.has_point(c.get_global_mouse_position()):
+		return true
+	if gr.has_point(ev):
+		return true
+	if c.size.x > 1.0 and c.size.y > 1.0:
+		# the column is inside the GridContainer's transform, so its LOCAL mouse is
+		# the only reading that follows the container's own position
+		var lr: Rect2 = Rect2(Vector2(0.0, 0.0), c.size)
+		# the tooltip lives on the ROOT layer over the strip, so the node under the
+		# cursor may be the pop-up's own panel; the column's local mouse still names
+		# it because mouse_pass_through leaves the hit-test with the card
+		if lr.has_point(c.get_local_mouse_position()):
+			return true
+	return false
+
+func _stat_line(row: Dictionary) -> String:
+	# the IN-RUN stat box (user 2026-11-25: the box under target logic must show
+	# what the character IS now, not what it could become). Newlines FIRST,
+	# autowrap second (Campfire.gd law: 4.7 autowrap alone did not constrain).
+	# No formatting idiom exists anywhere in the .gd codebase (grep: no String.num
+	# / %.2f), so _fmt_num below does the rounding by hand.
+	# C# PauseCard feeds: hp/max_hp int, dmg int, spd as a multiplier, move + rng
+	# floats, arm = armour + oak + leader flat, the SAME live total Game.cs shows.
+	var lines: Array = []
+	lines.append("hp " + str(int(float(row.get("hp", 0)))) + "/" + str(int(float(row.get("max_hp", 0)))))
+	lines.append("atk " + str(int(float(row.get("dmg", 0)))))
+	# the x prefix reads as a multiplier: x1.20 means twenty percent faster
+	lines.append("speed x" + _fmt_num(float(row.get("spd", 1.0)), 2))
+	# one decimal keeps move/range human-readable (102.5, not 102.50)
+	lines.append("move " + _fmt_num(float(row.get("move", 0.0)), 1))
+	# range 0 means melee: still shown so a melee-vs-ranged row never looks blank
+	lines.append("range " + _fmt_num(float(row.get("rng", 0.0)), 1))
+	var arm: int = int(float(row.get("arm", 0)))
+	# armour only when non-zero: a zero line is noise on four of five cards
+	# (crit/evasion stay out until the user asks - the stats we agreed on)
+	if arm != 0:
+		# the oak/leader bonuses already baked into arm by Game.cs PauseCard()
+		lines.append("armour " + str(arm))
+	return "\n".join(lines)
+
+
+# --- round 15 helpers (append-only tail) ---
+func _fmt_num(v: float, dp: int) -> String:
+	# by-hand fixed-decimal formatting
+	# str() has no format control; % is modulo only
+	var neg := v < 0.0
+	var t := v if dp == 0 else (v * 10.0 if dp == 1 else v * 100.0)
+	var n := absi(int(round(t)))
+	# divisor mirrors dp: 0 ones, 1 tenths, 2 hundredths
+	var d := 10 if dp == 1 else (100 if dp == 2 else 1)
+	# leading-zero pad keeps x2.50 reading as x2.50
+	# by-hand zero pad: str(n % d) left-padded to dp chars
+	var fs := ""
+	if dp > 0:
+		var ds := str(n % d)
+		while ds.length() < dp:
+			ds = "0" + ds
+		fs = ds
+	var out := str(int(n / d))
+	out += ("." + fs) if dp > 0 else ""
+	# no sign for a rounded -0 (n already zero then)
+	if neg and n != 0:
+		# leading minus
+		out = "-" + out
+	# sign applied
+	return out
+
+func _wrap_words(txt: String, per_line: int) -> String:
+	# pre-wrap at word boundaries so the tooltip height is countable:
+	# 4.x autowrap does not reliably constrain height (Campfire modal law);
+	# per_line is conservative, a real wrapped line never exceeds it; long
+	# words stay whole and autowrap is the belt for those
+	if per_line < 6:
+		return txt
+	var out := ""
+	var cur := ""
+	for para: String in txt.split("\n"):
+	# flush the previous paragraph's last line
+		if cur != "":
+			out += cur + "\n"
+			cur = ""
+		# word budget: cur plus space plus word must fit the line
+		for wd: String in para.split(" "):
+			if wd == "":
+				# collapse doubled spaces
+			# skip empty word
+				continue
+			# long word on an empty line stays whole
+			# join with a space when it fits; flush and start fresh otherwise
+			if cur == "" or cur.length() + 1 + wd.length() <= per_line:
+				cur = wd if cur == "" else cur + " " + wd
+			else:
+				out += cur + "\n"
+				cur = wd
+	if cur != "":
+		out += cur
+	return out
+
+func _hover_update() -> void:
+	# hover tooltip: raw mouse point, no event; columns may have moved, rescan every frame
+	tooltip.visible = false
+	var idx := -1
+	for i: int in range(cols.size()):
+		# null guard: cols entries are only Controls once _build has run
+		if cols[i] == null:
+			continue
+		# triple-check hover: grid transform may have changed, use each column's own frame
+		if _was_hover_on(cols[i], grid.get_global_mouse_position()):
+			idx = i
+			break
+	if idx == -1 or idx >= upgrade_texts.size():
+		return
+	# pre-wrap by conservative chars/line so the panel height can be computed here
+	tooltip_lbl.text = _wrap_words(upgrade_texts[idx], _est_chars(_cell_w))
+	tooltip.visible = true
+	# explicit sizing: PanelContainer min-size caching is unreliable in 4.7
+	var lines := tooltip_lbl.text.count("\n") + 1
+	tooltip.size = Vector2(_cell_w, lines * 16.0 + 40.0)
+	var cpos: Vector2 = cols[idx].get_global_position() + cols[idx].size * 0.5
+	tooltip.position = Vector2(cpos.x - tooltip.size.x * 0.5, max(0.0, _grid_top - tooltip.size.y))
+	tooltip.position.x = clampf(tooltip.position.x, 8.0, grid.get_viewport_rect().size.x - tooltip.size.x - 8.0)
+
+
+func _est_chars(w: float) -> int:
+	# conservative chars per line: assume wide glyphs so lines wrap earlier than they really do
+	# label renders at 0.8 scale; 8.0 px per char at native size stays under real capacity
+	return max(8, int(w * 0.8 / 8.0))

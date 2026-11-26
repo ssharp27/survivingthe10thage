@@ -8484,6 +8484,14 @@ private void UpdateSpirits(float delta)
 		card["idx"] = m.memberIndex;
 		card["upgrade_block"] = UpgradeBlock(m); // user 2026-11-06 playtest: ONE condensed line per track, compounded
 		card["target_mode"] = m.targetMode;
+		// user 2026-11-26 round 15: LIVE in-run stats for the pause card - same effective
+		// getters the combat rails use; arm mirrors Game.cs:1157 (stat + oak flat + leader flat)
+		// the user asked for HP/ATK/speed xN/move/range/armour only - no crit/evasion lines
+		card["dmg"] = m.EffDamage();
+		card["spd"] = m.AtkSpdMul();
+		card["move"] = m.EffMove();
+		card["rng"] = m.EffRange();
+		card["arm"] = m.stat[StatTags.ARMOUR] + (m.oakT > 0.0 ? 5.0 : 0.0) + LeaderArmourFlat();
 		// the card's mini: art is res://art/characters/<lowercased name>.png (2026-11-08 art
 		// reorg); the card skips it if the load misses, so a kit without a mini still shows its column
 		card["art"] = "res://art/characters/" + m.displayName.ToLower() + ".png";
