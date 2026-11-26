@@ -180,12 +180,14 @@ public partial class Game : Godot.Node2D
 	// rolls onto its own pool (it CAN show up on runs where it is not the leader).
 	// Row = registry index (BuildJoinLottery reads _stage): columns are memberIndex order
 	// (0 Baldrun | 1 Mosiah | 2 Asper | 3 Alvora | 4 Yu | 5 Stack | 6 Wash | 7 Bruno | 8 Brook | 9 Keeko | 10 Hapi | 11 Athios | 12 Hew).
-	// Weight 0 = cannot appear on that stage. Stage 1 per the user: Baldrun + Mosiah more likely
-	// than the rest. The Enemy Test Room row is ALL ZERO on purpose: the room runs no ally beats,
+	// Weight 0 = cannot appear on that stage. Stage 1 is FLAT now (user 2026-11-26: "set all
+	// characters to the same weight for appearing on this first map ... we'll change them in the
+	// future when we have more maps") - the old Baldrun + Mosiah 3x is retired, not special-cased.
+	// The Enemy Test Room row is ALL ZERO on purpose: the room runs no ally beats,
 	// so the exhausted pool is a logged no-op and nothing can recruit there.
 	// Sanity numbers - the user will add rows/weights per future stage.
 	// the new-style initializer: Godot's C# build trips CS0623 on nested old-style braces
-	private static readonly int[][] JOIN_W = { new int[] { 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }, new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };   // row 0 = stage 1: Baldrun + Mosiah heavy, the rest (Keeko 2026-11-14, Hapi 2026-11-17, Athios 2026-11-19, Hew 2026-11-22) at parity | row 1 = the test room: no recruits
+	private static readonly int[][] JOIN_W = { new int[] { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }, new int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };   // row 0 = stage 1: FLAT weights, every member equally likely (user 2026-11-26; the old Baldrun + Mosiah 3x retired - re-weight per map as more maps arrive) | row 1 = the test room: no recruits
 	private int[] _joinOrder = new int[0]; // ally slot k -> memberIndex drawn for it
 	private Godot.Collections.Array<int> _hpOrder = new(); // HUD strip slot -> memberIndex: the join order (see BuildJoinLottery)
 	private Godot.RandomNumberGenerator _joinRng; // UNSEEDED on purpose: a fresh process re-rolls
