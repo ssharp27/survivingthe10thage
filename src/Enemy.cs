@@ -60,13 +60,18 @@ public partial class Enemy : Combatant
     private const double ELITE_DMG_MUL = 2.0;
     // The ELITE XP x2 is NOT a constant here: the gem is doubled at the KILL site in Game.cs
     // (the only read of xpValue in the project), so a stamped body can never pay x4.
-    // ELITE MARK: the blue glowing outline is a copy of the body's OWN canvas, ~7% bigger and
+    // ELITE MARK: the blue glowing outline is a copy of the body's OWN canvas, ~18% bigger and
     // drawn BEHIND it (ZIndex -1), so only the blue rim peeks out = a silhouette halo with zero
     // new art. Greybox branch keeps a blue rim rect instead. Assistant pick - retune by eye.
     Godot.Sprite2D _halo;
     Godot.ColorRect _haloRect;
     float _haloT = 0.0f;
-    private const float ELITE_HALO_PAD = 1.07f;
+    // ROUND 16 ELITE MARK VISIBILITY (user hand-play, 2026-11-27: two full runs at 2.5% elite odds
+    // and the user saw NO elite at all, no blue aura): the ~7% sliver of the round-14 mark sat under
+    // a moving body at 0.8 art scale and simply did not read. The pad goes to a ~18% one and the
+    // pulse below keeps a HIGH alpha floor, so the rim still breathes but never dips toward clear.
+    // ZIndex stays -1: the rim must never cover the creature. VISUAL ONLY - no stat, no new art.
+    private const float ELITE_HALO_PAD = 1.18f;
 
     // fx-feel10 audit: did this body ever loose a shot? first loose prints once,
     // so the bench counts loosed lanes instead of spamming the horde.
@@ -382,7 +387,7 @@ public partial class Enemy : Combatant
         }
         // ROUND 14 ELITE MARK (user 2026-11-25: elites get a blue glowing outline). Built AFTER
         // the art / greybox branch so it copies whatever body this kind actually drew, and BEHIND
-        // it (ZIndex -1): a ~7% bigger blue copy of the body's own canvas leaves only a glowing
+        // it (ZIndex -1): a ~18% bigger blue copy of the body's own canvas leaves only a glowing
         // rim around the silhouette, so the mark costs zero new art and never hides the creature.
         // The halo flag was stamped at spawn before this first ran, and the mirror + pulse live
         // in _Process below.
@@ -970,7 +975,7 @@ public partial class Enemy : Combatant
         if (elite)
         {
             _haloT += (float)d;
-            float a = 0.55f + 0.3f * Mathf.Sin(_haloT * 3.2f); // assistant pulse pick - retune by eye
+            float a = 0.78f + 0.2f * Mathf.Sin(_haloT * 3.2f); // ROUND 16: alpha floor 0.58 (was 0.25) - the rim never dips toward clear (retune by eye)
             if (_halo != null)
                 _halo.Modulate = new Color(0.35f, 0.55f, 1.6f, a);
             if (_haloRect != null)

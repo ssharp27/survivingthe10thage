@@ -22,6 +22,20 @@ public partial class Combatant : Godot.Node2D
 	// so a body whose art failed to load can never become unhittable.
 	public float hitR = 20.0f;
 
+	// ROUND 16 (user hand-play 2026-11-27: "wasn't killing anything at all" party-wide from ~850 s on):
+	// crescent-volley and spin-cast BITE MEMORY rides the BODY. PartyMember's old bitmaps were
+	// indexed by LIST SLOT while Game's kill scans RemoveAt-compact _enemies in the SAME frame a
+	// sweep runs - the moment a body died, every later index named a DIFFERENT body, so survivors
+	// that shifted into a remembered bit were silently skipped and never bitten again; worse, both
+	// maps were fixed at 64 entries, so past body 64 NOTHING was remembered OR bitten at horde
+	// density. gen = the last crescent tag / spin-cast tag this body paid; mask = per-blade bits of
+	// that generation. One honest bite per crescent per volley per body is kept exactly as before.
+
+	public int biteGen = 0;   // crescent volley tag this body paid last (PartyMember _cresGenNext)
+	public int biteMask = 0;  // per-crescent bits (1 << cc) of that volley
+	public int spinGen = 0;   // spin-cast tag this body paid last (PartyMember _spinGenNext)
+	public int spinMask = 0;  // per-blade circle bits (1 << blade) of that cast
+
 
 	// guiding light (Alvora ring vulnerability, user 2026-10-23): bodies caught by her
 	// ring take +% damage from ALL sources for a window. Lives on the SHARED surface so

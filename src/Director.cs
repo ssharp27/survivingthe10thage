@@ -124,8 +124,17 @@ public partial class Director : Godot.Node2D
         // so the schedule's pacing is data: move a beat's time and the ramp follows
         double t = g.GetStageT();
         double half = g.GetStageLen();
-        _spawnTimer = (float)System.Math.Max(0.35, 1.1 - 0.6 * (t / half));
-        float legFrac = (float)(half > 0.0 ? t / half : 0.0);
+        // ROUND 16 CADENCE (user hand-play, 2026-11-27: the horde DIPPED around 500 s and only
+        // RAMPED again around 800 s): the density curve and the leg-start ease used to span the
+        // WHOLE beat leg, so any leg the table makes longer than a minute drags the horde thin for
+        // minutes and then charges it - the sawtooth WAS the leg length, not the difficulty curve.
+        // Both lanes now span at most RAMP_SPAN s of the leg. A SHORT leg keeps the round-13 law
+        // EXACTLY (span == leg, every 20-40 s beat in the current table is short), a LONG leg
+        // reaches full density 90 s in and HOLDS it instead of thinning toward the next beat.
+        double rampSpan = 90.0; // assistant pick - retune by eye
+        double span = half > 0.0 ? (half < rampSpan ? half : rampSpan) : 0.0;
+        _spawnTimer = (float)System.Math.Max(0.35, 1.1 - 0.6 * System.Math.Min(1.0, span > 0.0 ? t / span : 1.0));
+        float legFrac = (float)(span > 0.0 ? t / span : 0.0);
         // leg-start easing: a fresh beat leg opens thin and thickens toward the NEXT beat.
         // This is what M1's flat "half rate through the long pre-mini-boss window" did per
         // half; the beat table makes legs 20-40 s, so the easing rides the leg instead of a

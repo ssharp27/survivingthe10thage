@@ -307,7 +307,7 @@ public partial class PartyMember : Godot.Node2D
 	// side by side, each record with its own CRESCENT_ART art slots, so a blade is never reparented
 	// to a new throw mid-arc.
 	
-	const int CRESCENT_VOLLEYS = 5; // pipeline depth: flight is 0.85-1.15 s and the fastest observed cadence ~0.35 s needs four deep
+	const int CRESCENT_VOLLEYS = 8; // ROUND 16: 5 -> 8 records. Deeper AS made the ring's FALLBACK path (the record closest to landing) the common case, so a beat traded places with an arc still mid-flight; a wider ring keeps overlaps honest.
 	
 	const int CRESCENT_ART = 5; // blade slots per record (base one axe + the extra-axes ranks)
 	
@@ -331,7 +331,18 @@ public partial class PartyMember : Godot.Node2D
 	
 	int[] _cresBit = new int[CRESCENT_VOLLEYS]; // unique-body tally: printed the moment the flight lands
 	
-	int[][] _cresMemo = new int[CRESCENT_VOLLEYS][]; // per-body crescent-bite bits (256 = tallied), one map per record
+	// ROUND 16 (user hand-play 2026-11-27: "nothing was killing anything at all" deep in the run): the
+	// crescent and spin bite memos used to be BITMAPS INDEXED BY LIST SLOT. Game's kill scans
+	// RemoveAt-compact _enemies in the SAME frame the sweep runs in, so the moment a body dies
+	// every later index names a DIFFERENT body and a remembered bit silently skips a live one.
+	// Worse, both maps were fixed at 64 entries, so past body 64 nothing was remembered AND never
+	// bitten at horde density - the lane stopped eating anything at all as the stage thickened.
+	// Bite memory now rides the BODY (see Combatant.cs biteGen/biteMask/spinGen/spinMask):
+	// compaction cannot alias it and horde density cannot cap it. One honest bite per crescent
+		// per volley is kept exactly as before, just remembered where it cannot be misread.
+	int[] _cresTag = new int[CRESCENT_VOLLEYS]; // ROUND 16: the volley tag this record was armed with (0 = never armed)
+	
+	private static int _cresGenNext = 0; // ROUND 16: running crescent tag, SHARED across members so two throwers never hand a body the same tag
 	
 	// ROUND 13: the crescent art is hidden off-beat only when the WHOLE ring is empty - a flight-clock
 	// guard on ONE record used to clip a second volley that was still mid-spindle.
@@ -381,9 +392,9 @@ public partial class PartyMember : Godot.Node2D
 
 	int _spinBit = 0;           // unique-body tally: printed the moment the spin expires
 
-	int[] _spinMemo = null;     // per-body bite bits for the CURRENT circle (1 << blade)
+	int _spinTag = 0;           // ROUND 16: identity tag of the CURRENT cast (0 = no cast); bodies remember the tag they paid
 
-	int[] _spinCounted = null;  // per-body print bits across the whole cast (256 = tallied)
+	private static int _spinGenNext = 0; // ROUND 16: running spin-cast tag, SHARED across members so two throwers never hand a body the same tag
 
 	// user 2026-11-06: the cast's total window, so the spin can measure how far it has run
 	// (the growing blade arm reads off this fraction - orbitT alone only counts down)
@@ -2928,9 +2939,9 @@ public partial class PartyMember : Godot.Node2D
 
 				_spinBled = bleedR > 0;
 
-				_spinMemo = new int[64];
+				_spinTag = ++_spinGenNext; // ROUND 16: identity tag for this cast (bite memory is body-keyed, nothing to allocate)
 
-				_spinCounted = new int[64];
+				// ROUND 16: no per-cast print array - the unique-body tally reads the body's own spinGen tag
 
 				_spinBit = 0;
 
@@ -2952,9 +2963,9 @@ public partial class PartyMember : Godot.Node2D
 
 				_spinRev++;
 
-				for (int q2 = 0; q2 < _spinMemo.Length; q2++)
-
-					_spinMemo[q2] = 0; // fresh bite window: every blade rakes every body once per circle
+				// ROUND 16: the per-circle bite window is no longer CLEARED into anything - bodies remember
+				// the cast tag on their OWN fields (Combatant spinGen/spinMask), so a fresh circle needs no
+				// clearing pass, and no clearing could ever unmask a body that had shifted list slots anyway.
 
 			}
 
@@ -3027,13 +3038,9 @@ public partial class PartyMember : Godot.Node2D
 
 						{
 
-							for (int ii = 0; ii < live.Count && ii < _spinMemo.Length; ii++)
+							for (int ii = 0; ii < live.Count; ii++) // ROUND 16: no memo-length cap - every live body on a thick field is eligible
 
 							{
-
-								if ((_spinMemo[ii] & (1 << b2)) != 0)
-
-									continue; // this blade already bit this body this circle: one honest bite
 
 								Godot.Node2D en = live[ii];
 
@@ -3042,6 +3049,14 @@ public partial class PartyMember : Godot.Node2D
 								if (ec == null || ec.kind == "dead" || ec.hp <= 0.0f)
 
 									continue; // killed-but-unswept bodies are not valid bites (chain discipline)
+
+								// ROUND 16: bite memory keyed to the BODY (spinGen = cast tag, spinMask = per-blade bits). The
+								// old slot-index bitmap aliased the moment Game's kill scans RemoveAt-compact _enemies in the
+								// SAME frame a sweep runs, and its fixed 64 entries skipped every body past 64 at horde
+								// density - the user's "wasn't killing anything at all" wall from ~850 s on, party-wide.
+								if (ec.spinGen == _spinTag && (ec.spinMask & (1 << b2)) != 0)
+
+									continue; // this blade already bit this body this circle: one honest bite
 
 								if ((en.GlobalPosition - _axeFx[b2].GlobalPosition).Length() > spDisc + ec.hitR)
 
@@ -3053,17 +3068,15 @@ public partial class PartyMember : Godot.Node2D
 
 									ec.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 4.0); // same card-scaled stamp as the rake
 
-								_spinMemo[ii] |= (1 << b2);
-
-								if ((_spinCounted[ii] & 256) == 0)
+								if (ec.spinGen != _spinTag) // ROUND 16: body-keyed: first blade of THIS cast to bite wins the print tally
 
 								{
 
-									_spinCounted[ii] |= 256;
-
-									_spinBit++; // unique-body tally for the expiry print
+									ec.spinGen = _spinTag; ec.spinMask = (1 << b2); _spinBit++; // fresh cast: mask starts at this blade
 
 								}
+
+								else ec.spinMask |= (1 << b2); // same cast, a later circle or blade: the gate above already blocked a double bite
 
 							}
 
@@ -3171,7 +3184,7 @@ public partial class PartyMember : Godot.Node2D
 
 					continue; // no world handle: visual-only frame, the volley still completes
 
-				for (int ii = 0; ii < live.Count && ii < _cresMemo[vi].Length; ii++)
+				for (int ii = 0; ii < live.Count; ii++) // ROUND 16: no memo-length cap - every live body on a thick field is eligible
 
 				{
 
@@ -3183,7 +3196,7 @@ public partial class PartyMember : Godot.Node2D
 
 						continue;
 
-					if ((_cresMemo[vi][ii] & (1 << cc)) != 0)
+					if (ec.biteGen == _cresTag[vi] && (ec.biteMask & (1 << cc)) != 0)
 
 						continue; // this blade already bit this body: one honest bite per crescent
 
@@ -3201,7 +3214,7 @@ public partial class PartyMember : Godot.Node2D
 
 						ec.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 4.0); // same card-scaled stamp as the rake
 
-					_cresMemo[vi][ii] |= (1 << cc) | 256;
+					if (ec.biteGen != _cresTag[vi]) { ec.biteGen = _cresTag[vi]; ec.biteMask = (1 << cc); } else ec.biteMask |= (1 << cc); // ROUND 16: body-keyed bite memory
 
 					_cresBit[vi]++;
 
@@ -3221,7 +3234,7 @@ public partial class PartyMember : Godot.Node2D
 
 					for (int cc = 0; cc < _cresNC[vi]; cc++)
 
-						for (int ii = 0; ii < live.Count && ii < _cresMemo[vi].Length; ii++)
+						for (int ii = 0; ii < live.Count; ii++) // ROUND 16: no memo-length cap - every live body on a thick field is eligible
 
 						{
 
@@ -3233,7 +3246,7 @@ public partial class PartyMember : Godot.Node2D
 
 								continue;
 
-							if ((_cresMemo[vi][ii] & (1 << cc)) != 0)
+							if (ec.biteGen == _cresTag[vi] && (ec.biteMask & (1 << cc)) != 0)
 
 								continue;
 
@@ -3253,7 +3266,7 @@ public partial class PartyMember : Godot.Node2D
 
 								ec.Bleed(1.0 * stat[StatTags.ATTACK_DAMAGE], 4.0);
 
-							_cresMemo[vi][ii] |= (1 << cc) | 256;
+							if (ec.biteGen != _cresTag[vi]) { ec.biteGen = _cresTag[vi]; ec.biteMask = (1 << cc); } else ec.biteMask |= (1 << cc); // ROUND 16: body-keyed bite memory
 
 							_cresBit[vi]++;
 
@@ -4176,7 +4189,7 @@ public partial class PartyMember : Godot.Node2D
 
 			_cresT[vi] = _cresDur[vi]; // staggered clock: counts down the WHOLE staggered volley (last blade lands when it hits 0)
 
-			_cresMemo[vi] = new int[64]; // one bite per body per crescent (bit 256 = tallied)
+			_cresTag[vi] = ++_cresGenNext; // ROUND 16: fresh identity tag for this volley - bite memory rides the BODY, not the list slot
 
 			_fxT = _cresDur[vi] + 0.06f; // decay hides the blades the moment the LAST staggered blade lands
 

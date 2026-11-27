@@ -137,7 +137,9 @@ func _members_sig() -> String:
 		# NO roster change, and this signature is the only repaint trigger
 		# str() prints floats as they come: if the box would show a difference,
 		# the sig sees it too, which is exactly honest here
-		s += str(row.get("hp", 0)) + "/" + str(row.get("max_hp", 0)) + "/" + str(row.get("dmg", 0)) + "/" + str(row.get("spd", 0.0)) + "/" + str(row.get("move", 0.0)) + "/" + str(row.get("rng", 0.0)) + "/" + str(row.get("arm", 0)) + ";"
+		# ROUND 16: area/crit/critd/multi/eva/xp/collect joined the box, so they must count
+		# in the sig too or the card would never repaint on a crit/evasion/XP change alone
+		s += str(row.get("hp", 0)) + "/" + str(row.get("max_hp", 0)) + "/" + str(row.get("dmg", 0)) + "/" + str(row.get("spd", 0.0)) + "/" + str(row.get("move", 0.0)) + "/" + str(row.get("rng", 0.0)) + "/" + str(row.get("arm", 0)) + "/" + str(row.get("area", 0.0)) + "/" + str(row.get("crit", 0.0)) + "/" + str(row.get("critd", 0.0)) + "/" + str(row.get("multi", 0)) + "/" + str(row.get("eva", 0.0)) + "/" + str(row.get("xp", 1.0)) + "/" + str(row.get("collect", 0.0)) + ";"
 	return s
 
 func _close(reason: String) -> void:
@@ -604,28 +606,38 @@ func _was_hover_on(c: Control, ev: Vector2) -> bool:
 	return false
 
 func _stat_line(row: Dictionary) -> String:
-	# the IN-RUN stat box (user 2026-11-25: the box under target logic must show
-	# what the character IS now, not what it could become). Newlines FIRST,
-	# autowrap second (Campfire.gd law: 4.7 autowrap alone did not constrain).
-	# No formatting idiom exists anywhere in the .gd codebase (grep: no String.num
-	# / %.2f), so _fmt_num below does the rounding by hand.
-	# C# PauseCard feeds: hp/max_hp int, dmg int, spd as a multiplier, move + rng
-	# floats, arm = armour + oak + leader flat, the SAME live total Game.cs shows.
+	# ROUND 16: the user handed back the FULL row list, so the labels are theirs
+	# verbatim and in their order: HP / Attack Damage / Attack Speed / Range / Area /
+	# Crit Chance / Crit Damage / Multistrike / Armour / Evasion / Movement Speed /
+	# XP / Collection Range. Gold was named but stays OUT: the run has no gold
+	# economy yet, and the card refuses to print a stat nothing in the run can
+	# change. Multiplier rows read as PERCENT INCREASES, not x-factors: the user
+	# found "speed x1.63" unclear, and +63% is the honest read (_pct below).
+	# Crit Chance and Evasion are ABSOLUTE probabilities - plain N% is the truth,
+	# a +N% would promise an increase nobody took (_pct_plain below).
+	# Round-15 laws carried: armour prints ONLY when non-zero (a zero line is
+	# noise on four of five cards), range 0 means melee and is STILL shown so a
+	# melee row never looks blank, and newlines come FIRST with autowrap second
+	# (Campfire.gd law: 4.7 autowrap alone did not constrain). No format idiom
+	# exists in the .gd codebase (grep: no String.num / %.2f), so _fmt_num
+	# below does the rounding by hand.
 	var lines: Array = []
-	lines.append("hp " + str(int(float(row.get("hp", 0)))) + "/" + str(int(float(row.get("max_hp", 0)))))
-	lines.append("atk " + str(int(float(row.get("dmg", 0)))))
-	# the x prefix reads as a multiplier: x1.20 means twenty percent faster
-	lines.append("speed x" + _fmt_num(float(row.get("spd", 1.0)), 2))
-	# one decimal keeps move/range human-readable (102.5, not 102.50)
-	lines.append("move " + _fmt_num(float(row.get("move", 0.0)), 1))
-	# range 0 means melee: still shown so a melee-vs-ranged row never looks blank
-	lines.append("range " + _fmt_num(float(row.get("rng", 0.0)), 1))
+	lines.append("HP: " + str(int(float(row.get("hp", 0)))) + "/" + str(int(float(row.get("max_hp", 0)))))
+	lines.append("Attack Damage: " + str(int(float(row.get("dmg", 0)))))
+	lines.append("Attack Speed: " + _pct(float(row.get("spd", 1.0))))
+	lines.append("Range: " + _fmt_num(float(row.get("rng", 0.0)), 1))
+	lines.append("Area: " + _pct(float(row.get("area", 1.0))))
+	# crit chance and evasion are absolute probabilities: plain N% is honest here
+	lines.append("Crit Chance: " + _pct_plain(float(row.get("crit", 0.0))))
+	lines.append("Crit Damage: " + _pct(float(row.get("critd", 1.0))))
+	lines.append("Multistrike: " + str(int(float(row.get("multi", 0)))))
 	var arm: int = int(float(row.get("arm", 0)))
-	# armour only when non-zero: a zero line is noise on four of five cards
-	# (crit/evasion stay out until the user asks - the stats we agreed on)
 	if arm != 0:
-		# the oak/leader bonuses already baked into arm by Game.cs PauseCard()
-		lines.append("armour " + str(arm))
+		lines.append("Armour: " + str(arm))
+	lines.append("Evasion: " + _pct_plain(float(row.get("eva", 0.0))))
+	lines.append("Movement Speed: " + _fmt_num(float(row.get("move", 0.0)), 1))
+	lines.append("XP: " + _pct(float(row.get("xp", 1.0))))
+	lines.append("Collection Range: " + _pct(float(row.get("collect", 1.0))))
 	return "\n".join(lines)
 
 
@@ -715,3 +727,20 @@ func _est_chars(w: float) -> int:
 	# conservative chars per line: assume wide glyphs so lines wrap earlier than they really do
 	# label renders at 0.8 scale; 8.0 px per char at native size stays under real capacity
 	return max(8, int(w * 0.8 / 8.0))
+
+
+# --- round 16 helpers (append-only tail): factor -> percent-increase strings ---
+# the user reads multipliers as INCREASES: spd factor 1.63 must print +63%, and
+# _fmt_num alone cannot do the (factor - 1) * 100 step, so it lives here.
+func _pct(f: float) -> String:
+	# multiplier factor -> percent INCREASE: 1.63 -> +63%, 1.0 -> +0% (sign always
+	# printed so a debuff would read -x% and a neutral row is visibly neutral)
+	var p: int = int(round((f - 1.0) * 100.0))
+	if p < 0:
+		return "-" + _fmt_num(float(-p), 0) + "%"
+	return "+" + _fmt_num(float(p), 0) + "%"
+
+func _pct_plain(p: float) -> String:
+	# ABSOLUTE probabilities (crit chance, evasion) print as plain N%: a +N% would
+	# read as "an increase nobody took". 0.05 -> 5%
+	return _fmt_num(round(p * 100.0), 0) + "%"

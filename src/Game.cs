@@ -8488,12 +8488,34 @@ private void UpdateSpirits(float delta)
 		card["target_mode"] = m.targetMode;
 		// user 2026-11-26 round 15: LIVE in-run stats for the pause card - same effective
 		// getters the combat rails use; arm mirrors Game.cs:1157 (stat + oak flat + leader flat)
-		// the user asked for HP/ATK/speed xN/move/range/armour only - no crit/evasion lines
+		// user 2026-11-27 round 16: the box went to the user's FULL row list, in their exact order -
+		// hp / attack damage / attack speed / range / area / crit chance / crit damage / multistrike /
+		// armour / evasion / movement speed / xp / collection range. There is NO gold row: no gold
+		// economy exists yet (GOLD_PCT stays the dormant meta tag), so the card cannot print a stat
+		// nothing in the run can change. Feeding rules stay honest per kind (StatTags.cs KIND):
+		// MULTIPLIER tags ship as RAW FACTORS and PauseMenu.gd prints them as +N%, POINT tags that are
+		// probabilities (crit chance, evasion) ship as the probability itself, and multistrike is the
+		// whole-strike COUNT, so it ships as a count - never a fake percentage.
 		card["dmg"] = m.EffDamage();
 		card["spd"] = m.AtkSpdMul();
 		card["move"] = m.EffMove();
 		card["rng"] = m.EffRange();
 		card["arm"] = m.stat[StatTags.ARMOUR] + (m.oakT > 0.0 ? 5.0 : 0.0) + LeaderArmourFlat();
+		// ROUND 16 rows: every one mirrors the RAIL that consumes it, copied not rederived, so the
+		// card cannot disagree with what the run actually does -
+		//   area  = PartyMember.cs:2118 EffRange (AREA tag x Bruno lead)
+		//   crit  = PartyMember.cs:2210 RollDamage (tag + Precision + Wash standing + Assassination)
+		//   critd = the CRIT_DAMAGE multiplier on a crit hit
+		//   multi = Strikes(), the same whole-repeat count the attack verbs pay
+		//   eva   = Game.cs:1153 TakeHit (tag x Inquisitive Mind / Keeko lead)
+		//   xp    = Game.cs:5773 (1.0 + XP_PCT points) x Brook lead | collect = Game.cs:5738 bubble
+		card["area"] = m.stat[StatTags.AREA] * LeaderAreaMul();
+		card["crit"] = m.stat[StatTags.CRIT_CHANCE] + (m.elixPrecT > 0.0 ? 0.10 : 0.0) + (WashUp() ? 0.05 : 0.0) + (m.assT > 0.0 ? 0.15 : 0.0);
+		card["critd"] = m.stat[StatTags.CRIT_DAMAGE];
+		card["multi"] = m.Strikes();
+		card["eva"] = m.stat[StatTags.EVASION] * LeaderEvaMul();
+		card["xp"] = (1.0 + m.stat[StatTags.XP_PCT]) * LeaderXpMul();
+		card["collect"] = m.stat[StatTags.COLLECTION_RANGE] * LeaderCollectMul();
 		// the card's mini: art is res://art/characters/<lowercased name>.png (2026-11-08 art
 		// reorg); the card skips it if the load misses, so a kit without a mini still shows its column
 		card["art"] = "res://art/characters/" + m.displayName.ToLower() + ".png";
