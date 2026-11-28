@@ -4906,6 +4906,8 @@ public void RegisterEnemy(Combatant e)
 		{
 			// the standing child-walk idiom: Godot.Node, never Godot.Node2D - the scene carries
 			// Control children and an implicit Node2D cast THROWS InvalidCast per frame (PD229)
+				// the standing child-walk idiom: Godot.Node, never Godot.Node2D - the scene carries
+				// Control children and an implicit Node2D cast THROWS InvalidCast per frame (PD229)
 			foreach (Godot.Node nd in GetChildren())
 			{
 				Pickup pc3 = nd as Pickup; // null for every non-cog child, so no cast throws
@@ -5068,8 +5070,17 @@ public void RegisterEnemy(Combatant e)
 			// running in to attack enemies"): prey only counts when it is within MARTHA_HUNT px of HEW,
 			// so she never sprints off the flank after a straggler - attackers on Hew are her prey as always.
 			Vector2 hoff = WrapDelta(_marthaFlee ? _marthaBody.GlobalPosition : hew.GlobalPosition, n.GlobalPosition); // ROUND 10: prey distance FROM Hew - FROM HER while welding, so the run home still chomps what comes close (user 2026-11-25)
-			if (hoff.X * hoff.X + hoff.Y * hoff.Y > huntRing * huntRing) // ROUND 13: the gate rides Hew's reach
-				continue; // ROUND 13: outside Hew's OWN reach: he cannot answer for it, so neither can she
+			// ROUND 17 (user hand-play: Martha froze near Hew while bodies pressed on top of
+			// her): the census above measured prey only from Hew - a body inside HER OWN touch band
+			// but past the ring could never become prey, and nothing else in the lap nudges a rider
+			// that close, so she parked at her seat with the horde on her. The bite band chomps
+			// whatever gets that close (round-10 flee law), so prey inside HER band must pass the
+			// gate too: the gate now keeps Hew's reach OR her own band, and the lunge below is the
+			// same one the ring test always let her make.
+			Vector2 mband = WrapDelta(_marthaBody.GlobalPosition, n.GlobalPosition); // ROUND 17: her own body's view of this body
+			double tb = (double)nc.hitR + (double)MARTHA_RADIUS * _marthaRad; // ROUND 17: the same bite band the chomp below uses
+			if (hoff.X * hoff.X + hoff.Y * hoff.Y > huntRing * huntRing && mband.X * mband.X + mband.Y * mband.Y > tb * tb)
+				continue; // ROUND 17: OUTSIDE BOTH Hew's reach and her own band only: ROUND 13 law kept as-is
 			Vector2 off = WrapDelta(_marthaBody.GlobalPosition, n.GlobalPosition);
 			double d2 = off.X * off.X + off.Y * off.Y;
 			if (d2 < best)
@@ -5434,7 +5445,7 @@ public void RegisterEnemy(Combatant e)
 				continue; // live cogs keep their own frames
 			_cogLife[i] = COG_LIFE;
 			Godot.Node2D gn = _cogN[i];
-			gn.GlobalPosition = at;
+			gn.GlobalPosition = WrapNearCamera(at); // ROUND 17: fold the spawn anchor - a drop authored across a seam would ride the old view
 			gn.Position = new Vector2(0.0f, 0.0f); // the fall below drives Position: clear any banked offset
 			_cogS[i].Texture = cogFxTex; // null art: the sprite draws nothing, the square below takes the paint
 			_cogS[i].Modulate = new Color(1.0f, 1.0f, 1.0f, 1.0f);
@@ -5462,6 +5473,12 @@ public void RegisterEnemy(Combatant e)
 				gn.GlobalPosition = new Vector2(-9000.0f, -9000.0f); // free-slot sentinel like every pool
 				continue;
 			}
+			// ROUND 17 (user hand-play: the cog "drops" stayed stuck in a line after a wrap): the
+			// live anchor rode raw coords while the camera slid ~2400 px on a leader wrap, so the
+			// fall drew at the OLD seam. Fold the anchor; the Position fall below rides the folded
+			// global, and free slots hold the -9000 sentinel untouched (the _cogLife guard above
+			// skips them first).
+			gn.GlobalPosition = WrapNearCamera(gn.GlobalPosition);
 			gn.Set("rotation", (float)(gn.GetRotation() + _cogSpin[i] * delta)); // tumble on the slot node so art AND fallback read it
 			gn.Position = new Vector2(gn.Position.X, gn.Position.Y + (float)(COG_DROP * delta / COG_LIFE)); // the approved fall: ~10 px over the life
 			float a = _cogLife[i] > COG_LIFE * 0.5 ? 1.0f : (float)(_cogLife[i] / (COG_LIFE * 0.5)); // fade only in the back half: the drop stays crisp
@@ -5934,7 +5951,12 @@ private void UpdateSpirits(float delta)
 			Godot.Node2D b = _bullets[i];
 			if (b.GlobalPosition.X < -8000.0f)
 				continue;
-			b.GlobalPosition += _bulletVel[i] * delta;
+			// ROUND 17 (user hand-play: after a map wrap the volley bolts froze stuck in a line
+			// crossing the frame): the move kept RAW world coords while a leader wrap slides the
+			// camera ~2400 px, so they never came with the new view. Fold the moved position around
+			// the camera - same torus law as every mover (the parked -8000 slots above skip first);
+			// the despawn below still kills a bolt a touch past the frame, so volley law is untouched.
+			b.GlobalPosition = WrapNearCamera(b.GlobalPosition + _bulletVel[i] * delta);
 			// HURL tumble (user 2026-11-12 hand-play): only thrown-goblin slots hold a non-zero
 			// spin, so arrows / bolts / fireballs never twitch; the tumble rides the NODE so the
 			// art child AND the fallback square turn. Motion + hit lanes read POSITION: visual only.
@@ -6055,7 +6077,9 @@ private void UpdateSpirits(float delta)
 			if (s.GlobalPosition.X < -8000.0f)
 				continue;
 			_shotLife[i] -= delta;
-			s.GlobalPosition += _shotVel[i] * delta;
+			// ROUND 17: same wrap fold as the volley bolts - the party's shots rode raw coords
+			// while the camera slid ~2400 px on a leader wrap, so they drew stuck in a seam line.
+			s.GlobalPosition = WrapNearCamera(s.GlobalPosition + _shotVel[i] * delta);
 			Vector2 p = s.GlobalPosition;
 			Vector2 bc = GetCameraCenter();
 			if (_shotLife[i] <= 0.0 ||
@@ -8494,8 +8518,10 @@ private void UpdateSpirits(float delta)
 		// economy exists yet (GOLD_PCT stays the dormant meta tag), so the card cannot print a stat
 		// nothing in the run can change. Feeding rules stay honest per kind (StatTags.cs KIND):
 		// MULTIPLIER tags ship as RAW FACTORS and PauseMenu.gd prints them as +N%, POINT tags that are
-		// probabilities (crit chance, evasion) ship as the probability itself, and multistrike is the
-		// whole-strike COUNT, so it ships as a count - never a fake percentage.
+		// probabilities (crit chance, evasion) ship as the probability itself. ROUND 17 (user 2026-11-28
+		// hand-play: the multistrike row read a bare "1"): the row moved to the CHANCE rail - the
+		// probability a strike lands twice - NOT the whole-strike count Strikes() fed it before;
+		// PauseMenu.gd prints it plain N% like the other probability rows.
 		card["dmg"] = m.EffDamage();
 		card["spd"] = m.AtkSpdMul();
 		card["move"] = m.EffMove();
@@ -8506,13 +8532,17 @@ private void UpdateSpirits(float delta)
 		//   area  = PartyMember.cs:2118 EffRange (AREA tag x Bruno lead)
 		//   crit  = PartyMember.cs:2210 RollDamage (tag + Precision + Wash standing + Assassination)
 		//   critd = the CRIT_DAMAGE multiplier on a crit hit
-		//   multi = Strikes(), the same whole-repeat count the attack verbs pay
+		//   multi = PartyMember.cs:2206 msChance draw - the chance a strike repeats (ROUND 17)
 		//   eva   = Game.cs:1153 TakeHit (tag x Inquisitive Mind / Keeko lead)
 		//   xp    = Game.cs:5773 (1.0 + XP_PCT points) x Brook lead | collect = Game.cs:5738 bubble
 		card["area"] = m.stat[StatTags.AREA] * LeaderAreaMul();
 		card["crit"] = m.stat[StatTags.CRIT_CHANCE] + (m.elixPrecT > 0.0 ? 0.10 : 0.0) + (WashUp() ? 0.05 : 0.0) + (m.assT > 0.0 ? 0.15 : 0.0);
 		card["critd"] = m.stat[StatTags.CRIT_DAMAGE];
-		card["multi"] = m.Strikes();
+		// ROUND 17 multistrike rail: copied from the RollDamage draw (PartyMember.cs msChance), not
+		// rederived - multiChance / assT are the ally's own public rails; the +0.25 assassination term
+		// is the same term the draw pays while the window is up. The card showed the STRIKE COUNT before
+		// (a bare "1" to the user): the chance is the honest, actionable number.
+		card["multi"] = m.multiChance + (m.assT > 0.0 ? 0.25 : 0.0);
 		card["eva"] = m.stat[StatTags.EVASION] * LeaderEvaMul();
 		card["xp"] = (1.0 + m.stat[StatTags.XP_PCT]) * LeaderXpMul();
 		card["collect"] = m.stat[StatTags.COLLECTION_RANGE] * LeaderCollectMul();

@@ -630,7 +630,10 @@ func _stat_line(row: Dictionary) -> String:
 	# crit chance and evasion are absolute probabilities: plain N% is honest here
 	lines.append("Crit Chance: " + _pct_plain(float(row.get("crit", 0.0))))
 	lines.append("Crit Damage: " + _pct(float(row.get("critd", 1.0))))
-	lines.append("Multistrike: " + str(int(float(row.get("multi", 0)))))
+	# ROUND 17 (user hand-play: the row read a bare "1"): multi is now the CHANCE a strike
+	# repeats, same kind of number as crit chance and evasion, so it prints plain N% (an
+	# x-factor or +N% would read like an increase nobody took; _pct_plain below). 
+	lines.append("Multistrike: " + _pct_plain(float(row.get("multi", 0.0))))
 	var arm: int = int(float(row.get("arm", 0)))
 	if arm != 0:
 		lines.append("Armour: " + str(arm))

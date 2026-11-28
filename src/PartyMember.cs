@@ -3278,7 +3278,16 @@ public partial class PartyMember : Godot.Node2D
 
 					GD.Print("[10thAge] (axe) " + displayName + " crescents rake " + _cresBit[vi] + " bodies");
 
-				_cresDur[vi] = 0.0f; // volley done: the _fxT decay hides the blades off the throw
+				_cresDur[vi] = 0.0f; // volley done
+				// ROUND 17 (user hand-play: Bruno's crescent axes stayed stuck on screen after the
+				// volley, frozen mid-air): the hide sweep at the commit-flash decay above sits INSIDE
+				// the _fxT decay block, so once that clock has already run out a finishing record never
+				// gets hidden again and its slots stayed painted at the last art point. The volley
+				// completed here (boomerang home + catch bite already paid), so hiding THIS record's
+				// slots is visually honest - every other live record keeps its own slots.
+				if (_cresFx != null)
+					for (int hc = 0; hc < CRESCENT_ART; hc++)
+						_cresFx[vi * CRESCENT_ART + hc].Visible = false; // ROUND 17: per-record hide: the ring stays honest
 
 			}
 

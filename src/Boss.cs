@@ -46,6 +46,13 @@ public partial class Boss : Combatant
     Godot.Sprite2D[] _rimSpr = null;
     float _bSc = 1.0f;
     float _bFace = 1.0f;
+    // ROUND 17 RED MARK (user 2026-11-28 hand-play: "mini-bosses and bosses should have the red
+    // version of the elite halo"): the Enemy.cs elite halo rail CLONED onto the boss lane - one
+    // bigger copy of the boss's OWN canvas behind it + a red pulse below. Zero new art, visual
+    // only; the hitbox stays the boss node.
+    Godot.Sprite2D _halo = null;
+    float _haloT = 0.0f; // breath clock for the pulse
+    const float BOSS_HALO_PAD = 1.18f; // same rim depth as Enemy.cs ELITE_HALO_PAD
 
     // BOSS DANCE (user 2026-11-02, extended 2026-11-03): every boss runs this choreography,
     // not the old drift-and-ring engine. Cycle: run toward the party and settle at
@@ -151,6 +158,16 @@ public partial class Boss : Combatant
                 _artSpr = art;
                 _rig.AddChild(art); // on top of the rim ring: the RED only shows as the edge halo
                 _body.Visible = false; // greybox stands only while the art is missing
+                if (_artSpr != null && _halo == null) // built AFTER the art so it copies the drawn canvas
+                {
+                    Godot.Sprite2D hb = new Godot.Sprite2D();
+                    hb.Texture = tex;
+                    hb.Name = "BossHalo";
+                    hb.ZIndex = -1; // behind art AND the eight red rim copies: only the glow rim peeks
+                    hb.Scale = new Vector2(_bSc * BOSS_HALO_PAD, _bSc * BOSS_HALO_PAD);
+                    _rig.AddChild(hb);
+                    _halo = hb; // the pulse + mirror lanes below own it every frame
+                }
             }
         }
         // P1: NO RegisterEnemy here. An inactive boss must not be in the hittable
@@ -195,6 +212,15 @@ public partial class Boss : Combatant
             	for (int bi = 0; bi < 8; bi++)
             		_rimSpr[bi].Scale = new Vector2(_bSc * _bFace, _bSc); // the halo mirrors with the art
         }
+            if (_halo != null) // ROUND 17 RED MARK: same canvas copy, so it mirrors with the art
+                _halo.Scale = new Vector2(_bSc * _bFace * BOSS_HALO_PAD, _bSc * BOSS_HALO_PAD);
+        // ROUND 17 RED MARK pulse: twin of the Enemy.cs elite pulse (which keeps the blue rim lit
+        // while the hurt-flash / frost lanes touch the body only). RED twin of the blue (0.35,
+        // 0.55, 1.6) -> (1.6, 0.35, 0.35), alpha floor 0.58 per the round-16 rim law. Paint only,
+        // never a stat: the mark reads as GLOW on every mini-boss and boss, always.
+        _haloT += delta;
+        if (_halo != null)
+            _halo.Modulate = new Color(1.6f, 0.35f, 0.35f, 0.78f + 0.2f * Mathf.Sin(_haloT * 3.2f));
         float ratio = hp / maxHp;
         _phase = ratio > 0.66f ? 0 : (ratio > 0.33f ? 1 : 2);
         // mini slide (user 2026-10-21): the boss is a big painted miniature being
