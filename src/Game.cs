@@ -439,6 +439,10 @@ public partial class Game : Godot.Node2D
 	bool _pauseJustClosed = false; // card ate the same ESC press: eat one frame, no reopen
 	readonly double PAUSE_PILOT_TIMEOUT = 5.0; // seconds the pilot holds the card up
 	double _pauseRunT = 0.0; // run clock at card open: the seat readout proves the freeze held
+	// the SAME freeze proof the pause card prints, moved to the camp: the user's hand-play
+	// "It doesn't pause anymore." at the campfire. A held +0.0 over the card means the tree
+	// pause really armed; anything else means the sim kept ticking behind it.
+	double _campRunT = 0.0; // run clock at camp open
 
 
 	// ---------- M1 verification pilot (headless smoke only) ----------
@@ -8050,13 +8054,40 @@ private void UpdateSpirits(float delta)
 		else
 			_campfire.Set("party_data", CampfireCards()); // re-offer after a cancel
 		_campfire.Show();
+		// THE CAMP PAUSE ARM (user 2026-11-15 hand-play: "It doesn't pause anymore." at the
+		// campfire): same contract as ShowPauseCard - nothing here ever armed the freeze, so
+		// the sim kept ticking behind the card (monsters marching under it, the live arena HUD
+		// overlapping the camp UI). Both handlers below clear it, so the pair is the whole
+		// contract. Game._process is frozen while the camp is up, which is why C#'s timeout
+		// branch at the wait rail can no longer tick for the pilot: the pilot valve therefore
+		// rides the CARD's own PROCESS_MODE_ALWAYS _process through this export (0.0 on a
+		// human seat = the camp only closes on a real choice, the human camp never times out).
+		_campfire.Set("pilot_timeout", _pilot ? CAMPFIRE_WAIT_TIMEOUT : 0.0);
+		// the camp's tint rides the CHILD CanvasLayer Wash (index 0, layer 1); the root Show()
+		// reaches it on open, and EndCampfire hides it the same way on close - see the nested
+			// field visibility law in _OnPauseDismissed, where a root Hide() does NOT reach a
+			// nested CanvasLayer.
+		_campRunT = _runT; // the freeze proof: EndCampfire prints how far the clock moved
+		GetTree().Paused = true;
 		GD.Print("[10thAge] campfire: the rest card is up - short/long is the party's call");
+		GD.Print("[10thAge] camp readout: tree armed, run clock parked at " + ((int)(_campRunT * 10.0) / 10.0));
 	}
 
 	private void EndCampfire(string restType)
 	{
 		if (_campfire != null)
+		{
 			_campfire.Hide();
+			// NESTED FIELD VISIBILITY LAW (see _OnPauseDismissed): the camp's tint rides the
+			// CHILD CanvasLayer Wash (index 0, layer 1); a root Hide() does not reach a nested
+			// CanvasLayer, so the 0.55 veil stayed burnt in over the arena after the rest closed.
+			if (_campfire.GetChildCount() > 0)
+				((Godot.CanvasLayer)_campfire.GetChild(0)).Hide();
+			// the freeze proof (see the camp pause arm in ShowCampfire): a held camp reads +0.0,
+			// so the sim really stopped behind the card; anything else is the leak the user saw
+			// ("It doesn't pause anymore."). Only printed when the card was actually up.
+			GD.Print("[10thAge] camp readout: run clock held +" + ((int)(System.Math.Abs(_runT - _campRunT) * 10.0) / 10.0) + " over the card");
+		}
 		_campfireWaiting = false;
 		_campfireChoice = "";
 		if (restType == "long")
@@ -8339,12 +8370,18 @@ private void UpdateSpirits(float delta)
 	private void _OnCampfireChosen(string restType)
 	{
 		EndCampfire(restType);
+		// the camp pause arm (see ShowCampfire): the answer unfreezes the world, so the sim
+		// resumes the beat the moment the rest lands
+		GetTree().Paused = false;
 	}
 
 	private void _OnCampfireCancelled()
 	{
 		// the player backed out of the embers: keep the beat, put the card back up
 		_campfireWaiting = false;
+		// the camp pause arm: backing out unfreezes too, or the re-show at the wait rail can
+		// never tick (Game._process is frozen while the tree is paused)
+		GetTree().Paused = false;
 		GD.Print("[10thAge] campfire declined - the rest card comes back up");
 	}
 

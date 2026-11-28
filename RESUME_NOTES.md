@@ -1076,3 +1076,99 @@ P1 bugs: (1) boss pre-kill/softlock — no RegisterEnemy until ActivateBoss, par
   ENTER still commits / ESC still steps back.
 - NEXT VALVE: PD244 (fresh valve, fresh mirror re-feed required again - sync Campfire.gd +
   Campfire.tscn MANUALLY into the mirror).
+
+## ROUND-19 LEDGER (2026-11-28)
+- USER HAND-PLAY ON THE CAMP SCREEN, ALL SIX NEGATIVES FIXED THIS LAP: (1) the camp no longer
+  paused, (2) the party roster still showed the old stacked layout, (3) the confirm popup never
+  appeared above the rest cards, and every line of text / button the player never asked for was
+  still on the card (the two rule chips, the "CHOOSE YOUR REST - both feed the horde x1.20" label,
+  the bottom-left click hint, the top-left header block, the COMMIT TO THE EMBERS button).
+- CAMP PAUSE ROOT CAUSE (confirmed by reading the code, not guessed): Game.cs ShowCampfire only
+  Show()s the card and armed NOTHING - the pause screen's GetTree().Paused = true law had never
+  been mirrored for the camp. Fix lands next to _campfire.Show(): GetTree().Paused = true, and the
+  matching GetTree().Paused = false in BOTH handlers (_OnCampfireChosen and _OnCampfireCancelled),
+  so a cancelled camp resumes instead of parking the run.
+- FREEZE PROOF MOVED ONTO THE CAMP: new member double _campRunT (Game.cs L445) stamped _campRunT =
+  _runT at open; prints "[10thAge] camp readout: tree armed, run clock parked at 180.2" on open and
+  "[10thAge] camp readout: run clock held +0 over the card" inside the if (_campfire != null) block
+  of EndCampfire. held +0 = the tree really held for the whole beat.
+- PILOT VALVE NOW LIVES ON THE CARD (required by the pause arm): with the tree paused, the C#
+  timeout branch gated (_pilot || _campfire == null) cannot be relied on to tick at the right time,
+  so the camp card carries its own rail: @export var pilot_timeout: float = 0.0 plus _open_t =
+  Time.get_unix_time_from_system() in _ready, and its PROCESS_MODE_ALWAYS _process emits
+  rest_chosen("short") once the rail is over. C# feeds it: _campfire.Set("pilot_timeout",
+  _pilot ? CAMPFIRE_WAIT_TIMEOUT : 0.0). The C# branch stays only as the _campfire == null fallback
+  (that path early-returns before the pause arm, so it still ticks).
+- NESTED-FIELD VISIBILITY LAW APPLIED TO THE CAMP: the camp tint rides the CHILD CanvasLayer "Wash"
+  (index 0, layer 1, full-screen Veil ColorRect at 0.55 alpha), so EndCampfire now also hides it:
+  ((Godot.CanvasLayer)_campfire.GetChild(0)).Hide().
+- DELETIONS ON THE CARD (all of them text/buttons the user never asked for): header block (THE
+  CAMPFIRE / d20 / Tanurial Forest - camp between battles), RestLabel, ShortChip and LongChip,
+  "CHOOSE YOUR REST - both feed the horde x1.20", the bottom-left CLICK A REST CARD... hint, the
+  whole ConfirmModal subtree and its COMMIT TO THE EMBERS button. Campfire.tscn is now 203 lines
+  (HEAD was 324); RosterBar keeps only "THE COMPANY".
+- COMMIT FLOW AFTER THE BUTTON DELETION (the router, not a new button): click a rest card = _select
+  (idx) + _popup_ask() on mouse-DOWN; re-click the SAME card while the ask is up OR ENTER -> _commit
+  (); ESC with the ask up hides the ask only, ESC with the ask gone emits cancelled; ENTER with no
+  ask raises the ask; SPACE stays the leader dash and never answers. _was_click_on stays VERBATIM.
+- ROSTER ROOT CAUSE (confirmed): Campfire.tscn PartyGrid still had the old pre-pause-card anatomy,
+  so the party stacked in one 880x32 column. tscn now writes columns = 5 with h_sep 18 / v_sep 14,
+  and the GD cards are cloned from PauseMenu.gd's anatomy: _sb_column is _stylebox_card verbatim,
+  _sb_hp_track takes _sb_mode's values. _refresh_bars measures grid.size.x and rebuilds _build()
+  only when the width really moved (> 0.5 delta); cell_w = (gw - 4*18)/5 clamped [170,300].
+- POPUP PLACEMENT ROOT CAUSE (confirmed): the ask was a child of the old ConfirmModal, so it was
+  drawn inside the modal and never visible. It is now a flow slot: a PanelContainer of min size
+  Vector2(880.0, 110.0) with gui_draw_order = 10, sitting as AskRow's child IMMEDIATELY above
+  RestRow's two rest cards, with sb_popup declared just before RestRow.
+- POPUP FADE LAW (why only alpha moves): Containers skip hidden children, so hide()-ing the ask
+  lifted the rest cards up 118 px the moment the question appeared (hand-play symptom: the cards
+  jumped on every confirm). The slot stays RESERVED and only modulate.a moves; hide()/visible never
+  touch it.
+- 4.7 PICKABILITY DIALECT LESSON (this lap's runtime trap): BOTH popup.gui_pickable = a > 0.0 and
+  popup.mouse_passable = false raise the same runtime error, "Invalid assignment of property or key
+  ... with value of type 'bool' on a base object of type 'PanelContainer'", at _popup_fade from
+  _ready. A get_property_list() probe on a live PanelContainer shows GD's real property is mouse_filter
+  (Stop, Pass (Propagate Up), Ignore), so the code writes popup.mouse_filter = 2 # MOUSE_FILTER_IGNORE
+  while the .tscn keeps its own spelling, mouse_passable = false. LESSON: the scene dialect and the
+  GD dialect are NOT interchangeable - probe get_property_list() before writing any pickability line.
+- GD FAST GATE RETIRED (it stopped being usable this lap): gateGDPD.py / gateGD_r19.py (--check
+  --script res://ui/Campfire.gd) now hang 420-1700 s and print NOTHING once the .tscn surgery is in
+  the tree, so the old "err = 0 B or the SceneTree/MainLoop line" gate cannot report. Replacement
+  parse proof = _probe_gdparse_r19.gd on the mirror: load() FORCES COMPILE and printed
+  "parsed OK: (res://ui/Campfire.gd):<GDScript>" + the .tscn packs, with stderr 0 B. Runtime proof is
+  always the seat valve's err file.
+- MIRROR NOTE (why gates + valves run on copyPD_qa3, not r14): the r14 worktree's .godot cache is
+  BARE - it holds only "mono", no "imported"/"editor"/"uid_cache.bin" - so any gate run there
+  re-imports every art/fx asset and spends its whole allowance in import. syncCampPD18.py pushes
+  worktree -> mirror byte-for-byte, so gating + valving on the mirror proves the same bytes.
+- SEAT VALVE GREEN: gateSEATPD.py PD247 MIRROR=copyPD_qa3 M1_DEV_SKIP=camp WALL=300 -> rc=1
+  timedOut=True (wall kill, expected) outBytes=91204 errBytes=0. Out is 1403 lines and carries the
+  camp pair (tree armed / run clock held +0), the SHORT gift card, "SHORT rest: +25% max HP heal,
+  one free upgrade rank, horde scaling x1.2" and the camp vacuum, then runs ~1350 more lines to TPK
+  (a sim outcome, not a hand-play negative) - i.e. the beat really resumed after the pause.
+- MIRROR RE-FEED: copyPD_qa19.py (7 C# from the worktree, PauseMenu.gd 34323 B, Campfire.gd 26617 B
+  sha1 172e59b805dcbc41, Campfire.tscn 6352 B sha1 87979040110d40c9, 54 art/fx files, 0 import-cache
+  changes) + syncCampPD18.py camp byte-sync; dll 1239552 B sha1 f9cd10b1aaa38f30, pdb 614196 B
+  sha1 6d7ee0985a7c7ed2, 4 dll/pdb copies refreshed STALE-FIXED, "runtime dll now equal fresh: True".
+- ROUND-18 COPY LAW KEPT VERBATIM ON THE CARDS: ShortBody reads Heals all party members by 25% /
+  Grants 1 level up / Increases horde spawns by 20% and LongBody reads Heals all party members to
+  full HP / Increases horde spawns by 20%; the ask reads "Are you sure you want to short rest?"
+  / "Are you sure you want to long rest?".
+- LAWS RE-AFFIRMED: hand-play negatives are bugs to fix; no PNG assets ever; never claim measured
+  playtest windows (seed knobs dead); no invented "measured" evidence in comments (symptom +
+  reasoning only); the camp pause is an explicit UI pause and nothing else freezes in-game. Camp
+  laws intact: root set_process_mode(Node.PROCESS_MODE_ALWAYS), _was_click_on multi-space hit test
+  VERBATIM, ENTER-only commit with the _enter_down echo guard, SPACE = leader dash never answers,
+  nested Wash Hide on dismissal.
+- 4.7 REJECTS RESPECTED (plus one NEW rejection this lap): no @/, no String.pad_start, no bare or
+  qualified AUTOWRAP_WORD_SMART (numeric 2 only), no clip_behavior, no mouse_pass_through, no
+  Control.pause_picking, and no gui_pickable / mouse_passable assignment in GD on a PanelContainer
+  (use mouse_filter's numeric enum slot).
+- BUILD: exit 0 with EXACTLY the 5 baseline warns (3x CS0618 godot_mcp docks, CS0414 SEL_RING_PAD,
+  CS0414 CRESCENT_FLOOR). Game.cs changed this lap (pause arm, pilot_timeout feed, _campRunT rails,
+  nested Wash Hide), the two mis-indented continuation lines it picked up were repaired byte-level.
+- HAND-PLAY OWED (camp screen, fresh run): the camp freezes while the card is up, the popup shows
+  just above the two rest cards and never lifts them, the roster reads as five pause-screen plates
+  with HP bars, no chips/header/hint text remains, and ENTER commits / ESC steps back.
+- NEXT VALVE: PD248 (fresh seat id, fresh mirror re-feed required again - sync Campfire.gd +
+  Campfire.tscn MANUALLY into the mirror).

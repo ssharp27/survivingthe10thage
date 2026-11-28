@@ -3,7 +3,6 @@
 [ext_resource type="Theme" path="res://ui/grimoire_theme.tres" id="1_theme"]
 [ext_resource type="Script" path="res://ui/Campfire.gd" id="2_campfire_gd"]
 
-
 [sub_resource type="StyleBoxFlat" id="sb_frame"]
 bg_color = Color(0.13, 0.12, 0.11, 0.94)
 border_width_left = 2
@@ -32,11 +31,9 @@ corner_radius_bottom_left = 6
 shadow_size = 8.0
 shadow_color = Color(0, 0, 0, 0.4)
 
-
 [node name="Campfire" type="CanvasLayer"]
 script = ExtResource("2_campfire_gd")
 layer = 2
-
 
 [node name="Wash" type="CanvasLayer" parent="."]
 layer = 1
@@ -48,8 +45,6 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_passable = false
 color = Color(0.06, 0.05, 0.045, 0.55)
-
-
 
 [node name="Frame" type="PanelContainer" parent="."]
 theme = ExtResource("1_theme")
@@ -64,7 +59,6 @@ margin_top = 124.0
 margin_right = -160.0
 margin_bottom = -118.0
 
-
 [node name="Contents" type="VBoxContainer" parent="Frame"]
 anchor_left = 0.0
 anchor_top = 0.0
@@ -76,38 +70,6 @@ margin_top = 24.0
 margin_right = -24.0
 margin_bottom = -24.0
 theme_override_constants = {"v_separation": 8}
-
-[node name="Header" type="HBoxContainer" parent="Frame/Contents"]
-size_flags_horizontal = 3
-theme_override_constants = {"h_separation": 20, "v_separation": 6}
-
-[node name="DiceToken" type="Panel" parent="Frame/Contents/Header"]
-mouse_passable = false
-custom_minimum_size = Vector2(48.0, 48.0)
-
-[node name="DiceFace" type="Label" parent="Frame/Contents/Header/DiceToken"]
-anchor_left = 0.0
-anchor_top = 0.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-align = 1
-valign = 1
-text = "d20"
-theme_override_colors = {"font_color": Color(0.83, 0.64, 0.24, 1)}
-
-[node name="TitleBlock" type="VBoxContainer" parent="Frame/Contents/Header"]
-size_flags_horizontal = 3
-theme_override_constants = {"v_separation": 2}
-
-[node name="Title" type="Label" parent="Frame/Contents/Header/TitleBlock"]
-text = "THE CAMPFIRE"
-theme_override_colors = {"font_color": Color(0.957, 0.929, 0.847, 1)}
-scale = Vector2(1.3, 1.3)
-
-[node name="Subtitle" type="Label" parent="Frame/Contents/Header/TitleBlock"]
-text = "Tanurial Forest - camp between battles"
-theme_override_colors = {"font_color": Color(0.62, 0.55, 0.42, 1)}
-scale = Vector2(0.9, 0.9)
 
 [node name="RosterBar" type="HBoxContainer" parent="Frame/Contents"]
 mouse_passable = false
@@ -123,16 +85,53 @@ size_flags_horizontal = 3
 custom_minimum_size = Vector2(0.0, 2.0)
 color = Color(0.78, 0.66, 0.42, 0.7)
 
-[node name="PartyGrid" type="GridContainer" parent="Frame/Contents"]
+[node name="RosterRow" type="HBoxContainer" parent="Frame/Contents"]
 mouse_passable = false
-columns = 1
+
+[node name="RosterGapL" type="Control" parent="Frame/Contents/RosterRow"]
+mouse_passable = false
+custom_minimum_size = Vector2(0.0, 0.0)
 size_flags_horizontal = 3
-size_flags_vertical = 3
+
+[node name="PartyGrid" type="GridContainer" parent="Frame/Contents/RosterRow"]
+mouse_passable = false
+columns = 5
+size_flags_horizontal = 3
 theme_override_constants = {"h_separation": 18, "v_separation": 14}
 
-[node name="RestLabel" type="Label" parent="Frame/Contents"]
-text = "CHOOSE YOUR REST - both feed the horde x1.20"
-theme_override_colors = {"font_color": Color(0.83, 0.64, 0.24, 1)}
+[node name="RosterGapR" type="Control" parent="Frame/Contents/RosterRow"]
+mouse_passable = false
+custom_minimum_size = Vector2(0.0, 0.0)
+size_flags_horizontal = 3
+
+[node name="AskRow" type="HBoxContainer" parent="Frame/Contents"]
+mouse_passable = false
+
+[node name="AskGapL" type="Control" parent="Frame/Contents/AskRow"]
+mouse_passable = false
+custom_minimum_size = Vector2(0.0, 0.0)
+size_flags_horizontal = 3
+
+[node name="Popup" type="PanelContainer" parent="Frame/Contents/AskRow"]
+custom_minimum_size = Vector2(880.0, 110.0)
+mouse_passable = false
+theme_override_style_boxes = {"panel": SubResource("sb_popup")}
+gui_draw_order = 10
+[node name="PopupBody" type="Label" parent="Frame/Contents/AskRow/Popup"]
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+align = 1
+valign = 1
+autowrap = true
+text = ""
+theme_override_colors = {"font_color": Color(0.957, 0.929, 0.847, 1)}
+
+[node name="AskGapR" type="Control" parent="Frame/Contents/AskRow"]
+mouse_passable = false
+custom_minimum_size = Vector2(0.0, 0.0)
+size_flags_horizontal = 3
 
 [node name="RestRow" type="HBoxContainer" parent="Frame/Contents"]
 mouse_passable = false
@@ -170,18 +169,6 @@ valign = 1
 autowrap = true
 text = "Heals all party members by 25%\nGrants 1 level up\nIncreases horde spawns by 20%"
 theme_override_colors = {"font_color": Color(0.957, 0.929, 0.847, 1)}
-[node name="ShortChip" type="Label" parent="Frame/Contents/RestRow/ShortCard/ShortRest"]
-anchor_left = 0.04
-anchor_top = 0.74
-anchor_right = 0.96
-anchor_bottom = 0.94
-align = 1
-valign = 1
-autowrap = true
-text = "SHORT REST GIFT: one free upgrade rank, picked on the level-up card"
-theme_override_colors = {"font_color": Color(0.62, 0.55, 0.42, 1)}
-
-
 [node name="LongCard" type="VBoxContainer" parent="Frame/Contents/RestRow"]
 mouse_passable = false
 size_flags_horizontal = 3
@@ -213,112 +200,3 @@ valign = 1
 autowrap = true
 text = "Heals all party members to full HP\nIncreases horde spawns by 20%"
 theme_override_colors = {"font_color": Color(0.957, 0.929, 0.847, 1)}
-[node name="LongChip" type="Label" parent="Frame/Contents/RestRow/LongCard/LongRest"]
-anchor_left = 0.04
-anchor_top = 0.74
-anchor_right = 0.96
-anchor_bottom = 0.94
-align = 1
-valign = 1
-autowrap = true
-text = "no level up - the fallen rise at full HP"
-theme_override_colors = {"font_color": Color(0.62, 0.55, 0.42, 1)}
-
-
-[node name="ConfirmBar" type="HBoxContainer" parent="Frame/Contents"]
-mouse_passable = false
-size_flags_horizontal = 3
-theme_override_constants = {"h_separation": 10}
-
-[node name="ConfirmHint" type="Label" parent="Frame/Contents/ConfirmBar"]
-size_flags_horizontal = 3
-text = "CLICK A REST CARD, THEN COMMIT - ENTER COMMITS, ESC STEPS BACK"
-theme_override_colors = {"font_color": Color(0.62, 0.55, 0.42, 1)}
-scale = Vector2(0.85, 0.85)
-
-[node name="Commit" type="Button" parent="Frame/Contents/ConfirmBar"]
-text = "COMMIT TO THE EMBERS"
-focus_mode = 0
-custom_minimum_size = Vector2(230.0, 46.0)
-theme_override_colors = {"font_color": Color(0.83, 0.64, 0.24, 1)}
-
-
-[node name="ConfirmModal" type="Panel" parent="."]
-theme = ExtResource("1_theme")
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-margin_left = -380.0
-margin_top = -170.0
-margin_right = 380.0
-margin_bottom = 170.0
-visible = false
-
-
-[node name="ModalContents" type="VBoxContainer" parent="ConfirmModal"]
-anchor_left = 0.0
-anchor_top = 0.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-margin_left = 30.0
-margin_top = 26.0
-margin_right = -30.0
-margin_bottom = -26.0
-theme_override_constants = {"v_separation": 14}
-
-[node name="ModalTitle" type="Label" parent="ConfirmModal/ModalContents"]
-text = "YOUR REST, IN FULL"
-theme_override_colors = {"font_color": Color(0.83, 0.64, 0.24, 1)}
-scale = Vector2(1.15, 1.15)
-
-[node name="ModalDivider" type="ColorRect" parent="ConfirmModal/ModalContents"]
-custom_minimum_size = Vector2(0.0, 2.0)
-color = Color(0.83, 0.64, 0.24, 0.5)
-
-[node name="ModalBody" type="Label" parent="ConfirmModal/ModalContents"]
-text = "..."
-autowrap = true
-size_flags_vertical = 3
-theme_override_colors = {"font_color": Color(0.957, 0.929, 0.847, 1)}
-
-[node name="ModalSpacer" type="Control" parent="ConfirmModal/ModalContents"]
-size_flags_vertical = 3
-
-[node name="Popup" type="PanelContainer" parent="ConfirmModal"]
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-margin_left = -240.0
-margin_top = -132.0
-margin_right = 240.0
-margin_bottom = -86.0
-theme_override_style_boxes = {"panel": SubResource("sb_popup")}
-[node name="PopupBody" type="Label" parent="ConfirmModal/Popup"]
-anchor_left = 0.0
-anchor_top = 0.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-align = 1
-valign = 1
-autowrap = true
-text = ""
-theme_override_colors = {"font_color": Color(0.957, 0.929, 0.847, 1)}
-
-
-[node name="ModalButtons" type="HBoxContainer" parent="ConfirmModal/ModalContents"]
-theme_override_constants = {"h_separation": 16, "v_separation": 6}
-custom_minimum_size = Vector2(0.0, 46.0)
-
-[node name="RestNow" type="Button" parent="ConfirmModal/ModalContents/ModalButtons"]
-text = "REST NOW"
-focus_mode = 0
-custom_minimum_size = Vector2(150.0, 42.0)
-theme_override_colors = {"font_color": Color(0.957, 0.929, 0.847, 1)}
-
-[node name="ChangeMind" type="Button" parent="ConfirmModal/ModalContents/ModalButtons"]
-text = "CHANGE MY MIND"
-focus_mode = 0
-custom_minimum_size = Vector2(190.0, 42.0)
-theme_override_colors = {"font_color": Color(0.62, 0.55, 0.42, 1)}
