@@ -30,6 +30,8 @@ var BAR_BG = Color(0.78, 0.70, 0.58, 1)
 @onready var btn_rest_now: Button = $ConfirmModal/ModalContents/ModalButtons/RestNow
 @onready var btn_change_mind: Button = $ConfirmModal/ModalContents/ModalButtons/ChangeMind
 @onready var subtitle: Label = $Frame/Contents/Header/TitleBlock/Subtitle
+@onready var popup: PanelContainer = $ConfirmModal/Popup
+@onready var popup_body: Label = $ConfirmModal/Popup/PopupBody
 var _selection: int = 0
 var _cards: Array[Panel] = []
 var _sb_normal: StyleBoxFlat
@@ -45,12 +47,18 @@ func _ready() -> void:
 	set_process_mode(Node.PROCESS_MODE_ALWAYS)
 	if party_data.size() == 0:
 		_seed_demo()
-	_sb_normal = _stylebox_button(Color(0.957, 0.929, 0.847, 1), Color(0.78, 0.66, 0.42, 1))
-	_sb_selected = _stylebox_button(Color(0.90, 0.74, 0.42, 1), Color(0.70, 0.52, 0.26, 1))
+	_sb_normal = _stylebox_button(Color(0.20, 0.18, 0.15, 0.94), Color(0.42, 0.34, 0.22, 1))
+	_sb_selected = _stylebox_button(Color(0.28, 0.24, 0.19, 0.96), Color(0.83, 0.64, 0.24, 1))
 	# Frame had no stylebox bound, so its dark INK labels floated on the dimmed
 	# arena and read as smeared light-on-dark noise (human-test: "impossible to
 	# read"); grimoire_theme.tres now binds PanelContainer/panel to paper
 	modal.add_theme_stylebox_override("panel", _stylebox_modal())
+	# the popup rides the modal (hide() hides it too), so it can never answer on its
+	# own; the commit + modal buttons get the same dark plates the rest cards wear
+	popup.add_theme_stylebox_override("panel", _sb_popup())
+	_popup_paint(commit, Color(0.20, 0.18, 0.15, 0.94), Color(0.42, 0.34, 0.22, 1))
+	_popup_paint(btn_rest_now, Color(0.20, 0.18, 0.15, 0.94), Color(0.42, 0.34, 0.22, 1))
+	_popup_paint(btn_change_mind, Color(0.20, 0.18, 0.15, 0.94), Color(0.42, 0.34, 0.22, 1))
 	_build()
 	_select(0)
 	subtitle.text = "%s - camp between battles" % [stage_name]
@@ -126,7 +134,7 @@ func _make_card() -> Panel:
 	accent.size_flags_vertical = 3
 	var name_l: Label = Label.new()
 	name_l.name = "Name"
-	name_l.add_theme_color_override("font_color", INK)
+	name_l.add_theme_color_override("font_color", PAPER)
 	var leader_l: Label = Label.new()
 	leader_l.name = "LeaderTag"
 	leader_l.text = "LEADER"
@@ -156,13 +164,13 @@ func _make_card() -> Panel:
 	bar_wrap.add_child(bar_bg)
 	var hp_l: Label = Label.new()
 	hp_l.name = "HPText"
-	hp_l.add_theme_color_override("font_color", INK)
+	hp_l.add_theme_color_override("font_color", PAPER)
 	var state_l: Label = Label.new()
 	state_l.name = "State"
 	state_l.add_theme_color_override("font_color", BLOOD)
 	var weapon_l: Label = Label.new()
 	weapon_l.name = "Weapon"
-	weapon_l.add_theme_color_override("font_color", INK)
+	weapon_l.add_theme_color_override("font_color", PAPER)
 	var picks_l: Label = Label.new()
 	picks_l.name = "Picks"
 	picks_l.add_theme_color_override("font_color", MUTED)
@@ -178,7 +186,7 @@ func _make_card() -> Panel:
 	return card
 func _stylebox_card() -> StyleBoxFlat:
 	var sb: StyleBoxFlat = StyleBoxFlat.new()
-	sb.bg_color = Color(0.991, 0.980, 0.941, 1)
+	sb.bg_color = Color(0.16, 0.15, 0.13, 0.94)
 	sb.border_width_left = 2
 	sb.border_width_top = 2
 	sb.border_width_right = 2
@@ -206,12 +214,12 @@ func _stylebox_button(bg: Color, border: Color) -> StyleBoxFlat:
 	return sb
 func _stylebox_modal() -> StyleBoxFlat:
 	var sb: StyleBoxFlat = StyleBoxFlat.new()
-	sb.bg_color = Color(0.966, 0.941, 0.871, 1)
+	sb.bg_color = Color(0.13, 0.12, 0.11, 0.97)
 	sb.border_width_left = 3
 	sb.border_width_top = 3
 	sb.border_width_right = 3
 	sb.border_width_bottom = 3
-	sb.border_color = Color(0.83, 0.64, 0.24, 1)
+	sb.border_color = Color(0.42, 0.34, 0.22, 1)
 	sb.corner_radius_top_left = 12
 	sb.corner_radius_top_right = 12
 	sb.corner_radius_bottom_right = 12
@@ -219,6 +227,26 @@ func _stylebox_modal() -> StyleBoxFlat:
 	sb.shadow_size = 12.0
 	sb.shadow_color = Color(0, 0, 0, 0.35)
 	return sb
+func _sb_popup() -> StyleBoxFlat:
+	var sb: StyleBoxFlat = StyleBoxFlat.new()
+	sb.bg_color = Color(0.16, 0.14, 0.12, 0.97)
+	sb.border_width_left = 2
+	sb.border_width_top = 2
+	sb.border_width_right = 2
+	sb.border_width_bottom = 2
+	sb.border_color = Color(0.83, 0.64, 0.24, 1)
+	sb.corner_radius_top_left = 6
+	sb.corner_radius_top_right = 6
+	sb.corner_radius_bottom_right = 6
+	sb.corner_radius_bottom_left = 6
+	sb.shadow_size = 8.0
+	sb.shadow_color = Color(0, 0, 0, 0.4)
+	return sb
+func _popup_paint(b: Button, bg: Color, border: Color) -> void:
+	# grimoire_theme still hands DefaultButton paper boxes, which read as bright
+	# sheets once the card goes dark: repaint all four states.
+	for st in ["normal", "hover", "pressed", "disabled"]:
+		b.add_theme_stylebox_override(st, _stylebox_button(bg, border))
 func _populate_card(card: Panel, data: Dictionary) -> void:
 	var row: HBoxContainer = card.get_node("Row") as HBoxContainer
 	var name_l: Label = row.get_node("Name") as Label
@@ -294,6 +322,9 @@ func _select(idx: int) -> void:
 	btn_short.add_theme_stylebox_override("hover", _sb_selected if _selection == 0 else _sb_normal)
 	btn_long.add_theme_stylebox_override("normal", _sb_selected if _selection == 1 else _sb_normal)
 	btn_long.add_theme_stylebox_override("hover", _sb_selected if _selection == 1 else _sb_normal)
+	# the popup question sits just above the modal's two buttons: one line per rest
+	if popup_body:
+		popup_body.text = "Are you sure you want to short rest?" if _selection == 0 else "Are you sure you want to long rest?"
 func _on_short_pressed() -> void:
 	_select(0)
 func _on_long_pressed() -> void:
@@ -306,8 +337,8 @@ func _rest_summary() -> String:
 	# human bug 2026-10-20: 4.7 autowrap did NOT constrain the modal body (it ran
 	# past the panel and off-screen), so break the lines short ourselves.
 	if _selection == 0:
-		return "Short rest - bind wounds and keep watch.\nHeals the company +25% max HP (clamped).\nOne member trains overnight: one free upgrade rank, picked on the level-up card.\nEven so, the horde scales x1.20 hp, pace and heads."
-	return "Long rest - sleep through the night.\nFull revive + full heal for the WHOLE squad - the fallen rise at full HP.\nNo free upgrade rank.\nThe horde scales the same x1.20 hp, pace and heads."
+		return "Short rest - bind wounds and keep watch.\nHeals all party members by 25% of max HP.\nGrants 1 level up: one free upgrade rank,\npicked on the level-up card.\nThe horde spawns scale +20% either way."
+	return "Long rest - sleep through the night.\nHeals all party members to full HP:\nthe fallen rise at full HP.\nNo level up.\nThe horde spawns scale +20% either way."
 func _on_rest_now() -> void:
 	# human-test pass-9 fix: the rest resolves once. The modal's Buttons keep answering
 	# picks after the card is hidden (their rects ignored hide()), so a stale click must
