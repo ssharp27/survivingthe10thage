@@ -925,3 +925,59 @@ P1 bugs: (1) boss pre-kill/softlock — no RegisterEnemy until ActivateBoss, par
 - HAND-PLAY OWED (fresh run needed, nothing here tested by hand yet): Bruno axes VISIBLE at high attack speed + actually killing, blue elite auras readable on a live field, spawn cadence no longer dips ~500 s, pause-card percent reads on a LIVE board (all five members still fit centred).
 - DEFERRED (user, review later): enemy stat scaling possibly too aggressive ~900 s - no change this lap (round-14 law holds).
 - Next fresh seat valve **PD242** on mirror `copyPD_qa3` (bare valves `M1_PILOT=1 M1_TIMEWARP=8`); MIRROR LAW: re-feed src + bin dll/pdb FRESH every lap (GDScript never travels with the mirror - sync manually).
+
+
+## ROUND-17 LEDGER (2026-11-28)
+
+- FRESH VALVE: PD242 on mirror copyPD_qa3. Lap = ONE pass, one fresh valve, landed BEFORE the
+  round-18 queue. Expect timedOut=True rc=1, err 0 B.
+- RE-FED MIRROR this lap (mirror law): 7 C# files (Game / PartyMember / Pickup / Director / Enemy /
+  Combatant / Boss) + art/fx 54 files + bin dll/pdb refreshed from the fresh dotnetoutPD14 build;
+  "runtime dll now equal fresh: True". PauseMenu.gd synced MANUALLY (GD never travels with the
+  mirror build), 34323 bytes verified equal.
+- HAND-PLAY BUG 1 (Martha froze near Hew while bodies pressed on her): the hunt-gate prey census
+  measured prey distance FROM HEW only - a body inside MARTHA's own bite band but past Hew's ring
+  could never become prey, and nothing else in the lap nudges a rider that close, so she parked at
+  her seat. FIX: the gate now passes when a body is inside Hew's reach OR Martha's own bite band
+  (mband via WrapDelta, tb = hitR + MARTHA_RADIUS * _marthaRad, same band the chomp uses). ROUND-13
+  ring law kept as the first term.
+- HAND-PLAY BUG 2 (Bruno's crescent axes stayed stuck mid-air after the volley): the crescent hide
+  sweep sat INSIDE the _fxT commit-flash decay block, so once that clock had expired a finishing
+  record never got hidden again and its art slots stayed painted at the last flight point. FIX:
+  per-record hide of _cresFx[vi*CRESCENT_ART .. +4] at the volley-done line (_cresDur[vi] = 0):
+  the boomerang home + catch bite already paid, and every OTHER live record keeps its own slots.
+  Re-light paths (throw start + flight) restore slots on the next volley - verified.
+- HAND-PLAY BUG 3 (after a map wrap, "projectiles and drops stuck in a line"): the camera lerps to
+  the leader at 0.08/frame, so a leader wrap slides it ~2400 px while UNFOLDED movers lag at the
+  old seam. Root-caused the three unfolded movers: volley bolts (UpdateBullets raw move), party
+  shots (UpdateShots raw move), cog FX drops (DropCogFx spawned UNfolded; UpdateCogFx falls via
+  local Position only). FIX: fold AFTER the move (WrapNearCamera(pos + vel*delta)) with the parked
+  -8000 guards skipping first; cog anchor folded at spawn AND per frame (free -9000 sentinels
+  skipped via _cogLife). Skip list kept honest: puffs (0.30 s), cinder (0.16 s), chain FX too short
+  to read a seam. Splice law applied: ONE lines[] element PER LINE (no embedded \r in one element).
+- PAUSE CARD (Multistrike row read a bare "1"): the row moved to the CHANCE rail - multi =
+  multiChance + (assT > 0 ? 0.25 : 0), copied from the RollDamage msChance draw (PartyMember.cs
+  ~2206), printed plain N% via _pct_plain like crit chance / evasion. The old source was Strikes()
+  (whole-repeat COUNT, Game.cs PauseCard) - the chance is the honest, actionable number. NOT a +N%
+  (nobody took an increase) and NOT the strike count.
+- FEATURE (red elite halo on mini-bosses/bosses): ZERO new art - the Enemy.cs elite halo rail
+  CLONED into Boss.cs: one copy of the boss's OWN canvas, ZIndex -1, BOSS_HALO_PAD 1.18f (same
+  depth as ELITE_HALO_PAD), pulse twin of the blue (0.35, 0.55, 1.6) -> RED (1.6, 0.35, 0.35) with
+  the round-16 alpha floor 0.58 breath, _haloT clock, mirrors with the always-face law (_bFace).
+  Visual only: hitbox stays the boss node; all kinds (mini1 / boss1 / mini2 / final / legacy mini)
+  carry the mark. The eight red rim copies stay as they were.
+- LEVEL / XP QUESTION (user: does leveling cap?): NO cap exists - _level++ is unbounded and
+  _xpNext = 5.0 + _level * 4.0 keeps growing; each level is a flat +0.5 weapon damage. When EVERY
+  weapon rank is already capped the picker prints "EVERY RANK CAPPED - xp banked (evolutions are
+  M2 content)" and banks the XP (_pickerNoticeT = 4.0). So XP keeps flowing, levels keep rising,
+  and past-capped levels stop granting weapon ranks - the only dead-end is rank caps, not a level
+  ceiling.
+- LAWS RE-AFFIRMED: no enemy-speed changes; tier-1 fodder flat; elites 2.5% + tier-1 veto + elite
+  halo visual-only; pause-card rows live / hover / armour hidden when zero / range 0 melee still
+  shown; nothing freezes in-game (pause is UI-only). The "elite form/kind axis" law does NOT exist
+  in this repo (no src/Elite.cs) - inapplicable; the real elite lane is Enemy.cs (elite flag L44,
+  ELITE_CH 0.025, halo fields/pulse). No invented "measured" evidence in comments: symptom report +
+  reasoning only.
+- BUILD: exit 0, EXACTLY the 5 baseline warns (3x CS0618 godot_mcp docks, CS0414 SEL_RING_PAD,
+  CS0414 CRESCENT_FLOOR). GD fast gate: err 0 B.
+- NEXT VALVE: PD243 (fresh valve, fresh mirror re-feed required again).
