@@ -981,3 +981,98 @@ P1 bugs: (1) boss pre-kill/softlock — no RegisterEnemy until ActivateBoss, par
 - BUILD: exit 0, EXACTLY the 5 baseline warns (3x CS0618 godot_mcp docks, CS0414 SEL_RING_PAD,
   CS0414 CRESCENT_FLOOR). GD fast gate: err 0 B.
 - NEXT VALVE: PD243 (fresh valve, fresh mirror re-feed required again).
+
+## ROUND-18 LEDGER (2026-11-28)
+- FRESH VALVE: PD243 on mirror copyPD_qa3 (bare valves M1_PILOT=1 M1_TIMEWARP=8). Lap = ONE pass,
+  one fresh valve, landed BEFORE the round-19 queue. Result: timedOut=True rc=1, err 0 B, out
+  36,388 B / 544 lines (544 lines, 0 ERROR/SCRIPT ERROR/FATAL/assert/Exception suspects in out).
+  The out drop vs PD242 (203,694 B) is EXPLAINED BY THE LOG, not a fault: this march reached a
+  TPK - 'TPK - the whole party is down | level 11 | xp total 289' then 'run summary up - press
+  R to retry the stage' - so the sim stopped writing and the process idled to the ~1500 s wall.
+  err stayed 0 B, which is the standing clean signal; no playtest window claimed (seed knobs
+  dead), the TPK is a sim outcome, not a hand-play negative.
+- RE-FED MIRROR this lap (mirror law): 7 C# files (Game / PartyMember / Pickup / Director /
+  Enemy / Combatant / Boss) + art/fx 54 files + bin dll/pdb refreshed from the fresh dotnetout
+  build; "runtime dll now equal fresh: True". GD synced MANUALLY (GD never travels with the
+  mirror build): PauseMenu.gd 34323 B, Campfire.gd 19549 B, Campfire.tscn 10196 B - all
+  verified byte-equal to the worktree (sha1 Campfire.gd 2663b0c8e4aa8132, Campfire.tscn
+  5c9fbee75494e48e).
+- CAMP FIRE REWORK (user: "copy what we have for the pause screen currently"): the camp card
+  moved to the PAUSE SCREEN's vocabulary. Frame plate Color(0.13, 0.12, 0.11, 0.94) + border
+  Color(0.42, 0.34, 0.22, 1) radius 8 (sub_resource sb_frame); Wash/Veil veil Color(0.06,
+  0.05, 0.045, 0.55) behind; roster card labels INK -> PAPER Color(0.957, 0.929, 0.847, 1)
+  (Name / HPText / Weapon); _stylebox_card() dark Color(0.16, 0.15, 0.13, 0.94); _stylebox_modal()
+  dark Color(0.13, 0.12, 0.11, 0.97) + Color(0.42, 0.34, 0.22, 1) border. Root cause of the old
+  unreadable camp (human-test: "impossible to read"): the Frame had NO stylebox, so dark INK
+  labels floated on the dimmed arena. The blur still rides PauseMenu.gd's RUNTIME route
+  (_paint_blur() builds Blur ColorRect + ShaderMaterial.new() loading res://ui/pause_blur.gdshader)
+  - verified 0 ShaderMaterial mentions in any ui/*.tscn.
+- LONG-REST COLOURS ON BOTH REST BUTTONS (user: the short-rest colours are "impossible to
+  read", paint both like the long rest): FACT CHECK first - both Buttons already share
+  IDENTICAL styleboxes (_sb_normal / _sb_selected); the only short-vs-long difference was the
+  child Labels (ShortChip sage Color(0.34, 0.48, 0.30, 1) vs LongChip Color(0.62, 0.20, 0.20, 1)
+  over the same Body Color(0.42, 0.35, 0.26, 1) at scale 0.75). READING TAKEN: ONE identical
+  high-contrast treatment on BOTH rest buttons - GOLD Color(0.83, 0.64, 0.24, 1) Title, PAPER/CREAM
+  Color(0.957, 0.929, 0.847, 1) Body, SOFT Color(0.62, 0.55, 0.42, 1) chip, on the dark plate.
+  If the user meant the opposite pairing, say so and it is a two-line flip.
+- REST BUTTON COPY (verbatim, user text): Short = "Heals all party members by 25%" / "Grants 1
+  level up" / "Increases horde spawns by 20%"; Long = "Heals all party members to full HP" /
+  "Increases horde spawns by 20%". Buttons now carry text = "" with child Title / Body / Chip
+  Labels using align = 1 + valign = 1 so the copy CENTRES inside each button - 4.7 Button.text
+  gives no centring control we can use, and the repo's tscn dialect has no font-size overrides
+  (only scale), so the child-Label route is the honest one.
+- CONFIRM POPUP (small, just above the two modal buttons): PanelContainer Popup is a CHILD OF
+  ConfirmModal, so it rides the modal - modal.hide() hides it too and it can never answer on its
+  own (no popup.hide()/show() needed, and none added). Geometry verified from the pristine blob:
+  the modal is 760x340 centred (margins +/-380, +/-170), ModalContents insets 30/26, and the
+  ModalButtons row occupies modal bottom -26..-72; the Popup therefore uses anchor_* = 0.5/1.0
+  with margin_left -240 / margin_top -132 / margin_right 240 / margin_bottom -86 = 480x46 sitting
+  6 px above the buttons. StyleBox in the tscn (sb_popup: dark Color(0.16, 0.14, 0.12, 0.97) +
+  GOLD border, radius 6). PopupBody Label has text = "" and GD fills it: "Are you sure you want
+  to short rest?" / "Are you sure you want to long rest?" (verbatim ask form).
+- COMMIT / REST NOW / CHANGE MY MIND: dark plates via new GD _popup_paint(b, bg, border) looping
+  ["normal", "hover", "pressed", "disabled"] - grimoire_theme.tres still hands DefaultButton
+  PAPER boxes (Color(0.957, 0.929, 0.847, 1)), which read as bright sheets once the card went
+  dark. Rest buttons keep _sb_normal/_sb_selected so the selection state still paints.
+- TSCN VOCABULARY LESSON (cost this lap, fixed before ship): the spliced stylebox subresources
+  first shipped type="StyleBox" + corner_radius_tl / draw_begin / anti_antialiasing /
+  content_scale_factor, which is NOT this repo's dialect. grimoire_theme.tres writes StyleBoxFlat
+  with INT border widths + corner_radius_top_left/top_right/bottom_right/bottom_left. Repaired
+  byte-level (repairCampTscnPD18.py: 328 -> 324 lines) and load_steps corrected 4 -> 5 = 2 ext
+  + 2 sub + 1. chkCampPD.py now shows both subresources as StyleBoxFlat and 0 rejected leftovers.
+- JUDGMENT CALL SURFACED (user wording vs game truth): the buttons print the user's copy
+  VERBATIM ("Grants 1 level up"), but the game actually grants ONE FREE UPGRADE RANK picked on
+  the level-up card (Game.cs "SHORT REST GIFT" picker card, ~L8091) - not an XP level. The modal
+  summary reconciles it: "Grants 1 level up: one free upgrade rank, picked on the level-up card."
+  and the short chip says "SHORT REST GIFT: one free upgrade rank, picked on the level-up card";
+  the long chip says "no level up - the fallen rise at full HP". Flip the button copy if the
+  truthful form is wanted instead.
+- LAWS RE-AFFIRMED: hand-play negatives are bugs to fix before further rounds; no PNG assets ever;
+  never claim measured playtest windows (seed knobs dead); no invented "measured" evidence in
+  comments - symptom report + reasoning only; nothing freezes in-game (pause is UI-only); no
+  enemy-speed changes; tier-1 fodder flat; elites 2.5% + tier-1 veto; elite halo visual-only;
+  pause-card rows live / hover / armour hidden when zero / range 0 melee still shown; Multistrike
+  row = chance rail plain N%. CAMP LAWS KEPT INTACT (all verified present): set_process_mode
+  (Node.PROCESS_MODE_ALWAYS), hidden-card input guard "if not visible: return", modal re-click
+  guard "if not modal.visible: return", ENTER-only confirm (SPACE = leader dash), _was_click_on
+  multi-space hit test (5 uses), modal body short hand-broken lines (4.7 autowrap does NOT
+  constrain the modal body), card.modulate away 0.45 / out 0.55.
+- 4.7 REJECTS RESPECTED: no @/, no String.pad_start, no bare/qualified AUTOWRAP_WORD_SMART (numeric
+  2 only), no clip_behavior, no mouse_pass_through, no Control.pause_picking; tscn keys arbitrated
+  from the repo's own files: margin_* (never offset_*), mouse_passable = false (never mouse_filter),
+  align = 1 / valign = 1 (never horizontal_alignment).
+- ALERT-DIALOG note (user saw the popup this lap): the console exe raised the KNOWN ALERT for the
+  --check --script res://ui/Campfire.gd probe - the dialog text was the known CLEAN line "Can't
+  load the script ... as it doesn't inherit from SceneTree or MainLoop" (Campfire.gd extends
+  CanvasLayer). Probe side-effect ONLY: it never touches a running game, dismissing with OK is
+  harmless, and the valve runs are --headless so they raise no dialogs. GD fast gate err stayed
+  138 B = that one line.
+- BUILD: exit 0, EXACTLY the 5 baseline warns (3x CS0618 godot_mcp docks, CS0414 SEL_RING_PAD,
+  CS0414 CRESCENT_FLOOR). UI-only lap: no C# changed, so the second dotnet pass reported 0 Warnings
+  / 0 Errors on the up-to-date tree - the 5 baseline warns are unchanged from the full build.
+- HAND-PLAY OWED (camp screen, fresh run - nothing tested by hand this lap): popup sits above the
+  two modal buttons and is legible, both rest buttons read equally well, the centred copy stays
+  inside the buttons at 0.75 scale, the dark camp frame + roster cards read over a LIVE board, and
+  ENTER still commits / ESC still steps back.
+- NEXT VALVE: PD244 (fresh valve, fresh mirror re-feed required again - sync Campfire.gd +
+  Campfire.tscn MANUALLY into the mirror).
